@@ -91,7 +91,9 @@ if __name__ == "__main__":
     # print(wallet.eth_key('myfakephrase').PrivateKey().Raw().ToHex())
     # print(wallet.avax_key('myfakephrase').PrivateKey().Raw().ToHex())
 
-    typos = Typos(best_guess, max_edit_distance=2)
+    # If false, uses uppercase instead of lowercase letters
+    lowercase = True
+    typos = Typos(best_guess, max_edit_distance=2, lowercase=lowercase)
 
     # print(guess_eth_address(typos, wallet, expected_eth_address))
     print(guess_avaxp_address(typos, wallet, expected_avaxp_address))
