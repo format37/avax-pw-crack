@@ -77,11 +77,11 @@ def guess_avaxp_address(inputs: Iterable[str], wallet: Wallet, target_address: s
 
 
 if __name__ == "__main__":
-    mnemonic = "mixed snap before near whale there silent behave inform sight output keep ability bind target engage chief month axis belt bicycle timber slam glow"
+    mnemonic = "Forum cloud autumn carry build dove image series like general tribe glove alone saddle eager verb width envelope absurd need wool faith garlic quit"
     # myfakephrase is the actual password.
-    best_guess = "myfakephraze"
+    best_guess = "MONEY"
     expected_eth_address = '0xdc22f43BEFeb27E5B8185Ae6d336b41295998526'
-    expected_avaxp_address = 'P-avax1kp9uggwxkqhygljkpr0cls378sqwrxfw55qcka'
+    expected_avaxp_address = 'P-avax12tua7tqjntsgyz4dgjvqggy0pj4kst2zwmy2u9'
 
     wallet = Wallet(mnemonic)
 
