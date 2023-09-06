@@ -1,12 +1,12 @@
 import hashlib
 from typing import Iterable, Optional, List
-
 from bip_utils import (
     Bip39MnemonicValidator,
     Bip39SeedGenerator, Bip32Slip10Secp256k1, Bip32KeyIndex, Bech32Encoder,
 )
-
 from typos import Typos
+from Crypto.Hash import RIPEMD160
+import json
 
 
 class Wallet(object):
@@ -27,13 +27,23 @@ class Wallet(object):
         return child
 
 
-def child_to_avaxp_address(child) -> str:
+"""def child_to_avaxp_address(child) -> str:
     m = hashlib.sha256()
     m.update(child.PublicKey().RawCompressed().ToBytes())
 
     n = hashlib.new('ripemd160')
     n.update(m.digest())
 
+    b32_encoded = Bech32Encoder().Encode('avax', n.digest())
+    return f'P-{b32_encoded}'"""
+
+def child_to_avaxp_address(child) -> str:
+    m = hashlib.sha256()
+    m.update(child.PublicKey().RawCompressed().ToBytes())
+    
+    n = RIPEMD160.new()
+    n.update(m.digest())
+    
     b32_encoded = Bech32Encoder().Encode('avax', n.digest())
     return f'P-{b32_encoded}'
 
@@ -60,19 +70,15 @@ def guess_avaxp_address(inputs: Iterable[str], wallet: Wallet, target_addresses:
 
 
 if __name__ == "__main__":
-    mnemonic = "insert mnemonic here"
-    best_guess = "guess"
+    # Read configuration file
+    with open('config.json') as json_file:
+        data = json.load(json_file)
+        mnemonic = data['mnemonic']
+        best_guess = data['passphrase']
+        p_chain_address = data['p_chain_address']
+
     expected_avaxp_addresses = [
-        'P-avax1',
-        'P-avax1',
-	    'P-avax1',
-	    'P-avax1',
-	    'P-avax1',
-	    'P-avax1',
-	    'P-avax1',
-	    'P-avax1',
-	    'P-avax1',
-	    'P-avax1',
+        p_chain_address
     ]
 
     wallet = Wallet(mnemonic)

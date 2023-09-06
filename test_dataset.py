@@ -5,6 +5,7 @@ from bip_utils import (
 )
 from mnemonic import Mnemonic
 from Crypto.Hash import RIPEMD160
+import json
 
 
 # your other methods (e.g., child_to_avaxp_address) here...
@@ -54,17 +55,6 @@ def generate_single_avax_address(passphrase: str, wallet: Wallet) -> str:
     return child_to_avaxp_address(base_child.ChildKey(0))
 
 
-"""def child_to_avaxp_address(child) -> str:
-    m = hashlib.sha256()
-    m.update(child.PublicKey().RawCompressed().ToBytes())
-
-    n = hashlib.new('ripemd160')
-    n.update(m.digest())
-
-    b32_encoded = Bech32Encoder().Encode('avax', n.digest())
-    return f'P-{b32_encoded}'"""
-
-
 def child_to_avaxp_address(child) -> str:
     m = hashlib.sha256()
     m.update(child.PublicKey().RawCompressed().ToBytes())
@@ -76,13 +66,24 @@ def child_to_avaxp_address(child) -> str:
     return f'P-{b32_encoded}'
 
 
+def save_configuration(mnemonic_24_str, passphrase, p_chain_address):
+    # Save to JSON file
+    data = {
+        'mnemonic': mnemonic_24_str,
+        'passphrase': passphrase,
+        'p_chain_address': p_chain_address
+    }
+    with open('config.json', 'w') as f:
+        json.dump(data, f)
+
+
 def main():
     mnemonic_24_str = generate_mnemonic_phrase()
     print('mnemonic:\n"'+mnemonic_24_str+'"\n')
 
     # Mnemonic generation and passphrase
     mnemonic = mnemonic_24_str
-    passphrase = 'TESTPASSPHRASE'
+    passphrase = 'TESTPHRASE'
 
     # Wallet and p-chain address generation
     wallet = Wallet(mnemonic)
@@ -90,6 +91,11 @@ def main():
     p_chain_address = generate_single_avax_address(passphrase, wallet)
 
     print("Generated p-chain address:\n", p_chain_address)
+
+    # Save configuration to JSON file
+    save_configuration(mnemonic_24_str, passphrase, p_chain_address)
+
+    print("Configuration saved to config.json")
 
 
 if __name__ == "__main__":
