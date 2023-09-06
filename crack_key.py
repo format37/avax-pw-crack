@@ -27,16 +27,6 @@ class Wallet(object):
         return child
 
 
-"""def child_to_avaxp_address(child) -> str:
-    m = hashlib.sha256()
-    m.update(child.PublicKey().RawCompressed().ToBytes())
-
-    n = hashlib.new('ripemd160')
-    n.update(m.digest())
-
-    b32_encoded = Bech32Encoder().Encode('avax', n.digest())
-    return f'P-{b32_encoded}'"""
-
 def child_to_avaxp_address(child) -> str:
     m = hashlib.sha256()
     m.update(child.PublicKey().RawCompressed().ToBytes())
@@ -59,13 +49,17 @@ def generate_10_avax_addresses(passphrase: str, wallet: Wallet) -> List[str]:
 
 
 def guess_avaxp_address(inputs: Iterable[str], wallet: Wallet, target_addresses: list) -> Optional[str]:
+    counter = 0
     for test_passphrase in inputs:
         computed_addresses = generate_10_avax_addresses(test_passphrase, wallet)
 
         # Check for any matches between the computed addresses and target addresses
         for address in computed_addresses:
             if address in target_addresses:
+                print(f'Tried {counter} passphrases, found a match: {test_passphrase}')
                 return test_passphrase
+        counter += 1
+    print(f'Tried {counter} passphrases, no matches found.')
     return None
 
 
