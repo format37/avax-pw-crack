@@ -1,2 +1,4 @@
 bip_utils
 web3
+mnemonic
+pycryptodome
