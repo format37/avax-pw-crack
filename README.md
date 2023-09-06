@@ -37,3 +37,6 @@ This could take a very long time to run. If your guess is bad, or you have the w
 
 Python is single threaded, but if you have multiple guesses, you can run them in parallel.
 Just copy/paste the script and make sure each includes the guess you want to try.
+
+### Test dataset
+english.txt is a list of passphrase words, that has been downloaded from [bip-0039](https://raw.githubusercontent.com/bitcoin/bips/master/bip-0039/english.txt)  
