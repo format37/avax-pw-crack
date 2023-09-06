@@ -39,7 +39,7 @@ def child_to_avaxp_address(child) -> str:
 
 
 def generate_10_avax_addresses(passphrase: str, wallet: Wallet) -> List[str]:
-    """Generate 10 AVAX addresses for the given passphrase."""
+    """Generate 10 AVAX addresses for the given passphrase.""" 
     addresses = []
     base_child = wallet.avax_key(passphrase)
     for i in range(10):
