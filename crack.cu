@@ -1,6 +1,10 @@
 // __constant__ char d_lines[5010 * 45];
 
-__global__ void my_kernel(char* d_lines_global) {
+__global__ void my_kernel(
+    char* computed_addresses,
+    char* passphrases
+    ) 
+    {
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
     if (idx < 5010) {
         // Access the global memory here, e.g., d_lines_global[idx * 45]

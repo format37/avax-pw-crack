@@ -51,11 +51,18 @@ def generate_10_avax_addresses(passphrase: str, wallet: Wallet) -> List[str]:
 def guess_avaxp_address(inputs: Iterable[str], wallet: Wallet, target_addresses: list) -> Optional[str]:
     counter = 0
     for test_passphrase in inputs:
+        if len(test_passphrase) != 10:
+            continue
         computed_addresses = generate_10_avax_addresses(test_passphrase, wallet)
+        # Format with 3 signs, using leading zeros
+        counter_formatted = f'{counter:03}'
         # Save the computed addresses to a file
-        """with open(f'data_1/computed_addresses{counter}.txt', 'a', encoding='utf-8') as f:
+        with open(f'data_0/computed_addresses{counter_formatted}.txt', 'a', encoding='utf-8') as f:
             for address in computed_addresses:
-                f.write(f'{address}\n')"""
+                f.write(f'{address}\n')
+        # Save the passphrase to a file
+        with open(f'data_0/passphrases{counter_formatted}.txt', 'a', encoding='utf-8') as f:
+            f.write(f'{test_passphrase}\n')
 
         # Check for any matches between the computed addresses and target addresses
         for address in computed_addresses:
@@ -75,8 +82,10 @@ if __name__ == "__main__":
         best_guess = data['passphrase']
         p_chain_address = data['p_chain_address']
 
+    # p_chain_address and fake p_chain_address
     expected_avaxp_addresses = [
-        p_chain_address
+        p_chain_address,
+        p_chain_address.replace('P-', 'Z-'),
     ]
 
     wallet = Wallet(mnemonic)
