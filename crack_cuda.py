@@ -62,10 +62,19 @@ class CudaProcessor:
                     count += 1
                     if count >= N:
                         break
+        # print last h_lines
         self.passphrases_gpu = gpuarray.to_gpu(h_lines)
 
         # target_addresses
-        self.target_addresses_gpu = gpuarray.to_gpu(np.array(self.target_addresses, dtype='S1'))
+        # print('target_addresses:')
+        # print(np.array(self.target_addresses, dtype='S1').shape)
+        # self.target_addresses_gpu = gpuarray.to_gpu(np.array(self.target_addresses, dtype='S1'))
+        N = len(self.target_addresses)
+        LINE_LENGTH = 45  # or whatever the length should be
+        h_target_addresses = np.empty((N, LINE_LENGTH), dtype='S1')
+        for idx, address in enumerate(self.target_addresses):
+            h_target_addresses[idx] = list(address.ljust(LINE_LENGTH, '\0'))  # null-padding if needed
+        self.target_addresses_gpu = gpuarray.to_gpu(h_target_addresses)
 
         # result
         self.result_gpu = gpuarray.to_gpu(np.array(list(self.result), dtype='S1'))
@@ -101,11 +110,13 @@ def main():
         best_guess = data['passphrase']
         p_chain_address = data['p_chain_address']
 
-    # p_chain_address and fake p_chain_address
+    # p_chain_address from config and manual p_chain_address
     target_addresses = [
         p_chain_address,
-        p_chain_address.replace('P-', 'Z-'),
+        'P-avax1lzvtzylmaap8z65r7r7dqe45mqd44zgztxucc9',
     ]
+    # Print target_addresses
+    # print('target_addresses', target_addresses)
 
     processor = CudaProcessor(target_addresses)
     # While mnemonic and passphrase are not implemented in CUDA yet,

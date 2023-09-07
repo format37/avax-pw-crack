@@ -68,6 +68,7 @@ def guess_avaxp_address(inputs: Iterable[str], wallet: Wallet, target_addresses:
         for address in computed_addresses:
             if address in target_addresses:
                 print(f'Tried {counter} passphrases, found a match: {test_passphrase}')                
+                print('counter_formatted', counter_formatted)
                 return test_passphrase
         counter += 1
     print(f'Tried {counter} passphrases, no matches found.')
