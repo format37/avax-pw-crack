@@ -53,9 +53,9 @@ def guess_avaxp_address(inputs: Iterable[str], wallet: Wallet, target_addresses:
     for test_passphrase in inputs:
         computed_addresses = generate_10_avax_addresses(test_passphrase, wallet)
         # Save the computed addresses to a file
-        with open(f'data_1/computed_addresses{counter}.txt', 'a', encoding='utf-8') as f:
+        """with open(f'data_1/computed_addresses{counter}.txt', 'a', encoding='utf-8') as f:
             for address in computed_addresses:
-                f.write(f'{address}\n')
+                f.write(f'{address}\n')"""
 
         # Check for any matches between the computed addresses and target addresses
         for address in computed_addresses:

@@ -48,3 +48,8 @@ python3 test_dataset.py
 sh profile.sh
 sh report.sh
 ```
+#### conda cuda installation
+```
+conda install -c conda-forge pycuda 
+sudo apt install nvidia-cuda-toolkit
+```

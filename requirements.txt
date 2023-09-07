@@ -3,3 +3,4 @@ web3
 mnemonic
 pycryptodome
 snakeviz
+pycuda
