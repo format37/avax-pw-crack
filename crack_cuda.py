@@ -66,9 +66,6 @@ class CudaProcessor:
         self.passphrases_gpu = gpuarray.to_gpu(h_lines)
 
         # target_addresses
-        # print('target_addresses:')
-        # print(np.array(self.target_addresses, dtype='S1').shape)
-        # self.target_addresses_gpu = gpuarray.to_gpu(np.array(self.target_addresses, dtype='S1'))
         N = len(self.target_addresses)
         LINE_LENGTH = 45  # or whatever the length should be
         h_target_addresses = np.empty((N, LINE_LENGTH), dtype='S1')
@@ -115,8 +112,6 @@ def main():
         p_chain_address,
         'P-avax1lzvtzylmaap8z65r7r7dqe45mqd44zgztxucc9',
     ]
-    # Print target_addresses
-    # print('target_addresses', target_addresses)
 
     processor = CudaProcessor(target_addresses)
     # While mnemonic and passphrase are not implemented in CUDA yet,
