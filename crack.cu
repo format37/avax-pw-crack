@@ -1,13 +1,30 @@
-// __constant__ char d_lines[5010 * 45];
+__device__ int string_compare(const char* str1, const char* str2, int length) {
+    for (int i = 0; i < length; i++) {
+        if (str1[i] != str2[i]) {
+            return 0;
+        }
+    }
+    return 1;
+}
 
 __global__ void my_kernel(
     char* computed_addresses,
-    char* passphrases
+    char* passphrases,
+    char* target_addresses,
+    char* result
     ) 
     {
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
-    if (idx < 5010) {
-        // Access the global memory here, e.g., d_lines_global[idx * 45]
+    if (idx < 2310) {
+        // Access the global memory here, e.g., 
+        // computed_addresses[idx * 45]
+        // passphrases[idx * 10]
+    }
+    if (idx == 0) {
+        const char str[] = "TESTPHRASX";
+        for (int i = 0; i < 10; i++) {
+            result[i] = str[i];
+        }
     }
 }
 
