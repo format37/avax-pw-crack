@@ -50,6 +50,9 @@ sh report.sh
 ```
 #### conda cuda installation
 ```
-conda install -c conda-forge pycuda 
+conda install -c conda-forge pycuda
 sudo apt install nvidia-cuda-toolkit
 ```
+#### crypto sources & docs
+[crypto-cuda](https://github.com/peihongch/crypto-cuda/)
+[bip-0039](https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki)
