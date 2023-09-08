@@ -11,22 +11,23 @@ __global__ void my_kernel(
     char* computed_addresses,
     char* passphrases,
     char* target_addresses,
+    unsigned char target_addresses_count,
     char* result
     ) 
     {
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
     int LINE_LENGTH_ADDR = 45;
     int LINE_LENGTH_PASS = 10;
+    int passphrase_idx = idx / 10;
     if (idx < 2310) {
-        for (int target_idx = 0; target_idx < 2; target_idx++) { // TODO: Set count of target addresses
+        for (int target_idx = 0; target_idx < target_addresses_count; target_idx++) {
             // Compare the computed address with the target address
             if (string_compare(&computed_addresses[idx * LINE_LENGTH_ADDR], &target_addresses[target_idx * LINE_LENGTH_ADDR], LINE_LENGTH_ADDR)) {
-                // Print that match was found at idx
-                printf("CUDA: Match found at idx %d\n", idx);
-                // Match found, set the result to the corresponding passphrase
+                // Print that match was found for idx, phrase, and target
+                printf("Match found for idx %d, phrase %d, and target %d\n", idx, passphrase_idx, target_idx);
                 for (int i = 0; i < LINE_LENGTH_PASS; i++) {
-                    result[i] = passphrases[idx + i];
-                }                
+                    result[i] = passphrases[passphrase_idx * LINE_LENGTH_PASS + i];
+                }
             }
         }
     }
