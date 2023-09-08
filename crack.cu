@@ -8,6 +8,7 @@ __device__ int string_compare(const char* str1, const char* str2, int length) {
 }
 
 __global__ void my_kernel(
+    char* mnemonic,
     char* computed_addresses,
     char* passphrases,
     char* target_addresses,
@@ -19,7 +20,22 @@ __global__ void my_kernel(
     int LINE_LENGTH_ADDR = 45;
     int LINE_LENGTH_PASS = 10;
     int passphrase_idx = idx / 10;
-    if (idx < 2310) {
+    // Define the test_passphrase of length 10
+    char test_passphrase[10];
+    if (idx < 2310 && idx == 2200) {
+        
+        // === Bip39SeedGenerator ===
+        // Fill the test_passphrase with the current passphrase
+        for (int i = 0; i < LINE_LENGTH_PASS; i++) {
+            test_passphrase[i] = passphrases[passphrase_idx * LINE_LENGTH_PASS + i];
+        }
+        // print the test_passphrase
+        printf("test_passphrase: ");
+        for (int i = 0; i < LINE_LENGTH_PASS; i++) {
+            printf("%c", test_passphrase[i]);
+        }
+
+
         for (int target_idx = 0; target_idx < target_addresses_count; target_idx++) {
             // Compare the computed address with the target address
             if (string_compare(&computed_addresses[idx * LINE_LENGTH_ADDR], &target_addresses[target_idx * LINE_LENGTH_ADDR], LINE_LENGTH_ADDR)) {

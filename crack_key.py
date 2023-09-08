@@ -7,7 +7,7 @@ from bip_utils import (
 from typos import Typos
 from Crypto.Hash import RIPEMD160
 import json
-
+import os
 
 class Wallet(object):
     def __init__(self, mnemonic: str):
@@ -15,7 +15,9 @@ class Wallet(object):
         self.seed_generator = Bip39SeedGenerator(mnemonic)
 
     def avax_key(self, passphrase: str):
+        print('passphrase', passphrase)
         seed_bytes = self.seed_generator.Generate(passphrase)
+        print('seed_bytes', seed_bytes)
         master = Bip32Slip10Secp256k1.FromSeed(seed_bytes)
 
         # m/44'/9000'/0'
@@ -24,6 +26,7 @@ class Wallet(object):
                  .ChildKey(Bip32KeyIndex.HardenIndex(9000))
                  .ChildKey(Bip32KeyIndex.HardenIndex(0))
                  .ChildKey(0))
+        print('base_child', child_to_avaxp_address(child.ChildKey(0)))
         return child
 
 
@@ -42,6 +45,8 @@ def generate_10_avax_addresses(passphrase: str, wallet: Wallet) -> List[str]:
     """Generate 10 AVAX addresses for the given passphrase.""" 
     addresses = []
     base_child = wallet.avax_key(passphrase)
+    # print('base_child', child_to_avaxp_address(base_child.ChildKey(0)))
+    exit()
     for i in range(10):
         child = base_child.ChildKey(i)  # Iterate over the last index to generate 10 keys
         addresses.append(child_to_avaxp_address(child))
@@ -76,6 +81,10 @@ def guess_avaxp_address(inputs: Iterable[str], wallet: Wallet, target_addresses:
 
 
 if __name__ == "__main__":
+    # Remove all files in 'data_0' directory
+    for filename in os.listdir('data_0'):
+        os.remove(os.path.join('data_0', filename))
+
     # Read configuration file
     with open('config.json') as json_file:
         data = json.load(json_file)
