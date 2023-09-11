@@ -12,5 +12,8 @@ passphrase = 'TESTPHRASG'
 seed_generator = Bip39SeedGenerator(mnemonic)
 seed_bytes = seed_generator.Generate(passphrase)
 
-print(len(seed_bytes))
-print(seed_bytes)
+print('len:', len(seed_bytes))
+print('seed_bytes:', seed_bytes)
+# Convert from bytes to number
+seed_num = int.from_bytes(seed_bytes, byteorder='big')
+print('seed_num:', seed_num)
