@@ -46,7 +46,7 @@ def generate_10_avax_addresses(passphrase: str, wallet: Wallet) -> List[str]:
     addresses = []
     base_child = wallet.avax_key(passphrase)
     # print('base_child', child_to_avaxp_address(base_child.ChildKey(0)))
-    exit()
+    # exit()
     for i in range(10):
         child = base_child.ChildKey(i)  # Iterate over the last index to generate 10 keys
         addresses.append(child_to_avaxp_address(child))

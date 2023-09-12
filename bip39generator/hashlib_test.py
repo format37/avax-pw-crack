@@ -14,8 +14,8 @@ salt = AlgoUtils.Encode(salt)
 print('# salt:', salt)
 itr_num = 2048
 dklen = 64
-# result = hashlib.pbkdf2_hmac("sha512", password, salt, itr_num, dklen)
-result = hashlib.pbkdf2_hmac("sha256", password, salt, itr_num, dklen)
+result = hashlib.pbkdf2_hmac("sha512", password, salt, itr_num, dklen)
+# result = hashlib.pbkdf2_hmac("sha256", password, salt, itr_num, dklen)
 hex_result = result.hex()
 hex_result_with_hyphens = add_hyphens_to_hex(hex_result)
 print('result:', hex_result_with_hyphens)
