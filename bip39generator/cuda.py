@@ -12,8 +12,7 @@ def add_hyphens_to_hex(hex_str):
 kernel_file_path = "kernel.cu"  # Replace with the actual path
 mod = SourceModule(
     open(kernel_file_path, 'r').read(), 
-    arch='sm_86',
-    include_dirs=[os.getcwd()]
+    arch='sm_86'
     )
     # include_dirs=[os.getcwd()]
 

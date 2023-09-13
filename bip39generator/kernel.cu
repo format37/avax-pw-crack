@@ -1,5 +1,88 @@
 #include <cstdint>
-#include "pbkdf2_sha512.h"
+// #include "pbkdf2_sha512.h"
+
+// The rotate operation for 64bits
+#define ROR64(x,n) ((x >> n) | (x << (64 - n)))
+#define CH(x,y,z)  (z ^ (x & (y ^ z)))
+#define MAJ(x,y,z) ((x & y) | (z & (x | y)))
+#define S0_64(x)   (ROR64((x), 28) ^ ROR64((x),  34) ^ ROR64((x), 39)) 
+#define S1_64(x)   (ROR64((x), 14) ^ ROR64((x),  18) ^ ROR64((x), 41)) 
+#define R0_64(x)   (ROR64((x), 1)  ^ ROR64((x),  8)  ^ ((x) >> 7)) 
+#define R1_64(x)   (ROR64((x), 19) ^ ROR64((x), 61) ^ ((x) >> 6))
+
+#ifndef PBKDF2_SHA512_INCLUDE
+#define PBKDF2_SHA512_INCLUDE
+
+#define SHA512_BLOCKLEN  128ul
+#define SHA512_DIGESTLEN 64ul
+#define SHA512_DIGESTINT 8ul
+
+#ifndef PBKDF2_SHA512_STATIC
+#define PBKDF2_SHA512_DEF extern
+#else
+#define PBKDF2_SHA512_DEF static
+#endif
+
+#include <stdint.h>
+#include <string.h>
+
+typedef struct sha512_ctx_t
+{
+    uint64_t len;  // Make sure this is uint64_t
+    uint64_t h[SHA512_DIGESTINT];
+    uint8_t buf[SHA512_BLOCKLEN];
+} SHA512_CTX;
+
+__device__ void sha512_init(SHA512_CTX *ctx);
+__device__ void sha512_update(SHA512_CTX *ctx, const uint8_t *m, uint32_t mlen);
+__device__ void sha512_final(SHA512_CTX *ctx, uint8_t *md);
+
+typedef struct hmac_sha512_ctx_t
+{
+	uint8_t buf[SHA512_BLOCKLEN]; // key block buffer, not needed after init
+	uint64_t h_inner[SHA512_DIGESTINT];
+	uint64_t h_outer[SHA512_DIGESTINT];
+	SHA512_CTX sha;
+} HMAC_SHA512_CTX;
+
+PBKDF2_SHA512_DEF __device__ void hmac_sha512_init(HMAC_SHA512_CTX *hmac, const uint8_t *key, uint32_t keylen);
+PBKDF2_SHA512_DEF __device__ void hmac_sha512_update(HMAC_SHA512_CTX *hmac, const uint8_t *m, uint32_t mlen);
+// resets state to hmac_sha512_init
+PBKDF2_SHA512_DEF __device__ void hmac_sha512_final(HMAC_SHA512_CTX *hmac, uint8_t *md);
+
+PBKDF2_SHA512_DEF __device__ void pbkdf2_sha512(HMAC_SHA512_CTX *ctx,
+    const uint8_t *key, uint32_t keylen, const uint8_t *salt, uint32_t saltlen, uint32_t rounds,
+    uint8_t *dk, uint32_t dklen);
+
+#endif // PBKDF2_SHA512_INCLUDE
+
+//------------------------------------------------------------------------------
+
+#ifdef PBKDF2_SHA512_IMPLEMENTATION
+
+#include <string.h>
+
+/*static uint32_t ror(uint32_t n, uint32_t k)
+{
+	return (n >> k) | (n << (32 - k));
+}*/
+
+#define ROR(n,k) ror(n,k)
+
+#define CH(x,y,z)  (z ^ (x & (y ^ z)))
+#define MAJ(x,y,z) ((x & y) | (z & (x | y)))
+#define S0(x)      (ROR(x, 2) ^ ROR(x,13) ^ ROR(x,22))
+#define S1(x)      (ROR(x, 6) ^ ROR(x,11) ^ ROR(x,25))
+#define R0(x)      (ROR(x, 7) ^ ROR(x,18) ^ (x>>3))
+#define R1(x)      (ROR(x,17) ^ ROR(x,19) ^ (x>>10))
+
+#endif
+
+
+
+
+#define INNER_PAD '\x36'
+#define OUTER_PAD '\x5c'
 
 __device__ static const uint64_t K[80] = {
     UINT64_C(0x428a2f98d728ae22), UINT64_C(0x7137449123ef65cd),
@@ -77,17 +160,17 @@ __device__ void sha512_init(SHA512_CTX *s)
 
 __device__ static void sha512_transform(SHA512_CTX *s, const uint8_t *buf)
 {
-    uint64_t t1, t2, a, b, c, d, e, f, g, h, m[80]; // Change to uint64_t and m[80]
+    uint64_t t1, t2, a, b, c, d, e, f, g, h, m[80];
     uint32_t i, j;
 
-    for (i = 0, j = 0; i < 16; i++, j += 8) // Modify loop to collect 8 bytes for each entry in m
+    for (i = 0, j = 0; i < 16; i++, j += 8)
     {
         m[i] = ((uint64_t)buf[j] << 56) | ((uint64_t)buf[j + 1] << 48) |
                ((uint64_t)buf[j + 2] << 40) | ((uint64_t)buf[j + 3] << 32) |
                ((uint64_t)buf[j + 4] << 24) | ((uint64_t)buf[j + 5] << 16) |
                ((uint64_t)buf[j + 6] << 8) | ((uint64_t)buf[j + 7]);
     }
-    for (; i < 80; i++) // Increase loop limit to 80
+    for (; i < 80; i++)
     {
         m[i] = R1_64(m[i - 2]) + m[i - 7] + R0_64(m[i - 15]) + m[i - 16];
     }
@@ -149,11 +232,11 @@ __device__ void sha512_update(SHA512_CTX *s, const uint8_t *m, uint32_t len)
 	}
 	for (int i = 0; i < len; ++i) {s->buf[i] = p[i];}
 	// Debug line to print the block being processed
-    printf("Processing block: ");
+    /*printf("Processing block: ");
     for (int i = 0; i < SHA512_BLOCKLEN && i < len; ++i) {
         printf("%02x ", m[i]);
     }
-    printf("\n");
+    printf("\n");*/
 }
 
 __device__ void sha512_final(SHA512_CTX *s, uint8_t *md)
@@ -161,7 +244,9 @@ __device__ void sha512_final(SHA512_CTX *s, uint8_t *md)
 	uint32_t r = s->len % SHA512_BLOCKLEN;
 	uint64_t totalBits = s->len * 8;  // Total bits
 	uint64_t len_lower = totalBits & 0xFFFFFFFFFFFFFFFFULL;  // Lower 64 bits
-    uint64_t len_upper = totalBits >> 64;  // Upper 64 bits
+    //uint64_t len_upper = totalBits >> 64;  // Upper 64 bits
+    uint64_t len_upper = 0;  // Upper 64 bits are zero for 64-bit totalBits
+
 	
     // Pad message
     s->buf[r++] = 0x80;
@@ -196,6 +281,147 @@ __device__ void sha512_final(SHA512_CTX *s, uint8_t *md)
 	sha512_init(s);
 }
 
+PBKDF2_SHA512_DEF __device__ void hmac_sha512_init(HMAC_SHA512_CTX *hmac, const uint8_t *key, uint32_t keylen)
+{
+	SHA512_CTX *sha = &hmac->sha;
+    /*printf("stage 0: ");
+    for (int i = 0; i < SHA512_DIGESTLEN; ++i) {
+        printf("%02x ", sha->h[i]);
+    }
+    printf("\n");*/
+	
+	if (keylen <= SHA512_BLOCKLEN)
+	{
+        printf("keylen <= SHA512_BLOCKLEN: %d\n", keylen);
+		for (int i = 0; i < keylen; ++i) {hmac->buf[i] = key[i];}
+		memset(hmac->buf + keylen, '\0', SHA512_BLOCKLEN - keylen);
+	}
+	else
+	{
+		sha512_init(sha);
+		sha512_update(sha, key, keylen);
+		sha512_final(sha, hmac->buf);
+		memset(hmac->buf + SHA512_DIGESTLEN, '\0', SHA512_BLOCKLEN - SHA512_DIGESTLEN);
+	}
+	
+	uint32_t i;
+	for (i = 0; i < SHA512_BLOCKLEN; i++)
+	{
+		hmac->buf[ i ] = hmac->buf[ i ] ^ OUTER_PAD;
+	}
+    
+    /*printf("Before init: ");
+    for (int i = 0; i < SHA512_DIGESTLEN; ++i) {
+        printf("%02x ", sha->h[i]);
+    }
+    printf("\n");*/
+    
+	sha512_init(sha);
+	sha512_update(sha, hmac->buf, SHA512_BLOCKLEN);
+    
+
+    // Before copying outer state
+    /*printf("Before copying outer state: ");
+    for (int i = 0; i < SHA512_DIGESTLEN; ++i) {
+        printf("%02x ", sha->h[i]);
+    }
+    printf("\n");*/
+
+	// copy outer state
+	for (int i = 0; i < SHA512_DIGESTLEN; ++i) {hmac->h_outer[i] = sha->h[i];}
+    /*
+    // After copying outer state
+    printf("After copying outer state: ");
+    for (int i = 0; i < SHA512_DIGESTLEN; ++i) {
+        printf("%02x ", hmac->h_outer[i]);
+    }
+    printf("\n");*/
+	
+	for (i = 0; i < SHA512_BLOCKLEN; i++)
+	{
+		hmac->buf[ i ] = (hmac->buf[ i ] ^ OUTER_PAD) ^ INNER_PAD;
+	}
+	
+	sha512_init(sha);
+	sha512_update(sha, hmac->buf, SHA512_BLOCKLEN);
+	// copy inner state
+	for (int i = 0; i < SHA512_DIGESTLEN; ++i) {hmac->h_inner[i] = sha->h[i];}
+    // print result with merely printf
+    /*printf("HMAC inner state: ");
+    for (int i = 0; i < SHA512_DIGESTLEN; ++i) {
+        printf("%02x ", hmac->h_inner[i]);
+    }
+    printf("\n");
+    printf("HMAC outer state: ");
+    for (int i = 0; i < SHA512_DIGESTLEN; ++i) {
+        printf("%02x ", hmac->h_outer[i]);
+    }
+    printf("\n");*/
+}
+
+PBKDF2_SHA512_DEF __device__ void hmac_sha512_update(HMAC_SHA512_CTX *hmac, const uint8_t *m, uint32_t mlen)
+{
+	sha512_update(&hmac->sha, m, mlen);
+}
+
+PBKDF2_SHA512_DEF __device__ void hmac_sha512_final(HMAC_SHA512_CTX *hmac, uint8_t *md)
+{
+	SHA512_CTX *sha = &hmac->sha;
+	sha512_final(sha, md);
+	
+	// reset sha to outer state
+	for (int i = 0; i < SHA512_DIGESTLEN; ++i) {sha->h[i] = hmac->h_outer[i];}
+	sha->len = SHA512_BLOCKLEN;
+	
+	sha512_update(sha, md, SHA512_DIGESTLEN);
+	sha512_final(sha, md); // md = D(outer || D(inner || msg))
+	
+	// reset sha to inner state -> reset hmac
+	for (int i = 0; i < SHA512_DIGESTLEN; ++i) {sha->h[i] = hmac->h_inner[i];}
+	sha->len = SHA512_BLOCKLEN;
+}
+
+__device__ PBKDF2_SHA512_DEF void pbkdf2_sha512(HMAC_SHA512_CTX *hmac,
+    const uint8_t *key, uint32_t keylen, const uint8_t *salt, uint32_t saltlen, uint32_t rounds,
+    uint8_t *dk, uint32_t dklen)
+{
+	uint32_t hlen = SHA512_DIGESTLEN;
+	uint32_t l = dklen / hlen + ((dklen % hlen) ? 1 : 0);
+	uint32_t r = dklen - (l - 1) * hlen;
+	
+	hmac_sha512_init(hmac, key, keylen);
+	
+	uint8_t *U = hmac->buf;
+	uint8_t *T = dk;
+	uint8_t count[4];
+	
+	uint32_t i, j, k;
+	uint32_t len = hlen;
+	for (i = 1; i <= l; i++)
+	{
+		if (i == l) { len = r; }
+		count[0] = (i >> 24) & 0xFF;
+		count[1] = (i >> 16) & 0xFF;
+		count[2] = (i >>  8) & 0xFF;
+		count[3] = (i) & 0xFF;
+		hmac_sha512_update(hmac, salt, saltlen);
+		hmac_sha512_update(hmac, count, 4);
+		hmac_sha512_final(hmac, U);
+		for (int i = 0; i < len; ++i) {T[i] = U[i];}
+		for (j = 1; j < rounds; j++)
+		{
+			hmac_sha512_update(hmac, U, hlen);
+			hmac_sha512_final(hmac, U);
+			for (k = 0; k < len; k++)
+			{
+				T[k] ^= U[k];
+			}
+		}
+		T += len;
+	}
+	
+}
+
 __device__ void compute_sha(const uint8_t *msg, uint32_t mlen)
 {
 	uint8_t md[SHA512_DIGESTLEN] = {0};  // Initialize to zero
@@ -203,7 +429,33 @@ __device__ void compute_sha(const uint8_t *msg, uint32_t mlen)
     sha512_init(&sha);
     sha512_update(&sha, msg, mlen);
     sha512_final(&sha, md);
+    printf("SHA-512: ");
     print_as_hex(md, sizeof md);
+}
+
+__device__ void compute_hmac(const uint8_t *key, uint32_t klen, const uint8_t *msg, uint32_t mlen)
+{
+	uint8_t md[SHA512_DIGESTLEN];
+	HMAC_SHA512_CTX hmac;
+    printf("kle: %i\n", klen);
+	printf("mlen: %i\n", mlen);
+	hmac_sha512_init(&hmac, key, klen);
+	hmac_sha512_update(&hmac, msg, mlen);
+	hmac_sha512_final(&hmac, md);
+    printf("HMAC: ");
+	print_as_hex(md, sizeof md);
+}
+
+__device__ void compute_pbkdf2(const uint8_t *key, uint32_t klen, const uint8_t *salt, uint32_t slen,
+    uint32_t rounds, uint32_t dklen)
+{
+	// uint8_t *dk = malloc(dklen);
+    uint8_t *dk = (uint8_t*) malloc(dklen);
+	HMAC_SHA512_CTX pbkdf_hmac;
+	pbkdf2_sha512(&pbkdf_hmac, key, klen, salt, slen, rounds, dk, dklen);
+	printf("PBKDF2-SHA-512: ");
+	print_as_hex(dk, dklen);
+	free(dk);
 }
 
 __global__ void Bip39SeedGenerator() {
@@ -217,14 +469,25 @@ __global__ void Bip39SeedGenerator() {
     }*/
 
     // Preparing salt = "mnemonicTESTPHRASG"
-    //const unsigned char *salt = (unsigned char *)"mnemonicTESTPHRASG";
+    uint8_t *salt = (unsigned char *)"mnemonicTESTPHRASG";
 
-    //  print my_strlen((const char*) m_mnemonic)
-    printf("Mnemonic length: %d\n", my_strlen((const char*) m_mnemonic));
-
-    //compute_sha((uint8_t *) m_mnemonic, strlen(m_mnemonic));
     compute_sha((uint8_t *) m_mnemonic, my_strlen((const char*) m_mnemonic));
+
+    compute_hmac(
+        (uint8_t *) m_mnemonic, 
+        my_strlen((const char*) m_mnemonic), 
+        (uint8_t *) salt, 
+        my_strlen((const char*) salt)
+        );
 
     // Call pbkdf2_hmac to perform the key derivation
     //pbkdf2_hmac(m_mnemonic, salt, derived_key);
+    /*compute_pbkdf2(
+        (uint8_t *) m_mnemonic, 
+        my_strlen((const char*) m_mnemonic), 
+        (uint8_t *) salt, 
+        my_strlen((const char*) salt),
+	    2048, 
+        64
+        );*/
 }
