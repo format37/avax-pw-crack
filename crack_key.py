@@ -8,6 +8,8 @@ from typos import Typos
 from Crypto.Hash import RIPEMD160
 import json
 import os
+import bip_utils
+print('bip_utils.__path__:', bip_utils.__path__)
 
 class Wallet(object):
     def __init__(self, mnemonic: str):
@@ -18,7 +20,10 @@ class Wallet(object):
         print('passphrase', passphrase)
         seed_bytes = self.seed_generator.Generate(passphrase)
         print('seed_bytes', seed_bytes)
+        hex_result = seed_bytes.hex()
+        print('hex_result', hex_result)
         master = Bip32Slip10Secp256k1.FromSeed(seed_bytes)
+        print('master', master)
 
         # m/44'/9000'/0'
         child = (master
@@ -45,8 +50,9 @@ def generate_10_avax_addresses(passphrase: str, wallet: Wallet) -> List[str]:
     """Generate 10 AVAX addresses for the given passphrase.""" 
     addresses = []
     base_child = wallet.avax_key(passphrase)
-    # print('base_child', child_to_avaxp_address(base_child.ChildKey(0)))
-    # exit()
+    print('base_child from wallet', base_child.ChildKey(0))
+    print('child_to_avaxp_address', child_to_avaxp_address(base_child.ChildKey(0)))
+    exit()
     for i in range(10):
         child = base_child.ChildKey(i)  # Iterate over the last index to generate 10 keys
         addresses.append(child_to_avaxp_address(child))

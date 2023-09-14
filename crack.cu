@@ -34,9 +34,16 @@ __global__ void my_kernel(
         for (int i = 0; i < LINE_LENGTH_PASS; i++) {
             printf("%c", test_passphrase[i]);
         }
+        printf("\n");
 
 
         for (int target_idx = 0; target_idx < target_addresses_count; target_idx++) {
+            // print string_compare(&computed_addresses[idx * LINE_LENGTH_ADDR]
+            printf("&computed_addresses[idx * LINE_LENGTH_ADDR]: ");
+            for (int i = 0; i < LINE_LENGTH_ADDR; i++) {
+                printf("%c", computed_addresses[idx * LINE_LENGTH_ADDR + i]);
+            }
+            printf("\n");
             // Compare the computed address with the target address
             if (string_compare(&computed_addresses[idx * LINE_LENGTH_ADDR], &target_addresses[target_idx * LINE_LENGTH_ADDR], LINE_LENGTH_ADDR)) {
                 // Print that match was found for idx, phrase, and target
