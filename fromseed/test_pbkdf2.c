@@ -123,53 +123,43 @@ void compute_pbkdf2(
 
 // ++ bip32 From seed ++
 
-typedef struct {
-    unsigned char chain_code[32];
-    // Add other relevant fields like depth, index, etc.
-} Bip32KeyData;
+//#include <stdio.h>
+//#include <stdlib.h>
+//#include <string.h>
+#include <openssl/sha.h>
+#include <openssl/ripemd.h>
+#include "bech32.h" // Assuming you have a bech32 library
 
-typedef struct {
-    int some_field; // Placeholder
-} Bip32KeyNetVersions;
+char* child_to_avaxp_address(unsigned char* compressed_pub_key, size_t len) {
+    // Step 1: Generate SHA-256 hash
+    unsigned char sha256_hash[SHA256_DIGEST_LENGTH];
+    SHA256_CTX sha256;
+    SHA256_Init(&sha256);
+    SHA256_Update(&sha256, compressed_pub_key, len);
+    SHA256_Final(sha256_hash, &sha256);
 
-typedef struct {
-    unsigned char private_key[32];
-    Bip32KeyData *key_data;
-    Bip32KeyNetVersions *key_net_ver;
-} Bip32Base;
+    // Step 2: Generate RIPEMD-160 hash
+    unsigned char ripemd160_hash[RIPEMD160_DIGEST_LENGTH];
+    RIPEMD160_CTX ripemd160;
+    RIPEMD160_Init(&ripemd160);
+    RIPEMD160_Update(&ripemd160, sha256_hash, SHA256_DIGEST_LENGTH);
+    RIPEMD160_Final(ripemd160_hash, &ripemd160);
 
-void generate_master_key_and_chain_code(const unsigned char* seed, size_t seed_len,
-                                        unsigned char* master_key, unsigned char* chain_code) {
-    // Implement this function
-}
+    // Step 3: Bech32 encoding
+    char* bech32_encoded;
+    // Use a Bech32 encoding function here to encode ripemd160_hash
+    // The function signature might differ based on the library you use
+    bech32_encode("avax", ripemd160_hash, RIPEMD160_DIGEST_LENGTH, &bech32_encoded);
 
-Bip32Base* Bip32Base_FromSeed(
-	const unsigned char *seed_bytes, 
-	size_t seed_len, 
-	Bip32KeyNetVersions *key_net_ver
-	) {
-    // Step 1: Input validation
-    if (seed_len < 16) { // Minimum seed length requirement
-        // Handle error
-        return NULL;
-    }
+    // Step 4: Add 'P-' prefix
+    char* avaxp_address = malloc(strlen(bech32_encoded) + 3); // 2 for 'P-', 1 for '\0'
+    strcpy(avaxp_address, "P-");
+    strcat(avaxp_address, bech32_encoded);
 
-    // Step 2: Cryptographic operations
-    unsigned char master_key[32];  // 256 bits
-    unsigned char chain_code[32];  // 256 bits
-	// TODO: Use HMAC-SHA512 to generate master_key and chain_code from seed_bytes
-    generate_master_key_and_chain_code(seed_bytes, seed_len, master_key, chain_code);
+    // Clean up
+    free(bech32_encoded);
 
-    // Step 3: Data structures
-    Bip32Base *bip32_obj = (Bip32Base*)malloc(sizeof(Bip32Base));
-    //bip32_obj->private_key = (unsigned char*)malloc(32);
-    memcpy(bip32_obj->private_key, master_key, 32);
-
-    // Initialize key_data and key_net_ver (not shown here)
-
-    // Step 4: Error handling is integrated within the steps
-
-    return bip32_obj;
+    return avaxp_address;
 }
 
 // -- bip32 From seed --
@@ -192,14 +182,6 @@ int main(int argc, char **argv)
         derived_key[i] = 0;
     }
 
-	/*printf("SHA512 of argv[1]:\n");
-	compute_sha((uint8_t *) argv[1], strlen(argv[1]));
-	printf("\n");
-	
-	printf("HMAC-SHA512 of argv[2] with key arg[1]:\n");
-	compute_hmac((uint8_t *) argv[1], strlen(argv[1]), (uint8_t *) argv[2], strlen(argv[2]));
-	printf("\n");*/
-	
 	printf("PBKDF2 of key:arg[1], salt:arg[2], rounds:%i, dklen:%i \n", ROUNDS, DKLEN);
 	compute_pbkdf2(
 		(uint8_t *) argv[1], 
@@ -215,12 +197,19 @@ int main(int argc, char **argv)
 	printf("Derived key: ");
 	print_as_hex(derived_key, sizeof derived_key);
 	printf("\n");
-	// Bip32Base_FromSeed
-	Bip32Base *bip32_obj = Bip32Base_FromSeed(derived_key, sizeof derived_key, NULL);
-	// print private key
-	printf("Private key: ");
-	print_as_hex(bip32_obj->private_key, sizeof bip32_obj->private_key);
-	printf("\n");
 	
-	return 0;
+	// Generate a compressed public key from derived key or another method
+    // This is a separate process that typically involves elliptic curve operations
+    // For demonstration, let's assume you have this compressed public key
+    unsigned char compressed_pub_key[33];  // Replace this with actual compressed public key
+    size_t len = 33;
+
+    // Call the child_to_avaxp_address function
+    char* avaxp_address = child_to_avaxp_address(compressed_pub_key, len);
+    printf("Generated AVAXP address: %s\n", avaxp_address);
+
+    // Clean up
+    free(avaxp_address);
+
+    return 0;
 }

@@ -22,7 +22,9 @@ class Wallet(object):
         print('seed_bytes', seed_bytes)
         hex_result = seed_bytes.hex()
         print('hex_result', hex_result)
-        master = Bip32Slip10Secp256k1.FromSeed(seed_bytes)
+        # convert from hex to bytes and store to seed_bytes_restored
+        seed_bytes_restored = bytes.fromhex(hex_result)
+        master = Bip32Slip10Secp256k1.FromSeed(seed_bytes_restored)
         print('master', master)
 
         # m/44'/9000'/0'
