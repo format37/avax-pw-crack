@@ -123,43 +123,25 @@ void compute_pbkdf2(
 
 // ++ bip32 From seed ++
 
-//#include <stdio.h>
-//#include <stdlib.h>
-//#include <string.h>
-#include <openssl/sha.h>
-#include <openssl/ripemd.h>
-#include "bech32.h" // Assuming you have a bech32 library
+#include <openssl/hmac.h>
 
-char* child_to_avaxp_address(unsigned char* compressed_pub_key, size_t len) {
-    // Step 1: Generate SHA-256 hash
-    unsigned char sha256_hash[SHA256_DIGEST_LENGTH];
-    SHA256_CTX sha256;
-    SHA256_Init(&sha256);
-    SHA256_Update(&sha256, compressed_pub_key, len);
-    SHA256_Final(sha256_hash, &sha256);
+void generate_master_key_from_seed(const unsigned char *seed, size_t seed_len,
+                                   unsigned char **out_master_key, unsigned char **out_chain_code) {
+    // Initialize HMAC context with SHA-512
+    const EVP_MD *md = EVP_sha512();
+    unsigned char out[64];
+    unsigned int out_len;
 
-    // Step 2: Generate RIPEMD-160 hash
-    unsigned char ripemd160_hash[RIPEMD160_DIGEST_LENGTH];
-    RIPEMD160_CTX ripemd160;
-    RIPEMD160_Init(&ripemd160);
-    RIPEMD160_Update(&ripemd160, sha256_hash, SHA256_DIGEST_LENGTH);
-    RIPEMD160_Final(ripemd160_hash, &ripemd160);
+    // HMAC-SHA512
+    HMAC(md, "Bitcoin seed", 12, seed, seed_len, out, &out_len);
 
-    // Step 3: Bech32 encoding
-    char* bech32_encoded;
-    // Use a Bech32 encoding function here to encode ripemd160_hash
-    // The function signature might differ based on the library you use
-    bech32_encode("avax", ripemd160_hash, RIPEMD160_DIGEST_LENGTH, &bech32_encoded);
+    // Allocate memory for master_key and chain_code
+    *out_master_key = malloc(32);
+    *out_chain_code = malloc(32);
 
-    // Step 4: Add 'P-' prefix
-    char* avaxp_address = malloc(strlen(bech32_encoded) + 3); // 2 for 'P-', 1 for '\0'
-    strcpy(avaxp_address, "P-");
-    strcat(avaxp_address, bech32_encoded);
-
-    // Clean up
-    free(bech32_encoded);
-
-    return avaxp_address;
+    // Split the HMAC result into master key and chain code
+    memcpy(*out_master_key, out, 32);
+    memcpy(*out_chain_code, out + 32, 32);
 }
 
 // -- bip32 From seed --
@@ -196,20 +178,9 @@ int main(int argc, char **argv)
 	// print derived key
 	printf("Derived key: ");
 	print_as_hex(derived_key, sizeof derived_key);
-	printf("\n");
+	printf("\n");	
 	
-	// Generate a compressed public key from derived key or another method
-    // This is a separate process that typically involves elliptic curve operations
-    // For demonstration, let's assume you have this compressed public key
-    unsigned char compressed_pub_key[33];  // Replace this with actual compressed public key
-    size_t len = 33;
-
-    // Call the child_to_avaxp_address function
-    char* avaxp_address = child_to_avaxp_address(compressed_pub_key, len);
-    printf("Generated AVAXP address: %s\n", avaxp_address);
-
-    // Clean up
-    free(avaxp_address);
+	
 
     return 0;
 }
