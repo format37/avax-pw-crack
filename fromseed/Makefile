@@ -13,7 +13,7 @@ APP_OSSL := $(APPNAME)_ossl$(EXT)
 all: $(APP)
 
 $(APP): test_pbkdf2.c pbkdf2_sha512.h
-	$(CC) $(CFLAGS) -o $@ $<
+	$(CC) $(CFLAGS) -o $@ $< -lcrypto
 
 $(APP_OSSL): test_pbkdf2.c pbkdf2_sha512.h
 	$(CC) $(CFLAGS) -DHAS_OSSL -o $@ $< -lcrypto

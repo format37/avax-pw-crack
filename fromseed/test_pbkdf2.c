@@ -7,19 +7,33 @@
 #define PBKDF2_SHA512_IMPLEMENTATION
 #include "pbkdf2_sha512.h"
 
-#if defined(HAS_OSSL)
+//#if defined(HAS_OSSL)
 #include <openssl/evp.h>
 #include <openssl/crypto.h>
 #include <openssl/hmac.h>
-#endif
+//#endif
 
-void print_as_hex(const uint8_t *s,  const uint32_t slen)
+void print_as_hex_hyphen(const uint8_t *s,  const uint32_t slen)
 {
 	for (uint32_t i = 0; i < slen; i++)
 	{
 		printf("%02X%s", s[ i ], (i % 4 == 3) && (i != slen - 1) ? "-" : "");
 	}
 	printf("\n");
+}
+
+void print_as_hex_uint(const uint8_t *data,  const uint32_t len) {
+    for (size_t i = 0; i < len; i++) {
+        printf("%02x", data[i]);
+    }
+    printf("\n");
+}
+
+void print_as_hex_char(unsigned char *data, size_t len) {
+    for (size_t i = 0; i < len; i++) {
+        printf("%02x", data[i]);
+    }
+    printf("\n");
 }
 
 void check_with_ossl(const uint8_t *this_one, const uint8_t *ossl_one, uint32_t len,
@@ -32,7 +46,7 @@ void check_with_ossl(const uint8_t *this_one, const uint8_t *ossl_one, uint32_t 
 	else
 	{
 		printf(" *ossl %s does not match. It was:\n", what);
-		print_as_hex(ossl_one, len);
+		print_as_hex_uint(ossl_one, len);
 	}
 }
 
@@ -47,7 +61,7 @@ void compute_sha(const uint8_t *msg, uint32_t mlen)
     sha512_final(&sha, md);
 
     printf("Computed SHA-512: ");
-    print_as_hex(md, sizeof md);
+    print_as_hex_uint(md, sizeof md);
 	
 #if defined(HAS_OSSL)
 	uint8_t md_ossl[SHA512_DIGESTLEN];
@@ -70,7 +84,7 @@ void compute_hmac(const uint8_t *key, uint32_t klen, const uint8_t *msg, uint32_
 	hmac_sha512_update(&hmac, msg, mlen);
 	hmac_sha512_final(&hmac, md);
 	printf("Computed HMAC-SHA-512: ");
-	print_as_hex(md, sizeof md);
+	print_as_hex_uint(md, sizeof md);
 	
 #if defined(HAS_OSSL)
 	uint8_t md_ossl[SHA512_DIGESTLEN];
@@ -100,7 +114,7 @@ void compute_pbkdf2(
 	HMAC_SHA512_CTX pbkdf_hmac;
 	pbkdf2_sha512(&pbkdf_hmac, key, klen, salt, slen, rounds, dk, dklen);
 	printf("Computed PBKDF2-SHA-512: ");
-	print_as_hex(dk, dklen);
+	print_as_hex_uint(dk, dklen);
 	my_cuda_memcpy_unsigned_char(derived_key, dk, dklen);
 	
 	#if defined(HAS_OSSL)
@@ -123,7 +137,25 @@ void compute_pbkdf2(
 
 // ++ bip32 From seed ++
 
+void bip32_from_seed(const uint8_t *seed, uint32_t seed_len)
+{
+	// HMAC-SHA512
+    unsigned char hash[64];
+    unsigned int len = 64;
+    HMAC(EVP_sha512(), "Bitcoin seed", 12, seed, seed_len, hash, &len);
 
+    // Split the hash into the master private key and chain code
+    unsigned char master_private_key[32];
+    unsigned char chain_code[32];
+    memcpy(master_private_key, hash, 32);
+    memcpy(chain_code, hash + 32, 32);
+
+    // Print the master private key and chain code
+    printf("Master Private Key: ");
+    print_as_hex_char(master_private_key, 32);
+    printf("Chain Code: ");
+    print_as_hex_char(chain_code, 32);
+}
 
 // -- bip32 From seed --
 
@@ -158,10 +190,11 @@ int main(int argc, char **argv)
 	printf("\n");
 	// print derived key
 	printf("Derived key: ");
-	print_as_hex(derived_key, sizeof derived_key);
-	printf("\n");	
-	
-	
+	print_as_hex_uint(derived_key, sizeof derived_key);
+	printf("\n");
+
+	// master key
+	bip32_from_seed(derived_key, sizeof derived_key);
 
     return 0;
 }
