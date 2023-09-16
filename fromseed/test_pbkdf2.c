@@ -123,26 +123,7 @@ void compute_pbkdf2(
 
 // ++ bip32 From seed ++
 
-#include <openssl/hmac.h>
 
-void generate_master_key_from_seed(const unsigned char *seed, size_t seed_len,
-                                   unsigned char **out_master_key, unsigned char **out_chain_code) {
-    // Initialize HMAC context with SHA-512
-    const EVP_MD *md = EVP_sha512();
-    unsigned char out[64];
-    unsigned int out_len;
-
-    // HMAC-SHA512
-    HMAC(md, "Bitcoin seed", 12, seed, seed_len, out, &out_len);
-
-    // Allocate memory for master_key and chain_code
-    *out_master_key = malloc(32);
-    *out_chain_code = malloc(32);
-
-    // Split the HMAC result into master key and chain code
-    memcpy(*out_master_key, out, 32);
-    memcpy(*out_chain_code, out + 32, 32);
-}
 
 // -- bip32 From seed --
 
