@@ -25,7 +25,9 @@ class Wallet(object):
         # convert from hex to bytes and store to seed_bytes_restored
         seed_bytes_restored = bytes.fromhex(hex_result)
         master = Bip32Slip10Secp256k1.FromSeed(seed_bytes_restored)
-        print('master', master)
+        # print('master', master)
+        # print('Master Private Key', master.m_priv_key.Raw())
+        # print('Master Key Data', master.m_priv_key.m_key_data)
 
         # m/44'/9000'/0'
         child = (master
@@ -33,13 +35,17 @@ class Wallet(object):
                  .ChildKey(Bip32KeyIndex.HardenIndex(9000))
                  .ChildKey(Bip32KeyIndex.HardenIndex(0))
                  .ChildKey(0))
-        print('base_child', child_to_avaxp_address(child.ChildKey(0)))
+        print('Child private key:', child.ChildKey(0).PrivateKey().Raw().ToHex())
+        print('Child Chain Code:', child.ChildKey(0).ChainCode().ToHex())
+        print('RawUncompressed:', child.ChildKey(0).PublicKey().RawUncompressed())
+        print('RawCompressed:', child.ChildKey(0).PublicKey().RawCompressed())
+        print('child_to_avaxp_address:', child_to_avaxp_address(child.ChildKey(0)))
         return child
 
 
 def child_to_avaxp_address(child) -> str:
     m = hashlib.sha256()
-    m.update(child.PublicKey().RawCompressed().ToBytes())
+    m.update(child.PublicKey().RawCompressed().ToBytes()) # NEED THIS child.PublicKey().RawCompressed()
     
     n = RIPEMD160.new()
     n.update(m.digest())
@@ -52,8 +58,27 @@ def generate_10_avax_addresses(passphrase: str, wallet: Wallet) -> List[str]:
     """Generate 10 AVAX addresses for the given passphrase.""" 
     addresses = []
     base_child = wallet.avax_key(passphrase)
-    print('base_child from wallet', base_child.ChildKey(0))
-    print('child_to_avaxp_address', child_to_avaxp_address(base_child.ChildKey(0)))
+    # print('base_child from wallet', base_child.ChildKey(0))
+    # print('m_priv_key PublicKey RawUncompressed:', base_child.m_priv_key.PublicKey().RawCompressed())
+    # print('m_priv_key PublicKey RawCompressed:', base_child.m_priv_key.PublicKey().RawUncompressed())
+    # print('base_child.m_priv_key.priv_key:', base_child.m_priv_key.m_priv_key)
+    # print('base_child.m_priv_key.priv_key:', base_child.m_priv_key.m_key_data)
+    
+    # help(base_child.m_priv_key)
+    
+    # exit()
+    # print('base_child.m_pub_key:', base_child.m_pub_key)
+    #  print base_child as hex
+    # Assuming base_child.ChildKey(0) returns an integer or bytes
+    # print('base_child from wallet as hex:', hex(base_child.ChildKey(0)))
+    # help(base_child.ChildKey(0))
+    # exit()
+    # print(child.PublicKey().RawCompressed().ToBytes())    
+    # print('PublicKey RawUncompressed:', base_child.ChildKey(0).PublicKey().RawUncompressed())
+    # print('PublicKey RawCompressed:', base_child.ChildKey(0).PublicKey().RawCompressed())
+
+    
+    # print('child_to_avaxp_address', child_to_avaxp_address(base_child.ChildKey(0)))
     exit()
     for i in range(10):
         child = base_child.ChildKey(i)  # Iterate over the last index to generate 10 keys

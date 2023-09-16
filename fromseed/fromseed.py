@@ -67,8 +67,8 @@ child = (master
             .ChildKey(0))
 child_key = child.ChildKey(0)
 # print('child_key', child_key)
-# print('PublicKey:', child.PublicKey())
-# print('child_key.PublicKey().RawUncompressed():', child_key.PublicKey().RawUncompressed())
+# print('PublicKey:', child.PublicKey().RawUncompressed())
+print('child_key.PublicKey().RawUncompressed():', child_key.PublicKey().RawUncompressed())
 # print('RawCompressed:', child.PublicKey().RawCompressed())
 
 # print('base_child', child_to_avaxp_address(child_key))
