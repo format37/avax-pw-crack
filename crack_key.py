@@ -28,6 +28,40 @@ class Wallet(object):
         # print('master', master)
         # print('Master Private Key', master.m_priv_key.Raw())
         # print('Master Key Data', master.m_priv_key.m_key_data)
+        print('master.ChildKey(0).PrivateKey():', master.ChildKey(0).PrivateKey().Raw().ToHex())
+        print('master.ChildKey(0).ChainCode():', master.ChildKey(0).ChainCode().ToHex())
+
+        print('HardenIndex(44):', Bip32KeyIndex.HardenIndex(44))
+        print('HardenIndex(9000):', Bip32KeyIndex.HardenIndex(9000))
+        print('HardenIndex(0):', Bip32KeyIndex.HardenIndex(0))
+        print('\n')
+        
+
+        print('master.FingerPrint()', master.FingerPrint())
+        print('master.PrivateKey().Raw()', master.PrivateKey().Raw())
+        print('master.ChainCode():', master.ChainCode())
+        print('\n')
+        print('master.44.FingerPrint()', master.ChildKey(Bip32KeyIndex.HardenIndex(44)).FingerPrint())
+        print('master.44.PrivateKey().Raw()', master.ChildKey(Bip32KeyIndex.HardenIndex(44)).PrivateKey().Raw())
+        print('master.44.ChainCode():', master.ChildKey(Bip32KeyIndex.HardenIndex(44)).ChainCode())
+        print('\n')
+        print('master.44.9000.FingerPrint()', master.ChildKey(Bip32KeyIndex.HardenIndex(44)).ChildKey(Bip32KeyIndex.HardenIndex(9000)).FingerPrint())
+        print('master.44.9000.PrivateKey().Raw()', master.ChildKey(Bip32KeyIndex.HardenIndex(44)).ChildKey(Bip32KeyIndex.HardenIndex(9000)).PrivateKey().Raw())
+        print('master.44.9000.ChainCode():', master.ChildKey(Bip32KeyIndex.HardenIndex(44)).ChildKey(Bip32KeyIndex.HardenIndex(9000)).ChainCode())
+        print('\n')
+        print('master.44.9000.0.FingerPrint()', master.ChildKey(Bip32KeyIndex.HardenIndex(44)).ChildKey(Bip32KeyIndex.HardenIndex(9000)).ChildKey(Bip32KeyIndex.HardenIndex(0)).FingerPrint())
+        print('master.44.9000.0.PrivateKey().Raw()', master.ChildKey(Bip32KeyIndex.HardenIndex(44)).ChildKey(Bip32KeyIndex.HardenIndex(9000)).ChildKey(Bip32KeyIndex.HardenIndex(0)).PrivateKey().Raw())
+        print('master.44.9000.0.ChainCode():', master.ChildKey(Bip32KeyIndex.HardenIndex(44)).ChildKey(Bip32KeyIndex.HardenIndex(9000)).ChildKey(Bip32KeyIndex.HardenIndex(0)).ChainCode())
+        print('\n')
+        print('master.44.9000.0.0.FingerPrint()', master.ChildKey(Bip32KeyIndex.HardenIndex(44)).ChildKey(Bip32KeyIndex.HardenIndex(9000)).ChildKey(Bip32KeyIndex.HardenIndex(0)).ChildKey(0).FingerPrint())
+        print('master.44.9000.0.0.PrivateKey().Raw()', master.ChildKey(Bip32KeyIndex.HardenIndex(44)).ChildKey(Bip32KeyIndex.HardenIndex(9000)).ChildKey(Bip32KeyIndex.HardenIndex(0)).ChildKey(0).PrivateKey().Raw())
+        print('master.44.9000.0.0.ChainCode():', master.ChildKey(Bip32KeyIndex.HardenIndex(44)).ChildKey(Bip32KeyIndex.HardenIndex(9000)).ChildKey(Bip32KeyIndex.HardenIndex(0)).ChildKey(0).ChainCode())
+        print('\n')
+        print('master.44.9000.0.0.0.FingerPrint()', master.ChildKey(Bip32KeyIndex.HardenIndex(44)).ChildKey(Bip32KeyIndex.HardenIndex(9000)).ChildKey(Bip32KeyIndex.HardenIndex(0)).ChildKey(0).ChildKey(0).FingerPrint())
+        print('master.44.9000.0.0.0.PrivateKey().Raw()', master.ChildKey(Bip32KeyIndex.HardenIndex(44)).ChildKey(Bip32KeyIndex.HardenIndex(9000)).ChildKey(Bip32KeyIndex.HardenIndex(0)).ChildKey(0).ChildKey(0).PrivateKey().Raw())
+        print('master.44.9000.0.0.0.ChainCode():', master.ChildKey(Bip32KeyIndex.HardenIndex(44)).ChildKey(Bip32KeyIndex.HardenIndex(9000)).ChildKey(Bip32KeyIndex.HardenIndex(0)).ChildKey(0).ChildKey(0).ChainCode())
+        print('\n')
+
 
         # m/44'/9000'/0'
         child = (master
