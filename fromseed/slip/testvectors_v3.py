@@ -131,10 +131,13 @@ def show_testvector(name, curvename, seedhex, derivationpath):
         print('  * chain code: ' + binascii.hexlify(c).decode())
         print('  * private: ' + binascii.hexlify(k).decode())
         print('  * public: ' + binascii.hexlify(p).decode())
+    public = binascii.hexlify(p).decode()
+    return public
 
 def show_testvectors(name, curvenames, seedhex, derivationpath):
     for curvename in curvenames:
-        show_testvector(name, curvename, seedhex, derivationpath)
+        public = show_testvector(name, curvename, seedhex, derivationpath)
+    return public
 
 if __name__ == "__main__":
     """curvenames = ['secp256k1', 'nist256p1', 'ed25519']
@@ -156,7 +159,7 @@ if __name__ == "__main__":
     Bip32KeyIndex_HardenIndex_0 = 0x80000000
     Bip32KeyIndex_0 = 0x00000000
     
-    show_testvectors("Test vector", ['secp256k1'],
+    public = show_testvectors("Test vector", ['secp256k1'],
                     '23cd8f21118749c3d348e114a53b1cede7fd020bfa5f9bf67938b12d67b522aaf370480ed670a1c41aae0c0062faceb6aea0c031cc2907e8aaadd23ae8076818',
                     [
                         Bip32KeyIndex_HardenIndex_44,
@@ -165,3 +168,34 @@ if __name__ == "__main__":
                         Bip32KeyIndex_0,
                         Bip32KeyIndex_0
                     ])
+
+print('\npublic:', public)
+
+import hashlib
+from Crypto.Hash import RIPEMD160
+from bip_utils import Bech32Encoder
+
+# Assuming Bech32Encoder is already imported or implemented
+
+def child_to_avaxp_address(public_key) -> str:
+    # raw_compressed_key_hex = public_key
+    raw_compressed_key_hex = '025382fd923485ccbf2aea4f4dbe164124aea708f3977286b1f65ff0e1ef0fe939'
+    raw_compressed_key_bytes = bytes.fromhex(raw_compressed_key_hex)
+    
+    # SHA-256 Hashing
+    m = hashlib.sha256()
+    m.update(raw_compressed_key_bytes)
+    
+    # RIPEMD160 Hashing
+    n = RIPEMD160.new()
+    n.update(m.digest())
+    
+    # Bech32 Encoding
+    b32_encoded = Bech32Encoder().Encode('avax', n.digest())
+    
+    # return f'P-{b32_encoded}'
+    return 'P-{}'.format(b32_encoded)
+
+
+# Test the function
+print(child_to_avaxp_address(public))

@@ -79,6 +79,8 @@ class Wallet(object):
 
 def child_to_avaxp_address(child) -> str:
     m = hashlib.sha256()
+    print('child.PublicKey().Raw():', child.PublicKey())
+    print('child.PublicKey().RawCompressed():', child.PublicKey().RawCompressed())
     m.update(child.PublicKey().RawCompressed().ToBytes()) # NEED THIS child.PublicKey().RawCompressed()
     
     n = RIPEMD160.new()
