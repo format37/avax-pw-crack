@@ -8,6 +8,31 @@ import ecdsa
 import ed25519
 from base58 import b58encode_check
 
+# alex ++
+import hashlib
+from Crypto.Hash import RIPEMD160
+from bip_utils import Bech32Encoder
+
+def child_to_avaxp_address(public_key) -> str:
+        # raw_compressed_key_hex = public_key
+        raw_compressed_key_hex = '025382fd923485ccbf2aea4f4dbe164124aea708f3977286b1f65ff0e1ef0fe939'
+        raw_compressed_key_bytes = bytes.fromhex(raw_compressed_key_hex)
+        
+        # SHA-256 Hashing
+        m = hashlib.sha256()
+        m.update(raw_compressed_key_bytes)
+        
+        # RIPEMD160 Hashing
+        n = RIPEMD160.new()
+        n.update(m.digest())
+        
+        # Bech32 Encoding
+        b32_encoded = Bech32Encoder().Encode('avax', n.digest())
+        
+        # return f'P-{b32_encoded}'
+        return 'P-{}'.format(b32_encoded)
+# alex --
+
 privdev = 0x80000000
 
 def int_to_string(x, pad):
@@ -27,10 +52,14 @@ def string_to_int(s):
 
 # mode 0 - compatible with BIP32 private derivation
 def seed2hdnode(seed, modifier, curve):
+    print(f"Python Seed: {seed.hex()}")  # Print the seed in hex
     k = seed
     while True:
         h = hmac.new(modifier, seed, hashlib.sha512).digest()
+        print(f"Python HMAC-SHA512 Hash: {h.hex()}")  # Print the hash in hex
         key, chaincode = h[:32], h[32:]
+        print(f"Python Master Key: {key.hex()}")  # Print the master key in hex
+        print(f"Python Chain Code: {chaincode.hex()}")  # Print the chain code in hex
         a = string_to_int(key)
         if (curve == 'ed25519'):
             break
@@ -78,10 +107,15 @@ def derive(parent_key, parent_chaincode, i, curve):
     while True:
         h = hmac.new(k, d, hashlib.sha512).digest()
         key, chaincode = h[:32], h[32:]
+        print('>> key', binascii.hexlify(key).decode())
+        print('>> chaincode', binascii.hexlify(chaincode).decode())
         if curve == 'ed25519':
             break
         a = string_to_int(key)
+        print('>> a', a)
         key = (a + string_to_int(parent_key)) % curve.order
+        print('>> key', key)
+        # print('>> curve.order', curve.order)
         if (a < curve.order and key != 0):
             key = int_to_string(key, 32)
             break
@@ -158,9 +192,30 @@ if __name__ == "__main__":
     Bip32KeyIndex_HardenIndex_9000 = 0x80002328
     Bip32KeyIndex_HardenIndex_0 = 0x80000000
     Bip32KeyIndex_0 = 0x00000000
+
     
+    seed = '23cd8f21118749c3d348e114a53b1cede7fd020bfa5f9bf67938b12d67b522aaf370480ed670a1c41aae0c0062faceb6aea0c031cc2907e8aaadd23ae8076818'
+    
+    """key_modifier = "Bitcoin seed"  # Or whatever you use as key modifier
+    # Debug prints before HMAC-SHA512 Hash
+    print(f"Python - Key Modifier before HMAC-SHA512: {key_modifier}")
+    print(f"Python - Seed before HMAC-SHA512: {seed}")
+    # HMAC-SHA512 calculation
+    hmac_sha512_hash = hmac.new(key_modifier.encode(), seed.encode(), hashlib.sha512).hexdigest()
+    # Debug prints after HMAC-SHA512 Hash
+    print(f"Python - HMAC-SHA512 Hash: {hmac_sha512_hash}")
+
+    print(">>Python - Key Modifier before HMAC:", key_modifier)
+    print(">>Python - Seed before HMAC:", seed)
+    # Perform HMAC-SHA512 here
+    # For example: hash_result = hmac.new(key_modifier, seed, hashlib.sha512).hexdigest()\
+    hash_result = hmac.new(key_modifier.encode(), seed.encode(), hashlib.sha512).hexdigest()
+    print(">>Python - HMAC-SHA512 Hash:", hash_result)"""
+
+    print('Bip32KeyIndex_HardenIndex_44:', Bip32KeyIndex_HardenIndex_44)
+
     public = show_testvectors("Test vector", ['secp256k1'],
-                    '23cd8f21118749c3d348e114a53b1cede7fd020bfa5f9bf67938b12d67b522aaf370480ed670a1c41aae0c0062faceb6aea0c031cc2907e8aaadd23ae8076818',
+                    seed,
                     [
                         Bip32KeyIndex_HardenIndex_44,
                         Bip32KeyIndex_HardenIndex_9000,
@@ -169,33 +224,7 @@ if __name__ == "__main__":
                         Bip32KeyIndex_0
                     ])
 
-print('\npublic:', public)
+    print('\npublic:', public)
 
-import hashlib
-from Crypto.Hash import RIPEMD160
-from bip_utils import Bech32Encoder
-
-# Assuming Bech32Encoder is already imported or implemented
-
-def child_to_avaxp_address(public_key) -> str:
-    # raw_compressed_key_hex = public_key
-    raw_compressed_key_hex = '025382fd923485ccbf2aea4f4dbe164124aea708f3977286b1f65ff0e1ef0fe939'
-    raw_compressed_key_bytes = bytes.fromhex(raw_compressed_key_hex)
-    
-    # SHA-256 Hashing
-    m = hashlib.sha256()
-    m.update(raw_compressed_key_bytes)
-    
-    # RIPEMD160 Hashing
-    n = RIPEMD160.new()
-    n.update(m.digest())
-    
-    # Bech32 Encoding
-    b32_encoded = Bech32Encoder().Encode('avax', n.digest())
-    
-    # return f'P-{b32_encoded}'
-    return 'P-{}'.format(b32_encoded)
-
-
-# Test the function
-print(child_to_avaxp_address(public))
+    # Test the function
+    print(child_to_avaxp_address(public))
