@@ -149,6 +149,7 @@ def show_testvector(name, curvename, seedhex, derivationpath):
     print('  * private: ' + binascii.hexlify(k).decode())
     print('  * public: ' + binascii.hexlify(p).decode())
     depth = 0
+    counter = 1
     for i in derivationpath:
         if curve == 'ed25519':
             # no public derivation for ed25519
@@ -160,11 +161,12 @@ def show_testvector(name, curvename, seedhex, derivationpath):
             path = path + "<sub>H</sub>"
         k,c = derive(k, c, i, curve)
         p = publickey(k, curve) 
-        print('* Chain ' + path)
+        print('* Chain ' + path, 'step:', counter, 'original path:', i)
         print('  * fingerprint: ' + binascii.hexlify(fpr).decode())
         print('  * chain code: ' + binascii.hexlify(c).decode())
         print('  * private: ' + binascii.hexlify(k).decode())
         print('  * public: ' + binascii.hexlify(p).decode())
+        counter += 1
     public = binascii.hexlify(p).decode()
     return public
 
