@@ -1,5 +1,4 @@
 #!/usr/bin/env python3.4
-
 import binascii
 import hashlib
 import hmac
@@ -52,14 +51,14 @@ def string_to_int(s):
 
 # mode 0 - compatible with BIP32 private derivation
 def seed2hdnode(seed, modifier, curve):
-    print(f"Python Seed: {seed.hex()}")  # Print the seed in hex
+    print(f"Seed: {seed.hex()}")  # Print the seed in hex
     k = seed
     while True:
         h = hmac.new(modifier, seed, hashlib.sha512).digest()
-        print(f"Python HMAC-SHA512 Hash: {h.hex()}")  # Print the hash in hex
+        # print(f"Python HMAC-SHA512 Hash: {h.hex()}")  # Print the hash in hex
         key, chaincode = h[:32], h[32:]
-        print(f"Python Master Key: {key.hex()}")  # Print the master key in hex
-        print(f"Python Chain Code: {chaincode.hex()}")  # Print the chain code in hex
+        # print(f"Python Master Key: {key.hex()}")  # Print the master key in hex
+        # print(f"Python Chain Code: {chaincode.hex()}")  # Print the chain code in hex
         a = string_to_int(key)
         if (curve == 'ed25519'):
             break
@@ -104,18 +103,19 @@ def derive(parent_key, parent_chaincode, i, curve):
     else:
         key = publickey(parent_key, curve)
     d = key + struct.pack('>L', i)
+    # Insert debug prints here
+    print("      * Python Pre-HMAC variable key:", binascii.hexlify(key).decode())
+    print("      * Python Pre-HMAC Buffer:", binascii.hexlify(d).decode())
+    print("      * Python Pre-HMAC Key:", binascii.hexlify(k).decode())
     while True:
         h = hmac.new(k, d, hashlib.sha512).digest()
         key, chaincode = h[:32], h[32:]
-        print('>> key', binascii.hexlify(key).decode())
-        print('>> chaincode', binascii.hexlify(chaincode).decode())
+        print('    * il:', binascii.hexlify(key).decode())
+        print('    * ir:', binascii.hexlify(chaincode).decode())
         if curve == 'ed25519':
             break
         a = string_to_int(key)
-        print('>> a', a)
         key = (a + string_to_int(parent_key)) % curve.order
-        print('>> key', key)
-        # print('>> curve.order', curve.order)
         if (a < curve.order and key != 0):
             key = int_to_string(key, 32)
             break
@@ -139,30 +139,34 @@ def show_testvector(name, curvename, seedhex, derivationpath):
     p = publickey(k, curve)
     fpr = b'\x00\x00\x00\x00'
     path = 'm'
-    print("### "+name+" for "+curvename)
-    print('')
-    print("Seed (hex): " + seedhex)
-    print('')
-    print('* Chain ' + path)
-    print('  * fingerprint: ' + binascii.hexlify(fpr).decode())
+    # print("### "+name+" for "+curvename)
+    # print('')
+    # print("Seed (hex): " + seedhex)
+    # print('')
+    counter = 0
+    print('\n* step:', counter, 'index: m')
+    # print('  * fingerprint: ' + binascii.hexlify(fpr).decode())
     print('  * chain code: ' + binascii.hexlify(c).decode())
     print('  * private: ' + binascii.hexlify(k).decode())
     print('  * public: ' + binascii.hexlify(p).decode())
     depth = 0
-    counter = 1
+    counter += 1
     for i in derivationpath:
         if curve == 'ed25519':
+            print('>> ed25519')
             # no public derivation for ed25519
             i = i | privdev
-        fpr = fingerprint(p)
+        # fpr = fingerprint(p)
         depth = depth + 1
         path = path + "/" + str(i & (privdev-1))
         if ((i & privdev) != 0):
             path = path + "<sub>H</sub>"
+        print('\n* step:', counter, 'index:', i)
+        print('  * chain path: ' + path)
         k,c = derive(k, c, i, curve)
         p = publickey(k, curve) 
-        print('* Chain ' + path, 'step:', counter, 'original path:', i)
-        print('  * fingerprint: ' + binascii.hexlify(fpr).decode())
+        # print('\n* Chain ' + path, 'step:', counter, 'original path:', i)        
+        # print('  * fingerprint: ' + binascii.hexlify(fpr).decode())        
         print('  * chain code: ' + binascii.hexlify(c).decode())
         print('  * private: ' + binascii.hexlify(k).decode())
         print('  * public: ' + binascii.hexlify(p).decode())
@@ -176,45 +180,13 @@ def show_testvectors(name, curvenames, seedhex, derivationpath):
     return public
 
 if __name__ == "__main__":
-    """curvenames = ['secp256k1', 'nist256p1', 'ed25519']
-    show_testvectors("Test vector 1", curvenames,
-                    '000102030405060708090a0b0c0d0e0f',
-                    [privdev + 0, 1, privdev + 2, 2, 1000000000])
-    show_testvectors("Test vector 2", curvenames,
-                    'fffcf9f6f3f0edeae7e4e1dedbd8d5d2cfccc9c6c3c0bdbab7b4b1aeaba8a5a29f9c999693908d8a8784817e7b7875726f6c696663605d5a5754514e4b484542',
-                    [0, privdev + 2147483647, 1, privdev + 2147483646, 2])
-    show_testvectors("Test derivation retry", ['nist256p1'],
-                    '000102030405060708090a0b0c0d0e0f',
-                    [privdev + 28578, 33941])
-    show_testvectors("Test seed retry", ['nist256p1'],
-                    'a7305bc8df8d0951f0cb224c0e95d7707cbdf2c6ce7e8d481fec69c7ff5e9446',
-                    [])"""
     
     Bip32KeyIndex_HardenIndex_44 = 0x8000002c
     Bip32KeyIndex_HardenIndex_9000 = 0x80002328
     Bip32KeyIndex_HardenIndex_0 = 0x80000000
     Bip32KeyIndex_0 = 0x00000000
-
     
     seed = '23cd8f21118749c3d348e114a53b1cede7fd020bfa5f9bf67938b12d67b522aaf370480ed670a1c41aae0c0062faceb6aea0c031cc2907e8aaadd23ae8076818'
-    
-    """key_modifier = "Bitcoin seed"  # Or whatever you use as key modifier
-    # Debug prints before HMAC-SHA512 Hash
-    print(f"Python - Key Modifier before HMAC-SHA512: {key_modifier}")
-    print(f"Python - Seed before HMAC-SHA512: {seed}")
-    # HMAC-SHA512 calculation
-    hmac_sha512_hash = hmac.new(key_modifier.encode(), seed.encode(), hashlib.sha512).hexdigest()
-    # Debug prints after HMAC-SHA512 Hash
-    print(f"Python - HMAC-SHA512 Hash: {hmac_sha512_hash}")
-
-    print(">>Python - Key Modifier before HMAC:", key_modifier)
-    print(">>Python - Seed before HMAC:", seed)
-    # Perform HMAC-SHA512 here
-    # For example: hash_result = hmac.new(key_modifier, seed, hashlib.sha512).hexdigest()\
-    hash_result = hmac.new(key_modifier.encode(), seed.encode(), hashlib.sha512).hexdigest()
-    print(">>Python - HMAC-SHA512 Hash:", hash_result)"""
-
-    print('Bip32KeyIndex_HardenIndex_44:', Bip32KeyIndex_HardenIndex_44)
 
     public = show_testvectors("Test vector", ['secp256k1'],
                     seed,
