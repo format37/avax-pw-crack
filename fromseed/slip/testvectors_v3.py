@@ -6,11 +6,14 @@ import struct
 import ecdsa
 import ed25519
 from base58 import b58encode_check
+# import inspect
+
 
 # alex ++
 import hashlib
 from Crypto.Hash import RIPEMD160
 from bip_utils import Bech32Encoder
+import bip_utils
 
 def child_to_avaxp_address(public_key) -> str:
         # raw_compressed_key_hex = public_key
@@ -26,7 +29,17 @@ def child_to_avaxp_address(public_key) -> str:
         n.update(m.digest())
         
         # Bech32 Encoding
+        print('n.digest():', n.digest().hex())
         b32_encoded = Bech32Encoder().Encode('avax', n.digest())
+
+        # print, where is bip_utils library placed
+        # print(bip_utils.__file__)
+        # print(inspect.getfile(type_of_object))
+        
+        
+        # n_digest_text = '6AD9ACB7D814399C8BA8175B5627E9731EF1941C'
+        # n_digest_bytes = bytes.fromhex(n_digest_text)
+        # b32_encoded = Bech32Encoder().Encode('avax', n_digest_bytes)
         
         # return f'P-{b32_encoded}'
         return 'P-{}'.format(b32_encoded)
@@ -201,4 +214,4 @@ if __name__ == "__main__":
     print('\npublic:', public)
 
     # Test the function
-    print(child_to_avaxp_address(public))
+    print('avaxp:', child_to_avaxp_address(public))

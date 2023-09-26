@@ -1,17 +1,14 @@
-// ++ SHA ++
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-
 #define PBKDF2_SHA512_STATIC
 #define PBKDF2_SHA512_IMPLEMENTATION
 #include "pbkdf2_sha512.h"
-
-//#if defined(HAS_OSSL)
 #include <openssl/evp.h>
 #include <openssl/crypto.h>
 #include <openssl/hmac.h>
-//#endif
+#include <openssl/bn.h>
+
 
 void print_as_hex_hyphen(const uint8_t *s,  const uint32_t slen)
 {
@@ -132,32 +129,200 @@ void compute_pbkdf2(
 
 #define DKLEN 64
 #define ROUNDS 2048
-
 // -- SHA --
 
 // ++ bip32 From seed ++
+typedef struct {
+    unsigned char master_private_key[32];
+    unsigned char chain_code[32];
+} BIP32Info;
 
-void bip32_from_seed(const uint8_t *seed, uint32_t seed_len)
+BIP32Info bip32_from_seed(const uint8_t *seed, uint32_t seed_len)
 {
+	BIP32Info info;
 	// HMAC-SHA512
     unsigned char hash[64];
     unsigned int len = 64;
     HMAC(EVP_sha512(), "Bitcoin seed", 12, seed, seed_len, hash, &len);
-
     // Split the hash into the master private key and chain code
-    unsigned char master_private_key[32];
-    unsigned char chain_code[32];
-    memcpy(master_private_key, hash, 32);
-    memcpy(chain_code, hash + 32, 32);
+    memcpy(info.master_private_key, hash, 32);
+    memcpy(info.chain_code, hash + 32, 32);
+    return info;
+}
+// -- bip32 From seed --
 
-    // Print the master private key and chain code
-    printf("Master Private Key: ");
-    print_as_hex_char(master_private_key, 32);
-    printf("Chain Code: ");
-    print_as_hex_char(chain_code, 32);
+// ++ Child key derivation ++
+void reverse_byte_array(uint8_t *arr, size_t len) {
+    for(size_t i = 0; i < len / 2; i++) {
+        uint8_t tmp = arr[i];
+        arr[i] = arr[len - i - 1];
+        arr[len - i - 1] = tmp;
+    }
 }
 
-// -- bip32 From seed --
+// Debug print for OpenSSL BIGNUM
+void print_bn(const char* label, const BIGNUM* bn) {
+	char* bn_str = BN_bn2dec(bn);
+	printf("%s: %s\n", label, bn_str);
+	OPENSSL_free(bn_str);
+}
+
+void test_reverse_byte_array() {
+    uint8_t arr[4] = {0x01, 0x02, 0x03, 0x04};
+    reverse_byte_array(arr, 4);
+    for (int i = 0; i < 4; i++) {
+        printf("%02x ", arr[i]);
+    }
+    printf("\n");
+}
+
+void GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uint32_t index) {
+    test_reverse_byte_array();
+	static int chain_counter = 0;
+    static char path[100] = ""; // Assuming path length won't exceed 100
+    printf("\n* step %d index: %u\n", chain_counter, index);
+    chain_counter++; // Increment the counter for the next step
+	
+    // Update the path variable
+    if ((index & 0x80000000) != 0) {
+        snprintf(path, sizeof(path), "%s/%uH", path, index);
+    } else {
+        snprintf(path, sizeof(path), "%s/%u", path, index);
+    }
+
+    // Print the full derivation path
+    printf("  * chain path: %s\n", path);
+
+    // BigEndianBuffer equivalent
+    uint8_t buffer[100]; // Assuming buffer length won't exceed 100
+    size_t buffer_len = 0;
+
+    if (index == 0) {
+        // Assuming GetPublicKey() would populate 'pubKey'
+        uint8_t pubKey[33]; // Replace with actual public key
+        memcpy(buffer, pubKey, 33);
+        buffer_len += 33;
+    } else {
+        buffer[0] = 0;
+        memcpy(buffer + 1, key, 32);
+        buffer_len += 33;
+    }
+
+    // Write index in big-endian format
+    buffer[buffer_len++] = (index >> 24) & 0xFF;
+    buffer[buffer_len++] = (index >> 16) & 0xFF;
+    buffer[buffer_len++] = (index >> 8) & 0xFF;
+    buffer[buffer_len++] = index & 0xFF;
+
+    // HMAC-SHA512
+    unsigned int len = 64;
+    uint8_t hash[64];
+    HMAC(EVP_sha512(), chainCode, 32, buffer, buffer_len, hash, &len);
+
+    // Display debug information
+	printf("      * C Pre-HMAC variable key:");
+	print_as_hex_char(key, 32);
+	printf("      * C Pre-HMAC Buffer:");
+	print_as_hex_char(buffer, buffer_len);
+	printf("      * C Pre-HMAC Key:");
+	print_as_hex_char(chainCode, 32);
+
+	// Slice the hash into 'il' and 'ir'
+    uint8_t il[32], ir[32];
+    memcpy(il, hash, 32);
+    memcpy(ir, hash + 32, 32);
+
+    // Print 'il' and 'ir'
+    printf("    * il: ");
+    print_as_hex_char(il, 32);
+    printf("    * ir: ");
+    print_as_hex_char(ir, 32);
+
+	// Initialize OpenSSL big numbers
+    BIGNUM *a = BN_new();
+    BIGNUM *parentKeyInt = BN_new();
+    BIGNUM *curveOrder = BN_new();
+    BIGNUM *newKey = BN_new();
+    BN_CTX *ctx = BN_CTX_new();
+
+	// Set curve order for secp256k1
+	BN_dec2bn(&curveOrder, "115792089237316195423570985008687907852837564279074904382605163141518161494337");
+
+	// Print curve order for verification
+	print_bn("Curve Order", curveOrder);
+
+	// Convert byte arrays to big numbers
+	BN_bin2bn(il, 32, a);
+	BN_bin2bn(key, 32, parentKeyInt);
+
+	// Debug prints before BN_mod_add
+	print_bn("Debug C a (Before mod_add)", a);
+	print_bn("Debug C parentKeyInt (Before mod_add)", parentKeyInt);
+	print_bn("Debug C curveOrder (Before mod_add)", curveOrder);
+
+	// Intermediate manual addition
+	BIGNUM *tempSum = BN_new();
+	BN_add(tempSum, a, parentKeyInt);
+	print_bn("Debug C Temp Sum (a + parentKeyInt)", tempSum);
+	BN_free(tempSum);
+
+	// Perform BN_mod_add
+	if (BN_mod_add(newKey, a, parentKeyInt, curveOrder, ctx) != 1) {
+		printf("Error in BN_mod_add\n");
+	}
+
+	// Debug print after BN_mod_add
+	print_bn("Debug C newKey (After mod_add)", newKey);
+
+
+	int cmpResult = BN_cmp(a, curveOrder);
+	if (cmpResult < 0 && !BN_is_zero(newKey)) {
+		uint8_t newKeyBytes[32] = {0};  // Initialize to zero
+
+		// Debugging: Print length before conversion
+		int newKeyLen = 0;
+		printf("newKeyLen before BN_bn2bin: %d\n", newKeyLen);
+
+		// Convert newKey to byte array
+		print_bn("Debug C newKey (Before BN_bn2bin)", newKey);
+		newKeyLen = BN_bn2bin(newKey, newKeyBytes);
+		print_bn("Debug C newKey (After BN_bn2bin)", newKey);
+
+		// Debugging: Print length and hex dump after conversion
+		printf("newKeyLen after BN_bn2bin: %d\n", newKeyLen);
+		printf("newKeyBytes before reverse: ");
+		print_as_hex_char(newKeyBytes, newKeyLen);
+
+		// Reverse byte array for big-endian
+		//reverse_byte_array(newKeyBytes, newKeyLen);
+
+		// Debugging: Print hex dump after reverse
+		printf("newKeyBytes after reverse: ");
+		print_as_hex_char(newKeyBytes, newKeyLen);
+
+        
+        // Output newKeyBytes and ir (ChainCode)
+        printf("  * chain code:");
+		print_as_hex_char(ir, 32);
+		printf("  * private:");
+		print_as_hex_char(newKeyBytes, 32);
+		
+
+        // If newKeyBytes is less than 32 bytes, you'll need to pad with zeros at the beginning.
+        // If it's more than 32 bytes, you'll need to truncate. This can be done here.
+    } else {
+        printf("C GetChildKeyDerivation: The key at this index is invalid, so we increment the index and try again\n");
+        // Recursive call or loop to retry with incremented index
+    }
+
+    // Free OpenSSL big numbers
+    BN_free(a);
+    BN_free(parentKeyInt);
+    BN_free(curveOrder);
+    BN_free(newKey);
+    BN_CTX_free(ctx);
+}
+// -- Child key derivation --
 
 int main(int argc, char **argv)
 {
@@ -189,12 +354,23 @@ int main(int argc, char **argv)
 		);
 	printf("\n");
 	// print derived key
-	printf("Derived key: ");
+	printf("Seed: ");
 	print_as_hex_uint(derived_key, sizeof derived_key);
 	printf("\n");
 
 	// master key
-	bip32_from_seed(derived_key, sizeof derived_key);
+	BIP32Info master_key = bip32_from_seed(derived_key, sizeof derived_key);
+	printf("Chain Code: ");
+	print_as_hex_char(master_key.chain_code, 32);
+	printf("Private Key: ");
+	print_as_hex_char(master_key.master_private_key, 32);
+
+	// child key derivation
+	uint32_t index44 = 0x8000002C;
+	uint32_t index9000 = 0x80002328;
+	uint32_t index0Hardened = 0x80000000;
+	uint32_t index0 = 0x00000000;
+	GetChildKeyDerivation(master_key.master_private_key, master_key.chain_code, index44);
 
     return 0;
 }
