@@ -13,9 +13,11 @@
 #include <openssl/obj_mac.h>
 //#include <openssl/sha.h>
 #include <openssl/ripemd.h>
+#include <stdint.h>
 
 #define MY_SHA256_DIGEST_LENGTH 32
-
+#define CHARSET "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
+#define CHECKSUM_LENGTH 6
 
 void print_as_hex_hyphen(const uint8_t *s,  const uint32_t slen)
 {
@@ -406,6 +408,100 @@ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uint32_t index
 // -- Child key derivation --
 
 // ++ ChildToAvaxpAddress ++
+
+// ++ Bech32 Encode ++
+void ConvertBytesTo5BitGroups(uint8_t *data, size_t len, int **result, size_t *result_len) {
+    int buffer = 0;
+    int bufferLength = 0;
+    *result_len = 0;
+    *result = malloc(0);
+
+    for(size_t i = 0; i < len; i++) {
+        uint8_t b = data[i];
+        buffer = (buffer << 8) | b;
+        bufferLength += 8;
+
+        while(bufferLength >= 5) {
+            *result_len += 1;
+            *result = realloc(*result, *result_len * sizeof(int));
+            (*result)[*result_len - 1] = (buffer >> (bufferLength - 5)) & 31;
+            bufferLength -= 5;
+        }
+    }
+
+    if(bufferLength > 0) {
+        *result_len += 1;
+        *result = realloc(*result, *result_len * sizeof(int));
+        (*result)[*result_len - 1] = (buffer << (5 - bufferLength)) & 31;
+    }
+}
+
+void ExpandHrp(const char *hrp, int *ret) {
+    size_t hrp_len = strlen(hrp);
+    for (size_t i = 0; i < hrp_len; ++i) {
+        int c = hrp[i];
+        ret[i] = c >> 5;
+        ret[i + hrp_len + 1] = c & 31;
+    }
+    ret[hrp_len] = 0;
+}
+
+int PolyMod(int *values, size_t len) {
+    uint32_t chk = 1;
+    int generator[] = {0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3};
+    for (size_t i = 0; i < len; ++i) {
+        int v = values[i];
+        int top = chk >> 25;
+        chk = (chk & 0x1ffffff) << 5 ^ v;
+        for (int j = 0; j < 5; ++j) {
+            chk ^= ((top >> j) & 1) ? generator[j] : 0;
+        }
+    }
+    return chk;
+}
+
+void CreateChecksum(const char *hrp, int *data, size_t data_len, int *checksum) {
+    size_t hrp_len = strlen(hrp);
+    int *values = malloc((hrp_len * 2 + 1 + data_len + CHECKSUM_LENGTH) * sizeof(int));
+    ExpandHrp(hrp, values);
+    memcpy(values + hrp_len * 2 + 1, data, data_len * sizeof(int));
+    memset(values + hrp_len * 2 + 1 + data_len, 0, CHECKSUM_LENGTH * sizeof(int));
+
+    int polyMod = PolyMod(values, hrp_len * 2 + 1 + data_len + CHECKSUM_LENGTH) ^ 1;
+    for (int i = 0; i < CHECKSUM_LENGTH; ++i) {
+        checksum[i] = (polyMod >> 5 * (5 - i)) & 31;
+    }
+
+    free(values);
+}
+
+char* Encode(const char *hrp, uint8_t *data, size_t data_len) {
+    int *values, *checksum;
+    size_t values_len;
+    ConvertBytesTo5BitGroups(data, data_len, &values, &values_len);
+    checksum = malloc(CHECKSUM_LENGTH * sizeof(int));
+    CreateChecksum(hrp, values, values_len, checksum);
+
+    size_t hrp_len = strlen(hrp);
+    char *result = malloc(hrp_len + 1 + values_len + CHECKSUM_LENGTH + 1);
+    strcpy(result, hrp);
+    strcat(result, "1");
+
+    for (size_t i = 0; i < values_len; ++i) {
+        result[hrp_len + 1 + i] = CHARSET[values[i]];
+    }
+    for (int i = 0; i < CHECKSUM_LENGTH; ++i) {
+        result[hrp_len + 1 + values_len + i] = CHARSET[checksum[i]];
+    }
+    result[hrp_len + 1 + values_len + CHECKSUM_LENGTH] = '\0';
+
+    free(values);
+    free(checksum);
+
+    return result;
+}
+// -- Bech32 Encode --
+
 void hexStringToByteArray(const char *hexString, unsigned char *byteArray, int *byteArrayLength) {
     *byteArrayLength = strlen(hexString) / 2;
     printf("Expected length: %d\n", *byteArrayLength);  // Debug print
@@ -450,10 +546,10 @@ void computeRIPEMD160(unsigned char *data, size_t len, unsigned char *hash) {
     RIPEMD160(data, len, hash);
 }
 
-char* bech32Encode(const char *hrp, unsigned char *data, size_t len) {
+/*char* bech32Encode(const char *hrp, unsigned char *data, size_t len) {
     // TODO: Implement this
     return NULL;
-}
+}*/
 
 // Function to convert byte array to hexadecimal string
 char* byteArrayToHexString(unsigned char *byteArray, size_t byteArrayLen) {
@@ -496,7 +592,8 @@ char* childToAvaxpAddress(const char *publicKeyHex) {
 	printf("RIPEMD160: ");
 	print_as_hex_char(ripemd160Hash, RIPEMD160_DIGEST_LENGTH);
 
-    char *b32Encoded = bech32Encode("avax", ripemd160Hash, RIPEMD160_DIGEST_LENGTH);
+    //char *b32Encoded = bech32Encode("avax", ripemd160Hash, RIPEMD160_DIGEST_LENGTH);
+	char *b32Encoded = Encode("avax", ripemd160Hash, RIPEMD160_DIGEST_LENGTH);
 
     char *finalAddress = malloc(strlen(b32Encoded) + 3);
     sprintf(finalAddress, "P-%s", b32Encoded);
