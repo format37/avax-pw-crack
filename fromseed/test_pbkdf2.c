@@ -8,6 +8,8 @@
 #include <openssl/crypto.h>
 #include <openssl/hmac.h>
 #include <openssl/bn.h>
+#include <openssl/ec.h>
+#include <openssl/obj_mac.h>
 
 
 void print_as_hex_hyphen(const uint8_t *s,  const uint32_t slen)
@@ -176,7 +178,66 @@ void test_reverse_byte_array() {
     printf("\n");
 }
 
-void GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uint32_t index) {
+unsigned char *GetPublicKey(unsigned char *privateKeyBytes, size_t privateKeyLen, int *publicKeyLen) {
+    EC_GROUP *curve = NULL;
+    EC_KEY *eckey = NULL;
+    BIGNUM *privateKey = NULL;
+    EC_POINT *pub_key = NULL;
+    unsigned char *publicKeyBytes = NULL;
+    
+    curve = EC_GROUP_new_by_curve_name(NID_secp256k1);
+    if (curve == NULL) {
+        return NULL;
+    }
+
+    eckey = EC_KEY_new();
+    if (eckey == NULL) {
+        return NULL;
+    }
+    
+    if (!EC_KEY_set_group(eckey, curve)) {
+        return NULL;
+    }
+
+    privateKey = BN_bin2bn(privateKeyBytes, privateKeyLen, NULL);
+    if (privateKey == NULL) {
+        return NULL;
+    }
+    
+    if (!EC_KEY_set_private_key(eckey, privateKey)) {
+        return NULL;
+    }
+    
+    pub_key = EC_POINT_new(curve);
+    if (pub_key == NULL) {
+        return NULL;
+    }
+
+    if (!EC_POINT_mul(curve, pub_key, privateKey, NULL, NULL, NULL)) {
+        return NULL;
+    }
+
+    EC_KEY_set_public_key(eckey, pub_key);
+
+    *publicKeyLen = EC_POINT_point2oct(EC_KEY_get0_group(eckey), EC_KEY_get0_public_key(eckey), POINT_CONVERSION_COMPRESSED, NULL, 0, NULL);
+    publicKeyBytes = (unsigned char *) malloc(*publicKeyLen);
+
+    if (publicKeyBytes == NULL) {
+        return NULL;
+    }
+
+    EC_POINT_point2oct(EC_KEY_get0_group(eckey), EC_KEY_get0_public_key(eckey), POINT_CONVERSION_COMPRESSED, publicKeyBytes, *publicKeyLen, NULL);
+    
+    EC_GROUP_free(curve);
+    EC_KEY_free(eckey);
+    EC_POINT_free(pub_key);
+    BN_free(privateKey);
+
+    return publicKeyBytes;
+}
+
+
+BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uint32_t index) {
     test_reverse_byte_array();
 	static int chain_counter = 0;
     static char path[100] = ""; // Assuming path length won't exceed 100
@@ -198,10 +259,14 @@ void GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uint32_t index) {
     size_t buffer_len = 0;
 
     if (index == 0) {
-        // Assuming GetPublicKey() would populate 'pubKey'
-        uint8_t pubKey[33]; // Replace with actual public key
-        memcpy(buffer, pubKey, 33);
-        buffer_len += 33;
+		printf("    * INDEX is 0\n");
+		size_t publicKeyLen = 0;
+		unsigned char *publicKeyBytes = GetPublicKey(key, 32, &publicKeyLen);
+		print_as_hex_char(publicKeyBytes, publicKeyLen);
+		//buffer[0] = 0x02;
+		//memcpy(buffer + 1, publicKeyBytes + 1, 32);
+		memcpy(buffer, publicKeyBytes, 33);  // Copies the entire 33-byte compressed public key including the first byte
+		buffer_len += 33;		
     } else {
         buffer[0] = 0;
         memcpy(buffer + 1, key, 32);
@@ -274,7 +339,7 @@ void GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uint32_t index) {
 	// Debug print after BN_mod_add
 	print_bn("Debug C newKey (After mod_add)", newKey);
 
-
+	BIP32Info info;
 	int cmpResult = BN_cmp(a, curveOrder);
 	if (cmpResult < 0 && !BN_is_zero(newKey)) {
 		uint8_t newKeyBytes[32] = {0};  // Initialize to zero
@@ -306,7 +371,15 @@ void GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uint32_t index) {
 		print_as_hex_char(ir, 32);
 		printf("  * private:");
 		print_as_hex_char(newKeyBytes, 32);
+		printf("  * public:");
+		size_t publicKeyLen = 0;
+		unsigned char *publicKeyBytes = GetPublicKey(newKeyBytes, 32, &publicKeyLen);
+		print_as_hex_char(publicKeyBytes, publicKeyLen);
+
+
 		
+		memcpy(info.master_private_key, newKeyBytes, 32);
+		memcpy(info.chain_code, ir, 32);		
 
         // If newKeyBytes is less than 32 bytes, you'll need to pad with zeros at the beginning.
         // If it's more than 32 bytes, you'll need to truncate. This can be done here.
@@ -314,6 +387,7 @@ void GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uint32_t index) {
         printf("C GetChildKeyDerivation: The key at this index is invalid, so we increment the index and try again\n");
         // Recursive call or loop to retry with incremented index
     }
+	
 
     // Free OpenSSL big numbers
     BN_free(a);
@@ -321,6 +395,8 @@ void GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uint32_t index) {
     BN_free(curveOrder);
     BN_free(newKey);
     BN_CTX_free(ctx);
+
+	return info;
 }
 // -- Child key derivation --
 
@@ -370,7 +446,18 @@ int main(int argc, char **argv)
 	uint32_t index9000 = 0x80002328;
 	uint32_t index0Hardened = 0x80000000;
 	uint32_t index0 = 0x00000000;
-	GetChildKeyDerivation(master_key.master_private_key, master_key.chain_code, index44);
+	BIP32Info child_key_1 = GetChildKeyDerivation(master_key.master_private_key, master_key.chain_code, index44);
+	BIP32Info child_key_2 = GetChildKeyDerivation(child_key_1.master_private_key, child_key_1.chain_code, index9000);
+	BIP32Info child_key_3 = GetChildKeyDerivation(child_key_2.master_private_key, child_key_2.chain_code, index0Hardened);
+	BIP32Info child_key_4 = GetChildKeyDerivation(child_key_3.master_private_key, child_key_3.chain_code, index0);
+	BIP32Info child_key_5 = GetChildKeyDerivation(child_key_4.master_private_key, child_key_4.chain_code, index0);
+	// print child key
+	printf("Child Key 5: ");
+	print_as_hex_char(child_key_5.master_private_key, 32);
+	printf("Chain Code: ");
+	print_as_hex_char(child_key_5.chain_code, 32);
+
+	
 
     return 0;
 }
