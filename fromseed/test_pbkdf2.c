@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #define PBKDF2_SHA512_STATIC
 #define PBKDF2_SHA512_IMPLEMENTATION
+#include "pbkdf2_sha256.h"
 #include "pbkdf2_sha512.h"
 #include <openssl/evp.h>
 #include <openssl/crypto.h>
@@ -10,6 +11,10 @@
 #include <openssl/bn.h>
 #include <openssl/ec.h>
 #include <openssl/obj_mac.h>
+//#include <openssl/sha.h>
+#include <openssl/ripemd.h>
+
+#define MY_SHA256_DIGEST_LENGTH 32
 
 
 void print_as_hex_hyphen(const uint8_t *s,  const uint32_t slen)
@@ -27,13 +32,13 @@ void print_as_hex_uint(const uint8_t *data,  const uint32_t len) {
     }
     printf("\n");
 }
-
+/*
 void print_as_hex_char(unsigned char *data, size_t len) {
     for (size_t i = 0; i < len; i++) {
         printf("%02x", data[i]);
     }
     printf("\n");
-}
+}*/
 
 void check_with_ossl(const uint8_t *this_one, const uint8_t *ossl_one, uint32_t len,
     const char *what)
@@ -400,6 +405,107 @@ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uint32_t index
 }
 // -- Child key derivation --
 
+// ++ ChildToAvaxpAddress ++
+void hexStringToByteArray(const char *hexString, unsigned char *byteArray, int *byteArrayLength) {
+    *byteArrayLength = strlen(hexString) / 2;
+    printf("Expected length: %d\n", *byteArrayLength);  // Debug print
+    for(int i = 0; i < *byteArrayLength; ++i) {
+        sscanf(hexString + 2*i, "%2hhx", byteArray + i);
+    }
+}
+
+
+void print_as_hex_char(unsigned char *data, int len) {
+    for (int i = 0; i < len; i++) {
+        printf("%02x", data[i]);
+    }
+    printf("\n");
+}
+
+/*void computeSHA256(unsigned char *data, size_t len, unsigned char *hash) {
+    SHA256(data, len, hash);
+}*/
+
+/*void compute_sha256(const uint8_t *msg, uint32_t mlen) {
+    uint8_t md[MY_SHA256_DIGEST_LENGTH] = {0};  // Initialize to zero
+    SHA256_CTX sha;
+    SHA256_Init(&sha);
+
+    SHA256_Update(&sha, msg, mlen);
+
+    SHA256_Final(md, &sha);
+
+    printf("Computed SHA-256: ");
+    print_as_hex_uint(md, sizeof(md));
+}*/
+
+void compute_sha256(const uint8_t *msg, uint32_t mlen, uint8_t *outputHash) {
+    SHA256_CTX sha;
+    SHA256_Init(&sha);
+    SHA256_Update(&sha, msg, mlen);
+    SHA256_Final(outputHash, &sha);
+}
+
+void computeRIPEMD160(unsigned char *data, size_t len, unsigned char *hash) {
+    RIPEMD160(data, len, hash);
+}
+
+char* bech32Encode(const char *hrp, unsigned char *data, size_t len) {
+    // TODO: Implement this
+    return NULL;
+}
+
+// Function to convert byte array to hexadecimal string
+char* byteArrayToHexString(unsigned char *byteArray, size_t byteArrayLen) {
+    char *hexString = malloc(byteArrayLen * 2 + 1);  // Each byte becomes two hex characters; +1 for null-terminator
+    for (size_t i = 0; i < byteArrayLen; i++) {
+        sprintf(hexString + i * 2, "%02x", byteArray[i]);
+    }
+    hexString[byteArrayLen * 2] = '\0';  // Null-terminate the string
+    return hexString;
+}
+
+char* childToAvaxpAddress(const char *publicKeyHex) {
+	printf("Input Public Key Hex: %s\n", publicKeyHex);
+    printf("Expected Public Key Hex Length: %zu\n", strlen(publicKeyHex));
+    int len;
+    unsigned char publicKeyBytes[128];
+    hexStringToByteArray(publicKeyHex, publicKeyBytes, &len);
+    
+    printf("Public Key: ");
+    print_as_hex_uint(publicKeyBytes, len);
+    printf("Public Key Length: %d bytes\n", len);
+
+    //unsigned char sha256Hash[SHA256_DIGEST_LENGTH];
+	//unsigned char sha256Hash[MY_SHA256_DIGEST_LENGTH];
+    //computeSHA256(publicKeyBytes, len, sha256Hash);
+	//computeSHA256(publicKeyHex, len, sha256Hash);
+	/*uint8_t sha256Hash[MY_SHA256_DIGEST_LENGTH];
+    compute_sha256(publicKeyBytes, len);	
+	printf("SHA256: ");
+	print_as_hex_char(sha256Hash, MY_SHA256_DIGEST_LENGTH);*/
+	uint8_t sha256Hash[MY_SHA256_DIGEST_LENGTH];
+    compute_sha256(publicKeyBytes, len, sha256Hash);
+
+    printf("SHA256: ");
+    print_as_hex_uint(sha256Hash, MY_SHA256_DIGEST_LENGTH);
+
+
+    unsigned char ripemd160Hash[RIPEMD160_DIGEST_LENGTH];
+    computeRIPEMD160(sha256Hash, MY_SHA256_DIGEST_LENGTH, ripemd160Hash);
+	printf("RIPEMD160: ");
+	print_as_hex_char(ripemd160Hash, RIPEMD160_DIGEST_LENGTH);
+
+    char *b32Encoded = bech32Encode("avax", ripemd160Hash, RIPEMD160_DIGEST_LENGTH);
+
+    char *finalAddress = malloc(strlen(b32Encoded) + 3);
+    sprintf(finalAddress, "P-%s", b32Encoded);
+
+    free(b32Encoded);
+    return finalAddress;
+}
+// -- ChildToAvaxpAddress --
+
 int main(int argc, char **argv)
 {
 	if (argc != 3)
@@ -411,7 +517,15 @@ int main(int argc, char **argv)
 	printf("arg1: %s\n", argv[1]);
 	// pring arg2
 	printf("arg2: %s\n", argv[2]);
+	/*
+	const char *publicKeyHex = "025382FD923485CCBF2AEA4F4DBE164124AEA708F3977286B1F65FF0E1EF0FE939";
+    unsigned char publicKeyBytes[128];
+    int len;
 
+    hexStringToByteArray(publicKeyHex, publicKeyBytes, &len);
+    printf("Public Key Bytes: ");
+    print_as_hex_char(publicKeyBytes, len);
+	*/
 	unsigned char derived_key[64];  // This will hold the generated seed
     // Initialize derived_key to zeros
     for (int i = 0; i < 64; ++i) {
@@ -436,9 +550,9 @@ int main(int argc, char **argv)
 
 	// master key
 	BIP32Info master_key = bip32_from_seed(derived_key, sizeof derived_key);
-	printf("Chain Code: ");
+	printf("Master Chain Code: ");
 	print_as_hex_char(master_key.chain_code, 32);
-	printf("Private Key: ");
+	printf("Master Private Key: ");
 	print_as_hex_char(master_key.master_private_key, 32);
 
 	// child key derivation
@@ -452,12 +566,25 @@ int main(int argc, char **argv)
 	BIP32Info child_key_4 = GetChildKeyDerivation(child_key_3.master_private_key, child_key_3.chain_code, index0);
 	BIP32Info child_key_5 = GetChildKeyDerivation(child_key_4.master_private_key, child_key_4.chain_code, index0);
 	// print child key
-	printf("Child Key 5: ");
-	print_as_hex_char(child_key_5.master_private_key, 32);
-	printf("Chain Code: ");
+	printf("Child Chain Code: ");
 	print_as_hex_char(child_key_5.chain_code, 32);
+	printf("Child Private Key: ");
+	print_as_hex_char(child_key_5.master_private_key, 32);
+	printf("Child Public Key: ");
+	size_t publicKeyLen = 0;
+	unsigned char *publicKeyBytes = GetPublicKey(child_key_5.master_private_key, 32, &publicKeyLen);
+	print_as_hex_char(publicKeyBytes, publicKeyLen);
 
-	
+	// child to avaxp address
+	//char *avaxp_address = childToAvaxpAddress(publicKeyBytes);
+	//printf("Avaxp Address: %s\n", avaxp_address);
+	char *publicKeyHex = byteArrayToHexString(publicKeyBytes, publicKeyLen);
+	char *avaxp_address = childToAvaxpAddress(publicKeyHex);
+	printf("Avaxp Address: %s\n", avaxp_address);
+	free(publicKeyHex);  // Don't forget to free the allocated memory
+
+	//uint8_t data[] = {0x01, 0x02, 0x03, 0x04, 0x05};
+    //compute_sha256(data, sizeof(data));
 
     return 0;
 }
