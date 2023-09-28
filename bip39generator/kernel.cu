@@ -420,7 +420,7 @@ __device__ void compute_pbkdf2(
 __global__ void Bip39SeedGenerator() {
     // Convert the mnemonic and passphrase to byte arrays (or use them as-is if you can)
     uint8_t *m_mnemonic = (unsigned char *)"sell stereo useless course suffer tribe jazz monster fresh excess wire again father film sudden pelican always room attack rubber pelican trash alone cancel";
-    uint8_t *salt = (unsigned char *)"mnemonicTESTPHRASG";
+    uint8_t *salt = (unsigned char *)"mnemonicTESTPHRASE";
     unsigned char derived_key[64];  // This will hold the generated seed
     // Initialize derived_key to zeros
     for (int i = 0; i < 64; ++i) {
@@ -446,5 +446,6 @@ __global__ void Bip39SeedGenerator() {
         64,
         derived_key
         );
-    
+    printf("Cuda derived_key: ");
+    print_as_hex(derived_key, 64);    
 }

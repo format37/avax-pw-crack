@@ -29,7 +29,7 @@ derived_key_gpu = gpuarray.to_gpu(derived_key_host)
 pbkdf2_hmac_sha512_kernel(block=(1,1,1))
 
 # Copy the derived key back to the host
-derived_key_host = derived_key_gpu.get()
+"""derived_key_host = derived_key_gpu.get()
 
 # derived_key_host now contains the 64-byte seed generated from the mnemonic and passphrase
 print('\nLength of derived key:', len(derived_key_host))
@@ -38,4 +38,4 @@ seed_bytes = bytearray(derived_key_host)
 # print("seed_bytes:", seed_bytes)
 hex_result = seed_bytes.hex()
 hex_result_with_hyphens = add_hyphens_to_hex(hex_result)
-print('result:', hex_result_with_hyphens)
+print('result:', hex_result_with_hyphens)"""

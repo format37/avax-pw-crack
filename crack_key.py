@@ -10,6 +10,7 @@ import json
 import os
 import bip_utils
 print('bip_utils.__path__:', bip_utils.__path__)
+# exit()
 
 class Wallet(object):
     def __init__(self, mnemonic: str):
@@ -17,18 +18,18 @@ class Wallet(object):
         self.seed_generator = Bip39SeedGenerator(mnemonic)
 
     def avax_key(self, passphrase: str):
-        print('passphrase', passphrase)
+        print(' * passphrase:', passphrase)
         seed_bytes = self.seed_generator.Generate(passphrase)
-        print('seed_bytes', seed_bytes)
+        # print('seed_bytes', seed_bytes)
         hex_result = seed_bytes.hex()
-        print('hex_result', hex_result)
+        print(' * hex_result:', hex_result)
         # convert from hex to bytes and store to seed_bytes_restored
         seed_bytes_restored = bytes.fromhex(hex_result)
         master = Bip32Slip10Secp256k1.FromSeed(seed_bytes_restored)
         # print('master', master)
         # print('Master Private Key', master.m_priv_key.Raw())
         # print('Master Key Data', master.m_priv_key.m_key_data)
-        print('master.ChildKey(0).PrivateKey():', master.ChildKey(0).PrivateKey().Raw().ToHex())
+        """print('master.ChildKey(0).PrivateKey():', master.ChildKey(0).PrivateKey().Raw().ToHex())
         print('master.ChildKey(0).ChainCode():', master.ChildKey(0).ChainCode().ToHex())
 
         print('HardenIndex(44):', Bip32KeyIndex.HardenIndex(44))
@@ -60,7 +61,7 @@ class Wallet(object):
         print('master.44.9000.0.0.0.FingerPrint()', master.ChildKey(Bip32KeyIndex.HardenIndex(44)).ChildKey(Bip32KeyIndex.HardenIndex(9000)).ChildKey(Bip32KeyIndex.HardenIndex(0)).ChildKey(0).ChildKey(0).FingerPrint())
         print('master.44.9000.0.0.0.PrivateKey().Raw()', master.ChildKey(Bip32KeyIndex.HardenIndex(44)).ChildKey(Bip32KeyIndex.HardenIndex(9000)).ChildKey(Bip32KeyIndex.HardenIndex(0)).ChildKey(0).ChildKey(0).PrivateKey().Raw())
         print('master.44.9000.0.0.0.ChainCode():', master.ChildKey(Bip32KeyIndex.HardenIndex(44)).ChildKey(Bip32KeyIndex.HardenIndex(9000)).ChildKey(Bip32KeyIndex.HardenIndex(0)).ChildKey(0).ChildKey(0).ChainCode())
-        print('\n')
+        print('\n')"""
 
 
         # m/44'/9000'/0'
@@ -79,8 +80,8 @@ class Wallet(object):
 
 def child_to_avaxp_address(child) -> str:
     m = hashlib.sha256()
-    print('child.PublicKey().Raw():', child.PublicKey())
-    print('child.PublicKey().RawCompressed():', child.PublicKey().RawCompressed())
+    # print('child.PublicKey().Raw():', child.PublicKey())
+    # print('child.PublicKey().RawCompressed():', child.PublicKey().RawCompressed())
     m.update(child.PublicKey().RawCompressed().ToBytes()) # NEED THIS child.PublicKey().RawCompressed()
     
     n = RIPEMD160.new()
@@ -115,18 +116,24 @@ def generate_10_avax_addresses(passphrase: str, wallet: Wallet) -> List[str]:
 
     
     # print('child_to_avaxp_address', child_to_avaxp_address(base_child.ChildKey(0)))
-    exit()
+    # exit()
     for i in range(10):
         child = base_child.ChildKey(i)  # Iterate over the last index to generate 10 keys
+        if (i==0):
+            print('>>> child', child.ChildKey(0).PrivateKey().Raw().ToHex())
         addresses.append(child_to_avaxp_address(child))
     return addresses
 
 
 def guess_avaxp_address(inputs: Iterable[str], wallet: Wallet, target_addresses: list) -> Optional[str]:
     counter = 0
+    print('guessing..')
     for test_passphrase in inputs:
         if len(test_passphrase) != 10:
             continue
+        """if counter < 230:
+            counter += 1
+            continue"""
         computed_addresses = generate_10_avax_addresses(test_passphrase, wallet)
         # Format with 3 signs, using leading zeros
         counter_formatted = f'{counter:03}'
