@@ -18,19 +18,19 @@ typedef struct sha256_ctx_t
 	uint64_t len;                 // processed message length
 	uint32_t h[SHA256_DIGESTINT]; // hash state
 	uint8_t buf[SHA256_BLOCKLEN]; // message block buffer
-} SHA256_CTX;
+} MY_SHA256_CTX;
 
-PBKDF2_SHA256_DEF void sha256_init(SHA256_CTX *ctx);
-PBKDF2_SHA256_DEF void sha256_update(SHA256_CTX *ctx, const uint8_t *m, uint32_t mlen);
+PBKDF2_SHA256_DEF void sha256_init(MY_SHA256_CTX *ctx);
+PBKDF2_SHA256_DEF void sha256_update(MY_SHA256_CTX *ctx, const uint8_t *m, uint32_t mlen);
 // resets state: calls sha256_init
-PBKDF2_SHA256_DEF void sha256_final(SHA256_CTX *ctx, uint8_t *md);
+PBKDF2_SHA256_DEF void sha256_final(MY_SHA256_CTX *ctx, uint8_t *md);
 
 typedef struct hmac_sha256_ctx_t
 {
 	uint8_t buf[SHA256_BLOCKLEN]; // key block buffer, not needed after init
 	uint32_t h_inner[SHA256_DIGESTINT];
 	uint32_t h_outer[SHA256_DIGESTINT];
-	SHA256_CTX sha;
+	MY_SHA256_CTX sha;
 } HMAC_SHA256_CTX;
 
 PBKDF2_SHA256_DEF void hmac_sha256_init(HMAC_SHA256_CTX *hmac, const uint8_t *key, uint32_t keylen);
@@ -78,7 +78,7 @@ static const uint32_t K[64] =
 	0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
 };
 
-static void sha256_transform(SHA256_CTX *s, const uint8_t *buf)
+static void sha256_transform(MY_SHA256_CTX *s, const uint8_t *buf)
 {
 	uint32_t t1, t2, a, b, c, d, e, f, g, h, m[64];
 	uint32_t i, j;
@@ -123,7 +123,7 @@ static void sha256_transform(SHA256_CTX *s, const uint8_t *buf)
 	s->h[7] += h;
 }
 
-PBKDF2_SHA256_DEF void sha256_init(SHA256_CTX *s)
+PBKDF2_SHA256_DEF void sha256_init(MY_SHA256_CTX *s)
 {
 	s->len = 0;
 	
@@ -137,7 +137,7 @@ PBKDF2_SHA256_DEF void sha256_init(SHA256_CTX *s)
 	s->h[7] = 0x5be0cd19;
 }
 
-PBKDF2_SHA256_DEF void sha256_final(SHA256_CTX *s, uint8_t *md)
+PBKDF2_SHA256_DEF void sha256_final(MY_SHA256_CTX *s, uint8_t *md)
 {
 	uint32_t r = s->len % SHA256_BLOCKLEN;
 	
@@ -171,7 +171,7 @@ PBKDF2_SHA256_DEF void sha256_final(SHA256_CTX *s, uint8_t *md)
 	sha256_init(s);
 }
 
-PBKDF2_SHA256_DEF void sha256_update(SHA256_CTX *s, const uint8_t *m, uint32_t len)
+PBKDF2_SHA256_DEF void sha256_update(MY_SHA256_CTX *s, const uint8_t *m, uint32_t len)
 {
 	const uint8_t *p = m;
 	uint32_t r = s->len % SHA256_BLOCKLEN;
@@ -201,7 +201,7 @@ PBKDF2_SHA256_DEF void sha256_update(SHA256_CTX *s, const uint8_t *m, uint32_t l
 
 PBKDF2_SHA256_DEF void hmac_sha256_init(HMAC_SHA256_CTX *hmac, const uint8_t *key, uint32_t keylen)
 {
-	SHA256_CTX *sha = &hmac->sha;
+	MY_SHA256_CTX *sha = &hmac->sha;
 	
 	if (keylen <= SHA256_BLOCKLEN)
 	{
@@ -245,7 +245,7 @@ PBKDF2_SHA256_DEF void hmac_sha256_update(HMAC_SHA256_CTX *hmac, const uint8_t *
 
 PBKDF2_SHA256_DEF void hmac_sha256_final(HMAC_SHA256_CTX *hmac, uint8_t *md)
 {
-	SHA256_CTX *sha = &hmac->sha;
+	MY_SHA256_CTX *sha = &hmac->sha;
 	sha256_final(sha, md);
 	
 	// reset sha to outer state

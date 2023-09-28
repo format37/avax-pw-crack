@@ -28,18 +28,18 @@ typedef struct sha512_ctx_t
     uint64_t len;  // Make sure this is uint64_t
     uint64_t h[SHA512_DIGESTINT];
     uint8_t buf[SHA512_BLOCKLEN];
-} SHA512_CTX;
+} MY_SHA512_CTX;
 
-void sha512_init(SHA512_CTX *ctx);
-void sha512_update(SHA512_CTX *ctx, const uint8_t *m, uint32_t mlen);
-void sha512_final(SHA512_CTX *ctx, uint8_t *md);
+void sha512_init(MY_SHA512_CTX *ctx);
+void sha512_update(MY_SHA512_CTX *ctx, const uint8_t *m, uint32_t mlen);
+void sha512_final(MY_SHA512_CTX *ctx, uint8_t *md);
 
 typedef struct hmac_sha512_ctx_t
 {
 	uint8_t buf[SHA512_BLOCKLEN]; // key block buffer, not needed after init
 	uint64_t h_inner[SHA512_DIGESTINT];
 	uint64_t h_outer[SHA512_DIGESTINT];
-	SHA512_CTX sha;
+	MY_SHA512_CTX sha;
 } HMAC_SHA512_CTX;
 
 PBKDF2_SHA512_DEF void hmac_sha512_init(HMAC_SHA512_CTX *hmac, const uint8_t *key, uint32_t keylen);
@@ -123,7 +123,7 @@ void my_cuda_memcpy_unsigned_char(uint8_t *dst, const uint8_t *src, unsigned int
     }
 }
 
-static void sha512_transform(SHA512_CTX *s, const uint8_t *buf)
+static void sha512_transform(MY_SHA512_CTX *s, const uint8_t *buf)
 {
     uint64_t t1, t2, a, b, c, d, e, f, g, h, m[80]; // Change to uint64_t and m[80]
     uint32_t i, j;
@@ -174,7 +174,7 @@ static void sha512_transform(SHA512_CTX *s, const uint8_t *buf)
 }
 
 
-void sha512_init(SHA512_CTX *s)
+void sha512_init(MY_SHA512_CTX *s)
 {
 	s->len = 0;
 	s->h[0] = 0x6a09e667f3bcc908ULL;
@@ -187,7 +187,7 @@ void sha512_init(SHA512_CTX *s)
 	s->h[7] = 0x5be0cd19137e2179ULL;
 }
 
-void sha512_final(SHA512_CTX *s, uint8_t *md)
+void sha512_final(MY_SHA512_CTX *s, uint8_t *md)
 {
 	uint32_t r = s->len % SHA512_BLOCKLEN;
 	uint64_t totalBits = s->len * 8;  // Total bits
@@ -228,7 +228,7 @@ void sha512_final(SHA512_CTX *s, uint8_t *md)
 	// Debug line to print the final state
 }
 
-void sha512_update(SHA512_CTX *s, const uint8_t *m, uint32_t len)
+void sha512_update(MY_SHA512_CTX *s, const uint8_t *m, uint32_t len)
 {
 	const uint8_t *p = m;
 	uint32_t r = s->len % SHA512_BLOCKLEN;
@@ -261,7 +261,7 @@ void sha512_update(SHA512_CTX *s, const uint8_t *m, uint32_t len)
 
 PBKDF2_SHA512_DEF void hmac_sha512_init(HMAC_SHA512_CTX *hmac, const uint8_t *key, uint32_t keylen)
 {
-	SHA512_CTX *sha = &hmac->sha;	
+	MY_SHA512_CTX *sha = &hmac->sha;	
 	if (keylen <= SHA512_BLOCKLEN)
 	{
 		//memcpy(hmac->buf, key, keylen);
@@ -306,7 +306,7 @@ PBKDF2_SHA512_DEF void hmac_sha512_update(HMAC_SHA512_CTX *hmac, const uint8_t *
 
 PBKDF2_SHA512_DEF void hmac_sha512_final(HMAC_SHA512_CTX *hmac, uint8_t *md)
 {
-	SHA512_CTX *sha = &hmac->sha;
+	MY_SHA512_CTX *sha = &hmac->sha;
 	sha512_final(sha, md);
 	
 	// reset sha to outer state

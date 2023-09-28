@@ -3,21 +3,33 @@
 #include <stdlib.h>
 #define PBKDF2_SHA512_STATIC
 #define PBKDF2_SHA512_IMPLEMENTATION
-#include "pbkdf2_sha256.h"
-#include "pbkdf2_sha512.h"
+//#include "pbkdf2_sha256.h"
+//#include "pbkdf2_sha512.h"
 #include <openssl/evp.h>
 #include <openssl/crypto.h>
 #include <openssl/hmac.h>
 #include <openssl/bn.h>
 #include <openssl/ec.h>
 #include <openssl/obj_mac.h>
-//#include <openssl/sha.h>
+#include <openssl/sha.h>
 #include <openssl/ripemd.h>
 #include <stdint.h>
+#include <openssl/sha.h>
 
 #define MY_SHA256_DIGEST_LENGTH 32
 #define CHARSET "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
 #define CHECKSUM_LENGTH 6
+
+// ++ Declarations ++
+void print_as_hex_char(unsigned char *data, int len);
+//void my_cuda_memcpy_unsigned_char(unsigned char *dest, const unsigned char *src, size_t len);  // Assuming this function is defined elsewhere
+// -- Declarations --
+
+void my_cuda_memcpy_unsigned_char(uint8_t *dst, const uint8_t *src, unsigned int n) {
+    for (unsigned int i = 0; i < n; ++i) {
+        dst[i] = src[i];
+    }
+}
 
 void print_as_hex_hyphen(const uint8_t *s,  const uint32_t slen)
 {
@@ -56,15 +68,21 @@ void check_with_ossl(const uint8_t *this_one, const uint8_t *ossl_one, uint32_t 
 	}
 }
 
-void compute_sha(const uint8_t *msg, uint32_t mlen)
+void compute_sha(const uint8_t *msg, size_t mlen)
 {
-	uint8_t md[SHA512_DIGESTLEN] = {0};  // Initialize to zero
+	/*uint8_t md[SHA512_DIGESTLEN] = {0};  // Initialize to zero
     SHA512_CTX sha;
     sha512_init(&sha);
 
     sha512_update(&sha, msg, mlen);
 
-    sha512_final(&sha, md);
+    sha512_final(&sha, md);*/
+    // SHA512_DIGESTLEN 64ul
+    uint8_t md[64ul] = {0};  // Initialize to zero
+    SHA512_CTX sha512;
+    SHA512_Init(&sha512);
+    SHA512_Update(&sha512, msg, mlen);
+    SHA512_Final(md, &sha512);
 
     printf("Computed SHA-512: ");
     print_as_hex_uint(md, sizeof md);
@@ -82,13 +100,25 @@ void compute_sha(const uint8_t *msg, uint32_t mlen)
 #endif
 }
 
-void compute_hmac(const uint8_t *key, uint32_t klen, const uint8_t *msg, uint32_t mlen)
+void compute_hmac(const uint8_t *key, uint32_t klen, const uint8_t *msg, size_t mlen)
 {
-	uint8_t md[SHA512_DIGESTLEN];
-	HMAC_SHA512_CTX hmac;
+	//uint8_t md[64ul];
+	/*HMAC_SHA512_CTX hmac;
 	hmac_sha512_init(&hmac, key, klen);
 	hmac_sha512_update(&hmac, msg, mlen);
-	hmac_sha512_final(&hmac, md);
+	hmac_sha512_final(&hmac, md);*/
+    unsigned char md[64ul]; // Use OpenSSL's SHA512_DIGEST_LENGTH instead of hardcoding
+    unsigned int md_len;  // Length of the output hash
+    if (klen > INT_MAX || mlen > INT_MAX) {
+        // Handle error, perhaps return a specific error code or print an error message.
+        printf("Error: klen or mlen is too large\n");
+        return;
+    }
+
+    // Using OpenSSL's HMAC function
+    //HMAC(EVP_sha512(), key, klen, msg, mlen, md, &md_len);
+    HMAC(EVP_sha512(), key, (int)klen, msg, (size_t)mlen, md, &md_len);
+
 	printf("Computed HMAC-SHA-512: ");
 	print_as_hex_uint(md, sizeof md);
 	
@@ -116,9 +146,42 @@ void compute_pbkdf2(
 	unsigned char *derived_key
 	)
 {
+    if (klen > INT_MAX || slen > INT_MAX || rounds > INT_MAX || dklen > INT_MAX) {
+        // Handle error, perhaps return a specific error code or print an error message.
+        printf("Error: klen, slen, rounds, or dklen is too large\n");
+        return;
+    }
 	uint8_t *dk = malloc(dklen);
-	HMAC_SHA512_CTX pbkdf_hmac;
-	pbkdf2_sha512(&pbkdf_hmac, key, klen, salt, slen, rounds, dk, dklen);
+	//HMAC_SHA512_CTX pbkdf_hmac;
+	//pbkdf2_sha512(&pbkdf_hmac, key, klen, salt, slen, rounds, dk, dklen);
+    if (dk == NULL) {
+        // Handle memory allocation failure
+        fprintf(stderr, "Memory allocation failed\n");
+        exit(1);
+    }
+    // Check if uint32_t values can fit into int
+    if (klen > INT_MAX || slen > INT_MAX || rounds > INT_MAX || dklen > INT_MAX) {
+        // Handle error: these values are too large to be safely cast to int
+        fprintf(stderr, "One of the uint32_t values is too large to fit into an int.\n");
+        exit(1);  // Or other error handling
+    }
+    // Using OpenSSL's PBKDF2 function
+    if (PKCS5_PBKDF2_HMAC(
+        (const char *)key,
+        klen,
+        salt,
+        slen,
+        rounds,
+        EVP_sha512(),
+        dklen,
+        dk
+    ) == 0)
+    {
+        // Handle error
+        fprintf(stderr, "Error in PBKDF2\n");
+        free(dk);
+        exit(1);
+    }
 	printf("Computed PBKDF2-SHA-512: ");
 	print_as_hex_uint(dk, dklen);
 	my_cuda_memcpy_unsigned_char(derived_key, dk, dklen);
@@ -185,7 +248,7 @@ void test_reverse_byte_array() {
     printf("\n");
 }
 
-unsigned char *GetPublicKey(unsigned char *privateKeyBytes, size_t privateKeyLen, int *publicKeyLen) {
+unsigned char *GetPublicKey(unsigned char *privateKeyBytes, size_t privateKeyLen, size_t *publicKeyLen) {
     EC_GROUP *curve = NULL;
     EC_KEY *eckey = NULL;
     BIGNUM *privateKey = NULL;
@@ -227,13 +290,15 @@ unsigned char *GetPublicKey(unsigned char *privateKeyBytes, size_t privateKeyLen
     EC_KEY_set_public_key(eckey, pub_key);
 
     *publicKeyLen = EC_POINT_point2oct(EC_KEY_get0_group(eckey), EC_KEY_get0_public_key(eckey), POINT_CONVERSION_COMPRESSED, NULL, 0, NULL);
-    publicKeyBytes = (unsigned char *) malloc(*publicKeyLen);
+    //publicKeyBytes = (unsigned char *) malloc(*publicKeyLen);
+    publicKeyBytes = (unsigned char *) malloc((size_t) *publicKeyLen);
 
     if (publicKeyBytes == NULL) {
         return NULL;
     }
 
-    EC_POINT_point2oct(EC_KEY_get0_group(eckey), EC_KEY_get0_public_key(eckey), POINT_CONVERSION_COMPRESSED, publicKeyBytes, *publicKeyLen, NULL);
+    //EC_POINT_point2oct(EC_KEY_get0_group(eckey), EC_KEY_get0_public_key(eckey), POINT_CONVERSION_COMPRESSED, publicKeyBytes, *publicKeyLen, NULL);
+    EC_POINT_point2oct(EC_KEY_get0_group(eckey), EC_KEY_get0_public_key(eckey), POINT_CONVERSION_COMPRESSED, publicKeyBytes, (size_t) *publicKeyLen, NULL);
     
     EC_GROUP_free(curve);
     EC_KEY_free(eckey);
@@ -252,11 +317,11 @@ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uint32_t index
     chain_counter++; // Increment the counter for the next step
 	
     // Update the path variable
-    if ((index & 0x80000000) != 0) {
+    /*if ((index & 0x80000000) != 0) {
         snprintf(path, sizeof(path), "%s/%uH", path, index);
     } else {
         snprintf(path, sizeof(path), "%s/%u", path, index);
-    }
+    }*/
 
     // Print the full derivation path
     printf("  * chain path: %s\n", path);
@@ -446,15 +511,18 @@ void ExpandHrp(const char *hrp, int *ret) {
     ret[hrp_len] = 0;
 }
 
-int PolyMod(int *values, size_t len) {
+uint32_t PolyMod(int *values, size_t len) {
     uint32_t chk = 1;
     int generator[] = {0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3};
     for (size_t i = 0; i < len; ++i) {
         int v = values[i];
-        int top = chk >> 25;
-        chk = (chk & 0x1ffffff) << 5 ^ v;
+        //int top = chk >> 25;
+        uint32_t top = chk >> 25;
+        //chk = (chk & 0x1ffffff) << 5 ^ v;
+        chk = (chk & 0x1ffffff) << 5 ^ (uint32_t) v;
         for (int j = 0; j < 5; ++j) {
-            chk ^= ((top >> j) & 1) ? generator[j] : 0;
+            //chk ^= ((top >> j) & 1) ? generator[j] : 0;
+            chk ^= ((top >> j) & 1) ? (uint32_t) generator[j] : 0U;
         }
     }
     return chk;
@@ -467,7 +535,15 @@ void CreateChecksum(const char *hrp, int *data, size_t data_len, int *checksum) 
     memcpy(values + hrp_len * 2 + 1, data, data_len * sizeof(int));
     memset(values + hrp_len * 2 + 1 + data_len, 0, CHECKSUM_LENGTH * sizeof(int));
 
-    int polyMod = PolyMod(values, hrp_len * 2 + 1 + data_len + CHECKSUM_LENGTH) ^ 1;
+    //int polyMod = PolyMod(values, hrp_len * 2 + 1 + data_len + CHECKSUM_LENGTH) ^ 1;
+    int polyMod=0;
+    uint32_t temp = PolyMod(values, hrp_len * 2 + 1 + data_len + CHECKSUM_LENGTH);
+    if (temp <= INT_MAX) {
+        polyMod = temp ^ 1;
+    } else {
+        // Handle error
+        fprintf(stderr, "Error: PolyMod value is too large to fit into an int\n");
+    }
     for (int i = 0; i < CHECKSUM_LENGTH; ++i) {
         checksum[i] = (polyMod >> 5 * (5 - i)) & 31;
     }
@@ -490,7 +566,11 @@ char* Encode(const char *hrp, uint8_t *data, size_t data_len) {
     for (size_t i = 0; i < values_len; ++i) {
         result[hrp_len + 1 + i] = CHARSET[values[i]];
     }
-    for (int i = 0; i < CHECKSUM_LENGTH; ++i) {
+    /*for (int i = 0; i < CHECKSUM_LENGTH; ++i) {
+        //result[hrp_len + 1 + values_len + i] = CHARSET[checksum[i]];
+        result[(size_t)(hrp_len + 1 + values_len + i)] = CHARSET[checksum[i]];
+    }*/
+    for (size_t i = 0; i < CHECKSUM_LENGTH; ++i) {
         result[hrp_len + 1 + values_len + i] = CHARSET[checksum[i]];
     }
     result[hrp_len + 1 + values_len + CHECKSUM_LENGTH] = '\0';
@@ -535,7 +615,7 @@ void print_as_hex_char(unsigned char *data, int len) {
     print_as_hex_uint(md, sizeof(md));
 }*/
 
-void compute_sha256(const uint8_t *msg, uint32_t mlen, uint8_t *outputHash) {
+void compute_sha256(const uint8_t *msg, size_t mlen, uint8_t *outputHash) {
     SHA256_CTX sha;
     SHA256_Init(&sha);
     SHA256_Update(&sha, msg, mlen);
@@ -569,7 +649,8 @@ char* childToAvaxpAddress(const char *publicKeyHex) {
     hexStringToByteArray(publicKeyHex, publicKeyBytes, &len);
     
     printf("Public Key: ");
-    print_as_hex_uint(publicKeyBytes, len);
+    //print_as_hex_uint(publicKeyBytes, len);
+    print_as_hex_uint(publicKeyBytes, (uint32_t) len);
     printf("Public Key Length: %d bytes\n", len);
 
     //unsigned char sha256Hash[SHA256_DIGEST_LENGTH];
@@ -581,7 +662,8 @@ char* childToAvaxpAddress(const char *publicKeyHex) {
 	printf("SHA256: ");
 	print_as_hex_char(sha256Hash, MY_SHA256_DIGEST_LENGTH);*/
 	uint8_t sha256Hash[MY_SHA256_DIGEST_LENGTH];
-    compute_sha256(publicKeyBytes, len, sha256Hash);
+    //compute_sha256(publicKeyBytes, len, sha256Hash);
+    compute_sha256(publicKeyBytes, (uint32_t) len, sha256Hash);
 
     printf("SHA256: ");
     print_as_hex_uint(sha256Hash, MY_SHA256_DIGEST_LENGTH);
