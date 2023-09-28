@@ -19,12 +19,28 @@ class CudaProcessor:
         self._initialize_cuda()
         
     def _initialize_cuda(self):
-        drv.init()
-        self.dev = drv.Device(self.device_id)
-        self.ctx = self.dev.make_context()
-        
-        mod = SourceModule(open(self.kernel_file, 'r').read(), arch='sm_86')
-        self.my_kernel = mod.get_function("my_kernel")
+        try:
+            drv.init()
+            self.dev = drv.Device(self.device_id)
+            self.ctx = self.dev.make_context()
+            
+            # Define the nvcc options
+            options = [
+                '--arch=sm_86', 
+                f'-I{os.getcwd()}',  # Include the current working directory
+            ]
+            
+            # Read and compile the CUDA code
+            with open(self.kernel_file, 'r') as f:
+                cuda_code = f.read()
+            
+            mod = SourceModule(cuda_code, options=options)
+            
+            # Get the CUDA function
+            self.my_kernel = mod.get_function("my_kernel")
+            
+        except Exception as e:
+            print(f"An error occurred during CUDA initialization: {e}")
         
     def load_data(self):
         # computed_addresses
