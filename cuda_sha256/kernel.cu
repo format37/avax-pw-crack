@@ -799,6 +799,20 @@ __device__ void my_cuda_memcpy_uint32_t_to_uint8_t(uint8_t *dst, const uint32_t 
     }
 }
 
+__device__ void bigNumAddAndPrint(uint32_t* a, uint32_t* b, uint32_t* result, int num_chunks) {
+    uint64_t carry = 0;
+    printf("      * CUDA Temp Sum (Before bigNumAdd):");
+    for (int i = 0; i < num_chunks; ++i) {
+        uint64_t sum = (uint64_t)a[i] + (uint64_t)b[i] + carry;
+        result[i] = (uint32_t)sum;  // Store the lower 32 bits in the result
+        carry = sum >> 32;  // The upper 32 bits become the carry for the next iteration
+        printf("%08x", result[i]);
+    }
+    printf("\n");
+}
+
+
+
 __device__ void bigNumMod(uint32_t* a, uint32_t* m, uint32_t* result, int num_chunks) {
     bool isGreaterOrEqual = true;  // Start by assuming a >= m
 
@@ -831,7 +845,28 @@ __device__ void bigNumMod(uint32_t* a, uint32_t* m, uint32_t* result, int num_ch
     }
 }
 
+__device__ void bigNumModAddAndPrint(uint32_t* a, uint32_t* b, uint32_t* m, uint32_t* result, int num_chunks) {
+    // Create temporary storage for the sum
+    uint32_t* temp = new uint32_t[num_chunks];  
+    // Perform addition and print the result
+    bigNumAddAndPrint(a, b, temp, num_chunks);
+    // Perform modular reduction
+    bigNumMod(temp, m, result, num_chunks);
+    // Free the temporary storage
+    delete[] temp;
+}
+
 __device__ void bigNumAdd(uint32_t* a, uint32_t* b, uint32_t* result, int num_chunks) {
+	printf("      * Cuda a (Before bigNumAdd):");
+	for (int i = 0; i < num_chunks; i++) {
+		printf("%08x", a[i]);
+	}
+	printf("\n");
+	printf("      * Cuda b (Before bigNumAdd):");
+	for (int i = 0; i < num_chunks; i++) {
+		printf("%08x", b[i]);
+	}
+	printf("\n");
     uint64_t carry = 0;
     for (int i = 0; i < num_chunks; ++i) {
         uint64_t sum = (uint64_t)a[i] + (uint64_t)b[i] + carry;
@@ -841,6 +876,21 @@ __device__ void bigNumAdd(uint32_t* a, uint32_t* b, uint32_t* result, int num_ch
 }
 
 __device__ void bigNumModAdd(uint32_t* a, uint32_t* b, uint32_t* m, uint32_t* result, int num_chunks) {
+	printf("      * Cuda a (Before bigNumModAdd):");
+	for (int i = 0; i < num_chunks; i++) {
+		printf("%08x", a[i]);
+	}
+	printf("\n");
+	printf("      * Cuda b (Before bigNumModAdd):");
+	for (int i = 0; i < num_chunks; i++) {
+		printf("%08x", b[i]);
+	}
+	printf("\n");
+	printf("      * Cuda m (Before bigNumModAdd):");
+	for (int i = 0; i < num_chunks; i++) {
+		printf("%08x", m[i]);
+	}
+	printf("\n");
     uint32_t* temp = new uint32_t[num_chunks];  // Allocate temporary storage for the sum
     bigNumAdd(a, b, temp, num_chunks);
     bigNumMod(temp, m, result, num_chunks);  // Assume bigNumMod performs modular reduction
@@ -867,10 +917,7 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
     BIP32Info info;
 
     // Initialize big number chunks for curveOrder, il, parentKeyInt, and newKey
-    uint32_t il[8], parentKeyInt[8], newKey[8];
-
-    // Initialize curveOrder with the value for secp256k1
-    uint32_t curveOrder[8] = {0xD0364141, 0xBFD25E8C, 0xAF48A03B, 0xBAAEDCE6, 0xFFFFFFFE, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF};
+    uint32_t parentKeyInt[8];
     
     // Conversion of 'key' to big number chunks
     for (int i = 0; i < 8; ++i) {
@@ -921,7 +968,7 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
     }
     printf("\n");   
 
-	uint32_t ir[8];
+	uint32_t il[8], ir[8];
 	// Populate il and ir from hash
 	//my_cuda_memcpy_uint32_t(il, (uint32_t*)hash, 8); // Using uint32_t version for il
 	//my_cuda_memcpy_uint32_t(ir, (uint32_t*)(hash + 32), 8); // Using uint32_t version for ir
@@ -965,6 +1012,15 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
 	}
 	printf("\n");
 
+	// Initialize curveOrder with the value for secp256k1
+    // uint32_t curveOrder[8] = {0xD0364141, 0xBFD25E8C, 0xAF48A03B, 0xBAAEDCE6, 0xFFFFFFFE, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF};
+	// uint32_t curveOrder[8] = {0xCD0364141, 0xBBFD25E8C, 0xAFAF48A03, 0xFFFFFFEB, 0xFFFFFFAA, 0xFFFFFFED, 0xFFFFFFCE, 0xFFFFFF6A};
+	// uint32_t curveOrder[8] = {0xFFFFFFFE, 0xFFFFFFFF, 0xFFFFFFFF, 0xE6FFFFFF, 0x6DBAAEDC, 0x62AF48A0, 0x53D25E8C, 0xC4D03641};
+	// uint32_t curveOrder[8] = {0xFFFFFC2F, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF};
+	uint32_t curveOrder[8] = {0xffffffff, 0xffffffff, 0xffffffff, 0xfffffffe, 0xbaaedce6, 0xaf48a03b, 0xbfd25e8c, 0xd0364141};
+
+
+
 	// Before bigNumModAdd
 	/*printf("il: ");
 	for (int i = 0; i < 8; i++) {
@@ -982,11 +1038,14 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
 	}
 	printf("\n");
 
+	uint32_t newKey[8];
+
     // Perform BN_mod_add
-    bigNumModAdd(il, parentKeyInt, curveOrder, newKey, 8);
+    // bigNumModAdd(il, parentKeyInt, curveOrder, newKey, 8);
+	bigNumModAddAndPrint(il, parentKeyInt, curveOrder, newKey, 8);
 
 	// After bigNumModAdd
-	printf("newKey: ");
+	printf("Debug Cuda newKey after bigNumModAdd: ");
 	for (int i = 0; i < 8; i++) {
 		printf("%08x", newKey[i]);
 	}

@@ -312,6 +312,35 @@ unsigned char *GetPublicKey(unsigned char *privateKeyBytes, size_t privateKeyLen
     return publicKeyBytes;
 }
 
+void print_bn_as_uint32_array(const char* label, const BIGNUM* bn) {
+    int num_bytes = BN_num_bytes(bn);
+    unsigned char buffer[num_bytes];
+    BN_bn2bin(bn, buffer);
+    
+    printf("%s as uint32_t array: ", label);
+    for (int i = 0; i < num_bytes / 4; i++) {
+        uint32_t val = 0;
+        for (int j = 0; j < 4; j++) {
+            val = (val << 8) | buffer[i * 4 + j];
+        }
+        printf("0x%08x, ", val);
+    }
+    printf("\n");
+}
+
+// Debug print for OpenSSL BIGNUM in Decimal
+void print_bn_dec(const char* label, const BIGNUM* bn) {
+    char* bn_str = BN_bn2dec(bn);
+    printf("%s (Decimal): %s\n", label, bn_str);
+    OPENSSL_free(bn_str);
+}
+
+// Debug print for OpenSSL BIGNUM in Hexadecimal
+void print_bn_hex(const char* label, const BIGNUM* bn) {
+    char* bn_str = BN_bn2hex(bn);
+    printf("%s (Hexadecimal): %s\n", label, bn_str);
+    OPENSSL_free(bn_str);
+}
 
 BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uint32_t index) {
     test_reverse_byte_array();
@@ -396,7 +425,6 @@ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uint32_t index
     BIGNUM *a = BN_new();
     BIGNUM *parentKeyInt = BN_new();
     BIGNUM *curveOrder = BN_new();
-    BIGNUM *newKey = BN_new();
     BN_CTX *ctx = BN_CTX_new();
 
 	// Set curve order for secp256k1
@@ -404,6 +432,10 @@ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uint32_t index
 
 	// Print curve order for verification
 	print_bn("Curve Order", curveOrder);
+    print_bn_as_uint32_array("Curve Order", curveOrder);
+    // Print curve order in both decimal and hexadecimal for verification
+    print_bn_dec("Curve Order", curveOrder);
+    print_bn_hex("Curve Order", curveOrder);
 
 	// Convert byte arrays to big numbers
 	BN_bin2bn(il, 32, a);
@@ -419,6 +451,8 @@ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uint32_t index
 	BN_add(tempSum, a, parentKeyInt);
 	print_bn("Debug C Temp Sum (a + parentKeyInt)", tempSum);
 	BN_free(tempSum);
+
+    BIGNUM *newKey = BN_new();
 
 	// Perform BN_mod_add
 	if (BN_mod_add(newKey, a, parentKeyInt, curveOrder, ctx) != 1) {
