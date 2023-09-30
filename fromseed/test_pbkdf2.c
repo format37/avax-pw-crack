@@ -211,6 +211,8 @@ typedef struct {
 
 BIP32Info bip32_from_seed(const uint8_t *seed, uint32_t seed_len)
 {
+    // print seed len
+    printf("Seed length: %d\n", seed_len);
 	BIP32Info info;
 	// HMAC-SHA512
     unsigned char hash[64];

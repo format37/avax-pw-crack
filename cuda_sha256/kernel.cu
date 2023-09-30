@@ -738,6 +738,44 @@ __device__ void compute_sha256(const uint8_t *msg, uint32_t mlen)
 }
 // -- PBKDF2 SHA256 --
 
+// ++ bip32 From seed ++
+__device__ void print_as_hex_char(unsigned char *data, int len) {
+    for (int i = 0; i < len; i++) {
+        printf("%02x", data[i]);
+    }
+    printf("\n");
+}
+
+typedef struct {
+    unsigned char master_private_key[32];
+    unsigned char chain_code[32];
+} BIP32Info;
+
+__device__ BIP32Info bip32_from_seed_kernel(const uint8_t *seed, uint32_t seed_len) {
+	// print seed len
+	printf("Seed len: %d\n", seed_len);
+    BIP32Info info;
+	// Initialize HMAC_SHA512_CTX
+    HMAC_SHA512_CTX hmac;
+    
+    // Compute HMAC-SHA512 with "Bitcoin seed" as the key
+    hmac_sha512_init(&hmac, (const uint8_t *)"Bitcoin seed", 12);
+    hmac_sha512_update(&hmac, seed, seed_len);
+    
+    unsigned char hash[64];
+    hmac_sha512_final(&hmac, hash);
+    
+    // Copy the first 32 bytes to master_private_key and the next 32 bytes to chain_code
+    //my_cuda_memcpy_unsigned_char(info->master_private_key, hash, 32);
+    //my_cuda_memcpy_unsigned_char(info->chain_code, hash + 32, 32);
+	my_cuda_memcpy_unsigned_char(info.master_private_key, hash, 32);
+	my_cuda_memcpy_unsigned_char(info.chain_code, hash + 32, 32);
+
+
+	return info;
+}
+// -- bip32 From seed --
+
 __global__ void Bip39SeedGenerator() {
     // Convert the mnemonic and passphrase to byte arrays (or use them as-is if you can)
     uint8_t *m_mnemonic = (unsigned char *)"sell stereo useless course suffer tribe jazz monster fresh excess wire again father film sudden pelican always room attack rubber pelican trash alone cancel";
@@ -771,4 +809,12 @@ __global__ void Bip39SeedGenerator() {
     print_as_hex(derived_key, 64);
 
     compute_sha256((uint8_t *) m_mnemonic, my_strlen((const char*) m_mnemonic));
+
+	// master key
+	// BIP32Info master_key = bip32_from_seed_kernel(derived_key, my_strlen((const char*) derived_key));
+	BIP32Info master_key = bip32_from_seed_kernel(derived_key, 64);
+	printf("Master Chain Code: ");
+	print_as_hex_char(master_key.chain_code, 32);
+	printf("Master Private Key: ");
+	print_as_hex_char(master_key.master_private_key, 32);
 }
