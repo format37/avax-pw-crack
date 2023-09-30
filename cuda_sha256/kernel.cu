@@ -774,6 +774,148 @@ __device__ BIP32Info bip32_from_seed_kernel(const uint8_t *seed, uint32_t seed_l
 }
 // -- bip32 From seed --
 
+// ++ Child Key Derivation ++
+__device__ void my_cuda_memcpy_uint32_t(uint32_t *dst, const uint32_t *src, unsigned int n) {
+    for (unsigned int i = 0; i < n / sizeof(uint32_t); ++i) {  // assuming n is in bytes
+        dst[i] = src[i];
+    }
+}
+
+__device__ void my_cuda_memcpy_uint32_t_to_uint8_t(uint8_t *dst, const uint32_t *src, unsigned int n) {
+    for (unsigned int i = 0; i < n / sizeof(uint32_t); ++i) {
+        uint32_t val = src[i];
+        dst[4 * i] = (val) & 0xFF;
+        dst[4 * i + 1] = (val >> 8) & 0xFF;
+        dst[4 * i + 2] = (val >> 16) & 0xFF;
+        dst[4 * i + 3] = (val >> 24) & 0xFF;
+    }
+}
+
+__device__ void bigNumMod(uint32_t* a, uint32_t* m, uint32_t* result, int num_chunks) {
+    bool isGreaterOrEqual = true;  // Start by assuming a >= m
+
+    // Check if a >= m
+    for (int i = num_chunks - 1; i >= 0; i--) {
+        if (a[i] < m[i]) {
+            isGreaterOrEqual = false;
+            break;
+        } else if (a[i] > m[i]) {
+            break;
+        }
+    }
+
+    if (isGreaterOrEqual) {
+        // Calculate a - m and store it in result
+        int borrow = 0;
+        for (int i = 0; i < num_chunks; ++i) {
+            int diff = a[i] - m[i] - borrow;
+            if (diff < 0) {
+                diff += 0x100000000;  // 2^32
+                borrow = 1;
+            } else {
+                borrow = 0;
+            }
+            result[i] = diff;
+        }
+    } else {
+        // If a < m, then a mod m is just a
+        my_cuda_memcpy_uint32_t(result, a, num_chunks * sizeof(uint32_t));
+    }
+}
+
+__device__ void bigNumAdd(uint32_t* a, uint32_t* b, uint32_t* result, int num_chunks) {
+    uint64_t carry = 0;
+    for (int i = 0; i < num_chunks; ++i) {
+        uint64_t sum = (uint64_t)a[i] + (uint64_t)b[i] + carry;
+        result[i] = (uint32_t)sum;  // Store the lower 32 bits in the result
+        carry = sum >> 32;  // The upper 32 bits become the carry for the next iteration
+    }
+}
+
+__device__ void bigNumModAdd(uint32_t* a, uint32_t* b, uint32_t* m, uint32_t* result, int num_chunks) {
+    uint32_t* temp = new uint32_t[num_chunks];  // Allocate temporary storage for the sum
+    bigNumAdd(a, b, temp, num_chunks);
+    bigNumMod(temp, m, result, num_chunks);  // Assume bigNumMod performs modular reduction
+    delete[] temp;  // Free the temporary storage
+}
+
+__device__ bool isLessThan(uint32_t *a, uint32_t *b, int size) {
+    for (int i = 0; i < size; ++i) {
+        if (a[i] < b[i]) return true;
+        if (a[i] > b[i]) return false;
+    }
+    return false; // Equal
+}
+
+__device__ bool isNonZero(uint32_t *a, int size) {
+    for (int i = 0; i < size; ++i) {
+        if (a[i] != 0) return true;
+    }
+    return false;
+}
+
+__device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uint32_t index) {
+    BIP32Info info;
+
+    // Initialize big number chunks for curveOrder, il, parentKeyInt, and newKey
+    uint32_t il[8], parentKeyInt[8], newKey[8];
+
+    // Initialize curveOrder with the value for secp256k1
+    uint32_t curveOrder[8] = {0xD0364141, 0xBFD25E8C, 0xAF48A03B, 0xBAAEDCE6, 0xFFFFFFFE, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF};
+    
+    // Conversion of 'key' to big number chunks
+    for (int i = 0; i < 8; ++i) {
+        parentKeyInt[i] = *(uint32_t*)(key + 4 * i);
+    }
+
+    // Compute HMAC-SHA512
+    HMAC_SHA512_CTX hmac;
+    uint8_t buffer[100];
+    uint8_t hash[64];
+    unsigned int len = 64;
+
+    // Fill buffer according to index
+    if (index == 0) {
+        // TODO: Generate the public key from the parent private key and store it in buffer
+		;
+    } else {
+        buffer[0] = 0;
+        my_cuda_memcpy_unsigned_char(buffer + 1, key, 32);
+    }
+
+    // Append index in big-endian format to buffer
+    buffer[33] = (index >> 24) & 0xFF;
+    buffer[34] = (index >> 16) & 0xFF;
+    buffer[35] = (index >> 8) & 0xFF;
+    buffer[36] = index & 0xFF;
+
+    hmac_sha512_init(&hmac, chainCode, 32);
+    hmac_sha512_update(&hmac, buffer, len);  // Assuming buffer_len = 37 // TODO: Check would it be defined in "int len"? 64
+    hmac_sha512_final(&hmac, hash);
+
+    // Populate il and ir from hash
+	my_cuda_memcpy_uint32_t(il, (uint32_t*)hash, 8); // Using uint32_t version
+    my_cuda_memcpy_unsigned_char(info.chain_code, hash + 32, 32);
+
+    // Conversion of 'il' to big number chunks, after populating it
+    for (int i = 0; i < 8; ++i) {
+        il[i] = *(uint32_t*)(hash + 4 * i);  // Correcting the source of the conversion
+    }
+
+    // Perform BN_mod_add
+    bigNumModAdd(il, parentKeyInt, curveOrder, newKey, 8);
+
+    // Check if new key is valid
+    if (isLessThan(il, curveOrder, 8) && isNonZero(newKey, 8)) {
+		my_cuda_memcpy_uint32_t_to_uint8_t(info.master_private_key, newKey, 32);
+    } else {
+        printf("GetChildKeyDerivation: Invalid key\n");
+    }
+
+    return info;
+}
+// -- Child Key Derivation --
+
 __global__ void Bip39SeedGenerator() {
     // Convert the mnemonic and passphrase to byte arrays (or use them as-is if you can)
     uint8_t *m_mnemonic = (unsigned char *)"sell stereo useless course suffer tribe jazz monster fresh excess wire again father film sudden pelican always room attack rubber pelican trash alone cancel";
@@ -815,4 +957,11 @@ __global__ void Bip39SeedGenerator() {
 	print_as_hex_char(master_key.chain_code, 32);
 	printf("Master Private Key: ");
 	print_as_hex_char(master_key.master_private_key, 32);
+
+	// child key
+	BIP32Info child_key = GetChildKeyDerivation(master_key.master_private_key, master_key.chain_code, 0);
+	printf("Child Chain Code: ");
+	print_as_hex_char(child_key.chain_code, 32);
+	printf("Child Private Key: ");
+	print_as_hex_char(child_key.master_private_key, 32);
 }

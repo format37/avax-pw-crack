@@ -102,6 +102,8 @@ void compute_sha(const uint8_t *msg, size_t mlen)
 
 void compute_hmac(const uint8_t *key, uint32_t klen, const uint8_t *msg, size_t mlen)
 {
+    //print mlen
+    printf(" ### mlen ###: %zu\n", mlen);
 	//uint8_t md[64ul];
 	/*HMAC_SHA512_CTX hmac;
 	hmac_sha512_init(&hmac, key, klen);
@@ -317,13 +319,6 @@ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uint32_t index
     static char path[100] = ""; // Assuming path length won't exceed 100
     printf("\n* step %d index: %u\n", chain_counter, index);
     chain_counter++; // Increment the counter for the next step
-	
-    // Update the path variable
-    /*if ((index & 0x80000000) != 0) {
-        snprintf(path, sizeof(path), "%s/%uH", path, index);
-    } else {
-        snprintf(path, sizeof(path), "%s/%u", path, index);
-    }*/
 
     // Print the full derivation path
     printf("  * chain path: %s\n", path);
@@ -618,6 +613,8 @@ void print_as_hex_char(unsigned char *data, int len) {
 }*/
 
 void compute_sha256(const uint8_t *msg, size_t mlen, uint8_t *outputHash) {
+    // print mlen
+    printf(" _### mlen ###_: %zu\n", mlen);
     SHA256_CTX sha;
     SHA256_Init(&sha);
     SHA256_Update(&sha, msg, mlen);
