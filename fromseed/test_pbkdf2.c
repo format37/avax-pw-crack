@@ -366,6 +366,10 @@ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uint32_t index
     memcpy(il, hash, 32);
     memcpy(ir, hash + 32, 32);
 
+    // After HMAC-SHA512
+    printf("      * C Post-HMAC hash:");
+    print_as_hex_char(hash, 64);
+
     // Print 'il' and 'ir'
     printf("    * il: ");
     print_as_hex_char(il, 32);

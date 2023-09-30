@@ -855,6 +855,7 @@ __device__ bool isNonZero(uint32_t *a, int size) {
 }
 
 __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uint32_t index) {
+	printf("\n* step 0 index: %u\n", index);
     BIP32Info info;
 
     // Initialize big number chunks for curveOrder, il, parentKeyInt, and newKey
@@ -889,21 +890,85 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
     buffer[35] = (index >> 8) & 0xFF;
     buffer[36] = index & 0xFF;
 
-    hmac_sha512_init(&hmac, chainCode, 32);
-    hmac_sha512_update(&hmac, buffer, len);  // Assuming buffer_len = 37 // TODO: Check would it be defined in "int len"? 64
+	hmac_sha512_init(&hmac, chainCode, 32);
+    hmac_sha512_update(&hmac, buffer, 37);  // Assuming buffer_len = 37 // TODO: Check would it be defined in "int len"? 64
     hmac_sha512_final(&hmac, hash);
 
-    // Populate il and ir from hash
-	my_cuda_memcpy_uint32_t(il, (uint32_t*)hash, 8); // Using uint32_t version
-    my_cuda_memcpy_unsigned_char(info.chain_code, hash + 32, 32);
+	// Print the pre-HMAC values
+    printf("      * Cuda Pre-HMAC variable key:");
+    for (int i = 0; i < 32; i++) {
+        printf("%02x", key[i]);
+    }
+    printf("\n");
+
+    printf("      * Cuda Pre-HMAC Buffer:");
+    for (int i = 0; i < 37; i++) { // Assuming the buffer length up to the index is 37
+        printf("%02x", buffer[i]);
+    }
+    printf("\n");
+
+    printf("      * Cuda Pre-HMAC Key:");
+    for (int i = 0; i < 32; i++) {
+        printf("%02x", chainCode[i]);
+    }
+    printf("\n");   
+
+	uint32_t ir[8];
+	// Populate il and ir from hash
+	my_cuda_memcpy_uint32_t(il, (uint32_t*)hash, 8); // Using uint32_t version for il
+	my_cuda_memcpy_uint32_t(ir, (uint32_t*)(hash + 32), 8); // Using uint32_t version for ir
+
 
     // Conversion of 'il' to big number chunks, after populating it
     for (int i = 0; i < 8; ++i) {
         il[i] = *(uint32_t*)(hash + 4 * i);  // Correcting the source of the conversion
     }
 
+	// After HMAC-SHA512
+	printf("      * Cuda Post-HMAC hash:");
+	for (int i = 0; i < 64; i++) {
+		printf("%02x", hash[i]);
+	}
+	printf("\n");
+
+	// After populating il and ir
+	printf("    * il: ");
+	for (int i = 0; i < 8; i++) {
+		printf("%08x", il[i]);
+	}
+	printf("\n");
+	printf("    * ir: ");
+	for (int i = 0; i < 8; i++) {
+		printf("%08x", ir[i]);
+	}
+	printf("\n");
+
+	// Before bigNumModAdd
+	/*printf("il: ");
+	for (int i = 0; i < 8; i++) {
+		printf("%08x", il[i]);
+	}*/
+	printf("\n");
+	printf("parentKeyInt: ");
+	for (int i = 0; i < 8; i++) {
+		printf("%08x", parentKeyInt[i]);
+	}
+	printf("\n");
+	printf("curveOrder: ");
+	for (int i = 0; i < 8; i++) {
+		printf("%08x", curveOrder[i]);
+	}
+	printf("\n");
+
     // Perform BN_mod_add
     bigNumModAdd(il, parentKeyInt, curveOrder, newKey, 8);
+
+	// After bigNumModAdd
+	printf("newKey: ");
+	for (int i = 0; i < 8; i++) {
+		printf("%08x", newKey[i]);
+	}
+	printf("\n");
 
     // Check if new key is valid
     if (isLessThan(il, curveOrder, 8) && isNonZero(newKey, 8)) {
@@ -948,7 +1013,7 @@ __global__ void Bip39SeedGenerator() {
     printf("Cuda derived_key: ");
     print_as_hex(derived_key, 64);
 
-    compute_sha256((uint8_t *) m_mnemonic, my_strlen((const char*) m_mnemonic));
+    //compute_sha256((uint8_t *) m_mnemonic, my_strlen((const char*) m_mnemonic));
 
 	// master key
 	// BIP32Info master_key = bip32_from_seed_kernel(derived_key, my_strlen((const char*) derived_key));
@@ -958,8 +1023,13 @@ __global__ void Bip39SeedGenerator() {
 	printf("Master Private Key: ");
 	print_as_hex_char(master_key.master_private_key, 32);
 
+	// Define indices
+	uint32_t index44 = 0x8000002C;
+	uint32_t index9000 = 0x80002328;
+	uint32_t index0Hardened = 0x80000000;
+	uint32_t index0 = 0x00000000;
 	// child key
-	BIP32Info child_key = GetChildKeyDerivation(master_key.master_private_key, master_key.chain_code, 0);
+	BIP32Info child_key = GetChildKeyDerivation(master_key.master_private_key, master_key.chain_code, index44);
 	printf("Child Chain Code: ");
 	print_as_hex_char(child_key.chain_code, 32);
 	printf("Child Private Key: ");
