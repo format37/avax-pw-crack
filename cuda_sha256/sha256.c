@@ -28,7 +28,9 @@ void compute_sha(const uint8_t *msg, uint32_t mlen)
 
 // Add a main function if not present elsewhere
 int main() {
-    const uint8_t message[] = "Hello, world!";
+    //const uint8_t message[] = "Hello, world!";
+    // uint8_t *m_mnemonic = (unsigned char *)"sell stereo useless course suffer tribe jazz monster fresh excess wire again father film sudden pelican always room attack rubber pelican trash alone cancel";
+    const uint8_t message[] = "sell stereo useless course suffer tribe jazz monster fresh excess wire again father film sudden pelican always room attack rubber pelican trash alone cancel";
     compute_sha(message, sizeof(message) - 1);
     return 0;
 }
