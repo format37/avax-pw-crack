@@ -752,8 +752,6 @@ typedef struct {
 } BIP32Info;
 
 __device__ BIP32Info bip32_from_seed_kernel(const uint8_t *seed, uint32_t seed_len) {
-	// print seed len
-	printf("Seed len: %d\n", seed_len);
     BIP32Info info;
 	// Initialize HMAC_SHA512_CTX
     HMAC_SHA512_CTX hmac;
