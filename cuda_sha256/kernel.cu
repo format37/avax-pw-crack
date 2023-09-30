@@ -1,5 +1,6 @@
 #include <cstdint>
 
+// ++ PBKDF2 SHA512 ++
 // The rotate operation for 64bits
 #define ROR64(x,n) ((x >> n) | (x << (64 - n)))
 #define CH(x,y,z)  (z ^ (x & (y ^ z)))
@@ -416,6 +417,20 @@ __device__ void compute_pbkdf2(
     my_cuda_memcpy_unsigned_char(derived_key, dk, dklen);
 	free(dk);
 }
+// -- PBKDF2 SHA512 --
+
+// ++ PBKDF2 SHA256 ++
+/*__device__ void compute_sha256(const uint8_t *msg, uint32_t mlen)
+{
+    uint8_t md[SHA256_DIGESTLEN] = {0};  // Initialize to zero
+    SHA256_CTX sha;
+    sha256_init(&sha);
+    sha256_update(&sha, msg, mlen);
+    sha256_final(&sha, md);
+    printf("SHA-256: ");
+    print_as_hex(md, sizeof md);
+}*/
+// -- PBKDF2 SHA256 --
 
 __global__ void Bip39SeedGenerator() {
     // Convert the mnemonic and passphrase to byte arrays (or use them as-is if you can)
@@ -447,5 +462,7 @@ __global__ void Bip39SeedGenerator() {
         derived_key
         );
     printf("Cuda derived_key: ");
-    print_as_hex(derived_key, 64);    
+    print_as_hex(derived_key, 64);
+
+    //compute_sha256((uint8_t *) m_mnemonic, my_strlen((const char*) m_mnemonic));
 }
