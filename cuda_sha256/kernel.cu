@@ -775,11 +775,19 @@ __device__ BIP32Info bip32_from_seed_kernel(const uint8_t *seed, uint32_t seed_l
 // -- bip32 From seed --
 
 // ++ Child Key Derivation ++
-__device__ void my_cuda_memcpy_uint32_t(uint32_t *dst, const uint32_t *src, unsigned int n) {
+/*__device__ void my_cuda_memcpy_uint32_t(uint32_t *dst, const uint32_t *src, unsigned int n) {
     for (unsigned int i = 0; i < n / sizeof(uint32_t); ++i) {  // assuming n is in bytes
         dst[i] = src[i];
     }
+}*/
+
+__device__ void my_cuda_memcpy_uint32_t(uint32_t *dst, const uint32_t *src, unsigned int n) {
+    for (unsigned int i = 0; i < n / sizeof(uint32_t); ++i) {
+        uint32_t val = src[i];
+        dst[i] = __byte_perm(val, 0, 0x0123);
+    }
 }
+
 
 __device__ void my_cuda_memcpy_uint32_t_to_uint8_t(uint8_t *dst, const uint32_t *src, unsigned int n) {
     for (unsigned int i = 0; i < n / sizeof(uint32_t); ++i) {
@@ -915,9 +923,11 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
 
 	uint32_t ir[8];
 	// Populate il and ir from hash
-	my_cuda_memcpy_uint32_t(il, (uint32_t*)hash, 8); // Using uint32_t version for il
-	my_cuda_memcpy_uint32_t(ir, (uint32_t*)(hash + 32), 8); // Using uint32_t version for ir
-
+	//my_cuda_memcpy_uint32_t(il, (uint32_t*)hash, 8); // Using uint32_t version for il
+	//my_cuda_memcpy_uint32_t(ir, (uint32_t*)(hash + 32), 8); // Using uint32_t version for ir
+	// Populate il and ir from hash
+	my_cuda_memcpy_uint32_t(il, (uint32_t*)hash, 8 * sizeof(uint32_t)); // Using uint32_t version for il
+	my_cuda_memcpy_uint32_t(ir, (uint32_t*)(hash + 32), 8 * sizeof(uint32_t)); // Using uint32_t version for ir
 
     // Conversion of 'il' to big number chunks, after populating it
     for (int i = 0; i < 8; ++i) {
@@ -928,6 +938,18 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
 	printf("      * Cuda Post-HMAC hash:");
 	for (int i = 0; i < 64; i++) {
 		printf("%02x", hash[i]);
+	}
+	printf("\n");
+
+	printf("      * Cuda il as uint32_t: ");
+	for (int i = 0; i < 8; ++i) {
+		printf("%08x", il[i]);
+	}
+	printf("\n");
+
+	printf("      * Cuda ir as uint32_t: ");
+	for (int i = 0; i < 8; ++i) {
+		printf("%08x", ir[i]);
 	}
 	printf("\n");
 
