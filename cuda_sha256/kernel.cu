@@ -969,17 +969,13 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
     printf("\n");   
 
 	uint32_t il[8], ir[8];
+	
 	// Populate il and ir from hash
 	//my_cuda_memcpy_uint32_t(il, (uint32_t*)hash, 8); // Using uint32_t version for il
 	//my_cuda_memcpy_uint32_t(ir, (uint32_t*)(hash + 32), 8); // Using uint32_t version for ir
 	// Populate il and ir from hash
 	my_cuda_memcpy_uint32_t(il, (uint32_t*)hash, 8 * sizeof(uint32_t)); // Using uint32_t version for il
 	my_cuda_memcpy_uint32_t(ir, (uint32_t*)(hash + 32), 8 * sizeof(uint32_t)); // Using uint32_t version for ir
-
-    // Conversion of 'il' to big number chunks, after populating it
-    for (int i = 0; i < 8; ++i) {
-        il[i] = *(uint32_t*)(hash + 4 * i);  // Correcting the source of the conversion
-    }
 
 	// After HMAC-SHA512
 	printf("      * Cuda Post-HMAC hash:");
@@ -999,6 +995,13 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
 		printf("%08x", ir[i]);
 	}
 	printf("\n");
+
+    // Conversion of 'il' to big number chunks, after populating it
+    /*for (int i = 0; i < 8; ++i) {
+        il[i] = *(uint32_t*)(hash + 4 * i);  // Correcting the source of the conversion
+    }*/
+
+	
 
 	// After populating il and ir
 	printf("    * il: ");
