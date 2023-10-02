@@ -443,13 +443,27 @@ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uint32_t index
 
 	// Debug prints before BN_mod_add
 	print_bn("Debug C a (Before mod_add)", a);
+    print_bn_hex("Debug C a (Before mod_add)", a);
 	print_bn("Debug C parentKeyInt (Before mod_add)", parentKeyInt);
+    print_bn_hex("Debug C parentKeyInt (Before mod_add)", parentKeyInt);
+    
+    // print parentKeyInt byte by byte
+    /*char* tmp_bn_str = BN_bn2hex(bn);
+    // printf("%s (Hexadecimal): %s\n", label, bn_str);
+    printf("  * parentKeyInt as uint32_t array: ");
+    for (int i = 0; i < 8; ++i) {
+        printf("%08x-", tmp_bn_str[i]);
+    }
+    OPENSSL_free(tmp_bn_str);*/
+
 	print_bn("Debug C curveOrder (Before mod_add)", curveOrder);
+    print_bn_hex("Debug C curveOrder (Before mod_add)", curveOrder);
 
 	// Intermediate manual addition
 	BIGNUM *tempSum = BN_new();
 	BN_add(tempSum, a, parentKeyInt);
 	print_bn("Debug C Temp Sum (a + parentKeyInt)", tempSum);
+    print_bn_hex("Debug C Temp Sum (a + parentKeyInt)", tempSum);
 	BN_free(tempSum);
 
     BIGNUM *newKey = BN_new();
@@ -492,15 +506,40 @@ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uint32_t index
         // Output newKeyBytes and ir (ChainCode)
         printf("  * chain code:");
 		print_as_hex_char(ir, 32);
+        // print chain code as uint32_t array
+        printf("  * chain code as uint32_t array: ");
+        for (int i = 0; i < 8; ++i) {
+            printf("%08x-", ir_32[i]);
+        }
+        printf("\n");
 		printf("  * private:");
 		print_as_hex_char(newKeyBytes, 32);
+        // print private key as uint32_t array
+        printf("  * private key as uint32_t array: ");
+        for (int i = 0; i < 8; ++i) {
+            printf("%08x-", newKeyBytes[i]);
+        }
+        printf("\n");
 		printf("  * public:");
 		size_t publicKeyLen = 0;
 		unsigned char *publicKeyBytes = GetPublicKey(newKeyBytes, 32, &publicKeyLen);
 		print_as_hex_char(publicKeyBytes, publicKeyLen);
+        // print public key as uint32_t array
+        printf("  * public key as uint32_t array: ");
+        for (int i = 0; i < 8; ++i) {
+            printf("%08x-", publicKeyBytes[i]);
+        }
+        printf("\n");
 
+        // Add the current index to the path
+        char index_str[12];  // Assuming index won't exceed 10 digits
+        sprintf(index_str, "%u", index);
+        strcat(path, "/");
+        strcat(path, index_str);
 
-		
+        // Print the full derivation path
+        printf("  * chain path: %s\n", path);
+
 		memcpy(info.master_private_key, newKeyBytes, 32);
 		memcpy(info.chain_code, ir, 32);		
 
@@ -509,8 +548,7 @@ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uint32_t index
     } else {
         printf("C GetChildKeyDerivation: The key at this index is invalid, so we increment the index and try again\n");
         // Recursive call or loop to retry with incremented index
-    }
-	
+    }	
 
     // Free OpenSSL big numbers
     BN_free(a);

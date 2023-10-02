@@ -799,6 +799,31 @@ __device__ void my_cuda_memcpy_uint32_t_to_uint8_t(uint8_t *dst, const uint32_t 
     }
 }
 
+__device__ void my_cuda_memcpy_uint8_t_to_uint32_t(uint32_t *dst, const uint8_t *src, unsigned int n) {
+    for (unsigned int i = 0; i < n / 4; ++i) {
+        uint32_t val = 0;
+        val |= src[4 * i];
+        val |= src[4 * i + 1] << 8;
+        val |= src[4 * i + 2] << 16;
+        val |= src[4 * i + 3] << 24;
+        
+        // If you need to change byte order, you can use __byte_perm here.
+        // val = __byte_perm(val, 0, 0x0123);
+
+        dst[i] = val;
+    }
+}
+
+__device__ void my_cuda_memcpy_uint32_t_to_unsigned_char(unsigned char *dst, const uint32_t *src, unsigned int n) {
+    for (unsigned int i = 0; i < n / sizeof(uint32_t); ++i) {
+        uint32_t val = src[i];
+        dst[4 * i] = (val) & 0xFF;
+        dst[4 * i + 1] = (val >> 8) & 0xFF;
+        dst[4 * i + 2] = (val >> 16) & 0xFF;
+        dst[4 * i + 3] = (val >> 24) & 0xFF;
+    }
+}
+
 __device__ void bigNumAddAndPrint(uint32_t* a, uint32_t* b, uint32_t* result, int num_chunks) {
     uint64_t carry = 0;
     printf("      * CUDA Temp Sum (Before bigNumAdd):");
@@ -916,13 +941,7 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
 	printf("\n* step 0 index: %u\n", index);
     BIP32Info info;
 
-    // Initialize big number chunks for curveOrder, il, parentKeyInt, and newKey
-    uint32_t parentKeyInt[8];
     
-    // Conversion of 'key' to big number chunks
-    for (int i = 0; i < 8; ++i) {
-        parentKeyInt[i] = *(uint32_t*)(key + 4 * i);
-    }
 
     // Compute HMAC-SHA512
     HMAC_SHA512_CTX hmac;
@@ -996,12 +1015,46 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
 	}
 	printf("\n");
 
+	
+	// my_cuda_memcpy_uint32_t(temp_il, hash, 8 * sizeof(uint32_t));
+	// my_cuda_memcpy_uint32_t(temp_ir, hash + 32, 8 * sizeof(uint32_t));
+
+	// unsigned char chain_code[32];
+	// Print individual bytes of ir before copying
+	printf("      * Individual bytes of Cuda ir before copying: ");
+	uint8_t *ir_bytes = (uint8_t *) ir;
+	for (int i = 0; i < 32; ++i) {
+		printf("%02x", ir_bytes[i]);
+	}
+	printf("\n");
+
+	// Perform the copy
+	my_cuda_memcpy_uint32_t_to_unsigned_char(info.chain_code, ir, 32);
+
+	// Print individual bytes of chain_code after copying
+	printf("      * Individual bytes of Cuda chain_code after copying: ");
+	for (int i = 0; i < 32; ++i) {
+		printf("%02x", info.chain_code[i]);
+	}
+	printf("\n");
+	
+	// uint8_t* temp_il = (uint8_t*) il;
+	// uint8_t* temp_ir = (uint8_t*) ir;
+	/*uint32_t *ir_32 = (uint32_t *)ir;
+	// print temp_ir
+	printf("      * Cuda ir_32: ");
+	for (int i = 0; i < 32; i++) {
+		printf("%02x", ir_32[i]);
+	}
+	printf("\n");*/
+	// my_cuda_memcpy_unsigned_char(info.chain_code, ir, 32);
+	// my_cuda_memcpy_uint8_t_to_uint32_t(il, hash, 8 * sizeof(uint32_t));
+	// my_cuda_memcpy_uint8_t_to_uint32_t(ir, hash + 32, 8 * sizeof(uint32_t));
+
     // Conversion of 'il' to big number chunks, after populating it
     /*for (int i = 0; i < 8; ++i) {
         il[i] = *(uint32_t*)(hash + 4 * i);  // Correcting the source of the conversion
     }*/
-
-	
 
 	// After populating il and ir
 	printf("    * il: ");
@@ -1021,36 +1074,42 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
 	// uint32_t curveOrder[8] = {0xFFFFFFFE, 0xFFFFFFFF, 0xFFFFFFFF, 0xE6FFFFFF, 0x6DBAAEDC, 0x62AF48A0, 0x53D25E8C, 0xC4D03641};
 	// uint32_t curveOrder[8] = {0xFFFFFC2F, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF};
 	uint32_t curveOrder[8] = {0xffffffff, 0xffffffff, 0xffffffff, 0xfffffffe, 0xbaaedce6, 0xaf48a03b, 0xbfd25e8c, 0xd0364141};
-
-
-
 	// Before bigNumModAdd
 	/*printf("il: ");
 	for (int i = 0; i < 8; i++) {
 		printf("%08x", il[i]);
 	}*/
-	printf("\n");
-	printf("parentKeyInt: ");
-	for (int i = 0; i < 8; i++) {
-		printf("%08x", parentKeyInt[i]);
-	}
+
 	printf("\n");
 	printf("curveOrder: ");
 	for (int i = 0; i < 8; i++) {
 		printf("%08x", curveOrder[i]);
 	}
 	printf("\n");
+	
+	uint32_t parentKeyInt[32];
 
-	uint32_t newKey[8];
+	for (int i = 0; i < 32; i++) {
+		parentKeyInt[i] = key[i];
+	}
+
+	printf("\n");
+	printf("Debug Cuda parentKeyInt (Before mod_add) (Hexadecimal): ");
+	for (int i = 0; i < 32; i++) {
+		printf("%02x", parentKeyInt[i]);
+	}
+	printf("\n");	
+
+	uint32_t newKey[32];
 
     // Perform BN_mod_add
     // bigNumModAdd(il, parentKeyInt, curveOrder, newKey, 8);
 	bigNumModAddAndPrint(il, parentKeyInt, curveOrder, newKey, 8);
 
-	// After bigNumModAdd
+	// newKey after bigNumModAdd
 	printf("Debug Cuda newKey after bigNumModAdd: ");
-	for (int i = 0; i < 8; i++) {
-		printf("%08x", newKey[i]);
+	for (int i = 0; i < 32; i++) {
+		printf("%02x", newKey[i]);
 	}
 	printf("\n");
 
@@ -1060,6 +1119,9 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
     } else {
         printf("GetChildKeyDerivation: Invalid key\n");
     }
+
+	// Copy chainCode to info
+	// my_cuda_memcpy_unsigned_char(info.chain_code, ir, 32);
 
     return info;
 }
