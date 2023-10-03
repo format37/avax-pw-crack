@@ -826,12 +826,13 @@ __device__ void my_cuda_memcpy_uint32_t_to_unsigned_char(unsigned char *dst, con
 
 __device__ void bigNumAddAndPrint(uint32_t* a, uint32_t* b, uint32_t* result, int num_chunks) {
     uint64_t carry = 0;
-    printf("      * CUDA Temp Sum (Before bigNumAdd):");
+    printf("Debug Cuda Temp Sum (a + parentKeyInt) (Hexadecimal):");
     for (int i = 0; i < num_chunks; ++i) {
         uint64_t sum = (uint64_t)a[i] + (uint64_t)b[i] + carry;
         result[i] = (uint32_t)sum;  // Store the lower 32 bits in the result
         carry = sum >> 32;  // The upper 32 bits become the carry for the next iteration
-        printf("%08x", result[i]);
+        //printf("%02x", result[i]);
+		printf("At index %d: sum = %lx, carry = %lx, result = %x\n", i, sum, carry, result[i]);
     }
     printf("\n");
 }
@@ -1104,6 +1105,7 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
 
     // Perform BN_mod_add
     // bigNumModAdd(il, parentKeyInt, curveOrder, newKey, 8);
+	// uint32_t* a, uint32_t* b, uint32_t* m, uint32_t* result, int num_chunks
 	bigNumModAddAndPrint(il, parentKeyInt, curveOrder, newKey, 8);
 
 	// newKey after bigNumModAdd

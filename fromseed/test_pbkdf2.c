@@ -431,10 +431,10 @@ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uint32_t index
 	BN_dec2bn(&curveOrder, "115792089237316195423570985008687907852837564279074904382605163141518161494337");
 
 	// Print curve order for verification
-	print_bn("Curve Order", curveOrder);
-    print_bn_as_uint32_array("Curve Order", curveOrder);
+	//print_bn("Curve Order", curveOrder);
+    // print_bn_as_uint32_array("Curve Order", curveOrder);
     // Print curve order in both decimal and hexadecimal for verification
-    print_bn_dec("Curve Order", curveOrder);
+    // print_bn_dec("Curve Order", curveOrder);
     print_bn_hex("Curve Order", curveOrder);
 
 	// Convert byte arrays to big numbers
@@ -456,12 +456,25 @@ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uint32_t index
     }
     OPENSSL_free(tmp_bn_str);*/
 
-	print_bn("Debug C curveOrder (Before mod_add)", curveOrder);
-    print_bn_hex("Debug C curveOrder (Before mod_add)", curveOrder);
+	// print_bn("Debug C curveOrder (Before mod_add)", curveOrder);
+    // print_bn_hex("Debug C curveOrder (Before mod_add)", curveOrder);
 
 	// Intermediate manual addition
 	BIGNUM *tempSum = BN_new();
 	BN_add(tempSum, a, parentKeyInt);
+
+
+    unsigned char my_buffer[64];
+    BN_bn2bin(tempSum, my_buffer);
+    printf("Debug C Intermediate Sums (Hexadecimal):\n");
+
+    for (int i = 0; i < BN_num_bytes(tempSum); i+=4) {
+        uint32_t val = *((uint32_t*)(&my_buffer[i]));
+        printf("At index %d: val = %x\n", i / 4, val);
+    }
+    // BN_CTX_free(ctx);
+
+
 	print_bn("Debug C Temp Sum (a + parentKeyInt)", tempSum);
     print_bn_hex("Debug C Temp Sum (a + parentKeyInt)", tempSum);
 	BN_free(tempSum);
