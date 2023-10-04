@@ -46,4 +46,27 @@ __global__ void testKernel() {
   BN_free(m);
 
   BN_CTX_free(ctx);
+
+  /*// Allocate BIGNUMs in CUDA memory
+  BIGNUM *a, *b, *c;
+  cudaMalloc((void**)&a, sizeof(BIGNUM));
+  cudaMalloc((void**)&b, sizeof(BIGNUM)); 
+  cudaMalloc((void**)&c, sizeof(BIGNUM));
+
+  // Initialize values  
+  BN_dec2bn(&a, "10");
+  BN_dec2bn(&b, "20");
+
+  // Use BIGNUMs  
+  BN_add(c, a, b);
+
+  // Print result
+  char* str = BN_bn2hex(c);
+  printf("Result: %s\n", str);
+  OPENSSL_free(str);
+
+  // Free BIGNUMs
+  BN_free(a);
+  BN_free(b);
+  BN_free(c);*/
 }
