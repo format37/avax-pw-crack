@@ -364,7 +364,7 @@ int BN_clear_bit(BIGNUM *a, int n);
 __host__ __device__ char* BN_bn2hex(const BIGNUM *a) {
   // host+device stub
 }
-// __device__ char *BN_bn2dec(const BIGNUM *a);
+//__device__ char *BN_bn2dec(const BIGNUM *a);
 __host__ __device__ char* BN_bn2dec(const BIGNUM *a) {
   // host+device stub
 }
