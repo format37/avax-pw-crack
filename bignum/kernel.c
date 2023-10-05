@@ -19,47 +19,6 @@ __device__ void bn_print(char* msg, BIGNUM* a) {
   printf("\n");
 }
 
-__device__ void bn_print_v1(char* msg, BIGNUM* a) {
-
-  char buffer[1024];
-  int index = 0;
-
-  for(int i=0; i<a->top; i++) {
-    
-    BN_ULONG value = a->d[i];
-    do {
-      buffer[index++] = '0' + (value % 10);
-      value /= 10;
-    } while (value > 0);
-
-    // Add separator between words
-    if (i < a->top - 1) {
-      buffer[index++] = ','; 
-    }
-  }
-
-  // Add string terminator
-  buffer[index] = '\0';
-
-  // Reverse string
-  for(int i=0; i<index/2; i++) {
-    char tmp = buffer[i];
-    buffer[i] = buffer[index-i-1];
-    buffer[index-i-1] = tmp;
-  }
-
-  printf("%s%s\n", msg, buffer);
-
-}
-
-__device__ void bn_add_v0(BIGNUM* a, BIGNUM* b, BIGNUM* r) {
-  int max = a->top > b->top ? a->top : b->top;
-  for(int i=0; i<max+1; i++) {
-    r->d[i] = a->d[i] + b->d[i];
-  }
-  r->top = max + 1;
-}
-
 __device__ void bn_add(BIGNUM* a, BIGNUM* b, BIGNUM* r) {
 
   int max = a->top > b->top ? a->top : b->top;
@@ -136,10 +95,6 @@ __global__ void testKernel() {
   BIGNUM m;
 
   // Initialize a and b
-  /*a_d[0] = 0x0000000a; 
-  a.d = a_d; a.top = 1;
-  b_d[0] = 0x0000000b;
-  b.d = b_d; b.top = 1;*/
   a.d = a_d; 
   a.top = 1; 
   a.d[0] = 10;
