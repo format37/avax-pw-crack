@@ -16,22 +16,30 @@ int main() {
   BIGNUM *b = BN_new();
   BIGNUM *c = BN_new();
 
-  BN_dec2bn(&a, "10");
-  BN_dec2bn(&b, "20");
-
+  // Initialize a and b
+  BN_dec2bn(&a, "70");
+  BN_dec2bn(&b, "50");
+  
+  // Print inputs
   print_bn("A:", a);
   print_bn("B:", b);
 
+  // Add A and B
   BN_add(c, a, b);
 
+  // Print A + B
   print_bn("A + B:", c);
 
   // Modular Reduction
   BIGNUM *m = BN_new();
   BN_dec2bn(&m, "100");
+
+  // Print M
+  print_bn("M:", m);
   
   BN_mod(c, c, m, ctx);
 
+  // Print C mod M
   print_bn("C mod M:", c);
 
   // Other operations like subtraction, multiply, divide etc.

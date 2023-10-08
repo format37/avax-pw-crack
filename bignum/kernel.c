@@ -32,93 +32,98 @@ __device__ void bn_add(BIGNUM* a, BIGNUM* b, BIGNUM* r) {
   if (b->top > a->top) {
     r->top = b->top; 
   }
-
 }
 
-__device__ unsigned int bn_sub_words(BN_ULONG *r, const BN_ULONG *a, const BN_ULONG *b, int cl) {
-  BN_ULONG t1, t2;
-  int c = 0;
-
-  do {
-    t1 = a[0]; t2 = b[0];
-    r[0] = (t1 - t2 -c) & BN_MASK2;
-    c=(t1 < t2); a++; b++;
-  } while (--cl);
-
-  return c;
+__device__ BN_ULONG bn_mod(BN_ULONG num, BN_ULONG divisor) {
+  return num % divisor; 
 }
 
-__device__ unsigned int bn_add_words(BN_ULONG *r, const BN_ULONG *a, const BN_ULONG *b, int cl, unsigned int carry) {
+__device__ BN_ULONG bn_mod_big(BIGNUM *num, BIGNUM *divisor) {
 
-  unsigned int c = carry;
-  BN_ULONG l;
-
-  do {
-    BN_ULONG t = a[0];
-    t += c;
-    c = (t < c);
-    l=(t+b[0])&BN_MASK2;
-    c+=l < t;
-    r[0] = l;
-    a++; b++; 
-  } while (--cl);
-
-  return c;
-
+  BN_ULONG d = divisor->d[divisor->top-1]; // divisor
+  BN_ULONG n = num->d[num->top-1]; // numerator
+  
+  return bn_mod(n, d);
 }
 
-__device__ void bn_mod(BIGNUM* a, BIGNUM* m, BIGNUM* r, int mlen) {
-  int i;
-  for (i = a->top - 1; i >= mlen; i--) {
-    if (a->d[i]) {
-      unsigned int carry = bn_sub_words(r->d, a->d, m->d, mlen);
-      carry = bn_add_words(r->d, r->d, m->d, mlen, carry);
-    }
-    else
-      r->d[i] = 0;
+__device__ BN_ULONG bn_mod_big_signed(BIGNUM *num, BIGNUM *divisor) {
+
+  int numNeg = num->neg;
+  int divNeg = divisor->neg;
+
+  BN_ULONG d = divisor->d[divisor->top-1]; 
+  BN_ULONG n = num->d[num->top-1];
+
+  BN_ULONG res = bn_mod(n, d);
+
+  if (numNeg) {
+    res = d - res; // subtract from divisor
   }
-  for (; i >= 0; i--)
-    r->d[i] = a->d[i];
-  r->top = mlen;
+
+  if (divNeg) {
+    res = -res; // negate result if divisor is negative
+  }
+
+  return res;
+
 }
 
 __global__ void testKernel() {
+  BN_CTX *ctx = BN_CTX_new();
+
+  // Addition
+  BIGNUM a;
+  BIGNUM b;
+  BIGNUM c;
 
   BN_ULONG a_d[10];
   BN_ULONG b_d[10]; 
   BN_ULONG c_d[20];
-  BN_ULONG m_d[10];
-
-  BIGNUM a;
-  BIGNUM b;
-  BIGNUM c;
-  BIGNUM m;
 
   // Initialize a and b
   a.d = a_d; 
   a.top = 1; 
-  a.d[0] = 10;
+  a.d[0] = 70;
   b.d = b_d;
   b.top = 1;
-  b.d[0] = 20;
+  b.d[0] = 50;
 
   // Print inputs
   bn_print("A: ", &a);
   bn_print("B: ", &b);
-
-  // Addition
+  
+  // Add A and B
   c.d = c_d;
+  c.top = 1;
+  c.neg = 0;
   bn_add(&a, &b, &c);
-
-  // Print result  
+  
+  // Print A + B
   bn_print("A + B: ", &c);
 
-  // Modulus  
-  m.d = m_d; m.top = 1;
-  m_d[0] = 0x00000064;
+  // Modular Reduction
+  BIGNUM m;
+  BN_ULONG m_d[10];
+  m.d = m_d;
+  m.top = 1;
+  m.neg = 0;
+  m_d[0] = 0x00000064; // 100
 
-  bn_mod(&c, &m, &c, 1);
+  // Print M
+  bn_print("M: ", &m);
+
+  // Result 
+  BN_ULONG res;
   
-  // Print result
-  bn_print("C mod M: ", &c);
+  // bn_mod(&c, &m, &c, 1);
+  // BN_mod(&c, &c, &m, ctx);
+  // Call BN_mod correctly
+  // BN_mod(&rem, &c, &m, ctx);
+  // BN_nnmod(&c, &c, &m, ctx);
+  res = bn_mod_big_signed(&c, &m);
+  
+  // Print C mod M
+  printf("C mod M: %02x\n", res);
+
+  BN_CTX_free(ctx);
 }

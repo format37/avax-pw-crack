@@ -14,10 +14,10 @@ APP_OSSL := $(APPNAME)_ossl$(EXT)
 
 all: $(APP) 
 
-$(APP): program.c cgbn.h
+$(APP): program.c
 	$(CC) $(CFLAGS) -o $@ $< -lcrypto
 
-$(APP_OSSL): program.c cgbn.h
+$(APP_OSSL): program.c
 	$(CC) $(CFLAGS) -DHAS_OSSL -o $@ $< -lcrypto
 
 clean:
