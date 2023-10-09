@@ -1,5 +1,9 @@
 #include <cstdint>
 
+// ++ Big number arithmetic ++
+#include "bignum.h"
+// -- Big number arithmetic --
+
 // ++ PBKDF2 SHA512 ++
 // The rotate operation for 64bits
 #define ROR64(x,n) ((x >> n) | (x << (64 - n)))

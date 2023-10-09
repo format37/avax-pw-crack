@@ -1,4 +1,5 @@
 #include <cstdint>
+#include "bignum.h" // Big number arithmetic
 
 // ++ PBKDF2 SHA512 ++
 // The rotate operation for 64bits
@@ -824,7 +825,7 @@ __device__ void my_cuda_memcpy_uint32_t_to_unsigned_char(unsigned char *dst, con
     }
 }
 
-__device__ void bigNumAddAndPrint(uint32_t* a, uint32_t* b, uint32_t* result, int num_chunks) {
+__device__ void bigNumAddAndPrint_v0(uint32_t* a, uint32_t* b, uint32_t* result, int num_chunks) {
     uint64_t carry = 0;
     printf("Debug Cuda Temp Sum (a + parentKeyInt) (Hexadecimal):");
     for (int i = 0; i < num_chunks; ++i) {
@@ -837,7 +838,62 @@ __device__ void bigNumAddAndPrint(uint32_t* a, uint32_t* b, uint32_t* result, in
     printf("\n");
 }
 
+__device__ void bigNumAddAndPrint(uint32_t* a, uint32_t* b, uint32_t* result, int num_chunks) {
+    BIGNUM a_num, b_num, c_num;
+    BN_ULONG a_d[10], b_d[10], c_d[20]; // Assuming 10 chunks max for a and b, and 20 for c
 
+    // Initialize a
+    a_num.d = a_d; 
+    a_num.top = num_chunks;
+    for (int i = 0; i < num_chunks; ++i) {
+        a_num.d[i] = a[i];
+    }
+
+    // Initialize b
+    b_num.d = b_d;
+    b_num.top = num_chunks;
+    for (int i = 0; i < num_chunks; ++i) {
+        b_num.d[i] = b[i];
+    }
+
+    // Initialize c
+    c_num.d = c_d;
+    c_num.top = 0; // Will be set by bn_add
+    c_num.neg = 0; // Assuming non-negative numbers
+
+	// print what we adding to what
+	printf("      * Cuda a (Before bigNumAdd):");
+	for (int i = 0; i < num_chunks; i++) {
+		printf("%08x", a[i]);
+	}
+	printf("\n");
+	printf("      * Cuda b (Before bigNumAdd):");
+	for (int i = 0; i < num_chunks*4; i++) {
+		printf("%02x", b[i]);
+	}
+	printf("\n");
+
+    // Perform the addition
+    bn_add(&a_num, &b_num, &c_num);
+
+	printf("      * Cuda c (After bigNumAdd):");
+	for (int i = 0; i < c_num.top; i++) {
+		printf("%08x", c_num.d[i]);
+	}
+	printf("\n");
+
+    // Copy the result back to the result array
+    for (int i = 0; i < c_num.top; ++i) {
+        result[i] = c_num.d[i];
+    }
+
+    // Print debug information
+    printf("Debug Cuda Temp Sum (a + b) (Hexadecimal):");
+    for (int i = 0; i < c_num.top; ++i) {
+        printf("At index %d: result = %x\n", i, result[i]);
+    }
+    printf("\n");
+}
 
 __device__ void bigNumMod(uint32_t* a, uint32_t* m, uint32_t* result, int num_chunks) {
     bool isGreaterOrEqual = true;  // Start by assuming a >= m
@@ -942,8 +998,6 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
 	printf("\n* step 0 index: %u\n", index);
     BIP32Info info;
 
-    
-
     // Compute HMAC-SHA512
     HMAC_SHA512_CTX hmac;
     uint8_t buffer[100];
@@ -953,6 +1007,7 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
     // Fill buffer according to index
     if (index == 0) {
         // TODO: Generate the public key from the parent private key and store it in buffer
+		printf("!!! Public key generation not implemented yet !!!\n");
 		;
     } else {
         buffer[0] = 0;

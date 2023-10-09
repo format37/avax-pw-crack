@@ -10,10 +10,18 @@ def add_hyphens_to_hex(hex_str):
 
 # Load and compile the extended CUDA kernel code
 kernel_file_path = "kernel.cu"  # Replace with the actual path
+include_dirs = ['/home/alex/projects/avax-pw-crack/include/']
+with open(kernel_file_path, 'r') as f:
+    cuda_code = f.read()
 mod = SourceModule(
+    cuda_code,
+    arch='sm_86',
+    include_dirs=include_dirs
+    )
+"""mod = SourceModule(
     open(kernel_file_path, 'r').read(), 
     arch='sm_86'
-    )
+    )"""
     # include_dirs=[os.getcwd()]
 
 # Retrieve the kernel function

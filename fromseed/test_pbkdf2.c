@@ -294,14 +294,11 @@ unsigned char *GetPublicKey(unsigned char *privateKeyBytes, size_t privateKeyLen
     EC_KEY_set_public_key(eckey, pub_key);
 
     *publicKeyLen = EC_POINT_point2oct(EC_KEY_get0_group(eckey), EC_KEY_get0_public_key(eckey), POINT_CONVERSION_COMPRESSED, NULL, 0, NULL);
-    //publicKeyBytes = (unsigned char *) malloc(*publicKeyLen);
     publicKeyBytes = (unsigned char *) malloc((size_t) *publicKeyLen);
 
     if (publicKeyBytes == NULL) {
         return NULL;
     }
-
-    //EC_POINT_point2oct(EC_KEY_get0_group(eckey), EC_KEY_get0_public_key(eckey), POINT_CONVERSION_COMPRESSED, publicKeyBytes, *publicKeyLen, NULL);
     EC_POINT_point2oct(EC_KEY_get0_group(eckey), EC_KEY_get0_public_key(eckey), POINT_CONVERSION_COMPRESSED, publicKeyBytes, (size_t) *publicKeyLen, NULL);
     
     EC_GROUP_free(curve);
@@ -361,8 +358,6 @@ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uint32_t index
 		size_t publicKeyLen = 0;
 		unsigned char *publicKeyBytes = GetPublicKey(key, 32, &publicKeyLen);
 		print_as_hex_char(publicKeyBytes, publicKeyLen);
-		//buffer[0] = 0x02;
-		//memcpy(buffer + 1, publicKeyBytes + 1, 32);
 		memcpy(buffer, publicKeyBytes, 33);  // Copies the entire 33-byte compressed public key including the first byte
 		buffer_len += 33;		
     } else {
@@ -430,11 +425,6 @@ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uint32_t index
 	// Set curve order for secp256k1
 	BN_dec2bn(&curveOrder, "115792089237316195423570985008687907852837564279074904382605163141518161494337");
 
-	// Print curve order for verification
-	//print_bn("Curve Order", curveOrder);
-    // print_bn_as_uint32_array("Curve Order", curveOrder);
-    // Print curve order in both decimal and hexadecimal for verification
-    // print_bn_dec("Curve Order", curveOrder);
     print_bn_hex("Curve Order", curveOrder);
 
 	// Convert byte arrays to big numbers
@@ -446,23 +436,10 @@ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uint32_t index
     print_bn_hex("Debug C a (Before mod_add)", a);
 	print_bn("Debug C parentKeyInt (Before mod_add)", parentKeyInt);
     print_bn_hex("Debug C parentKeyInt (Before mod_add)", parentKeyInt);
-    
-    // print parentKeyInt byte by byte
-    /*char* tmp_bn_str = BN_bn2hex(bn);
-    // printf("%s (Hexadecimal): %s\n", label, bn_str);
-    printf("  * parentKeyInt as uint32_t array: ");
-    for (int i = 0; i < 8; ++i) {
-        printf("%08x-", tmp_bn_str[i]);
-    }
-    OPENSSL_free(tmp_bn_str);*/
-
-	// print_bn("Debug C curveOrder (Before mod_add)", curveOrder);
-    // print_bn_hex("Debug C curveOrder (Before mod_add)", curveOrder);
 
 	// Intermediate manual addition
 	BIGNUM *tempSum = BN_new();
 	BN_add(tempSum, a, parentKeyInt);
-
 
     unsigned char my_buffer[64];
     BN_bn2bin(tempSum, my_buffer);
@@ -472,8 +449,6 @@ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uint32_t index
         uint32_t val = *((uint32_t*)(&my_buffer[i]));
         printf("At index %d: val = %x\n", i / 4, val);
     }
-    // BN_CTX_free(ctx);
-
 
 	print_bn("Debug C Temp Sum (a + parentKeyInt)", tempSum);
     print_bn_hex("Debug C Temp Sum (a + parentKeyInt)", tempSum);
@@ -508,13 +483,9 @@ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uint32_t index
 		printf("newKeyBytes before reverse: ");
 		print_as_hex_char(newKeyBytes, newKeyLen);
 
-		// Reverse byte array for big-endian
-		//reverse_byte_array(newKeyBytes, newKeyLen);
-
 		// Debugging: Print hex dump after reverse
 		printf("newKeyBytes after reverse: ");
 		print_as_hex_char(newKeyBytes, newKeyLen);
-
         
         // Output newKeyBytes and ir (ChainCode)
         printf("  * chain code:");
@@ -554,7 +525,7 @@ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uint32_t index
         printf("  * chain path: %s\n", path);
 
 		memcpy(info.master_private_key, newKeyBytes, 32);
-		memcpy(info.chain_code, ir, 32);		
+		memcpy(info.chain_code, ir, 32);
 
         // If newKeyBytes is less than 32 bytes, you'll need to pad with zeros at the beginning.
         // If it's more than 32 bytes, you'll need to truncate. This can be done here.

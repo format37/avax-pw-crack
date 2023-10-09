@@ -28,12 +28,12 @@ class CudaProcessor:
             with open(self.kernel_file, 'r') as f:
                 cuda_code = f.read()
             
-            # include_dir = '/mnt/hdd0/share/alex/projects/cuda_libs/'
-            # include_dir = '/home/alex/projects/avax-pw-crack/bignum/'
-            # include_dir = './'
-            # include_dirs = []
-            # mod = SourceModule(cuda_code, arch='sm_86', include_dirs=include_dirs)
-            mod = SourceModule(cuda_code, arch='sm_86')
+            include_dirs = ['/home/alex/projects/avax-pw-crack/include/']
+            mod = SourceModule(
+                cuda_code,
+                arch='sm_86',
+                include_dirs=include_dirs
+                )
             
             # Get the CUDA function
             self.my_kernel = mod.get_function("my_kernel")

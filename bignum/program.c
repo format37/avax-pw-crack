@@ -17,8 +17,10 @@ int main() {
   BIGNUM *c = BN_new();
 
   // Initialize a and b
-  BN_dec2bn(&a, "70");
-  BN_dec2bn(&b, "50");
+  // BN_dec2bn(&a, "70");
+  // BN_dec2bn(&b, "50");
+  BN_hex2bn(&a, "C17747B1566D9FE8AB7087E3F0C50175B788A1C84F4C756C405000A0CA2248E1");
+  BN_hex2bn(&b, "6C91CEA9CF0CAC55A7596D16B56D2AEFD204BB99DD677993158A7E6564F93CDF");
   
   // Print inputs
   print_bn("A:", a);
