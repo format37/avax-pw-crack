@@ -33,18 +33,27 @@ int main() {
   print_bn("A + B:", c);
 
   // Modular Reduction
+  // old ++
   BIGNUM *m = BN_new();
   BN_dec2bn(&m, "100");
-
   // Print M
-  print_bn("M:", m);
-  
+  print_bn("M:", m);  
   BN_mod(c, c, m, ctx);
-
   // Print C mod M
   print_bn("C mod M:", c);
+  // old --
 
-  // Other operations like subtraction, multiply, divide etc.
+  // new ++
+  /*BIGNUM *curveOrder = BN_new();
+  // Set curve order for secp256k1
+	BN_dec2bn(&curveOrder, "115792089237316195423570985008687907852837564279074904382605163141518161494337");
+  print_bn_hex("Curve Order", curveOrder);
+  // Convert byte arrays to big numbers
+	BN_bin2bn(il, 32, a);
+	BN_bin2bn(key, 32, parentKeyInt);
+  BN_mod_add(newKey, a, parentKeyInt, curveOrder, ctx);*/
+  // new ++
+
 
   BN_free(a);
   BN_free(b);

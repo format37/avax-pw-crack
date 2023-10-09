@@ -11,7 +11,7 @@ __global__ void testKernel() {
 
   BN_ULONG a_d[8];
   BN_ULONG b_d[8]; 
-  BN_ULONG c_d[8];
+  BN_ULONG c_d[16];
 
   // Initialize a
   // C17747B1566D9FE8AB7087E3F0C50175B788A1C84F4C756C405000A0CA2248E1
@@ -45,10 +45,10 @@ __global__ void testKernel() {
   bn_print("B: ", &b);
   
   // Initialize c
-  for (int i = 0; i < 8; i++) c_d[i] = 0;
+  for (int i = 0; i < 16; i++) c_d[i] = 0;
   c.d = c_d;
   c.neg = 0;
-  c.top = 8;
+  c.top = 16;
 
   // Add A and B
   bn_add(&a, &b, &c);
@@ -58,27 +58,41 @@ __global__ void testKernel() {
 
   // Modular Reduction
   BIGNUM m;
-  BN_ULONG m_d[10];
+  BN_ULONG m_d[8];
+  for (int i = 0; i < 8; i++) m_d[i] = 0;
+  m_d[0] = 0x00000064; // 100
   m.d = m_d;
   m.top = 1;
   m.neg = 0;
-  m_d[0] = 0x00000064; // 100
-
+  // m_d[0] = 0x00000064; // 100
   // Print M
   bn_print("M: ", &m);
 
   // Result 
-  BN_ULONG res;
-  
+  // BN_ULONG res;  
   // bn_mod(&c, &m, &c, 1);
   // BN_mod(&c, &c, &m, ctx);
   // Call BN_mod correctly
   // BN_mod(&rem, &c, &m, ctx);
   // BN_nnmod(&c, &c, &m, ctx);
-  res = bn_mod_big_signed(&c, &m);
+  // res = bn_mod_big_signed(&c, &m);
+  // int bn_mod(BIGNUM *rm, const BIGNUM *num, const BIGNUM *divisor)
+  
+  // Initialize rm
+  /*BIGNUM rm;
+  BN_ULONG rm_d[8];
+  for (int i = 0; i < 8; i++) rm_d[i] = 0;*/
+
+  //bn_print("rm: ", &rm);
+
+  //res = bn_mod(&c, &m, 1);
+  // void bn_mod_curveOrder(uint32_t result[8], const uint32_t num[16])
+  bn_mod_curveOrder(&m, &c);
   
   // Print C mod M
-  printf("C mod M: %02x\n", res);
+  // printf("C mod M: %02x\n", res);
+  // printf("C mod M: %02x\n", bn_mod(&c, &m, 1));
+  bn_print("M: ", &m);
 
   BN_CTX_free(ctx);
 }
