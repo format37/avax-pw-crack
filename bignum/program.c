@@ -8,6 +8,13 @@ void print_bn(char* msg, BIGNUM* a) {
   OPENSSL_free(str); 
 }
 
+// Debug print for OpenSSL BIGNUM in Hexadecimal
+void print_bn_hex(const char* label, const BIGNUM* bn) {
+    char* bn_str = BN_bn2hex(bn);
+    printf("%s (Hexadecimal): %s\n", label, bn_str);
+    OPENSSL_free(bn_str);
+}
+
 int main() {
   BN_CTX *ctx = BN_CTX_new();
   
@@ -44,14 +51,17 @@ int main() {
   // old --
 
   // new ++
-  /*BIGNUM *curveOrder = BN_new();
+  BIGNUM *newKey = BN_new();
+  BIGNUM *curveOrder = BN_new();  
   // Set curve order for secp256k1
 	BN_dec2bn(&curveOrder, "115792089237316195423570985008687907852837564279074904382605163141518161494337");
   print_bn_hex("Curve Order", curveOrder);
   // Convert byte arrays to big numbers
-	BN_bin2bn(il, 32, a);
-	BN_bin2bn(key, 32, parentKeyInt);
-  BN_mod_add(newKey, a, parentKeyInt, curveOrder, ctx);*/
+	// BN_bin2bn(il, 32, a);
+	// BN_bin2bn(key, 32, parentKeyInt);
+  // BN_mod_add(newKey, a, parentKeyInt, curveOrder, ctx);
+  BN_mod_add(newKey, c, a, curveOrder, ctx);
+  print_bn_hex("New Key", newKey);
   // new ++
 
 
