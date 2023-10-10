@@ -431,6 +431,10 @@ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uint32_t index
 	BN_bin2bn(il, 32, a);
 	BN_bin2bn(key, 32, parentKeyInt);
 
+    // TODO: Remove ++
+    // BN_hex2bn(&a, "C17747B1566D9FE8AB7087E3F0C50175B788A1C84F4C756C405000A0CA2248E1");
+    // TODO: Remove --
+
 	// Debug prints before BN_mod_add
 	print_bn("Debug C a (Before mod_add)", a);
     print_bn_hex("Debug C a (Before mod_add)", a);

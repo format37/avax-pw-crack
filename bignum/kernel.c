@@ -7,11 +7,13 @@ __global__ void testKernel() {
   // Addition
   BIGNUM a;
   BIGNUM b;
-  BIGNUM c;
+  BIGNUM curveOrder;
+  BIGNUM newKey;
 
   BN_ULONG a_d[8];
-  BN_ULONG b_d[8]; 
-  BN_ULONG c_d[16];
+  BN_ULONG b_d[8];
+  BN_ULONG newKey_d[8];
+  BN_ULONG curveOrder_d[16];
 
   // Initialize a
   // C17747B1566D9FE8AB7087E3F0C50175B788A1C84F4C756C405000A0CA2248E1
@@ -40,21 +42,36 @@ __global__ void testKernel() {
   b.d = b_d;
   b.neg = 0;
   b.top = 8;
+
+  // Initialize newKey_d
+  for (int i = 0; i < 8; i++) newKey_d[i] = 0;
+  newKey.d = newKey_d;
+  newKey.neg = 0;
+  newKey.top = 8;
+
+  // Initialize curveOrder_d
+  // FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
+  curveOrder_d[0] = 0xFFFFFFFF;
+  curveOrder_d[1] = 0xFFFFFFFF;
+  curveOrder_d[2] = 0xFFFFFFFF;
+  curveOrder_d[3] = 0xFFFFFFFE;
+  curveOrder_d[4] = 0xBAAEDCE6;
+  curveOrder_d[5] = 0xAF48A03B;
+  curveOrder_d[6] = 0xBFD25E8C;
+  curveOrder_d[7] = 0xD0364141;
+  curveOrder.d = curveOrder_d;
+  curveOrder.neg = 0;
+  curveOrder.top = 8;
+
   // Print inputs
   bn_print("A: ", &a);
   bn_print("B: ", &b);
-  
-  // Initialize c
-  for (int i = 0; i < 16; i++) c_d[i] = 0;
-  c.d = c_d;
-  c.neg = 0;
-  c.top = 16;
 
   // Add A and B
-  bn_add(&a, &b, &c);
+  bn_add(&a, &b, &newKey);
   
   // Print A + B
-  bn_print("A + B: ", &c);
+  bn_print("Debug Cuda newKey (After add): ", &newKey);
 
   // Modular Reduction
   BIGNUM m;
@@ -66,7 +83,7 @@ __global__ void testKernel() {
   m.neg = 0;
   // m_d[0] = 0x00000064; // 100
   // Print M
-  bn_print("M: ", &m);
+  // bn_print("M: ", &m);
 
   // Result 
   // BN_ULONG res;  
@@ -87,12 +104,18 @@ __global__ void testKernel() {
 
   //res = bn_mod(&c, &m, 1);
   // void bn_mod_curveOrder(uint32_t result[8], const uint32_t num[16])
-  bn_mod_curveOrder(&m, &c);
+  printf("Calling bn_nnmod\n");
+  // bn_mod_curveOrder(&newKey, &newKey, &curveOrder);
+  // Modular reduction 
+  // bn_nnmod(&newKey, &curveOrder);
+  bn_mod_big_signed(&newKey, &curveOrder);
+  
   
   // Print C mod M
   // printf("C mod M: %02x\n", res);
   // printf("C mod M: %02x\n", bn_mod(&c, &m, 1));
-  bn_print("M: ", &m);
+  printf("mod:\n");
+  bn_print("Debug Cuda newKey (After mod): ", &newKey);
 
   BN_CTX_free(ctx);
 }

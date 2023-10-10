@@ -14,6 +14,7 @@ __device__ void bn_print(char* msg, BIGNUM* a) {
   printf("%s", msg);
   for(int i=0; i<a->top; i++) {
     printf("%02x", a->d[i]);
+    //printf("%s", BN_bn2hex(a));
   }
   printf("\n");
 }
@@ -74,7 +75,7 @@ __device__ void bn_sub(BIGNUM* a, BIGNUM* b, BIGNUM* r) {
   for (int i = 0; i < len; i++) {
     BN_ULONG ai = i < a->top ? a->d[i] : 0;
     BN_ULONG bi = i < b->top ? b->d[i] : 0;
-    BN_ULONG ri = ai - bi - borrow;
+    // BN_ULONG ri = ai - bi - borrow;
     /*if (ri > ai) borrow = 1;
     else borrow = 0;
     r->d[i] = ri;*/
@@ -130,23 +131,45 @@ __device__ int bn_compare(const BIGNUM *a, const BIGNUM *b) {
     return 0;
 }
 
-__device__ void bn_mod_curveOrder(BIGNUM *result, const BIGNUM *num) {
-    BIGNUM curveOrder;
-    bn_init(&curveOrder);
-    curveOrder.d[0] = 0xd0364141;
-    curveOrder.d[1] = 0xbfd25e8c;
-    curveOrder.d[2] = 0xaf48a03b;
-    curveOrder.d[3] = 0xbaaedce6;
-    curveOrder.d[4] = 0xfffffffe;
-    curveOrder.d[5] = 0xffffffff;
-    curveOrder.d[6] = 0xffffffff;
-    curveOrder.d[7] = 0xffffffff;
-    curveOrder.top = 8;
+__device__ int bn_cmp(const BIGNUM *a, const BIGNUM *b) {
 
+  int i;
+
+  // Compare top 
+  if (a->top > b->top) return 1;
+  if (a->top < b->top) return -1;
+
+  // Compare words
+  for (i = a->top - 1; i >= 0; i--) {
+    if (a->d[i] > b->d[i]) return 1;
+    if (a->d[i] < b->d[i]) return -1; 
+  }
+
+  // If all words equal, BIGNUMs are equal
+  return 0; 
+
+}
+
+__device__ void bn_nnmod(BIGNUM *r, BIGNUM *m) {
+// Make parameter const
+  while (bn_cmp(r, m) >= 0) {
+    bn_sub(r, r, m); 
+  }
+}
+
+/*__device__ void bn_mod_curveOrder(BIGNUM *result, const BIGNUM *num, BIGNUM *curveOrder) {
+    // print the curveOrder value
+    printf("bn_mod_curveOrder: ");
+    for (int i = 0; i < 8; i++) {
+        printf("%08x", curveOrder->d[i]);
+    }
+    printf("\n");
+    printf("bn_mod_curveOrder 0\n");    
     BIGNUM temp;
-    bn_init(&temp);
-    bn_init(result);
-
+    // bn_init(&temp);
+    printf("bn_mod_curveOrder 1\n");
+    // bn_init(result);
+    
     // Copy the input number to the result
     for (int i = 0; i < 8; i++) {
         result->d[i] = num->d[i];
@@ -154,16 +177,16 @@ __device__ void bn_mod_curveOrder(BIGNUM *result, const BIGNUM *num) {
     result->top = 8;
 
     // Simplified modulus operation (can be optimized further)
-    while (bn_compare(result, &curveOrder) >= 0) {
-        bn_sub(result, &curveOrder, &temp);
+    while (bn_compare(result, curveOrder) >= 0) {
+        bn_sub(result, curveOrder, &temp);
         for (int j = 0; j < 8; j++) {
             result->d[j] = temp.d[j];
         }
     }
-}
+}*/
 
 // old version ++
-/*__device__ BN_ULONG bn_mod_v0(BN_ULONG num, BN_ULONG divisor) {
+__device__ BN_ULONG bn_mod(BN_ULONG num, BN_ULONG divisor) {
   return num % divisor; 
 }
 
@@ -183,7 +206,11 @@ __device__ BN_ULONG bn_mod_big_signed(BIGNUM *num, BIGNUM *divisor) {
   BN_ULONG d = divisor->d[divisor->top-1]; 
   BN_ULONG n = num->d[num->top-1];
 
-  BN_ULONG res = bn_mod(n, d);
+  //BN_ULONG res = bn_mod(n, d);
+  //BN_ULONG res = n % d;
+  //BN_ULONG res = n & BN_MASK2;
+  //BN_ULONG res = n & 0xffffffff;
+  BN_ULONG res = bn_mod_big(num, divisor);
 
   if (numNeg) {
     res = d - res; // subtract from divisor
@@ -195,5 +222,5 @@ __device__ BN_ULONG bn_mod_big_signed(BIGNUM *num, BIGNUM *divisor) {
 
   return res;
 
-}*/
+}
 // Old version --
