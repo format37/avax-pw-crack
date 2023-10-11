@@ -208,7 +208,7 @@ const BIGNUM *BN_value_one(void);
 char *BN_options(void);
 BN_CTX *BN_CTX_new_ex(OSSL_LIB_CTX *ctx);
 // __device__ BN_CTX *BN_CTX_new(void);
-__host__ __device__ BN_CTX* BN_CTX_new() {
+__host__ __device__ BN_CTX *BN_CTX_new() {
   // host+device stub
 }
 BN_CTX *BN_CTX_secure_new_ex(OSSL_LIB_CTX *ctx);
@@ -264,7 +264,7 @@ int BN_bn2nativepad(const BIGNUM *a, unsigned char *to, int tolen);
 int BN_signed_bn2native(const BIGNUM *a, unsigned char *to, int tolen);
 BIGNUM *BN_mpi2bn(const unsigned char *s, int len, BIGNUM *ret);
 int BN_bn2mpi(const BIGNUM *a, unsigned char *to);
-int BN_sub(BIGNUM *r, const BIGNUM *a, const BIGNUM *b);
+__device__ int BN_sub(BIGNUM *r, const BIGNUM *a, const BIGNUM *b);
 int BN_usub(BIGNUM *r, const BIGNUM *a, const BIGNUM *b);
 int BN_uadd(BIGNUM *r, const BIGNUM *a, const BIGNUM *b);
 // __device__ int BN_add(BIGNUM *r, const BIGNUM *a, const BIGNUM *b);
@@ -286,16 +286,19 @@ int BN_is_negative(const BIGNUM *b);
 
 //__device__ int BN_div(BIGNUM *dv, BIGNUM *rem, const BIGNUM *m, const BIGNUM *d,
 //           BN_CTX *ctx);
-__host__ __device__ int BN_div(BIGNUM *dv, BIGNUM *rem, const BIGNUM *m, const BIGNUM *d,
+/*__host__ __device__ int BN_div(BIGNUM *dv, BIGNUM *rem, const BIGNUM *m, const BIGNUM *d,
            BN_CTX *ctx)
 {
   // host+device stub
 }
 // Alex --
 
-//# define BN_mod(rem,m,d,ctx) BN_div(NULL,(rem),(m),(d),(ctx))
-
-// int BN_nnmod(BIGNUM *r, const BIGNUM *m, const BIGNUM *d, BN_CTX *ctx);
+# define BN_mod(rem,m,d,ctx) BN_div(NULL,(rem),(m),(d),(ctx))
+*/
+__device__ int BN_div(BIGNUM *dv, BIGNUM *rem, const BIGNUM *m, const BIGNUM *d,
+           BN_CTX *ctx);
+# define BN_mod(rem,m,d,ctx) BN_div(NULL,(rem),(m),(d),(ctx))
+__device__ int BN_nnmod(BIGNUM *r, const BIGNUM *m, const BIGNUM *d, BN_CTX *ctx);
 int BN_mod_add(BIGNUM *r, const BIGNUM *a, const BIGNUM *b, const BIGNUM *m,
                BN_CTX *ctx);
 int BN_mod_add_quick(BIGNUM *r, const BIGNUM *a, const BIGNUM *b,
