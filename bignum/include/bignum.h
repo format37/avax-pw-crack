@@ -51,7 +51,7 @@ __device__ void bn_print(char* msg, BIGNUM* a) {
   printf("%s", msg);
   for(int i=0; i<a->top; i++) {
     printf("%02x", a->d[i]);
-    //printf("%s", BN_bn2hex(a));
+    // printf("%s", BN_bn2hex(a));
   }
   printf("\n");
 }
@@ -204,9 +204,11 @@ __device__ static BN_ULONG *bn_expand_internal(const BIGNUM *b, int words)
         return NULL;
     }
     if (BN_get_flags(b, BN_FLG_SECURE))
-        a = OPENSSL_secure_zalloc(words * sizeof(*a));
+        //a = OPENSSL_secure_zalloc(words * sizeof(*a));
+        a = (BN_ULONG*) calloc(words, sizeof(BN_ULONG));
     else
-        a = OPENSSL_zalloc(words * sizeof(*a));
+        // a = OPENSSL_zalloc(words * sizeof(*a));
+        a = (BN_ULONG*) calloc(words, sizeof(BN_ULONG));
     if (a == NULL)
         return NULL;
 
