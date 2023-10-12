@@ -109,13 +109,15 @@ __global__ void testKernel() {
   // Modular reduction 
   // bn_nnmod(&newKey, &curveOrder);
   // bn_mod_big_signed(&newKey, &curveOrder);
-  BN_nnmod(&newKey, &newKey, &curveOrder, ctx);
+  int bn_result = BN_nnmod(&newKey, &newKey, &curveOrder, ctx);
   
   
   // Print C mod M
   // printf("C mod M: %02x\n", res);
   // printf("C mod M: %02x\n", bn_mod(&c, &m, 1));
   // bn_print("Debug Cuda newKey (After mod): ", &newKey);
+  printf("bn_result: %d\n", bn_result);
+  print_bn_hex("Debug Cuda newKey (After mod):", &newKey);
 
   BN_CTX_free(ctx);
 }

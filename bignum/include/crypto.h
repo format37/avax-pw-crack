@@ -341,14 +341,14 @@ void CRYPTO_get_mem_functions(CRYPTO_malloc_fn *malloc_fn,
                               CRYPTO_realloc_fn *realloc_fn,
                               CRYPTO_free_fn *free_fn);
 
-void *CRYPTO_malloc(size_t num, const char *file, int line);
+__device__ void *CRYPTO_malloc(size_t num, const char *file, int line);
 void *CRYPTO_zalloc(size_t num, const char *file, int line);
 void *CRYPTO_memdup(const void *str, size_t siz, const char *file, int line);
 char *CRYPTO_strdup(const char *str, const char *file, int line);
 char *CRYPTO_strndup(const char *str, size_t s, const char *file, int line);
 // __device__ void CRYPTO_free(void *ptr, const char *file, int line);
 __host__ __device__ void CRYPTO_free(void *ptr, const char *file, int line) {}
-void CRYPTO_clear_free(void *ptr, size_t num, const char *file, int line);
+__device__ void CRYPTO_clear_free(void *ptr, size_t num, const char *file, int line);
 void *CRYPTO_realloc(void *addr, size_t num, const char *file, int line);
 void *CRYPTO_clear_realloc(void *addr, size_t old_num, size_t num,
                            const char *file, int line);
@@ -358,7 +358,7 @@ int CRYPTO_secure_malloc_done(void);
 void *CRYPTO_secure_malloc(size_t num, const char *file, int line);
 void *CRYPTO_secure_zalloc(size_t num, const char *file, int line);
 void CRYPTO_secure_free(void *ptr, const char *file, int line);
-void CRYPTO_secure_clear_free(void *ptr, size_t num,
+__device__ void CRYPTO_secure_clear_free(void *ptr, size_t num,
                               const char *file, int line);
 int CRYPTO_secure_allocated(const void *ptr);
 int CRYPTO_secure_malloc_initialized(void);

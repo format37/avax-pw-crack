@@ -74,7 +74,7 @@ extern "C" {
 # endif
 
 void BN_set_flags(BIGNUM *b, int n);
-int BN_get_flags(const BIGNUM *b, int n);
+__device__ int BN_get_flags(const BIGNUM *b, int n);
 
 /* Values for |top| in BN_rand() */
 #define BN_RAND_TOP_ANY    -1
@@ -189,14 +189,14 @@ void *BN_GENCB_get_arg(BN_GENCB *cb);
 # define BN_num_bytes(a) ((BN_num_bits(a)+7)/8)
 
 int BN_abs_is_word(const BIGNUM *a, const BN_ULONG w);
-int BN_is_zero(const BIGNUM *a);
+__device__ int BN_is_zero(const BIGNUM *a);
 int BN_is_one(const BIGNUM *a);
 int BN_is_word(const BIGNUM *a, const BN_ULONG w);
 int BN_is_odd(const BIGNUM *a);
 
 # define BN_one(a)       (BN_set_word((a),1))
 
-void BN_zero_ex(BIGNUM *a);
+__device__ void BN_zero_ex(BIGNUM *a);
 
 # if OPENSSL_API_LEVEL > 908
 #  define BN_zero(a)      BN_zero_ex(a)
@@ -217,9 +217,9 @@ BN_CTX *BN_CTX_secure_new(void);
 __host__ __device__ void BN_CTX_free(BN_CTX *c) {
   // host+device stub
 }
-void BN_CTX_start(BN_CTX *ctx);
-BIGNUM *BN_CTX_get(BN_CTX *ctx);
-void BN_CTX_end(BN_CTX *ctx);
+__device__ void BN_CTX_start(BN_CTX *ctx);
+__device__ BIGNUM *BN_CTX_get(BN_CTX *ctx);
+__device__ void BN_CTX_end(BN_CTX *ctx);
 int BN_rand_ex(BIGNUM *rnd, int bits, int top, int bottom,
                unsigned int strength, BN_CTX *ctx);
 int BN_rand(BIGNUM *rnd, int bits, int top, int bottom);
@@ -239,7 +239,7 @@ OSSL_DEPRECATEDIN_3_0
 int BN_pseudo_rand_range(BIGNUM *rnd, const BIGNUM *range);
 # endif
 int BN_num_bits(const BIGNUM *a);
-int BN_num_bits_word(BN_ULONG l);
+__device__ int BN_num_bits_word(BN_ULONG l);
 int BN_security_bits(int L, int N);
 // __device__ BIGNUM *BN_new(void);
 __host__ __device__ BIGNUM* BN_new() {
@@ -247,7 +247,7 @@ __host__ __device__ BIGNUM* BN_new() {
 }
 BIGNUM *BN_secure_new(void);
 void BN_clear_free(BIGNUM *a);
-BIGNUM *BN_copy(BIGNUM *a, const BIGNUM *b);
+__device__ BIGNUM *BN_copy(BIGNUM *a, const BIGNUM *b);
 void BN_swap(BIGNUM *a, BIGNUM *b);
 BIGNUM *BN_bin2bn(const unsigned char *s, int len, BIGNUM *ret);
 BIGNUM *BN_signed_bin2bn(const unsigned char *s, int len, BIGNUM *ret);

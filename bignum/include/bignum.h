@@ -9,6 +9,11 @@
 #define HBITS(a) (((a)>>BN_BITS4)&BN_MASK2l)
 #define L2HBITS(a) (((a)<<BN_BITS4)&BN_MASK2)
 #define bn_pollute(a)
+/* How many bignums are in each "pool item"; */
+#define BN_CTX_POOL_SIZE        16
+/* The stack frame info is resizing, set a first-time expansion size; */
+#define BN_CTX_START_FRAMES     32
+#define CTXDBG(str, ctx) do {} while(0)
 
 #define mul64(l,h,bl,bh) \
         { \
@@ -39,6 +44,14 @@
         (r)=l&BN_MASK2; \
         }
 
+/* A wrapper to manage the "stack frames" */
+typedef struct bignum_ctx_stack {
+    /* Array of indexes into the bignum stack */
+    unsigned int *indexes;
+    /* Number of stack frames, and the size of the allocated array */
+    unsigned int depth, size;
+} BN_STACK;
+
 typedef struct bignum_st {
   BN_ULONG *d;
   int top;
@@ -47,6 +60,44 @@ typedef struct bignum_st {
   int flags;
 } BIGNUM;
 
+/**********/
+/* BN_CTX */
+/**********/
+
+/* A bundle of bignums that can be linked with other bundles */
+typedef struct bignum_pool_item {
+    /* The bignum values */
+    BIGNUM vals[BN_CTX_POOL_SIZE];
+    /* Linked-list admin */
+    struct bignum_pool_item *prev, *next;
+} BN_POOL_ITEM;
+
+/* A linked-list of bignums grouped in bundles */
+typedef struct bignum_pool {
+    /* Linked-list admin */
+    BN_POOL_ITEM *head, *current, *tail;
+    /* Stack depth and allocation size */
+    unsigned used, size;
+} BN_POOL;
+
+/* The opaque BN_CTX type */
+struct bignum_ctx {
+    /* The bignum bundles */
+    BN_POOL pool;
+    /* The "stack frames", if you will */
+    BN_STACK stack;
+    /* The number of bignums currently assigned */
+    unsigned int used;
+    /* Depth of stack overflow */
+    int err_stack;
+    /* Block "gets" until an "end" (compatibility behaviour) */
+    int too_many;
+    /* Flags. */
+    int flags;
+    /* The library context */
+    OSSL_LIB_CTX *libctx;
+};
+
 __device__ void bn_print(char* msg, BIGNUM* a) {
   printf("%s", msg);
   for(int i=0; i<a->top; i++) {
@@ -54,6 +105,13 @@ __device__ void bn_print(char* msg, BIGNUM* a) {
     // printf("%s", BN_bn2hex(a));
   }
   printf("\n");
+}
+
+// Debug print for OpenSSL BIGNUM in Hexadecimal
+__device__ void print_bn_hex(const char* label, const BIGNUM* bn) {
+    char* bn_str = BN_bn2hex(bn);
+    printf("%s (Hexadecimal): %s\n", label, bn_str);
+    OPENSSL_free(bn_str);
 }
 
 __device__ void init_zero(BIGNUM* r, int len) {
@@ -112,12 +170,17 @@ __device__ int BN_nnmod(BIGNUM *r, const BIGNUM *m, const BIGNUM *d, BN_CTX *ctx
      * like BN_mod, but returns non-negative remainder (i.e., 0 <= r < |d|
      * always holds)
      */
-
+    printf("BN_nnmod. stage 0\n");
     if (!(BN_mod(r, m, d, ctx)))
-        return 0;
+        printf("BN_nnmod. stage 1\n");
+        return 0;    
+    printf("BN_nnmod. stage 2\n");
     if (!r->neg)
+        printf("BN_nnmod. stage 3\n");
         return 1;
+    printf("BN_nnmod. stage 4\n");
     /* now   -|d| < r < 0,  so we have to set  r := r + |d| */
+    printf("BN_nnmod: r->neg = %d\n", r->neg);
     return (d->neg ? BN_sub : BN_add) (r, r, d);
 }
 
@@ -205,10 +268,12 @@ __device__ static BN_ULONG *bn_expand_internal(const BIGNUM *b, int words)
     }
     if (BN_get_flags(b, BN_FLG_SECURE))
         //a = OPENSSL_secure_zalloc(words * sizeof(*a));
-        a = (BN_ULONG*) calloc(words, sizeof(BN_ULONG));
+        // a = (BN_ULONG*) calloc(words, sizeof(BN_ULONG));
+        cudaMalloc(&a, words * sizeof(BN_ULONG));
     else
         // a = OPENSSL_zalloc(words * sizeof(*a));
-        a = (BN_ULONG*) calloc(words, sizeof(BN_ULONG));
+        // a = (BN_ULONG*) calloc(words, sizeof(BN_ULONG));
+        cudaMalloc(&a, words * sizeof(BN_ULONG));
     if (a == NULL)
         return NULL;
 
@@ -320,7 +385,7 @@ __device__ BN_ULONG bn_div_words(BN_ULONG h, BN_ULONG l, BN_ULONG d)
 
 /* Divide h,l by d and return the result. */
 /* I need to test this some more :-( */
-BN_ULONG bn_div_words(BN_ULONG h, BN_ULONG l, BN_ULONG d)
+__device__ BN_ULONG bn_div_words(BN_ULONG h, BN_ULONG l, BN_ULONG d)
 {
     BN_ULONG dh, dl, q, ret = 0, th, tl, t;
     int i, count = 2;
@@ -592,7 +657,7 @@ __device__ BN_ULONG bn_add_words(BN_ULONG *r, const BN_ULONG *a, const BN_ULONG 
     return (BN_ULONG)ll;
 }
 #else                           /* !BN_LLONG */
-BN_ULONG bn_add_words(BN_ULONG *r, const BN_ULONG *a, const BN_ULONG *b,
+__device__ BN_ULONG bn_add_words(BN_ULONG *r, const BN_ULONG *a, const BN_ULONG *b,
                       int n)
 {
     BN_ULONG c, l, t;
@@ -649,6 +714,73 @@ BN_ULONG bn_add_words(BN_ULONG *r, const BN_ULONG *a, const BN_ULONG *b,
     return (BN_ULONG)c;
 }
 #endif                          /* !BN_LLONG */
+
+/*__device__ static int BN_STACK_push_v0(BN_STACK *st, unsigned int idx)
+{
+    if (st->depth == st->size) {
+        // Need to expand
+        unsigned int newsize =
+            st->size ? (st->size * 3 / 2) : BN_CTX_START_FRAMES;
+        unsigned int *newitems;
+
+        if ((newitems = OPENSSL_malloc(sizeof(*newitems) * newsize)) == NULL)
+            return 0;
+        if (st->depth)
+            memcpy(newitems, st->indexes, sizeof(*newitems) * st->depth);
+        OPENSSL_free(st->indexes);
+        st->indexes = newitems;
+        st->size = newsize;
+    }
+    st->indexes[(st->depth)++] = idx;
+    return 1;
+}*/
+
+__device__ static int BN_STACK_push(BN_STACK *st, unsigned int idx) {
+
+  unsigned int* newitems;
+  unsigned int newsize;
+  
+  if (st->depth == st->size) {
+
+    newsize = st->size ? (st->size * 3 / 2) : BN_CTX_START_FRAMES;
+
+    newitems = (unsigned int*)OPENSSL_malloc(sizeof(*newitems) * newsize);
+    
+    if (newitems == NULL)
+       return 0;
+
+    if (st->depth > 0) 
+      memcpy(newitems, st->indexes, sizeof(*newitems) * st->depth);
+
+    if (st->indexes)
+      OPENSSL_free(st->indexes);
+
+  } else {
+    newitems = st->indexes; 
+  }
+
+  st->indexes = newitems;
+  st->size = (newitems == st->indexes) ? st->size : newsize;
+
+  st->indexes[(st->depth)++] = idx;
+
+  return 1;
+}
+
+__device__ void BN_CTX_start(BN_CTX *ctx)
+{
+    CTXDBG("ENTER BN_CTX_start()", ctx);
+    /* If we're already overflowing ... */
+    if (ctx->err_stack || ctx->too_many)
+        ctx->err_stack++;
+    /* (Try to) get a new frame pointer */
+    else if (!BN_STACK_push(&ctx->stack, ctx->used)) {
+        // ERR_raise(ERR_LIB_BN, BN_R_TOO_MANY_TEMPORARY_VARIABLES);
+        printf("BN_CTX_start: BN_R_TOO_MANY_TEMPORARY_VARIABLES\n");
+        ctx->err_stack++;
+    }
+    CTXDBG("LEAVE BN_CTX_start()", ctx);
+}
 
 /*
  * It's argued that *length* of *significant* part of divisor is public.
@@ -889,6 +1021,11 @@ __device__ void bn_correct_top(BIGNUM *a)
     bn_pollute(a);
 }
 
+__device__ int BN_is_zero(const BIGNUM *a)
+{
+    return a->top == 0;
+}
+
 /*-
  * BN_div computes  dv := num / divisor, rounding towards
  * zero, and sets up rm  such that  dv*divisor + rm = num  holds.
@@ -900,6 +1037,7 @@ __device__ void bn_correct_top(BIGNUM *a)
 __device__ int BN_div(BIGNUM *dv, BIGNUM *rm, const BIGNUM *num, const BIGNUM *divisor,
            BN_CTX *ctx)
 {
+    printf("BN_div: stage 0\n");
     int ret;
 
     if (BN_is_zero(divisor)) {
@@ -907,7 +1045,7 @@ __device__ int BN_div(BIGNUM *dv, BIGNUM *rm, const BIGNUM *num, const BIGNUM *d
         printf("BN_div: Divide by zero error\n");
         return 0;
     }
-
+    printf("BN_div: stage 1\n");
     /*
      * Invalid zero-padding would have particularly bad consequences so don't
      * just rely on bn_check_top() here (bn_check_top() works only for
@@ -918,7 +1056,7 @@ __device__ int BN_div(BIGNUM *dv, BIGNUM *rm, const BIGNUM *num, const BIGNUM *d
         printf("BN_div: Not initialized error\n");
         return 0;
     }
-
+    printf("BN_div: stage 2\n");
     ret = bn_div_fixed_top(dv, rm, num, divisor, ctx);
 
     if (ret) {
@@ -927,6 +1065,6 @@ __device__ int BN_div(BIGNUM *dv, BIGNUM *rm, const BIGNUM *num, const BIGNUM *d
         if (rm != NULL)
             bn_correct_top(rm);
     }
-
+    printf("BN_div: stage 3\n");
     return ret;
 }
