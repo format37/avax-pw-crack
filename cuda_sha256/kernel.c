@@ -1161,6 +1161,10 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
 	// Print A + B
   	bn_print("Debug Cuda newKey (After add): ", &newKey);
 
+	printf("Calling bn_mod\n");
+	bn_mod(&newKey, &newKey, &curveOrder);
+	bn_print("Debug Cuda newKey (After mod): ", &newKey);
+
     return info;
 }
 // -- Child Key Derivation --
