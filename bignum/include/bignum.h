@@ -198,13 +198,13 @@ __device__ int bn_check_top_by_alex(const BIGNUM *a)
     return 0;
 }
 
-int bn_check_top_by_alex_v1(const BIGNUM *a)
+/*__device__ int bn_check_top_by_alex_v1(const BIGNUM *a)
 {
     if (a->top < 0 || a->top > a->dmax) {
         abort();
     }
     return a->top;
-}
+}*/
 
 __device__ static int bn_left_align(BIGNUM *num)
 {
@@ -769,17 +769,112 @@ __device__ static int BN_STACK_push(BN_STACK *st, unsigned int idx) {
 
 __device__ void BN_CTX_start(BN_CTX *ctx)
 {
+    printf("BN_CTX_start: stage 0\n");
     CTXDBG("ENTER BN_CTX_start()", ctx);
-    /* If we're already overflowing ... */
-    if (ctx->err_stack || ctx->too_many)
-        ctx->err_stack++;
-    /* (Try to) get a new frame pointer */
+    printf("BN_CTX_start: stage 1\n");
+    // If we're already overflowing ...
+    
+    // TODO: Enable this:
+    /*if (ctx->err_stack || ctx->too_many) {
+        printf("BN_CTX_start: stage 2a\n");
+        ctx->err_stack++;        
+    }
+    // (Try to) get a new frame pointer
     else if (!BN_STACK_push(&ctx->stack, ctx->used)) {
+        printf("BN_CTX_start: stage 2b\n");
         // ERR_raise(ERR_LIB_BN, BN_R_TOO_MANY_TEMPORARY_VARIABLES);
         printf("BN_CTX_start: BN_R_TOO_MANY_TEMPORARY_VARIABLES\n");
         ctx->err_stack++;
     }
+
+    printf("BN_CTX_start: stage 3\n");
     CTXDBG("LEAVE BN_CTX_start()", ctx);
+    */
+}
+
+__device__ void bn_init(BIGNUM *a)
+{
+    static BIGNUM nilbn;
+
+    *a = nilbn;
+    //bn_check_top(a);
+    bn_check_top_by_alex(a);
+}
+
+__device__ static BIGNUM *BN_POOL_get(BN_POOL *p, int flag)
+{
+    BIGNUM *bn;
+    unsigned int loop;
+
+    /* Full; allocate a new pool item and link it in. */
+    if (p->used == p->size) {
+        BN_POOL_ITEM *item;
+        // printf("BN_POOL_get: stage 0\n");
+
+        // TODO: Enable this:
+        //if ((item = OPENSSL_malloc(sizeof(*item))) == NULL)        
+        //    return NULL;
+
+        for (loop = 0, bn = item->vals; loop++ < BN_CTX_POOL_SIZE; bn++) {
+            bn_init(bn);
+            if ((flag & BN_FLG_SECURE) != 0)
+                BN_set_flags(bn, BN_FLG_SECURE);
+        }
+        item->prev = p->tail;
+        item->next = NULL;
+
+        if (p->head == NULL)
+            p->head = p->current = p->tail = item;
+        else {
+            p->tail->next = item;
+            p->tail = item;
+            p->current = item;
+        }
+        p->size += BN_CTX_POOL_SIZE;
+        p->used++;
+        /* Return the first bignum from the new pool */
+        return item->vals;
+    }
+
+    if (!p->used)
+        p->current = p->head;
+    else if ((p->used % BN_CTX_POOL_SIZE) == 0)
+        p->current = p->current->next;
+    return p->current->vals + ((p->used++) % BN_CTX_POOL_SIZE);
+}
+
+__device__ BIGNUM *BN_CTX_get(BN_CTX &ctx)
+{
+    printf("BN_CTX_get: stage 0\n");
+    BIGNUM *ret;
+
+    CTXDBG("ENTER BN_CTX_get()", ctx);
+    printf("BN_CTX_get: stage 1\n");
+    //if (ctx->err_stack || ctx->too_many)
+    if (ctx.err_stack || ctx.too_many)
+        printf("BN_CTX_get: stage 2\n");
+        return NULL;
+    printf("BN_CTX_get: stage 3\n");
+    //if ((ret = BN_POOL_get(&ctx->pool, ctx->flags)) == NULL) {
+    if ((ret = BN_POOL_get(&ctx.pool, ctx.flags)) == NULL) {
+        /*
+         * Setting too_many prevents repeated "get" attempts from cluttering
+         * the error stack.
+         */
+        //ctx->too_many = 1;
+        ctx.too_many = 1;
+        //ERR_raise(ERR_LIB_BN, BN_R_TOO_MANY_TEMPORARY_VARIABLES);
+        printf("BN_CTX_get: BN_R_TOO_MANY_TEMPORARY_VARIABLES\n");
+        return NULL;
+    }
+    /* OK, make sure the returned bignum is "zero" */
+    BN_zero(ret);
+    /* clear BN_FLG_CONSTTIME if leaked from previous frames */
+    ret->flags &= (~BN_FLG_CONSTTIME);
+    //ctx->used++;
+    ctx.used++;
+    CTXDBG("LEAVE BN_CTX_get()", ctx);
+    return ret;
 }
 
 /*
@@ -813,22 +908,24 @@ __device__ int bn_div_fixed_top(BIGNUM *dv, BIGNUM *rm, const BIGNUM *num,
     BN_ULONG *resp, *wnum, *wnumtop;
     BN_ULONG d0, d1;
     int num_n, div_n, num_neg;
-
+    printf("bn_div_fixed_top: stage 0\n");
     assert(divisor->top > 0 && divisor->d[divisor->top - 1] != 0);
 
     bn_check_top_by_alex(num);
     bn_check_top_by_alex(divisor);
     bn_check_top_by_alex(dv);
     bn_check_top_by_alex(rm);
-
+    printf("bn_div_fixed_top: stage 1\n");
     BN_CTX_start(ctx);
+    printf("bn_div_fixed_top: stage 2\n");
     res = (dv == NULL) ? BN_CTX_get(ctx) : dv;
+    printf("bn_div_fixed_top: stage 3\n");
     tmp = BN_CTX_get(ctx);
     snum = BN_CTX_get(ctx);
     sdiv = BN_CTX_get(ctx);
+    
     if (sdiv == NULL)
-        goto err;
-
+        goto err;    
     /* First we normalise the numbers */
     if (!BN_copy(sdiv, divisor))
         goto err;
@@ -846,7 +943,7 @@ __device__ int bn_div_fixed_top(BIGNUM *dv, BIGNUM *rm, const BIGNUM *num,
 
     div_n = sdiv->top;
     num_n = snum->top;
-
+    
     if (num_n <= div_n) {
         /* caller didn't pad dividend -> no constant-time guarantee... */
         if (bn_wexpand(snum, div_n + 1) == NULL)
@@ -997,6 +1094,7 @@ __device__ int bn_div_fixed_top(BIGNUM *dv, BIGNUM *rm, const BIGNUM *num,
     BN_CTX_end(ctx);
     return 1;
  err:
+    printf("bn_div_fixed_top: error\n");
     bn_check_top_by_alex(rm);
     BN_CTX_end(ctx);
     return 0;
@@ -1058,13 +1156,13 @@ __device__ int BN_div(BIGNUM *dv, BIGNUM *rm, const BIGNUM *num, const BIGNUM *d
     }
     printf("BN_div: stage 2\n");
     ret = bn_div_fixed_top(dv, rm, num, divisor, ctx);
-
+    printf("BN_div: stage 4\n");
     if (ret) {
         if (dv != NULL)
             bn_correct_top(dv);
         if (rm != NULL)
             bn_correct_top(rm);
     }
-    printf("BN_div: stage 3\n");
+    // printf("BN_div: stage 4\n");
     return ret;
 }

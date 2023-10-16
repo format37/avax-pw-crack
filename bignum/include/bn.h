@@ -73,7 +73,7 @@ extern "C" {
 #  define BN_FLG_FREE            0x8000 /* used for debugging */
 # endif
 
-void BN_set_flags(BIGNUM *b, int n);
+__device__ void BN_set_flags(BIGNUM *b, int n);
 __device__ int BN_get_flags(const BIGNUM *b, int n);
 
 /* Values for |top| in BN_rand() */
