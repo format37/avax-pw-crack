@@ -338,11 +338,62 @@ __device__ void bn_add(BIGNUM* a, BIGNUM* b, BIGNUM* r) {
 }
 
 
-__device__ BN_ULONG bn_mod(BN_ULONG num, BN_ULONG divisor) {
+/*__device__ BN_ULONG bn_mod(BN_ULONG num, BN_ULONG divisor) {
   return num % divisor; 
+}*/
+
+__device__ void bn_mod(BIGNUM* r, BIGNUM* m, BIGNUM* d) {
+    // Copy m to r
+    for (int i = 0; i < m->top; i++) {
+        r->d[i] = m->d[i];
+    }
+    r->top = m->top;
+    r->neg = 0;
+
+    // Keep subtracting d from r until r < d
+    while (true) {
+        int borrow = 0;
+        int is_smaller = 0;
+
+        // Subtract d from r, with borrow
+        for (int i = d->top - 1; i >= 0; i--) {
+            long long res = (long long)r->d[i] - d->d[i] - borrow;
+            if (res < 0) {
+                res += 0x100000000;
+                borrow = 1;
+            } else {
+                borrow = 0;
+            }
+            r->d[i] = (BN_ULONG)res;
+
+            if (r->d[i] < d->d[i]) {
+                is_smaller = 1;
+            }
+        }
+
+        // If we had a borrow at the end, add back d to correct
+        if (borrow) {
+            int carry = 0;
+            for (int i = d->top - 1; i >= 0; i--) {
+                long long res = (long long)r->d[i] + d->d[i] + carry;
+                if (res >= 0x100000000) {
+                    res -= 0x100000000;
+                    carry = 1;
+                } else {
+                    carry = 0;
+                }
+                r->d[i] = (BN_ULONG)res;
+            }
+            break;
+        }
+
+        if (is_smaller) {
+            break;
+        }
+    }
 }
 
-__device__ BN_ULONG bn_mod_big(BIGNUM *num, BIGNUM *divisor) {
+/*__device__ BN_ULONG bn_mod_big(BIGNUM *num, BIGNUM *divisor) {
 
   BN_ULONG d = divisor->d[divisor->top-1]; // divisor
   BN_ULONG n = num->d[num->top-1]; // numerator
@@ -370,4 +421,4 @@ __device__ BN_ULONG bn_mod_big_signed(BIGNUM *num, BIGNUM *divisor) {
 
   return res;
 
-}
+}*/

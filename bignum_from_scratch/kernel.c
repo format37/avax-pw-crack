@@ -51,6 +51,49 @@ __device__ void big_num_add_mod(BN_ULONG *result, BN_ULONG *a, BN_ULONG *b, BN_U
     }
 }
 
+__device__ void robust_BN_nnmod(BIGNUM *r, const BIGNUM *m, const BIGNUM *d) {
+    // Copy m into r
+    for (int i = 0; i < m->top; ++i) {
+        r->d[i] = m->d[i];
+    }
+    r->top = m->top;
+    r->neg = 0;  // Result is non-negative
+
+    // Now we'll reduce r modulo d, using simple division
+    for (int i = 0; i < r->top; ++i) {
+        if (r->d[i] >= d->d[0]) {
+            BN_ULONG quotient = r->d[i] / d->d[0];
+            BN_ULONG remainder = r->d[i] % d->d[0];
+
+            // Subtract quotient*d from r
+            BN_ULONG borrow = 0;
+            for (int j = 0; j < d->top; ++j) {
+                unsigned long long sub = (unsigned long long) r->d[i+j] - (unsigned long long) d->d[j] * quotient - borrow;
+                r->d[i+j] = (BN_ULONG) (sub % 0x100000000);
+                borrow = (BN_ULONG) (sub >> 32);
+            }
+
+            // Add back the remainder at position i
+            unsigned long long sum = (unsigned long long) r->d[i] + (unsigned long long) remainder;
+            r->d[i] = (BN_ULONG) (sum % 0x100000000);
+            BN_ULONG carry = (BN_ULONG) (sum >> 32);
+
+            // Propagate any carry
+            for (int j = i+1; j < r->top && carry; ++j) {
+                sum = (unsigned long long) r->d[j] + carry;
+                r->d[j] = (BN_ULONG) (sum % 0x100000000);
+                carry = (BN_ULONG) (sum >> 32);
+            }
+
+            // If there's still a carry, increase the size of r
+            if (carry) {
+                r->d[r->top] = carry;
+                r->top++;
+            }
+        }
+    }
+}
+
 __global__ void testKernel() {
   BN_CTX *ctx = BN_CTX_new();
 
@@ -133,13 +176,19 @@ __global__ void testKernel() {
   m.neg = 0;
   
   printf("Calling bn_nnmod\n");
+  // expected:2E09165B257A4C3E52C9F4FAA6322C66CEDE807B7D6B4EC3960820795EE5447F
+
   /*if (!simple_BN_nnmod(&newKey, &newKey, &curveOrder)) {
       // Handle error (e.g., division by zero)
       printf("Error: Division by zero\n");
   }*/
-  // Now perform (A + B) mod curveOrder
-  big_num_add_mod(newKey.d, a.d, b.d, curveOrder.d, a.top);
-  printf("Debug Cuda newKey (original_): 2E09165B257A4C3E52C9F4FAA6322C66CEDE807B7D6B4EC3960820795EE5447F\n");
+  
+  //big_num_add_mod(newKey.d, a.d, b.d, curveOrder.d, a.top); // Fine:2e09165b257a4c3e52c9f4faa6322c6 Wrong:5898d5d622cb3eeff55da7f062f1b85c0
+
+  //robust_BN_nnmod(&newKey, &newKey, &curveOrder); // Wrong:5c122cb6257a4c3e52c9f4faa6322c66cede807b7d6b4ec4960820795ee54480
+  bn_mod(&newKey, &newKey, &curveOrder);
+
+  printf("Debug Cuda newKey (expected_): 2E09165B257A4C3E52C9F4FAA6322C66CEDE807B7D6B4EC3960820795EE5447F\n");
   bn_print("Debug Cuda newKey (After mod): ", &newKey);
   
 
