@@ -9,7 +9,7 @@ def add_hyphens_to_hex(hex_str):
     return '-'.join([hex_str[i:i+8] for i in range(0, len(hex_str), 8)])
 
 # Load and compile the extended CUDA kernel code
-kernel_file_path = "kernel.cu"  # Replace with the actual path
+kernel_file_path = "kernel.c"
 include_dirs = ['/home/alex/projects/avax-pw-crack/include/']
 with open(kernel_file_path, 'r') as f:
     cuda_code = f.read()
@@ -18,11 +18,6 @@ mod = SourceModule(
     arch='sm_86',
     include_dirs=include_dirs
     )
-"""mod = SourceModule(
-    open(kernel_file_path, 'r').read(), 
-    arch='sm_86'
-    )"""
-    # include_dirs=[os.getcwd()]
 
 # Retrieve the kernel function
 pbkdf2_hmac_sha512_kernel = mod.get_function("Bip39SeedGenerator")
