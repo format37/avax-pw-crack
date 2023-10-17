@@ -994,6 +994,46 @@ __device__ bool isNonZero(uint32_t *a, int size) {
     return false;
 }
 
+// Public key ++
+__device__ void getPublicKey(BIGNUM* privateKey, BIGNUM* publicKey, size_t *publicKeyLen) {
+  uint privateKeyLen = 32;
+  // uint publicKeyLen = 33;
+  /*
+  // Allocate EC objects on device
+  EC_GROUP *curve = EC_GROUP_new_by_curve_name_on_device(NID_secp256k1);  
+  EC_KEY *eckey = EC_KEY_new_on_device();
+
+  // Initialize key
+  BIGNUM *privBN = BN_bin2bn_on_device(privateKey, privateKeyLen, NULL);
+  EC_KEY_set_group(eckey, curve);
+  EC_KEY_set_private_key(eckey, privBN);
+
+  // Compute public key
+  EC_POINT *pub = EC_POINT_new(curve);
+  EC_POINT_mul(curve, pub, privBN, NULL, NULL, NULL);
+  EC_KEY_set_public_key(eckey, pub);
+
+  // Serialize public key
+  *publicKeyLen = EC_POINT_point2oct(EC_KEY_get0_group(eckey),  
+                                     EC_KEY_get0_public_key(eckey),
+                                     POINT_CONVERSION_COMPRESSED,
+                                     NULL, 0, NULL);
+
+  EC_POINT_point2oct(EC_KEY_get0_group(eckey),
+                     EC_KEY_get0_public_key(eckey),
+                     POINT_CONVERSION_COMPRESSED,
+                     publicKey, *publicKeyLen, NULL);
+                     
+  // Cleanup          
+  EC_GROUP_free(curve);
+  EC_KEY_free(eckey);
+  EC_POINT_free(pub);
+  BN_free(privBN);
+  */
+}
+// -- Public key --
+
+
 __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uint32_t index) {
 	printf("\n* step 0 index: %u\n", index);
     BIP32Info info;
@@ -1102,12 +1142,14 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
 	BIGNUM a;
 	BIGNUM b;
 	BIGNUM curveOrder;
-	BIGNUM newKey;	
+	BIGNUM newKey;
+	BIGNUM publicKey;
 
 	BN_ULONG a_d[8];
   	BN_ULONG b_d[8];
 	BN_ULONG newKey_d[8];
   	BN_ULONG curveOrder_d[16];
+	BN_ULONG publicKey_d[8];
 	// uint32_t curveOrder[8] = {0xffffffff, 0xffffffff, 0xffffffff, 0xfffffffe, 0xbaaedce6, 0xaf48a03b, 0xbfd25e8c, 0xd0364141};
 	// Initialize curveOrder_d for secp256k1
 	// FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
@@ -1164,6 +1206,34 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
 	printf("Calling bn_mod\n");
 	bn_mod(&newKey, &newKey, &curveOrder);
 	bn_print("Debug Cuda newKey (After mod): ", &newKey);
+	printf("\n");
+	bn_print("  * private: ", &newKey);
+	printf("\n");
+
+	// uint8_t newKeyBytes[32] = {0};  // Initialize to zero
+	printf("\n");
+	printf("  * public: ");	
+	size_t publicKeyLen = 0;
+	// Initialize public key
+	// BIGNUM publicKey;
+	for (int i = 0; i < 8; i++) publicKey_d[i] = 0;
+	publicKey.d = publicKey_d;
+	publicKey.neg = 0;
+	publicKey.top = 0;
+
+	getPublicKey(&newKey, &publicKey, &publicKeyLen);
+
+	// Print the public key
+	for (int i = 0; i < publicKeyLen; i++) {
+		printf("%02x", publicKey.d[i]);
+	}
+	// Define the public key
+	//unsigned char publicKey[65] = {0};
+	// Convert BIGNUM newKey to byte array
+	//uint8_t newKeyBytes[32];
+	//BN_bn2bin(&newKey, newKeyBytes);
+	//getPublicKey(newKeyBytes, 32, publicKey);
+	printf("\n");
 
     return info;
 }
