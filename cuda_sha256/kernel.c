@@ -995,41 +995,111 @@ __device__ bool isNonZero(uint32_t *a, int size) {
 }
 
 // Public key ++
-__device__ void getPublicKey(BIGNUM* privateKey, BIGNUM* publicKey, size_t *publicKeyLen) {
-  uint privateKeyLen = 32;
-  // uint publicKeyLen = 33;
-  /*
-  // Allocate EC objects on device
-  EC_GROUP *curve = EC_GROUP_new_by_curve_name_on_device(NID_secp256k1);  
-  EC_KEY *eckey = EC_KEY_new_on_device();
+struct EC_GROUP {
 
-  // Initialize key
-  BIGNUM *privBN = BN_bin2bn_on_device(privateKey, privateKeyLen, NULL);
-  EC_KEY_set_group(eckey, curve);
-  EC_KEY_set_private_key(eckey, privBN);
+  BIGNUM *p; // Prime modulus 
+  BIGNUM *a; // Curve parameter
+  BIGNUM *b; // Curve parameter
+  
+  BIGNUM *order; // Group order 
+  BIGNUM *gx; // Generator x coord
+  BIGNUM *gy; // Generator y coord
 
-  // Compute public key
-  EC_POINT *pub = EC_POINT_new(curve);
-  EC_POINT_mul(curve, pub, privBN, NULL, NULL, NULL);
-  EC_KEY_set_public_key(eckey, pub);
+};
 
-  // Serialize public key
-  *publicKeyLen = EC_POINT_point2oct(EC_KEY_get0_group(eckey),  
-                                     EC_KEY_get0_public_key(eckey),
-                                     POINT_CONVERSION_COMPRESSED,
-                                     NULL, 0, NULL);
+struct ECPoint {
+  BIGNUM *x; 
+  BIGNUM *y;
+};
 
-  EC_POINT_point2oct(EC_KEY_get0_group(eckey),
-                     EC_KEY_get0_public_key(eckey),
-                     POINT_CONVERSION_COMPRESSED,
-                     publicKey, *publicKeyLen, NULL);
-                     
-  // Cleanup          
-  EC_GROUP_free(curve);
-  EC_KEY_free(eckey);
-  EC_POINT_free(pub);
-  BN_free(privBN);
-  */
+__device__ BIGNUM BN_new() {
+
+  BIGNUM bn;
+  
+  // Initialize fields
+  bn.d = NULL;
+  bn.top = 0; 
+  bn.dmax = 0;
+  bn.neg = 0;
+  bn.flags = 0;
+
+  return bn; 
+}
+
+/*__device__ void BN_alloc(BIGNUM* bn, int n) {
+
+  // Allocate storage on stack
+  BN_ULONG limb_data[n];
+
+  // Copy to BIGNUM limbs
+  bn.d = limb_data;  
+  bn.dmax = n;
+}*/
+
+ECPoint* ec_point_add(ECPoint *p1, ECPoint *p2, EC_GROUP *curve) {
+
+  BIGNUM *x1 = p1->x;
+  BIGNUM *y1 = p1->y;
+
+  BIGNUM *x2 = p2->x; 
+  BIGNUM *y2 = p2->y;
+
+  BIGNUM x3 = BN_new();
+  BIGNUM y3 = BN_new();
+
+  // Compute x3 = (x1*y2 + y1*x2) / (y2-y1) // TODO: Compute this
+  // Compute y3 = (y1*y2 - x1*x2) / (y2-y1)
+
+  return new ECPoint(x3, y3);
+
+}
+
+__device__ EC_POINT* generator; // Fixed generator point 
+
+__device__ void ec_point_multiply(BIGNUM* k, EC_POINT* G, EC_POINT* R) {
+  
+   // Point multiplication algorithm
+   // Using double and add
+  
+  EC_POINT* Q = new EC_POINT; 
+  Q->x = BN_new();
+  Q->y = BN_new();
+
+  // Initialize Q = infinity
+  BN_zero(Q->x);
+  BN_zero(Q->y);
+
+  // Loop over bits of k
+  for (int i = numBits(k) - 1; i >= 0; i--) {
+
+    ec_point_double(Q); // Q = 2*Q
+
+    if (BN_is_bit_set(k, i)) {
+       ec_point_add(Q, G); // Q = Q + G 
+    }
+  }
+
+  // Return result
+  *R = *Q;
+
+  BN_free(Q->x);
+  BN_free(Q->y);
+  delete Q;
+}
+
+__device__ void getPublicKey(BIGNUM* privKey, BIGNUM* pubKeyX, BIGNUM* pubKeyY) {
+
+  // Create EC point to store result
+  EC_POINT* pubPoint = new EC_POINT;
+  
+  // Compute public key = privKey * generator 
+  ec_point_multiply(privKey, generator, pubPoint);
+
+  // Save x,y coordinates of public key    
+  *pubKeyX = pubPoint->x;
+  *pubKeyY = pubPoint->y;
+
+  delete pubPoint;
 }
 // -- Public key --
 

@@ -260,6 +260,9 @@ unsigned char *GetPublicKey(unsigned char *privateKeyBytes, size_t privateKeyLen
     unsigned char *publicKeyBytes = NULL;
     
     curve = EC_GROUP_new_by_curve_name(NID_secp256k1);
+    // print all curve parameters
+    printf("Curve parameters:\n");
+    
     if (curve == NULL) {
         return NULL;
     }

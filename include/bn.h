@@ -242,9 +242,9 @@ int BN_num_bits(const BIGNUM *a);
 __device__ int BN_num_bits_word(BN_ULONG l);
 int BN_security_bits(int L, int N);
 // __device__ BIGNUM *BN_new(void);
-__host__ __device__ BIGNUM* BN_new() {
+/*__host__ __device__ BIGNUM* BN_new() {
   // host+device stub
-}
+}*/
 BIGNUM *BN_secure_new(void);
 void BN_clear_free(BIGNUM *a);
 __device__ BIGNUM *BN_copy(BIGNUM *a, const BIGNUM *b);
@@ -321,7 +321,7 @@ BN_ULONG BN_div_word(BIGNUM *a, BN_ULONG w);
 int BN_mul_word(BIGNUM *a, BN_ULONG w);
 int BN_add_word(BIGNUM *a, BN_ULONG w);
 int BN_sub_word(BIGNUM *a, BN_ULONG w);
-int BN_set_word(BIGNUM *a, BN_ULONG w);
+__device__  int BN_set_word(BIGNUM *a, BN_ULONG w);
 BN_ULONG BN_get_word(const BIGNUM *a);
 
 int BN_cmp(const BIGNUM *a, const BIGNUM *b);
