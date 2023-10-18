@@ -37,15 +37,21 @@ class Wallet(object):
         print('HardenIndex(0):', Bip32KeyIndex.HardenIndex(0))
         print('\n')
         
-
+        """
         print('master.FingerPrint()', master.FingerPrint())
         print('master.PrivateKey().Raw()', master.PrivateKey().Raw())
         print('master.ChainCode():', master.ChainCode())
         print('\n')
+        
         print('master.44.FingerPrint()', master.ChildKey(Bip32KeyIndex.HardenIndex(44)).FingerPrint())
         print('master.44.PrivateKey().Raw()', master.ChildKey(Bip32KeyIndex.HardenIndex(44)).PrivateKey().Raw())
+        # PublicKey uncompressed
+        print('master.44.PublicKey().RawUncompressed()', master.ChildKey(Bip32KeyIndex.HardenIndex(44)).PublicKey().RawUncompressed())
+        # PublicKey compressed
+        print('master.44.PublicKey().RawCompressed()', master.ChildKey(Bip32KeyIndex.HardenIndex(44)).PublicKey().RawCompressed())
         print('master.44.ChainCode():', master.ChildKey(Bip32KeyIndex.HardenIndex(44)).ChainCode())
         print('\n')
+        """
         print('master.44.9000.FingerPrint()', master.ChildKey(Bip32KeyIndex.HardenIndex(44)).ChildKey(Bip32KeyIndex.HardenIndex(9000)).FingerPrint())
         print('master.44.9000.PrivateKey().Raw()', master.ChildKey(Bip32KeyIndex.HardenIndex(44)).ChildKey(Bip32KeyIndex.HardenIndex(9000)).PrivateKey().Raw())
         print('master.44.9000.ChainCode():', master.ChildKey(Bip32KeyIndex.HardenIndex(44)).ChildKey(Bip32KeyIndex.HardenIndex(9000)).ChainCode())
@@ -95,11 +101,11 @@ def generate_10_avax_addresses(passphrase: str, wallet: Wallet) -> List[str]:
     """Generate 10 AVAX addresses for the given passphrase.""" 
     addresses = []
     base_child = wallet.avax_key(passphrase)
-    # print('base_child from wallet', base_child.ChildKey(0))
-    # print('m_priv_key PublicKey RawUncompressed:', base_child.m_priv_key.PublicKey().RawCompressed())
-    # print('m_priv_key PublicKey RawCompressed:', base_child.m_priv_key.PublicKey().RawUncompressed())
-    # print('base_child.m_priv_key.priv_key:', base_child.m_priv_key.m_priv_key)
-    # print('base_child.m_priv_key.priv_key:', base_child.m_priv_key.m_key_data)
+    print('base_child from wallet', base_child.ChildKey(0))
+    print('m_priv_key PublicKey RawUncompressed:', base_child.m_priv_key.PublicKey().RawCompressed())
+    print('m_priv_key PublicKey RawCompressed:', base_child.m_priv_key.PublicKey().RawUncompressed())
+    print('base_child.m_priv_key.priv_key:', base_child.m_priv_key.m_priv_key)
+    print('base_child.m_priv_key.priv_key:', base_child.m_priv_key.m_key_data)
     
     # help(base_child.m_priv_key)
     
@@ -134,6 +140,9 @@ def guess_avaxp_address(inputs: Iterable[str], wallet: Wallet, target_addresses:
         """if counter < 230:
             counter += 1
             continue"""
+        if counter < 230: # TODO: remove this
+            counter += 1
+            continue
         computed_addresses = generate_10_avax_addresses(test_passphrase, wallet)
         # Format with 3 signs, using leading zeros
         counter_formatted = f'{counter:03}'
