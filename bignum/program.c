@@ -22,6 +22,162 @@ void print_bn_hex(const char* label, const BIGNUM* bn) {
     OPENSSL_free(bn_str);
 }
 
+// public ++
+// Point structure 
+typedef struct {
+  BIGNUM *x;
+  BIGNUM *y;
+} Point;
+
+// Allocate memory for point
+Point* point_new() {
+  Point* point = malloc(sizeof(Point));
+  point->x = BN_new();
+  point->y = BN_new();
+  return point;
+}
+
+// Free memory 
+void point_free(Point* point) {
+  BN_free(point->x);
+  BN_free(point->y);
+  free(point);
+}
+
+// Derive public key
+Point* derive_public_key(BIGNUM* private_key) {
+
+  // Constants for secp256k1
+  BIGNUM *p = NULL;
+  BIGNUM *a = NULL; 
+  BIGNUM *b = NULL;
+  BIGNUM *Gx = NULL;
+  BIGNUM *Gy = NULL;
+
+  // Initialize constants
+  BN_dec2bn(&p, "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F"); 
+  BN_dec2bn(&a, "0");
+  BN_dec2bn(&b, "7");
+  BN_hex2bn(&Gx, "79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798");
+  BN_hex2bn(&Gy, "483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8");
+  
+  BN_CTX *ctx = BN_CTX_new();
+  Point* result = point_new();
+  
+  // result = private_key * G
+  Point* current = point_new();
+  // current->x = BN_dup(Gx);
+  // current->y = BN_dup(Gy);
+  current->x = BN_new();
+  current->y = BN_new();
+
+  // Set current to initial point
+  BN_copy(current->x, Gx); 
+  BN_copy(current->y, Gy);
+
+  BIGNUM* coef = BN_dup(private_key);
+  
+  while(!BN_is_zero(coef)) {
+    /*
+    if (BN_is_odd(coef)) {
+      if (BN_is_zero(result->x)) {
+        BN_copy(result->x, current->x);
+        BN_copy(result->y, current->y);
+      } else {
+        // point addition
+        BIGNUM *x3, *y3, *s, *u, *v;
+        x3 = BN_new();
+        y3 = BN_new();
+        s = BN_new();
+        u = BN_new();
+        v = BN_new();
+        
+        // u = (current->x - result->x) % p
+        BN_mod_sub(u, current->x, result->x, p, ctx);
+        
+        // v = (current->y - result->y) % p 
+        BN_mod_sub(v, current->y, result->y, p, ctx);
+        
+        // s = (v * pow(u, p-2, p)) % p
+        BN_mod_inverse(s, u, p, ctx);
+        BN_mod_mul(s, s, v, p, ctx);
+        
+        // x3 = (s*s - result->x - current->x) % p
+        BN_mod_sqr(x3, s, p, ctx);
+        BN_mod_sub(x3, x3, result->x, p, ctx);
+        BN_mod_sub(x3, x3, current->x, p, ctx);
+        
+        // y3 = (s*(result->x - x3) - result->y) % p
+        BN_mod_sub(y3, result->x, x3, p, ctx);
+        BN_mod_mul(y3, s, y3, p, ctx);
+        BN_mod_sub(y3, y3, result->y, p, ctx);
+        
+        BN_copy(result->x, x3);
+        BN_copy(result->y, y3);
+
+        BN_free(x3);
+        BN_free(y3);
+        BN_free(s); 
+        BN_free(u);
+        BN_free(v);
+      }
+    }*/
+    
+    // current = current + current
+    { 
+      BIGNUM *x3, *y3, *s, *u, *v;
+      x3 = BN_new();
+      y3 = BN_new();
+      s = BN_new();
+      u = BN_new();
+      v = BN_new();
+      /*
+      // u = (current->x - current->x) % p
+      BN_mod_sub(u, current->x, current->x, p, ctx);
+        
+      // v = (current->y - current->y) % p
+      BN_mod_sub(v, current->y, current->y, p, ctx);
+      
+      // s = (3*(current->x)^2 + a) * pow(2*current->y, p-2, p) % p 
+      BN_mod_sqr(s, current->x, p, ctx);
+      // BN_mul_word(s, s, 3);
+      BN_mul_word(s, 3); // multiply s by 3
+      BN_add(s, s, a);
+      BN_lshift1(v, current->y);
+      BN_mod_inverse(v, v, p, ctx);
+      BN_mod_mul(s, s, v, p, ctx);
+      
+      // x3 = (s*s - 2*current->x) % p
+      BN_mod_sqr(x3, s, p, ctx);
+      BN_lshift1(u, current->x);
+      BN_mod_sub(x3, x3, u, p, ctx);
+      
+      // y3 = (s*(current->x - x3) - current->y) % p
+      BN_mod_sub(y3, current->x, x3, p, ctx);
+      BN_mod_mul(y3, s, y3, p, ctx);
+      BN_mod_sub(y3, y3, current->y, p, ctx);
+
+      BN_copy(current->x, x3);
+      BN_copy(current->y, y3);
+
+      BN_free(x3);
+      BN_free(y3);
+      BN_free(s);
+      BN_free(u); 
+      BN_free(v);*/
+    }
+    
+    BN_rshift1(coef, coef);
+  }
+
+  point_free(current);
+
+  BN_CTX_free(ctx);
+  
+  return result;
+}
+// public --
+
 int main() {  
   // Addition
   BIGNUM *a = BN_new();
@@ -72,6 +228,13 @@ int main() {
   newKeyLen = BN_bn2bin(newKey, newKeyBytes);
   printf("private: ");
 	print_as_hex_char(newKeyBytes, newKeyLen);
+
+  // Public Key
+  Point* public_key = derive_public_key(newKey);
+  print_bn("Debug C public_key->x", public_key->x);
+  print_bn_hex("Debug C public_key->x", public_key->x);
+  print_bn("Debug C public_key->y", public_key->y);
+  print_bn_hex("Debug C public_key->y", public_key->y);
 
   BN_free(a);
   BN_free(b);
