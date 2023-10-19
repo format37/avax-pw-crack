@@ -29,10 +29,11 @@ class Wallet(object):
         # print('master', master)
         # print('Master Private Key', master.m_priv_key.Raw())
         # print('Master Key Data', master.m_priv_key.m_key_data)
+        print('HardenIndex(44):', Bip32KeyIndex.HardenIndex(44))
         """print('master.ChildKey(0).PrivateKey():', master.ChildKey(0).PrivateKey().Raw().ToHex())
         print('master.ChildKey(0).ChainCode():', master.ChildKey(0).ChainCode().ToHex())
 
-        print('HardenIndex(44):', Bip32KeyIndex.HardenIndex(44))
+        
         print('HardenIndex(9000):', Bip32KeyIndex.HardenIndex(9000))
         print('HardenIndex(0):', Bip32KeyIndex.HardenIndex(0))
         print('\n')
