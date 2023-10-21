@@ -995,114 +995,152 @@ __device__ bool isNonZero(uint32_t *a, int size) {
 }
 
 // Public key ++
-struct EC_GROUP {
+typedef struct point_st {
+  BIGNUM x;
+  BIGNUM y;
+  BIGNUM a;
+  BIGNUM b;
+} POINT;
 
-  BIGNUM *p; // Prime modulus 
-  BIGNUM *a; // Curve parameter
-  BIGNUM *b; // Curve parameter
-  
-  BIGNUM *order; // Group order 
-  BIGNUM *gx; // Generator x coord
-  BIGNUM *gy; // Generator y coord
-
-};
-
-struct ECPoint {
-  BIGNUM *x; 
-  BIGNUM *y;
-};
-
-__device__ BIGNUM BN_new() {
-
-  BIGNUM bn;
-  
-  // Initialize fields
-  bn.d = NULL;
-  bn.top = 0; 
-  bn.dmax = 0;
-  bn.neg = 0;
-  bn.flags = 0;
-
-  return bn; 
+__device__ void point_add(POINT* point1, POINT* point2, BIGNUM* p) {
+	printf("      * Cuda adding point1->x:");
+	for (int i = 0; i < 8; i++) {
+		printf("%08x", point1->x.d[i]);
+	}
+	printf("\n");
+	printf("      * Cuda adding point1->y:");
+	for (int i = 0; i < 8; i++) {
+		printf("%08x", point1->y.d[i]);
+	}
+	printf("\n");
+	printf("      * Cuda adding point2->x:");
+	for (int i = 0; i < 8; i++) {
+		printf("%08x", point2->x.d[i]);
+	}
+	printf("\n");
+	printf("      * Cuda adding point2->y:");
+	for (int i = 0; i < 8; i++) {
+		printf("%08x", point2->y.d[i]);
+	}
+	printf("\n");
 }
 
-/*__device__ void BN_alloc(BIGNUM* bn, int n) {
+__device__ void point_mul(BIGNUM* coefficient, BIGNUM* publicKey) {
+	// Constants for secp256k1
+    // 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F
+	BIGNUM p;
+	BN_ULONG p_d[8];
+	p_d[0] = 0xFFFFFFFF;
+	p_d[1] = 0xFFFFFFFF;
+	p_d[2] = 0xFFFFFFFF;
+	p_d[3] = 0xFFFFFFFF;
+	p_d[4] = 0xFFFFFFFF;
+	p_d[5] = 0xFFFFFFFF;
+	p_d[6] = 0xFFFFFFFE;
+	p_d[7] = 0xFFFFFC2F;
+	p.d = p_d;
+	p.neg = 0;
+	p.top = 8;
 
-  // Allocate storage on stack
-  BN_ULONG limb_data[n];
+	BIGNUM a;
+	BN_ULONG a_d[8];
+	for (int i = 0; i < 8; i++) a_d[i] = 0;
+	a.d = a_d;
+	a.neg = 0;
+	a.top = 0;
 
-  // Copy to BIGNUM limbs
-  bn.d = limb_data;  
-  bn.dmax = n;
-}*/
+	BIGNUM b;
+	BN_ULONG b_d[8];
+	for (int i = 0; i < 8; i++) b_d[i] = 0;
+	// add 7
+	b_d[7] = 7;
+	b.d = b_d;
+	b.neg = 0;
+	b.top = 0;
 
-ECPoint* ec_point_add(ECPoint *p1, ECPoint *p2, EC_GROUP *curve) {
+	// 0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798
+	BIGNUM Gx;
+	BN_ULONG Gx_d[8];
+	Gx_d[0] = 0x79BE667E;
+	Gx_d[1] = 0xF9DCBBAC;
+	Gx_d[2] = 0x55A06295;
+	Gx_d[3] = 0xCE870B07;
+	Gx_d[4] = 0x029BFCDB;
+	Gx_d[5] = 0x2DCE28D9;
+	Gx_d[6] = 0x59F2815B;
+	Gx_d[7] = 0x16F81798;
+	Gx.d = Gx_d;
+	Gx.neg = 0;
+	Gx.top = 8;
 
-  BIGNUM *x1 = p1->x;
-  BIGNUM *y1 = p1->y;
+	// 0x483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8
+	BIGNUM Gy;
+	BN_ULONG Gy_d[8];
+	Gy_d[0] = 0x483ADA77;
+	Gy_d[1] = 0x26A3C465;
+	Gy_d[2] = 0x5DA4FBFC;
+	Gy_d[3] = 0x0E1108A8;
+	Gy_d[4] = 0xFD17B448;
+	Gy_d[5] = 0xA6855419;
+	Gy_d[6] = 0x9C47D08F;
+	Gy_d[7] = 0xFB10D4B8;
+	Gy.d = Gy_d;
+	Gy.neg = 0;
+	Gy.top = 8;
 
-  BIGNUM *x2 = p2->x; 
-  BIGNUM *y2 = p2->y;
+	printf("Multiplying point:\n");
+	// print Gx, Gy, a, b, p
+	printf("      * Cuda Gx:");
+	for (int i = 0; i < 8; i++) {
+		printf("%08x", Gx_d[i]);
+	}
+	printf("\n");
+	printf("      * Cuda Gy:");
+	for (int i = 0; i < 8; i++) {
+		printf("%08x", Gy_d[i]);
+	}
+	printf("\n");
+	printf("      * Cuda a:");
+	for (int i = 0; i < 8; i++) {
+		printf("%08x", a_d[i]);
+	}
+	printf("\n");
+	printf("      * Cuda b:");
+	for (int i = 0; i < 8; i++) {
+		printf("%08x", b_d[i]);
+	}
+	printf("\n");
+	printf("      * Cuda p:");
+	for (int i = 0; i < 8; i++) {
+		printf("%08x", p_d[i]);
+	}
+	printf("\n");
 
-  BIGNUM x3 = BN_new();
-  BIGNUM y3 = BN_new();
+	// coefficient
+	printf("      * Cuda By coefficient:");
+	for (int i = 0; i < 8; i++) {
+		printf("%08x", coefficient->d[i]);
+	}
+	printf("\n");
 
-  // Compute x3 = (x1*y2 + y1*x2) / (y2-y1) // TODO: Compute this
-  // Compute y3 = (y1*y2 - x1*x2) / (y2-y1)
+	BIGNUM coef = *coefficient;
+	POINT point = {Gx, Gy, a, b};
+	POINT current = point;
+	// point at infinity
+	POINT result = {Gx, Gy, a, b}; // TODO: convert 0, 0 to NULL, NULL
 
-  return new ECPoint(x3, y3);
-
+	// &Gx, &Gy, &a, &b, &p, 
+	/*BIGNUM* Gx, 
+	BIGNUM* Gy, 
+	BIGNUM* a, 
+	BIGNUM* b, 
+	BIGNUM* p,*/
 }
 
-__device__ EC_POINT* generator; // Fixed generator point 
-
-__device__ void ec_point_multiply(BIGNUM* k, EC_POINT* G, EC_POINT* R) {
-  
-   // Point multiplication algorithm
-   // Using double and add
-  
-  EC_POINT* Q = new EC_POINT; 
-  Q->x = BN_new();
-  Q->y = BN_new();
-
-  // Initialize Q = infinity
-  BN_zero(Q->x);
-  BN_zero(Q->y);
-
-  // Loop over bits of k
-  for (int i = numBits(k) - 1; i >= 0; i--) {
-
-    ec_point_double(Q); // Q = 2*Q
-
-    if (BN_is_bit_set(k, i)) {
-       ec_point_add(Q, G); // Q = Q + G 
-    }
-  }
-
-  // Return result
-  *R = *Q;
-
-  BN_free(Q->x);
-  BN_free(Q->y);
-  delete Q;
+__device__ void derive_public_key(BIGNUM* private_key, BIGNUM* publicKey) {
+	point_mul(private_key, publicKey);
 }
-
-__device__ void getPublicKey(BIGNUM* privKey, BIGNUM* pubKeyX, BIGNUM* pubKeyY) {
-
-  // Create EC point to store result
-  EC_POINT* pubPoint = new EC_POINT;
-  
-  // Compute public key = privKey * generator 
-  ec_point_multiply(privKey, generator, pubPoint);
-
-  // Save x,y coordinates of public key    
-  *pubKeyX = pubPoint->x;
-  *pubKeyY = pubPoint->y;
-
-  delete pubPoint;
-}
-// -- Public key --
-
+// Public key --
 
 __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uint32_t index) {
 	printf("\n* step 0 index: %u\n", index);
@@ -1291,18 +1329,14 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
 	publicKey.neg = 0;
 	publicKey.top = 0;
 
-	getPublicKey(&newKey, &publicKey, &publicKeyLen);
+	// getPublicKey(&newKey, &publicKey, &publicKeyLen);
+	// Derive public key
+    derive_public_key(&newKey, &publicKey);
 
 	// Print the public key
-	for (int i = 0; i < publicKeyLen; i++) {
+	for (int i = 0; i < 8; i++) {
 		printf("%02x", publicKey.d[i]);
 	}
-	// Define the public key
-	//unsigned char publicKey[65] = {0};
-	// Convert BIGNUM newKey to byte array
-	//uint8_t newKeyBytes[32];
-	//BN_bn2bin(&newKey, newKeyBytes);
-	//getPublicKey(newKeyBytes, 32, publicKey);
 	printf("\n");
 
     return info;
