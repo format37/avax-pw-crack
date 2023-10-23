@@ -337,11 +337,6 @@ __device__ void bn_add(BIGNUM* a, BIGNUM* b, BIGNUM* r) {
     }
 }
 
-
-/*__device__ BN_ULONG bn_mod(BN_ULONG num, BN_ULONG divisor) {
-  return num % divisor; 
-}*/
-
 __device__ void bn_mod(BIGNUM* r, BIGNUM* m, BIGNUM* d) {
     // Copy m to r
     for (int i = 0; i < m->top; i++) {
@@ -392,33 +387,3 @@ __device__ void bn_mod(BIGNUM* r, BIGNUM* m, BIGNUM* d) {
         }
     }
 }
-
-/*__device__ BN_ULONG bn_mod_big(BIGNUM *num, BIGNUM *divisor) {
-
-  BN_ULONG d = divisor->d[divisor->top-1]; // divisor
-  BN_ULONG n = num->d[num->top-1]; // numerator
-  
-  return bn_mod(n, d);
-}
-
-__device__ BN_ULONG bn_mod_big_signed(BIGNUM *num, BIGNUM *divisor) {
-
-  int numNeg = num->neg;
-  int divNeg = divisor->neg;
-
-  BN_ULONG d = divisor->d[divisor->top-1]; 
-  BN_ULONG n = num->d[num->top-1];
-
-  BN_ULONG res = bn_mod(n, d);
-
-  if (numNeg) {
-    res = d - res; // subtract from divisor
-  }
-
-  if (divNeg) {
-    res = -res; // negate result if divisor is negative
-  }
-
-  return res;
-
-}*/

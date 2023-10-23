@@ -1004,6 +1004,36 @@ typedef struct point_st {
   bool yisnull = true;
 } POINT;
 
+__device__ void bn_mul_words(BN_ULONG *rp, const BN_ULONG *ap, int num, BN_ULONG w)
+{
+    BN_ULONG c1 = 0;
+
+    // Loop through each word in the BIGNUM
+    for (int i = 0; i < num; i++) {
+        BN_ULONG t = ap[i];
+        
+        // Assuming 64-bit words and using built-in __umul64hi for high word of product
+        BN_ULONG low = t * w;  
+        BN_ULONG high = __umul64hi(t, w);
+        
+        // Add carry from last operation
+        low += c1;
+        if (low < c1) {
+            high++;  // Overflow, carry to high word
+        }
+        
+        // Save result
+        rp[i] = low;
+        
+        // Next carry
+        c1 = high;
+    }
+    
+    // Handle any remaining carry (this would go into a new word in the result BIGNUM)
+    // Depending on your BIGNUM implementation, you might need to add this to the result BIGNUM
+    // rp[num] = c1;
+}
+
 // Function to compare two BIGNUM values
 // Returns 0 if equal, 1 if a > b, -1 if a < b
 __device__ int BN_cmp(const BIGNUM *a, const BIGNUM *b) {
@@ -1114,6 +1144,9 @@ __device__ int bn_mod_inverse(BIGNUM *a, BIGNUM *n, BIGNUM *res, BN_CTX *ctx) {
 }
 
 __device__ POINT point_add(POINT* point1, POINT* point2, BIGNUM* p) {
+	
+	POINT result;
+
 	printf("      * Cuda adding point1->x:");
 	for (int i = 0; i < 8; i++) {
 		printf("%08x", point1->x.d[i]);
@@ -1135,8 +1168,6 @@ __device__ POINT point_add(POINT* point1, POINT* point2, BIGNUM* p) {
 	}
 	printf("\n");
 
-	POINT result;
-
 	if (!BN_cmp(&(point1->a), &(point2->a)) || !BN_cmp(&(point1->b), &(point2->b))) {
 		printf("      * Cuda Points are not on the same curve\n");
 	}
@@ -1151,6 +1182,7 @@ __device__ POINT point_add(POINT* point1, POINT* point2, BIGNUM* p) {
 		return result;
 	}
 
+	// Vertical line
 	if (BN_cmp(&(point1->x), &(point2->x)) && BN_cmp(&(point1->y), &(point2->y))) {
 		result.xisnull = true;
 		result.yisnull = true;
@@ -1159,8 +1191,13 @@ __device__ POINT point_add(POINT* point1, POINT* point2, BIGNUM* p) {
 		return result;
 	}
 
+	// Point doubling
 	if (!BN_cmp(&(point1->x), &(point2->x))) {
 		// s = (point2->y - point1->y) * pow(point2->x - point1->x, -1, p);
+		// Calculate the modular multiplicative inverse
+		// int a = point2->x - point1->x;
+		// int inv = modInverse(a, p);
+
 	}
 }
 
