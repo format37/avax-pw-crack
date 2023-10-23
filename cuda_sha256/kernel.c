@@ -1034,6 +1034,81 @@ __device__ void bn_mul_words(BN_ULONG *rp, const BN_ULONG *ap, int num, BN_ULONG
     // rp[num] = c1;
 }
 
+__device__ BN_ULONG bn_mul_add_words(BN_ULONG *rp, const BN_ULONG *ap, int num, BN_ULONG w)
+{
+    BN_ULONG c1 = 0;
+
+    // Loop through each word in the BIGNUM
+    for (int i = 0; i < num; i++) {
+        BN_ULONG t = ap[i];
+        
+        // Assuming 64-bit words and using built-in __umul64hi for high word of product
+        BN_ULONG low = t * w;  
+        BN_ULONG high = __umul64hi(t, w);
+        
+        // Add carry from last operation
+        low += c1;
+        if (low < c1) {
+            high++;  // Overflow, carry to high word
+        }
+
+        // Add to existing value in rp
+        BN_ULONG sum = rp[i] + low;
+        if (sum < low) {
+            high++;  // Overflow, carry to high word
+        }
+
+        // Save result
+        rp[i] = sum;
+
+        // Next carry
+        c1 = high;
+    }
+
+    // Return the carry value
+    return c1;
+}
+
+__device__ void bn_mul_normal(BN_ULONG *r, BN_ULONG *a, int na, BN_ULONG *b, int nb)
+{
+    // Initialize result array to zero
+    for (int i = 0; i < na + nb; i++) {
+        r[i] = 0;
+    }
+
+    // Loop through each word in both a and b
+    for (int i = 0; i < na; i++) {
+        BN_ULONG carry = 0;
+        
+        for (int j = 0; j < nb; j++) {
+            BN_ULONG t = a[i] * b[j];
+            
+            // Assuming 64-bit words and using built-in __umul64hi for high word of product
+            BN_ULONG low = t;
+            BN_ULONG high = __umul64hi(a[i], b[j]);
+            
+            // Add carry from last operation
+            low += carry;
+            if (low < carry) {
+                high++;  // Overflow, carry to high word
+            }
+            
+            // Add to existing value in r
+            low += r[i + j];
+            if (low < r[i + j]) {
+                high++;  // Overflow, carry to high word
+            }
+            
+            // Save result and carry
+            r[i + j] = low;
+            carry = high;
+        }
+        
+        // Save any remaining carry into next word
+        r[i + nb] += carry;
+    }
+}
+
 // Function to compare two BIGNUM values
 // Returns 0 if equal, 1 if a > b, -1 if a < b
 __device__ int BN_cmp(const BIGNUM *a, const BIGNUM *b) {
