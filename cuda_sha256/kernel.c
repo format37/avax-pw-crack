@@ -1000,11 +1000,41 @@ typedef struct point_st {
   BIGNUM y;
   BIGNUM a;
   BIGNUM b;
+  bool xisnull = true;
+  bool yisnull = true;
 } POINT;
+
+// Function to compare two BIGNUM values
+// Returns 0 if equal, 1 if a > b, -1 if a < b
+__device__ int BN_cmp(const BIGNUM *a, const BIGNUM *b) {
+  // First, compare signs
+  /*if (a->neg && !b->neg) return -1;
+  if (!a->neg && b->neg) return 1;
+  
+  // If both numbers are negative, swap the pointers
+  // so we only need to do the absolute comparison once
+  if (a->neg && b->neg) {
+    const BIGNUM *tmp = a;
+    a = b;
+    b = tmp;
+  }
+
+  // Compare the number of used elements
+  if (a->top > b->top) return 1;
+  if (a->top < b->top) return -1;*/
+
+  // If the number of used elements is the same, compare element by element
+  for (int i = a->top - 1; i >= 0; i--) {
+    if (a->d[i] > b->d[i]) return 1;
+    if (a->d[i] < b->d[i]) return -1;
+  }
+
+  return 0; // The numbers are equal
+}
 
 __device__ int bn_mod_inverse(BIGNUM *a, BIGNUM *n, BIGNUM *res, BN_CTX *ctx) {
 
-  BIGNUM x, y, u, v, A, B, C, D;
+  /*BIGNUM x, y, u, v, A, B, C, D;
 
   BN_ULONG t;
   int s;
@@ -1078,12 +1108,12 @@ __device__ int bn_mod_inverse(BIGNUM *a, BIGNUM *n, BIGNUM *res, BN_CTX *ctx) {
     else
       BN_copy(res, &x);
     return 1;
-  }
+  }*/
 
   return 0;
 }
 
-__device__ void point_add(POINT* point1, POINT* point2, BIGNUM* p) {
+__device__ POINT point_add(POINT* point1, POINT* point2, BIGNUM* p) {
 	printf("      * Cuda adding point1->x:");
 	for (int i = 0; i < 8; i++) {
 		printf("%08x", point1->x.d[i]);
@@ -1105,71 +1135,33 @@ __device__ void point_add(POINT* point1, POINT* point2, BIGNUM* p) {
 	}
 	printf("\n");
 
-	if (point1->x.top == 0 && point1->y.top == 0) {
-		// Point at infinity, return point2
-		return;
+	POINT result;
+
+	if (!BN_cmp(&(point1->a), &(point2->a)) || !BN_cmp(&(point1->b), &(point2->b))) {
+		printf("      * Cuda Points are not on the same curve\n");
 	}
 
-	if (point2->x.top == 0 && point2->y.top == 0) {
-		// Point at infinity, return point1 
-		return;
+	// Point at infinity
+	if (point1->xisnull) { // TODO: Check isnull 
+		result = *point2;
+		return result;
+	}
+	if (point2->xisnull) {
+		result = *point1;
+		return result;
 	}
 
-	BIGNUM s;
-	s.top = 0;
-
-	if (point1->x.top != point2->x.top || bn_cmp(&point1->x, &point2->x) != 0) {
-		
-		// Compute inverse
-		BN_CTX *ctx = BN_CTX_new();
-		BIGNUM inv;
-		inv.top = 0;
-		bn_mod_inverse(&point2->x, p, &inv, ctx);
-
-		// Compute slope
-		bn_sub(&point2->y, &point1->y, &s);
-		bn_mul(&s, &inv, &s);
-		bn_mod(&s, &s, p);
-
-	} else {
-
-		if (bn_cmp(&point1->y, &point2->y) != 0) {
-		// Points add to infinity
-		point1->x.top = 0;
-		point1->y.top = 0;
-		return;
-		}
-
-		// Compute slope for doubling case
-		BIGNUM temp;
-		bn_add(&point1->x, &point1->x, &temp);
-		bn_mul(&temp, &temp, &temp);
-		bn_add(&temp, &point1->a, &temp);
-
-		BIGNUM temp2;
-		bn_add(&point1->y, &point1->y, &temp2);
-
-		bn_mod_inverse(&temp2, p, &inv, ctx);
-		bn_mul(&temp, &inv, &s);
-		bn_mod(&s, &s, p);
-
+	if (BN_cmp(&(point1->x), &(point2->x)) && BN_cmp(&(point1->y), &(point2->y))) {
+		result.xisnull = true;
+		result.yisnull = true;
+		result.a = point1->a;
+		result.b = point1->b;
+		return result;
 	}
 
-	// Compute new point
-	BIGNUM x3, y3;
-
-	BIGNUM temp;
-	bn_sub(&point1->x, &point2->x, &temp);
-	bn_mul(&s, &temp, &temp);
-	bn_sub(&temp, &point1->x, &x3);
-	bn_sub(&point1->y, &temp, &y3);
-
-	bn_mod(&x3, &x3, p);
-	bn_mod(&y3, &y3, p);
-
-	// Set point1 as new point
-	point1->x = x3;
-	point1->y = y3;
+	if (!BN_cmp(&(point1->x), &(point2->x))) {
+		// s = (point2->y - point1->y) * pow(point2->x - point1->x, -1, p);
+	}
 }
 
 __device__ void point_mul(BIGNUM* coefficient, BIGNUM* publicKey) {
