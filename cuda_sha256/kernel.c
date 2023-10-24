@@ -1,4 +1,5 @@
 #include <cstdint>
+#include <math.h>
 #include "bignum.h" // Big number arithmetic
 
 // ++ PBKDF2 SHA512 ++
