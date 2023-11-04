@@ -81,6 +81,8 @@ int main() {
   uint8_t newKeyBytes[32] = {0};  // Initialize to zero
   int newKeyLen = 0;
   newKeyLen = BN_bn2bin(newKey, newKeyBytes);
+  // print newKeyLen
+  printf("newKeyLen: %d\n", newKeyLen);
   printf("private: ");
 	print_as_hex_char(newKeyBytes, newKeyLen);
 
