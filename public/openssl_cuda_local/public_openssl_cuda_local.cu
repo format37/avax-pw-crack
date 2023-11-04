@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <cuda.h>
 #include "bignum.h"
+#include "ec.h"
+#include "obj_mac.h"
 
 __device__ int simple_BN_nnmod(BIGNUM *r, const BIGNUM *m, const BIGNUM *d)
 {
@@ -97,104 +99,109 @@ __device__ void robust_BN_nnmod(BIGNUM *r, const BIGNUM *m, const BIGNUM *d) {
 
 __global__ void testKernel() {
 
-  BN_CTX *ctx = BN_CTX_new();
+    BN_CTX *ctx = BN_CTX_new();
 
-  // Addition
-  BIGNUM a;
-  BIGNUM b;
-  BIGNUM curveOrder;
-  BIGNUM newKey;
+    // Addition
+    BIGNUM a;
+    BIGNUM b;
+    BIGNUM curveOrder;
+    BIGNUM newKey;
 
-  BN_ULONG a_d[8];
-  BN_ULONG b_d[8];
-  BN_ULONG newKey_d[8];
-  BN_ULONG curveOrder_d[16];
+    BN_ULONG a_d[8];
+    BN_ULONG b_d[8];
+    BN_ULONG newKey_d[8];
+    BN_ULONG curveOrder_d[16];
 
-  // Initialize a
-  // C17747B1566D9FE8AB7087E3F0C50175B788A1C84F4C756C405000A0CA2248E1
-  a_d[0] = 0xC17747B1;
-  a_d[1] = 0x566D9FE8;
-  a_d[2] = 0xAB7087E3;
-  a_d[3] = 0xF0C50175;
-  a_d[4] = 0xB788A1C8;
-  a_d[5] = 0x4F4C756C;
-  a_d[6] = 0x405000A0;
-  a_d[7] = 0xCA2248E1;  
-  a.d = a_d; 
-  a.top = 8;
-  a.neg = 0;
+    // Initialize a
+    // C17747B1566D9FE8AB7087E3F0C50175B788A1C84F4C756C405000A0CA2248E1
+    a_d[0] = 0xC17747B1;
+    a_d[1] = 0x566D9FE8;
+    a_d[2] = 0xAB7087E3;
+    a_d[3] = 0xF0C50175;
+    a_d[4] = 0xB788A1C8;
+    a_d[5] = 0x4F4C756C;
+    a_d[6] = 0x405000A0;
+    a_d[7] = 0xCA2248E1;  
+    a.d = a_d; 
+    a.top = 8;
+    a.neg = 0;
 
-  // Initialize b
-  // 6C91CEA9CF0CAC55A7596D16B56D2AEFD204BB99DD677993158A7E6564F93CDF
-  b_d[0] = 0x6C91CEA9;
-  b_d[1] = 0xCF0CAC55;
-  b_d[2] = 0xA7596D16;
-  b_d[3] = 0xB56D2AEF;
-  b_d[4] = 0xD204BB99;
-  b_d[5] = 0xDD677993;
-  b_d[6] = 0x158A7E65;
-  b_d[7] = 0x64F93CDF;
-  b.d = b_d;
-  b.neg = 0;
-  b.top = 8;
+    // Initialize b
+    // 6C91CEA9CF0CAC55A7596D16B56D2AEFD204BB99DD677993158A7E6564F93CDF
+    b_d[0] = 0x6C91CEA9;
+    b_d[1] = 0xCF0CAC55;
+    b_d[2] = 0xA7596D16;
+    b_d[3] = 0xB56D2AEF;
+    b_d[4] = 0xD204BB99;
+    b_d[5] = 0xDD677993;
+    b_d[6] = 0x158A7E65;
+    b_d[7] = 0x64F93CDF;
+    b.d = b_d;
+    b.neg = 0;
+    b.top = 8;
 
-  // Initialize newKey_d
-  for (int i = 0; i < 8; i++) newKey_d[i] = 0;
-  newKey.d = newKey_d;
-  newKey.neg = 0;
-  newKey.top = 8;
+    // Initialize newKey_d
+    for (int i = 0; i < 8; i++) newKey_d[i] = 0;
+    newKey.d = newKey_d;
+    newKey.neg = 0;
+    newKey.top = 8;
 
-  // Initialize curveOrder_d
-  // FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
-  curveOrder_d[0] = 0xFFFFFFFF;
-  curveOrder_d[1] = 0xFFFFFFFF;
-  curveOrder_d[2] = 0xFFFFFFFF;
-  curveOrder_d[3] = 0xFFFFFFFE;
-  curveOrder_d[4] = 0xBAAEDCE6;
-  curveOrder_d[5] = 0xAF48A03B;
-  curveOrder_d[6] = 0xBFD25E8C;
-  curveOrder_d[7] = 0xD0364141;
-  curveOrder.d = curveOrder_d;
-  curveOrder.neg = 0;
-  curveOrder.top = 8;
+    // Initialize curveOrder_d
+    // FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
+    curveOrder_d[0] = 0xFFFFFFFF;
+    curveOrder_d[1] = 0xFFFFFFFF;
+    curveOrder_d[2] = 0xFFFFFFFF;
+    curveOrder_d[3] = 0xFFFFFFFE;
+    curveOrder_d[4] = 0xBAAEDCE6;
+    curveOrder_d[5] = 0xAF48A03B;
+    curveOrder_d[6] = 0xBFD25E8C;
+    curveOrder_d[7] = 0xD0364141;
+    curveOrder.d = curveOrder_d;
+    curveOrder.neg = 0;
+    curveOrder.top = 8;
 
-  // Print inputs
-  bn_print("A: ", &a);
-  bn_print("B: ", &b);
+    // Print inputs
+    bn_print("A: ", &a);
+    bn_print("B: ", &b);
 
-  // Add A and B
-  bn_add(&a, &b, &newKey);
-  
-  // Print A + B
-  bn_print("Debug Cuda newKey (After add): ", &newKey);
+    // Add A and B
+    bn_add(&a, &b, &newKey);
+    
+    // Print A + B
+    bn_print("Debug Cuda newKey (After add): ", &newKey);
 
-  // Modular Reduction
-  BIGNUM m;
-  BN_ULONG m_d[8];
-  for (int i = 0; i < 8; i++) m_d[i] = 0;
-  m_d[0] = 0x00000064; // 100
-  m.d = m_d;
-  m.top = 1;
-  m.neg = 0;
-  
-  printf("Calling bn_nnmod\n");
-  // expected:2E09165B257A4C3E52C9F4FAA6322C66CEDE807B7D6B4EC3960820795EE5447F
+    // Modular Reduction
+    BIGNUM m;
+    BN_ULONG m_d[8];
+    for (int i = 0; i < 8; i++) m_d[i] = 0;
+    m_d[0] = 0x00000064; // 100
+    m.d = m_d;
+    m.top = 1;
+    m.neg = 0;
+    
+    printf("Calling bn_nnmod\n");
+    // expected:2E09165B257A4C3E52C9F4FAA6322C66CEDE807B7D6B4EC3960820795EE5447F
 
-  /*if (!simple_BN_nnmod(&newKey, &newKey, &curveOrder)) {
-      // Handle error (e.g., division by zero)
-      printf("Error: Division by zero\n");
-  }*/
-  
-  //big_num_add_mod(newKey.d, a.d, b.d, curveOrder.d, a.top); // Fine:2e09165b257a4c3e52c9f4faa6322c6 Wrong:5898d5d622cb3eeff55da7f062f1b85c0
+    /*if (!simple_BN_nnmod(&newKey, &newKey, &curveOrder)) {
+        // Handle error (e.g., division by zero)
+        printf("Error: Division by zero\n");
+    }*/
+    
+    //big_num_add_mod(newKey.d, a.d, b.d, curveOrder.d, a.top); // Fine:2e09165b257a4c3e52c9f4faa6322c6 Wrong:5898d5d622cb3eeff55da7f062f1b85c0
 
-  //robust_BN_nnmod(&newKey, &newKey, &curveOrder); // Wrong:5c122cb6257a4c3e52c9f4faa6322c66cede807b7d6b4ec4960820795ee54480
-  bn_mod(&newKey, &newKey, &curveOrder);
+    //robust_BN_nnmod(&newKey, &newKey, &curveOrder); // Wrong:5c122cb6257a4c3e52c9f4faa6322c66cede807b7d6b4ec4960820795ee54480
+    bn_mod(&newKey, &newKey, &curveOrder);
 
-  printf("Debug Cuda newKey (expected_): 2E09165B257A4C3E52C9F4FAA6322C66CEDE807B7D6B4EC3960820795EE5447F\n");
-  bn_print("Debug Cuda newKey (After mod): ", &newKey);
-  
+    printf("Debug Cuda newKey (expected_): 2E09165B257A4C3E52C9F4FAA6322C66CEDE807B7D6B4EC3960820795EE5447F\n");
+    bn_print("Debug Cuda newKey (After mod): ", &newKey);
 
-  BN_CTX_free(ctx);
+
+    // Derive the public key
+    // EC_KEY *eckey = EC_KEY_new_by_curve_name(NID_secp256k1);
+
+    
+
+    BN_CTX_free(ctx);
 
 }
 
