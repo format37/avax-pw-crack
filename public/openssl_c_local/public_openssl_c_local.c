@@ -1,11 +1,7 @@
-// #include <openssl/bn.h>
 #include "bn.h"
-// #include "bignum.h"
 #include <stdio.h>
 #include <string.h>
-//#include <openssl/ec.h>
 #include "ec.h"
-//#include <openssl/obj_mac.h>
 #include "obj_mac.h"
 
 
