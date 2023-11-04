@@ -98,59 +98,43 @@ __device__ void robust_BN_nnmod(BIGNUM *r, const BIGNUM *m, const BIGNUM *d) {
 }
 
 // Public key derivation ++
-__device__ int bn_bn2binpad(const BN_ULONG *p, int count, unsigned char *to) {
-
-  int i;
-  BN_ULONG l;
-
-  l = p[0];
-  i = 0;
-
-  while (l != 0) {
-    to[--count] = l & 0xff;
-    l >>= 8;
-    i++; 
-  }
-
-  return i;
-}
-
-/*__device__ int bn_bn2bin(const BIGNUM *a, unsigned char *to) {
-
-  int i, num = 32;
-
-  for (i = 0; i < num; i++) {
-    // Debug prints
-    printf("i: %d\n", i);
-    printf("num - 1 - i: %d\n", num - 1 - i);
-    printf("a->d[num - 1 - i]: %d\n", a->d[num - 1 - i]);
-    printf("to: %d\n", to);
-    // printf("bn_bn2binpad(&a->d[num - 1 - i], BN_BYTES, to): %d\n", bn_bn2binpad(&a->d[num - 1 - i], BN_BYTES, to));
-
-    to[i] = bn_bn2binpad(&a->d[num - 1 - i], BN_BYTES, to);
-    printf("to[i]: %d\n", to[i]);
-  }
-
-  return num;
-}*/
+#define BN_BYTES 8 // Assuming each limb is 8 bytes
 
 __device__ int bn_bn2bin(const BIGNUM *a, unsigned char *to) {
 
-  // int num = BN_num_bytes(a);
-    int num = 32;
-  
-  for (int i = 0; i < num; i++) {
+    int num = a->top * BN_BYTES; // Assuming 'top' is the number of limbs
 
-    int limb_index = i / BN_BYTES;
-    int byte_index = BN_BYTES - 1 - (i % BN_BYTES); 
+    bool skip_step = true;
+    unsigned char bit_counter = 0;
+    int j = 0;
+    
+    for (int i = 0; i < num; i++) {
 
-    BN_ULONG limb = a->d[limb_index];
-    BN_ULONG byte = (limb >> (byte_index * 8)) & 0xff;
+        if (bit_counter<4) {
+            bit_counter++;
+            continue;
+        }
 
-    to[i] = (unsigned char) byte; 
-  }
+        else {
+            int limb_index = i / BN_BYTES;
+            int byte_index = BN_BYTES - 1 - (i % BN_BYTES);
 
-  return num; 
+            BN_ULONG limb = a->d[limb_index];
+            BN_ULONG byte = (limb >> (byte_index * 8)) & 0xff;
+
+            to[j] = (unsigned char) byte;
+            // printf("to[%d]: %02x\n", j, to[j]);
+            j++;
+        }
+
+        bit_counter++;
+        if (bit_counter == 8) {
+            // Reset the counter every 8 bytes
+            bit_counter = 0;
+        }
+    }
+
+    return num/2; 
 }
 
 __device__ void print_as_hex_char(unsigned char *data, int len) {
@@ -270,10 +254,10 @@ __global__ void testKernel() {
     printf("private: ");
 	print_as_hex_char(newKeyBytes, newKeyLen);
   
-    /*EC_KEY *eckey = EC_KEY_new_by_curve_name(NID_secp256k1);
+    // EC_KEY *eckey = EC_KEY_new_by_curve_name(NID_secp256k1);
     BIGNUM *priv_key = BN_new();
     unsigned char compressed_pubkey[65];
-    size_t compressed_pubkey_len;*/
+    size_t compressed_pubkey_len;
 
     // Set private key
     // BN_hex2bn(&priv_key, "2E09165B257A4C3E52C9F4FAA6322C66CEDE807B7D6B4EC3960820795EE5447F");
