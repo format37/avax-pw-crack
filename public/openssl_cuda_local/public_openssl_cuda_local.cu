@@ -98,6 +98,7 @@ __device__ void robust_BN_nnmod(BIGNUM *r, const BIGNUM *m, const BIGNUM *d) {
 }
 
 // Public key derivation ++
+// bn_bn2bin: 
 #define BN_BYTES 8 // Assuming each limb is 8 bytes
 
 __device__ int bn_bn2bin(const BIGNUM *a, unsigned char *to) {
@@ -143,6 +144,31 @@ __device__ void print_as_hex_char(unsigned char *data, int len) {
     }
     printf("\n");
 }
+
+// EC_KEY_new_by_curve_name
+/*__device__ EC_KEY *cuda_EC_KEY_new_by_curve_name_ex(OSSL_LIB_CTX *ctx, const char *propq,
+                                    int nid)
+{
+    EC_KEY *ret = EC_KEY_new_ex(ctx, propq);
+    if (ret == NULL)
+        return NULL;
+    ret->group = EC_GROUP_new_by_curve_name_ex(ctx, propq, nid);
+    if (ret->group == NULL) {
+        EC_KEY_free(ret);
+        return NULL;
+    }
+    if (ret->meth->set_group != NULL
+        && ret->meth->set_group(ret, ret->group) == 0) {
+        EC_KEY_free(ret);
+        return NULL;
+    }
+    return ret;
+}
+
+__device__ EC_KEY *cuda_EC_KEY_new_by_curve_name(int nid)
+{
+    return cuda_EC_KEY_new_by_curve_name_ex(NULL, NULL, nid);
+}*/
 // Public key derivation --
 
 __global__ void testKernel() {
@@ -255,6 +281,8 @@ __global__ void testKernel() {
 	print_as_hex_char(newKeyBytes, newKeyLen);
   
     // EC_KEY *eckey = EC_KEY_new_by_curve_name(NID_secp256k1);
+    // #define NID_secp256k1           714
+    // EC_KEY *eckey = cuda_EC_KEY_new_by_curve_name(714); // NID_secp256k1
     BIGNUM *priv_key = BN_new();
     unsigned char compressed_pubkey[65];
     size_t compressed_pubkey_len;

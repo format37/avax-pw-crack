@@ -90,6 +90,8 @@ int main() {
 
   // Derive the public key
   EC_KEY *eckey = EC_KEY_new_by_curve_name(NID_secp256k1);
+  // print eckey
+  printf("eckey: %p\n", eckey);
   BIGNUM *priv_key = BN_new();
   unsigned char compressed_pubkey[65];
   size_t compressed_pubkey_len;
