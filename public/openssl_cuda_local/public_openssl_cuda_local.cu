@@ -97,6 +97,86 @@ __device__ void robust_BN_nnmod(BIGNUM *r, const BIGNUM *m, const BIGNUM *d) {
     }
 }
 
+// Public key derivation ++
+/* EC_METHOD definitions */
+
+struct ec_key_method_st {
+    const char *name;
+    int32_t flags;
+    int (*init)(EC_KEY *key);
+    void (*finish)(EC_KEY *key);
+    int (*copy)(EC_KEY *dest, const EC_KEY *src);
+    int (*set_group)(EC_KEY *key, const EC_GROUP *grp);
+    int (*set_private)(EC_KEY *key, const BIGNUM *priv_key);
+    int (*set_public)(EC_KEY *key, const EC_POINT *pub_key);
+    int (*keygen)(EC_KEY *key);
+    int (*compute_key)(unsigned char **pout, size_t *poutlen,
+                       const EC_POINT *pub_key, const EC_KEY *ecdh);
+    int (*sign)(int type, const unsigned char *dgst, int dlen, unsigned char
+                *sig, unsigned int *siglen, const BIGNUM *kinv,
+                const BIGNUM *r, EC_KEY *eckey);
+    int (*sign_setup)(EC_KEY *eckey, BN_CTX *ctx_in, BIGNUM **kinvp,
+                      BIGNUM **rp);
+    ECDSA_SIG *(*sign_sig)(const unsigned char *dgst, int dgst_len,
+                           const BIGNUM *in_kinv, const BIGNUM *in_r,
+                           EC_KEY *eckey);
+
+    int (*verify)(int type, const unsigned char *dgst, int dgst_len,
+                  const unsigned char *sigbuf, int sig_len, EC_KEY *eckey);
+    int (*verify_sig)(const unsigned char *dgst, int dgst_len,
+                      const ECDSA_SIG *sig, EC_KEY *eckey);
+};
+
+typedef struct {
+    int val;
+} CRYPTO_REF_COUNT;
+
+struct ec_key_st {
+    const EC_KEY_METHOD *meth;
+    ENGINE *engine;
+    int version;
+    EC_GROUP *group;
+    EC_POINT *pub_key;
+    BIGNUM *priv_key;
+    unsigned int enc_flag;
+    point_conversion_form_t conv_form;
+    CRYPTO_REF_COUNT references;
+    int flags;
+#ifndef FIPS_MODULE
+    CRYPTO_EX_DATA ex_data;
+#endif
+    OSSL_LIB_CTX *libctx;
+    char *propq;
+
+    /* Provider data */
+    size_t dirty_cnt; /* If any key material changes, increment this */
+};
+
+__device__ EC_KEY *EC_KEY_new_by_curve_name_ex(OSSL_LIB_CTX *ctx, const char *propq,
+                                    int nid)
+{
+    EC_KEY *ret = EC_KEY_new_ex(ctx, propq);
+    if (ret == NULL)
+        return NULL;
+    ret->group = EC_GROUP_new_by_curve_name_ex(ctx, propq, nid);
+    if (ret->group == NULL) {
+        EC_KEY_free(ret);
+        return NULL;
+    }
+    if (ret->meth->set_group != NULL
+        && ret->meth->set_group(ret, ret->group) == 0) {
+        EC_KEY_free(ret);
+        return NULL;
+    }
+    return ret;
+}
+
+__device__ EC_KEY *EC_KEY_new_by_curve_name(int nid)
+{
+    return EC_KEY_new_by_curve_name_ex(NULL, NULL, nid);
+}
+// Public key derivation --
+
 __global__ void testKernel() {
 
     BN_CTX *ctx = BN_CTX_new();
@@ -196,9 +276,12 @@ __global__ void testKernel() {
     bn_print("Debug Cuda newKey (After mod): ", &newKey);
 
 
-    // Derive the public key
-    // EC_KEY *eckey = EC_KEY_new_by_curve_name(NID_secp256k1);
 
+    // Derive the public key
+    EC_KEY *eckey = EC_KEY_new_by_curve_name(NID_secp256k1);
+    BIGNUM *priv_key = BN_new();
+    unsigned char compressed_pubkey[65];
+    size_t compressed_pubkey_len;
     
 
     BN_CTX_free(ctx);
