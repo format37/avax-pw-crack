@@ -1,8 +1,6 @@
 #include <stdio.h>
 #include <cuda.h>
 #include "bignum.h"
-#include "ec.h"
-#include "obj_mac.h"
 
 __device__ int simple_BN_nnmod(BIGNUM *r, const BIGNUM *m, const BIGNUM *d)
 {
@@ -98,77 +96,40 @@ __device__ void robust_BN_nnmod(BIGNUM *r, const BIGNUM *m, const BIGNUM *d) {
 }
 
 // Public key derivation ++
-// bn_bn2bin: 
-#define BN_BYTES 8 // Assuming each limb is 8 bytes
+__device__ BIGNUM CURVE_P;
+__device__ BIGNUM CURVE_A;
+__device__ BIGNUM CURVE_B;
+__device__ BIGNUM CURVE_GX;
+__device__ BIGNUM CURVE_GY;
+__device__ BN_ULONG CURVE_P_d[8];
+__device__ BN_ULONG CURVE_A_d[8];
+__device__ BN_ULONG CURVE_B_d[8];
+__device__ BN_ULONG CURVE_GX_d[8];
+__device__ BN_ULONG CURVE_GY_d[8];
 
-__device__ int bn_bn2bin(const BIGNUM *a, unsigned char *to) {
+struct EC_POINT {
+  BIGNUM x; 
+  BIGNUM y;
+};
 
-    int num = a->top * BN_BYTES; // Assuming 'top' is the number of limbs
+__device__ EC_POINT point_add(EC_POINT P1, EC_POINT P2) {
+  
+  // Point addition formula using existing BIGNUM ops
+  
+  EC_POINT sum;
+  
+  // x3 = x1 + x2 
+  bn_add(&P1.x, &P2.x, &sum.x); 
+  
+  // y3 = y1 + y2
+  bn_add(&P1.y, &P2.y, &sum.y);
+  
+  // Reduce coordinates modulo p (curve order)
+  bn_mod(&sum.x, &CURVE_P, &CURVE_P);
+  bn_mod(&sum.y, &CURVE_P, &CURVE_P);
 
-    bool skip_step = true;
-    unsigned char bit_counter = 0;
-    int j = 0;
-    
-    for (int i = 0; i < num; i++) {
-
-        if (bit_counter<4) {
-            bit_counter++;
-            continue;
-        }
-
-        else {
-            int limb_index = i / BN_BYTES;
-            int byte_index = BN_BYTES - 1 - (i % BN_BYTES);
-
-            BN_ULONG limb = a->d[limb_index];
-            BN_ULONG byte = (limb >> (byte_index * 8)) & 0xff;
-
-            to[j] = (unsigned char) byte;
-            // printf("to[%d]: %02x\n", j, to[j]);
-            j++;
-        }
-
-        bit_counter++;
-        if (bit_counter == 8) {
-            // Reset the counter every 8 bytes
-            bit_counter = 0;
-        }
-    }
-
-    return num/2; 
+  return sum;
 }
-
-__device__ void print_as_hex_char(unsigned char *data, int len) {
-    for (int i = 0; i < len; i++) {
-        printf("%02x", data[i]);
-    }
-    printf("\n");
-}
-
-// EC_KEY_new_by_curve_name
-/*__device__ EC_KEY *cuda_EC_KEY_new_by_curve_name_ex(OSSL_LIB_CTX *ctx, const char *propq,
-                                    int nid)
-{
-    EC_KEY *ret = EC_KEY_new_ex(ctx, propq);
-    if (ret == NULL)
-        return NULL;
-    ret->group = EC_GROUP_new_by_curve_name_ex(ctx, propq, nid);
-    if (ret->group == NULL) {
-        EC_KEY_free(ret);
-        return NULL;
-    }
-    if (ret->meth->set_group != NULL
-        && ret->meth->set_group(ret, ret->group) == 0) {
-        EC_KEY_free(ret);
-        return NULL;
-    }
-    return ret;
-}
-
-__device__ EC_KEY *cuda_EC_KEY_new_by_curve_name(int nid)
-{
-    return cuda_EC_KEY_new_by_curve_name_ex(NULL, NULL, nid);
-}*/
 // Public key derivation --
 
 __global__ void testKernel() {
@@ -270,27 +231,53 @@ __global__ void testKernel() {
     bn_print("Debug Cuda newKey (After mod): ", &newKey);
 
 
-
     // Derive the public key
-    uint8_t newKeyBytes[32] = {0};  // Initialize to zero
-    int newKeyLen = 0;
-    newKeyLen = bn_bn2bin(&newKey, newKeyBytes);
-    // print newKeyLen
-    printf("newKeyLen: %d\n", newKeyLen);
-    printf("private: ");
-	print_as_hex_char(newKeyBytes, newKeyLen);
-  
-    // EC_KEY *eckey = EC_KEY_new_by_curve_name(NID_secp256k1);
-    // #define NID_secp256k1           714
-    // EC_KEY *eckey = cuda_EC_KEY_new_by_curve_name(714); // NID_secp256k1
-    BIGNUM *priv_key = BN_new();
-    unsigned char compressed_pubkey[65];
-    size_t compressed_pubkey_len;
-
-    // Set private key
-    // BN_hex2bn(&priv_key, "2E09165B257A4C3E52C9F4FAA6322C66CEDE807B7D6B4EC3960820795EE5447F");
-    // BN_bin2bn(newKeyBytes, newKeyLen, priv_key);
+    printf("Deriving the public key..\n");
+    // Initialize constants
+    // CURVE_P is curveOrder_d
+    CURVE_P.d = curveOrder_d;
+    CURVE_P.top = 8;
+    CURVE_P.neg = 0;
     
+    for (int i = 0; i < 8; i++) CURVE_A_d[i] = 0;
+    CURVE_A.d = CURVE_A_d;
+    CURVE_A.top = 8;
+    CURVE_A.neg = 0;
+    
+    // For secp256k1, CURVE_B should be initialized to 7 rather than 0
+    for (int i = 0; i < 8; i++) CURVE_B_d[i] = 0;
+    CURVE_B_d[0] = 0x00000007;
+    CURVE_B.d = CURVE_B_d;
+    CURVE_B.top = 8;
+    CURVE_B.neg = 0;
+
+    // Generator x coordinate
+    CURVE_GX_d[0] = 0x79BE667E;
+    CURVE_GX_d[1] = 0xF9DCBBAC;
+    CURVE_GX_d[2] = 0x55A06295;
+    CURVE_GX_d[3] = 0xCE870B07;
+    CURVE_GX_d[4] = 0x029BFCDB;
+    CURVE_GX_d[5] = 0x2DCE28D9;
+    CURVE_GX_d[6] = 0x59F2815B;
+    CURVE_GX_d[7] = 0x16F81798;
+    CURVE_GX.d = CURVE_GX_d;
+    CURVE_GX.top = 8;
+    CURVE_GX.neg = 0;   
+
+    // Generator y coordinate
+    BIGNUM CURVE_GY;
+    BN_ULONG CURVE_GY_d[8];
+    CURVE_GY_d[0] = 0x483ADA77;
+    CURVE_GY_d[1] = 0x26A3C465;
+    CURVE_GY_d[2] = 0x5DA4FBFC;
+    CURVE_GY_d[3] = 0x0E1108A8;
+    CURVE_GY_d[4] = 0xFD17B448;
+    CURVE_GY_d[5] = 0xA6855419;
+    CURVE_GY_d[6] = 0x9C47D08F;
+    CURVE_GY_d[7] = 0xFB10D4B8;
+    CURVE_GY.d = CURVE_GY_d;
+    CURVE_GY.top = 8;
+    CURVE_GY.neg = 0;
 
     BN_CTX_free(ctx);
 

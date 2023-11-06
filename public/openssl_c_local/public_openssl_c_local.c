@@ -92,6 +92,12 @@ int main() {
   EC_KEY *eckey = EC_KEY_new_by_curve_name(NID_secp256k1);
   // print eckey
   printf("eckey: %p\n", eckey);
+  // printf(&eckey.priv_key);
+
+  printf("\n");
+  // printf("%02x", eckey->priv_key[0]);
+  //print_as_hex_char(eckey->priv_key, 32);
+  
   BIGNUM *priv_key = BN_new();
   unsigned char compressed_pubkey[65];
   size_t compressed_pubkey_len;
