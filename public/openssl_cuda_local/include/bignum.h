@@ -152,15 +152,33 @@ __device__ int bn_cmp(BIGNUM* a, BIGNUM* b) {
 __device__ void bn_add(BIGNUM* a, BIGNUM* b, BIGNUM* r) {
     int max = a->top > b->top ? a->top : b->top;
     BN_ULONG carry = 0;
-    printf("Starting addition... max: %d\n", max);
+    //printf("Starting addition... max: %d\n", max);
+    /*printf("Starting addition... [0_0]\n");
+    // print a
+    printf("a: ");
+    for (int i = 0; i < a->top; i++) {
+        printf("%08x\n", a->d[i]);
+    }
+    // print b
+    printf("b: ");
+    for (int i = 0; i < b->top; i++) {
+        printf("%08x\n", b->d[i]);
+    }
+    // print r
+    printf("r: ");
+    for (int i = 0; i < r->top; i++) {
+        printf("%08x\n", r->d[i]);
+    }*/
 
     for(int i=max-1; i>=0; i--) {
         BN_ULONG ai = (i < a->top) ? a->d[i] : 0;
         BN_ULONG bi = (i < b->top) ? b->d[i] : 0;
 
         BN_ULONG sum = ai + bi + carry;
+        printf("rdsum\n");
         r->d[i] = sum;
         //carry = (sum < ai || sum < bi) ? 1 : 0;  // Another way to determine carry
+        printf("carry");
         carry = (sum < ai || (sum - ai) < bi) ? 1 : 0;
 
 
@@ -172,6 +190,8 @@ __device__ void bn_add(BIGNUM* a, BIGNUM* b, BIGNUM* r) {
         printf(", result: %08x", r->d[i]);
         printf(", carry: %08x\n", carry);
     }
+
+    
 
     // If there's a carry after processing all words
     if (carry) {
@@ -190,6 +210,27 @@ __device__ void bn_add(BIGNUM* a, BIGNUM* b, BIGNUM* r) {
     for (int i = 0; i < r->top; i++) {
         printf("%08x\n", r->d[i]);
     }
+}
+
+__device__ void bn_add_v1(BIGNUM* a, BIGNUM* b, BIGNUM* r) {
+    int max = (a->top > b->top ? a->top : b->top) + 1; // Allocate one more for potential carry
+
+    // Expects r->d was already preallocated with a size of at least max
+    // Either allocate more memory or initialize r->d before calling bn_add, like:
+    // r->d = (BN_ULONG*)malloc(sizeof(BN_ULONG) * r->top);
+
+    BN_ULONG carry = 0;
+    for(int i = 0; i < max - 1; i++) { // Loop through both numbers
+        BN_ULONG ai = (i < a->top) ? a->d[i] : 0; // Safely get from a or zero
+        BN_ULONG bi = (i < b->top) ? b->d[i] : 0; // Safely get from b or zero
+
+        unsigned long long sum = (unsigned long long)ai + bi + carry; // Avoid overflow using larger type
+        r->d[i] = (BN_ULONG)(sum & 0xFFFFFFFF); // Store lower 32 bits
+        carry = (BN_ULONG)(sum >> 32); // Upper 32 bits become carry
+    }
+    r->d[max - 1] = carry; // Store final carry, if any
+    // Update the top to reflect the actual number of significant words
+    r->top = (carry != 0) ? max : max - 1; // If the carry is not 0, include it in the length of r
 }
 
 

@@ -83,10 +83,9 @@ class Point:
             coef >>= 1
 
             debug_counter += 1
-            """if debug_counter > 1:
+            if debug_counter > 0:
                 print('3 x:', hex(result.x))
                 print('3 y:', hex(result.y))
-                exit()"""
         
         print('3 x:', hex(result.x))
         print('3 y:', hex(result.y))

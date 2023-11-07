@@ -112,23 +112,300 @@ struct EC_POINT {
   BIGNUM y;
 };
 
-__device__ EC_POINT point_add(EC_POINT P1, EC_POINT P2) {
-  
-  // Point addition formula using existing BIGNUM ops
-  
-  EC_POINT sum;
-  
-  // x3 = x1 + x2 
-  bn_add(&P1.x, &P2.x, &sum.x); 
-  
-  // y3 = y1 + y2
-  bn_add(&P1.y, &P2.y, &sum.y);
-  
-  // Reduce coordinates modulo p (curve order)
-  bn_mod(&sum.x, &CURVE_P, &CURVE_P);
-  bn_mod(&sum.y, &CURVE_P, &CURVE_P);
+__device__ void set_bn(BIGNUM *dest, const BIGNUM *src) {
+    // Copy over the significant words from source to destination.
+    for (int i = 0; i < src->top; ++i) {
+        dest->d[i] = src->d[i];
+    }
 
-  return sum;
+    // Set the 'top' to match the source 'BIGNUM'
+    dest->top = src->top;
+
+    // Set the 'neg' flag as per the source 'BIGNUM'
+    dest->neg = src->neg;
+
+    // Zero out any remaining entries in the array if the source 'top' is less than the dest 'top'
+    for (int i = src->top; i < dest->top; ++i) {
+        dest->d[i] = 0;
+    }
+}
+
+// In the current structure, we might use a specific value (e.g., 0 or -1) 
+// to represent the components of the point at infinity.
+
+// A version that uses 0 to signify the point at infinity could be:
+__device__ int point_is_at_infinity(EC_POINT *P) {
+    // Assuming the x-coordinate is represented as an array of BN_ULONG
+    // with 'top' items, and that the point at infinity has all its
+    // BN_ULONGs set to 0.
+    
+    // If we like to detect a "point at infinity" by checking if the first word
+    // is zero and making an assumption that this can only happen for the point at infinity:
+    if (P->x.top == 0 && P->x.d[0] == 0) {
+        return 1; // P is the point at infinity
+    }
+
+    return 0; // P is not the point at infinity
+}
+
+// __device__ void mod_inv(BIGNUM *value, BIGNUM *mod, BIGNUM *inv);
+__device__ int extended_gcd(BIGNUM *a, BIGNUM *p, BIGNUM *x, BIGNUM *y);
+
+__device__ void mod_inv(BIGNUM *value, BIGNUM *mod, BIGNUM *inv) {
+    BIGNUM x, y;
+    // You need to make sure that BIGNUM x, y are initialized properly with minted memory
+    // You also need a proper gcd implementation on GPU here.
+    int g = extended_gcd(value, mod, &x, &y);
+    
+    // In case x is negative, we add mod to it, assuming mod>0
+    if (x.neg) {
+        // BN_ULONG zero = 0;
+        bn_add(&x, mod, inv);
+        bn_mod(inv, mod, inv);
+    } else {
+        bn_mod(&x, mod, inv);
+    }
+}
+
+__device__ void bn_sub(BIGNUM *a, BIGNUM *b, BIGNUM *r) {
+    int max = a->top > b->top ? a->top : b->top;
+    BN_ULONG borrow = 0;
+    
+    for (int i = 0; i < max; ++i) {
+        BN_ULONG ai = (i < a->top) ? a->d[i] : 0;
+        BN_ULONG bi = (i < b->top) ? b->d[i] : 0;
+
+        // Check if a subtraction would cause a borrow
+        if (ai >= bi + borrow) {
+            r->d[i] = ai - bi - borrow;
+            borrow = 0;
+        } else {
+            // Borrow from the next highest bit
+            r->d[i] = (1ULL << (sizeof(BN_ULONG) * 8)) + ai - bi - borrow;
+            borrow = 1;
+        }
+    }
+    
+    // Set result top and sign
+    r->top = a->top; // r will have at most as many words as a
+    for (int i = r->top - 1; i >= 0; --i) {
+        if (r->d[i] != 0) {
+            break;
+        }
+        r->top--; // Reduce top for each leading zero
+    }
+
+    // Detect underflow
+    if (borrow != 0) {
+        // Handle result underflow if needed (b > a)
+        printf("Underflow detected\n");
+        // Set r to correct value or raise an error
+    }
+    
+    r->neg = 0; // Assuming we don't want negative numbers, otherwise set sign properly
+}
+
+// Assuming 'a' and 'mod' are coprime, output 'x' such that: a*x ≡ 1 (mod 'mod')
+// Pseudo code for Extended Euclidean Algorithm in CUDA
+__device__ int extended_gcd(BIGNUM *a, BIGNUM *mod, BIGNUM *x, BIGNUM *y) {
+    // Initialization of prev_x, x, last_y, and y is omitted here but important.
+    BIGNUM prev_x, last_y, last_remainder, remainder, quotient, temp;
+    // Initialize prev_x = 1, x = 0, last_y = 0, y = 1 
+    // Initialize last_remainder = mod, remainder = a
+
+    // Initialize a BIGNUM for zero.
+    BIGNUM zero;
+    BN_ULONG zero_d[1] = {0}; // Assuming BN_ULONG is the type used to represent a single "word" of the BIGNUM.
+
+    zero.d = zero_d;
+    zero.top = (zero_d[0] != 0); // If we've set zero_d[0] to 0, zero's top should be zero, implying an actual value of 0.
+    zero.dmax = 1; // The maximum number of "words" in the BIGNUM. Since zero is just 0, this is 1.
+
+    while (bn_cmp(&remainder, &zero) != 0) {
+        bn_div(&last_remainder, &remainder, &quotient);
+        
+        bn_mul(&quotient, &x, &temp); // temp = quotient*x
+        bn_sub(&prev_x, &temp, &prev_x); // new prev_x = prev_x - temp
+        bn_mul(&quotient, &y, &temp); // temp = quotient*y
+        bn_sub(&last_y, &temp, &last_y); // new last_y = last_y - temp
+        
+        // Swap last_remainder with remainder
+        // Swap prev_x with x
+        // Swap last_y with y
+    }
+    
+    set_bn(x, &prev_x);
+    set_bn(y, &last_y);
+
+    return 1; // In this simplified version, we'd return the gcd, but we're presuming a==1
+}
+
+__device__ void mod_mul(BIGNUM *a, BIGNUM *b, BIGNUM *mod, BIGNUM *result);
+
+__device__ void point_double(EC_POINT *P, EC_POINT *R, BIGNUM *p) {
+    // Temporary storage for the calculations
+    BIGNUM s, xR, yR, m;
+
+    if (point_is_at_infinity(P)) {
+        // Point doubling at infinity remains at infinity
+        set_bn(&R->x, &P->x);  // Copying P->x to R->x, assuming these are in the proper zeroed state
+        set_bn(&R->y, &P->y);  // Copying P->y to R->y
+        return;
+    }
+
+    // Calculate m = 3x^2 + a (a is zero for secp256k1)
+    mod_mul(&P->x, &P->x, p, &m);  // m = x^2 mod p
+    set_bn(&s, &m);                 // s = x^2 (Since we use a=0 in secp256k1, skip adding 'a')
+    bn_add(&m, &m, &s);             // s = 2x^2
+    bn_add(&s, &m, &s);             // s = 3x^2
+
+    // Calculate s = (3x^2 + a) / (2y) = (s) / (2y)
+    // First, compute the modular inverse of (2y)
+    BIGNUM two_y;
+    set_bn(&two_y, &P->y);         // Assuming set_bn simply duplicates P->y
+    bn_add(&two_y, &two_y, &two_y); // two_y = 2y
+    BIGNUM inv_two_y;
+    mod_inv(&two_y, p, &inv_two_y);  // Compute the inverse of 2y
+
+    mod_mul(&s, &inv_two_y, p, &s);  // Finally, s = (3x^2 + a) / (2y) mod p
+
+    // Compute xR = s^2 - 2x mod p
+    mod_mul(&s, &s, p, &xR);        // xR = s^2 mod p
+    set_bn(&m, &P->x);              // m = x
+    bn_add(&m, &m, &m);             // m = 2x
+    bn_sub(&xR, &m, &xR);           // xR = s^2 - 2x
+    bn_mod(&xR, p, &xR);            // Modulo operation
+
+    // Compute yR = s * (x - xR) - y mod p
+    bn_sub(&P->x, &xR, &yR);        // yR = x - xR
+    mod_mul(&s, &yR, p, &yR);       // yR = s * (x - xR)
+    bn_sub(&yR, &P->y, &yR);        // yR = s * (x - xR) - y
+    bn_mod(&yR, p, &yR);            // Modulo operation
+
+    // Copy results to R only after all calculations are complete to allow in-place doubling (P == R)
+    set_bn(&R->x, &xR);
+    set_bn(&R->y, &yR);
+}
+
+__device__ void point_add(EC_POINT *P, EC_POINT *Q, EC_POINT *R, BIGNUM *p) {
+    // Check if one of the points is the point at infinity
+    if (point_is_at_infinity(P)) {
+        *R = *Q;
+        return;
+    }
+    if (point_is_at_infinity(Q)) {
+        *R = *P;
+        return;
+    }
+
+    // Check if P == Q (point doubling)
+    if (bn_cmp(&P->x, &Q->x) == 0 && bn_cmp(&P->y, &Q->y) == 0) {
+        // call point_double
+        point_double(P, R, p);
+        return;
+    }
+
+    BIGNUM s, m, xR, yR;
+
+    // Calculate slope (s = (yQ - yP) * inv(xQ - xP) mod p)
+    BIGNUM tmp1, tmp2;
+    bn_sub(&Q->y, &P->y, &tmp1); // yQ - yP
+    bn_sub(&Q->x, &P->x, &tmp2); // xQ - xP
+    mod_inv(&tmp2, p, &tmp2);     // inv(xQ - xP)
+    mod_mul(&tmp1, &tmp2, p, &s); // (yQ - yP) * inv(xQ - xP)
+  
+    // Calculate xR (xR = s^2 - xP - xQ mod p)
+    mod_mul(&s, &s, p, &xR); // s^2
+    bn_sub(&xR, &P->x, &xR); // s^2 - xP
+    bn_sub(&xR, &Q->x, &xR); // s^2 - xP - xQ
+    bn_mod(&xR, p, &xR);     // mod p
+
+    // Calculate yR (yR = s * (xP - xR) - yP mod p)
+    bn_sub(&P->x, &xR, &yR); // xP - xR
+    mod_mul(&s, &yR, p, &yR); // s * (xP - xR)
+    bn_sub(&yR, &P->y, &yR);  // s * (xP - xR) - yP
+    bn_mod(&yR, p, &yR);      // mod p
+
+    // Set result
+    set_bn(&R->x, &xR);
+    set_bn(&R->y, &yR);
+}
+
+__device__ void bignum_to_bit_array(const BIGNUM *n, unsigned int *bits) {
+    int index = 0;
+    for (int i = 0; i < n->top; ++i) {
+        BN_ULONG word = n->d[i];
+        for (int j = 0; j < 32; ++j) {  // Assuming BN_ULONG is 32 bits
+            bits[index++] = (word >> j) & 1;
+        }
+    }
+}
+
+__device__ void init_point_at_infinity(EC_POINT *P) {
+    // For the x and y coordinates of P, we'll set the 'top' to 0,
+    // which is our chosen convention for representing the point at infinity.
+
+    P->x.top = 0; // No valid 'words' in the BIGNUM representing x
+    P->y.top = 0; // No valid 'words' in the BIGNUM representing y
+
+    // If 'd' arrays have been allocated, set them to zero as well.
+    // memset could potentially be used for this if available and if 'd' is allocated.
+    
+    for (int i = 0; i < P->x.dmax; ++i) {
+        P->x.d[i] = 0;
+    }
+    for (int i = 0; i < P->y.dmax; ++i) {
+        P->y.d[i] = 0;
+    }
+    
+    // Alternatively, if you use flags or other conventions for points at infinity,
+    // set them accordingly here.
+}
+
+__device__ EC_POINT ec_point_scalar_mul(EC_POINT *point, BIGNUM *scalar, BIGNUM *curve_order) {
+    EC_POINT current = *point;                       // This initializes the current point with the input point
+    EC_POINT result;                                 // Initialize the result variable, which accumulates the result
+    init_point_at_infinity(&result);                 // Initialize it to the point at infinity
+
+    // Convert scalar BIGNUM to an array of integers that's easy to iterate bit-wise
+    unsigned int bits[256];                          // Assuming a 256-bit scalar
+    bignum_to_bit_array(scalar, bits);               // You will need to implement bignum_to_bit_array()
+
+    // printf("coef hex: %s\n", bignum_to_hex(scalar)); // Convert BIGNUM to hex string for printing
+    bn_print("coef: ", scalar);                      // Print the scalar
+
+    for (int i = 0; i < 256; i++) {                 // Assuming 256-bit scalars
+        // printf("0 x: %s\n", bignum_to_hex(&current.x));
+        bn_print("0 x: ", &current.x);
+        // printf("0 y: %s\n", bignum_to_hex(&current.y));
+        bn_print("0 y: ", &current.y);
+
+        if (bits[i]) {                              // If the i-th bit is set
+            // point_add(&result, &current, &result);  // Add current to the result
+            // point_add(&result, &current, &result, &field_order);  // Add current to the result
+            point_add(&result, &current, &result, curve_order);  // Add current to the result
+            // printf("1 x: %s\n", bignum_to_hex(&result.x));
+            bn_print("1 x: ", &result.x);
+            // printf("1 y: %s\n", bignum_to_hex(&result.y));
+            bn_print("1 y: ", &result.y);
+
+        }
+
+        //point_double(&current, &current);           // Double current
+        // point_double(&current, &current, &field_order);  // Double current and store the result in current
+        point_double(&current, &current, curve_order);
+        // printf("2 x: %s\n", bignum_to_hex(&current.x));
+        bn_print("2 x: ", &current.x);
+        // printf("2 y: %s\n", bignum_to_hex(&current.y));
+        bn_print("2 y: ", &current.y);
+    }
+
+    // printf("Final x: %s\n", bignum_to_hex(&result.x));
+    bn_print("Final x: ", &result.x);
+    // printf("Final y: %s\n", bignum_to_hex(&result.y));
+    bn_print("Final y: ", &result.y);
+
+    return result;
 }
 // Public key derivation --
 
@@ -215,16 +492,6 @@ __global__ void testKernel() {
     m.neg = 0;
     
     printf("Calling bn_nnmod\n");
-    // expected:2E09165B257A4C3E52C9F4FAA6322C66CEDE807B7D6B4EC3960820795EE5447F
-
-    /*if (!simple_BN_nnmod(&newKey, &newKey, &curveOrder)) {
-        // Handle error (e.g., division by zero)
-        printf("Error: Division by zero\n");
-    }*/
-    
-    //big_num_add_mod(newKey.d, a.d, b.d, curveOrder.d, a.top); // Fine:2e09165b257a4c3e52c9f4faa6322c6 Wrong:5898d5d622cb3eeff55da7f062f1b85c0
-
-    //robust_BN_nnmod(&newKey, &newKey, &curveOrder); // Wrong:5c122cb6257a4c3e52c9f4faa6322c66cede807b7d6b4ec4960820795ee54480
     bn_mod(&newKey, &newKey, &curveOrder);
 
     printf("Debug Cuda newKey (expected_): 2E09165B257A4C3E52C9F4FAA6322C66CEDE807B7D6B4EC3960820795EE5447F\n");
@@ -259,10 +526,7 @@ __global__ void testKernel() {
     CURVE_GX_d[4] = 0x029BFCDB;
     CURVE_GX_d[5] = 0x2DCE28D9;
     CURVE_GX_d[6] = 0x59F2815B;
-    CURVE_GX_d[7] = 0x16F81798;
-    CURVE_GX.d = CURVE_GX_d;
-    CURVE_GX.top = 8;
-    CURVE_GX.neg = 0;   
+    CURVE_GX_d[7] = 0x16F81798; 
 
     // Generator y coordinate
     BIGNUM CURVE_GY;
@@ -275,9 +539,25 @@ __global__ void testKernel() {
     CURVE_GY_d[5] = 0xA6855419;
     CURVE_GY_d[6] = 0x9C47D08F;
     CURVE_GY_d[7] = 0xFB10D4B8;
-    CURVE_GY.d = CURVE_GY_d;
-    CURVE_GY.top = 8;
-    CURVE_GY.neg = 0;
+
+    // Initialize generator
+    EC_POINT G;
+    G.x.d = CURVE_GX_d; 
+    G.y.d = CURVE_GY_d;
+    // Set tops, negs
+    G.x.top = 8;
+    G.y.top = 8;
+    G.x.neg = 0;
+    G.y.neg = 0;
+
+    // Derive public key 
+    EC_POINT publicKey = ec_point_scalar_mul(&G, &newKey, &curveOrder);
+
+    // Print public key
+    printf("Public key:\n");
+    bn_print("Public key x: ", &publicKey.x);
+    bn_print("Public key y: ", &publicKey.y);
+
 
     BN_CTX_free(ctx);
 
