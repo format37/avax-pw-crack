@@ -112,6 +112,10 @@ struct EC_POINT {
   BIGNUM y;
 };
 
+__device__ void bn_div(BIGNUM *a, BIGNUM *b, BIGNUM *q, BIGNUM *r);
+__device__ void bn_mul(BIGNUM *a, BIGNUM *b, BIGNUM *product);
+__device__ void bn_sub(BIGNUM *a, BIGNUM *b, BIGNUM *r);
+
 __device__ void set_bn(BIGNUM *dest, const BIGNUM *src) {
     // Copy over the significant words from source to destination.
     for (int i = 0; i < src->top; ++i) {
@@ -149,7 +153,52 @@ __device__ int point_is_at_infinity(EC_POINT *P) {
 }
 
 // __device__ void mod_inv(BIGNUM *value, BIGNUM *mod, BIGNUM *inv);
-__device__ int extended_gcd(BIGNUM *a, BIGNUM *p, BIGNUM *x, BIGNUM *y);
+// __device__ int extended_gcd(BIGNUM *a, BIGNUM *p, BIGNUM *x, BIGNUM *y);
+
+// Assuming 'a' and 'mod' are coprime, output 'x' such that: a*x ≡ 1 (mod 'mod')
+// Pseudo code for Extended Euclidean Algorithm in CUDA
+__device__ int extended_gcd(BIGNUM *a, BIGNUM *mod, BIGNUM *x, BIGNUM *y) {
+    // Initialization of prev_x, x, last_y, and y is omitted here but important.
+    BIGNUM prev_x, last_y, last_remainder, remainder, quotient, temp;
+    // Initialize prev_x = 1, x = 0, last_y = 0, y = 1 
+    // Initialize last_remainder = mod, remainder = a
+
+    // Initialize a BIGNUM for zero.
+    BIGNUM zero;
+    BN_ULONG zero_d[1] = {0}; // Assuming BN_ULONG is the type used to represent a single "word" of the BIGNUM.
+
+    zero.d = zero_d;
+    // zero.top = (zero_d[0] != 0); // If we've set zero_d[0] to 0, zero's top should be zero, implying an actual value of 0.
+    zero.top = 0;
+    zero.dmax = 1; // The maximum number of "words" in the BIGNUM. Since zero is just 0, this is 1.
+
+    BIGNUM *temp_remainder = new BIGNUM(); // If dynamic memory is allowed - or statically allocate enough space if not
+
+    while (bn_cmp(&remainder, &zero) != 0) {
+        // bn_div(&last_remainder, &remainder, &quotient);
+        bn_div(&last_remainder, &remainder, &quotient, temp_remainder); // Now using 4 arguments
+        BIGNUM swap_temp = last_remainder; // Temporary storage for the swap
+        last_remainder = *temp_remainder;
+        *temp_remainder = swap_temp;
+
+        bn_mul(&quotient, x, &temp); // temp = quotient*x
+        bn_sub(&prev_x, &temp, &prev_x); // new prev_x = prev_x - temp
+        bn_mul(&quotient, y, &temp); // temp = quotient*y
+        bn_sub(&last_y, &temp, &last_y); // new last_y = last_y - temp
+        
+        // Swap last_remainder with remainder
+        // Swap prev_x with x
+        // Swap last_y with y
+    }
+
+    // Clean up
+    delete temp_remainder; // Only if dynamic memory is allowed - if you statically allocated, this is unnecessary
+    
+    set_bn(x, &prev_x);
+    set_bn(y, &last_y);
+
+    return 1; // In this simplified version, we'd return the gcd, but we're presuming a==1
+}
 
 __device__ void mod_inv(BIGNUM *value, BIGNUM *mod, BIGNUM *inv) {
     BIGNUM x, y;
@@ -205,42 +254,163 @@ __device__ void bn_sub(BIGNUM *a, BIGNUM *b, BIGNUM *r) {
     r->neg = 0; // Assuming we don't want negative numbers, otherwise set sign properly
 }
 
-// Assuming 'a' and 'mod' are coprime, output 'x' such that: a*x ≡ 1 (mod 'mod')
-// Pseudo code for Extended Euclidean Algorithm in CUDA
-__device__ int extended_gcd(BIGNUM *a, BIGNUM *mod, BIGNUM *x, BIGNUM *y) {
-    // Initialization of prev_x, x, last_y, and y is omitted here but important.
-    BIGNUM prev_x, last_y, last_remainder, remainder, quotient, temp;
-    // Initialize prev_x = 1, x = 0, last_y = 0, y = 1 
-    // Initialize last_remainder = mod, remainder = a
 
-    // Initialize a BIGNUM for zero.
-    BIGNUM zero;
-    BN_ULONG zero_d[1] = {0}; // Assuming BN_ULONG is the type used to represent a single "word" of the BIGNUM.
-
-    zero.d = zero_d;
-    zero.top = (zero_d[0] != 0); // If we've set zero_d[0] to 0, zero's top should be zero, implying an actual value of 0.
-    zero.dmax = 1; // The maximum number of "words" in the BIGNUM. Since zero is just 0, this is 1.
-
-    while (bn_cmp(&remainder, &zero) != 0) {
-        bn_div(&last_remainder, &remainder, &quotient);
-        
-        bn_mul(&quotient, &x, &temp); // temp = quotient*x
-        bn_sub(&prev_x, &temp, &prev_x); // new prev_x = prev_x - temp
-        bn_mul(&quotient, &y, &temp); // temp = quotient*y
-        bn_sub(&last_y, &temp, &last_y); // new last_y = last_y - temp
-        
-        // Swap last_remainder with remainder
-        // Swap prev_x with x
-        // Swap last_y with y
-    }
+__device__ void bn_mul(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
+    // Assuming all BIGNUMs are initialized, and all the `d` arrays have enough allocated memory.
     
-    set_bn(x, &prev_x);
-    set_bn(y, &last_y);
+    // Initialize product to zero.
+    for (int i = 0; i < product->dmax; i++) {
+        product->d[i] = 0;
+    }
+    product->top = 0;
 
-    return 1; // In this simplified version, we'd return the gcd, but we're presuming a==1
+    // Multiply each digit of a by each digit of b, accumulate results in product
+    for (int i = 0; i < a->top; i++) {
+        BN_ULONG carry = 0;
+        for (int j = 0; j < b->top || carry; j++) {
+            // Perform the multiplication (and add the carry from the previous operation)
+            unsigned long long sum = product->d[i + j] + carry +
+                (j < b->top ? ((unsigned long long)a->d[i] * b->d[j]) : 0);
+
+            product->d[i + j] = (BN_ULONG)(sum & 0xFFFFFFFF); // Cast here depends on the size of BN_ULONG
+            
+            // Compute the carry for the next round of addition
+            carry = (BN_ULONG)(sum >> 32); // Assuming BN_ULONG is 32-bits
+        }
+
+        // Update the top, which tracks the number of valid words in the product
+        // This assumes that bn_add updates product->top.
+        if (i + b->top > product->top) {
+            product->top = i + b->top;
+        }
+    }
+
+    // Now product contains the product of a and b, without modulo operation.
+    // If necessary, perform a modulo operation here (modular reduction), or separately after calling bn_mul.
 }
 
-__device__ void mod_mul(BIGNUM *a, BIGNUM *b, BIGNUM *mod, BIGNUM *result);
+__device__ void bn_add_bit(BIGNUM *a, int bit_index) {
+    // Determine the word in the array where this bit resides.
+    int word_index = bit_index / (sizeof(BN_ULONG) * 8);
+    int bit_in_word = bit_index % (sizeof(BN_ULONG) * 8);
+
+    // Set this bit. BN_ULONG is assumed to be large enough to handle the shifts without overflow.
+    BN_ULONG bit_to_set = ((BN_ULONG)1) << bit_in_word;
+
+    // Add the bit to the BIGNUM. This is safe from overflow because we're only setting one bit.
+    a->d[word_index] |= bit_to_set;
+
+    // Update 'top'. If we added a bit beyond the current 'top', we'll need to expand it.
+    if (word_index >= a->top) {
+        // Make sure we've added a bit that's not in the leading zeroes of the BIGNUM.
+        // If so, `top` needs to reflect this new significant word.
+        a->top = word_index + 1;
+
+        // Ensure all bits above the current one are set to 0 in the new top 'word'.
+        for (int i = bit_in_word + 1; i < sizeof(BN_ULONG) * 8; i++) {
+            a->d[word_index] &= ~(((BN_ULONG)1) << i);
+        }
+    }
+}
+
+#define BN_ULONG_NUM_BITS (sizeof(BN_ULONG) * 8)
+
+__device__ int bn_is_bit_set(const BIGNUM *bn, int bit_index) {
+    // Check if the bit index is within the range of the BIGNUM's length
+    if (bit_index < 0 || bit_index >= bn->top * BN_ULONG_NUM_BITS) {
+        return 0; // Bit out of range, return 0 indicating not set
+    }
+
+    // Calculate which word and which bit within that word we are interested in
+    int word_index = bit_index / BN_ULONG_NUM_BITS;
+    int bit_position = bit_index % BN_ULONG_NUM_BITS;
+
+    // Create a mask for the bit within the word
+    BN_ULONG mask = (BN_ULONG)1 << bit_position;
+
+    // Check if the bit is set and return the appropriate value
+    return (bn->d[word_index] & mask) ? 1 : 0;
+}
+
+__device__ void bn_lshift(BIGNUM *a, int shift) {
+    if (shift <= 0) {
+        // No shift or invalid shift count; do nothing.
+        return;
+    }
+
+    // Perform the shift for each word from the most significant down to the least significant.
+    BN_ULONG carry = 0;
+    for (int i = a->top - 1; i >= 0; --i) {
+        BN_ULONG new_carry = a->d[i] >> (BN_ULONG_NUM_BITS - shift); // Capture the bits that will be shifted out.
+        a->d[i] = (a->d[i] << shift) | carry; // Shift current word and add bits from previous carry.
+        carry = new_carry; // Update carry for the next iteration.
+    }
+
+    // Update the 'top' if the left shift carried out of the msb.
+    if (carry != 0) {
+        if (a->top < a->dmax) {
+            a->d[a->top] = carry; // Assign the carry to the new most significant word.
+            a->top++; // Increase the top to account for the new most significant word.
+        } else {
+            // Handle overflow case where there's no room for an extra word.
+            // This would require either halting with an error or reallocating a->d.
+            printf("Error: no room for extra word in bn_lshift\n");
+        }
+    }
+}
+
+__device__ void bn_div(BIGNUM *a, BIGNUM *b, BIGNUM *q, BIGNUM *r) {
+    // Initialize quotient and remainder to zero.
+    for (int i = 0; i < q->dmax; ++i) q->d[i] = 0;
+    for (int i = 0; i < r->dmax; ++i) r->d[i] = 0;
+    
+    // Initialize remainder with dividend 'a'.
+    set_bn(r, a);
+
+    // Normalize based on the highest set bit of divisor 'b'
+    int n = b->top * sizeof(BN_ULONG) * 8; // n is total number of bits in b
+    
+    // Find the highest set bit for normalization.
+    while (n > 0 && !bn_is_bit_set(b, n - 1)) --n;
+    
+    // Long division algorithm.
+    for (int i = a->top * sizeof(BN_ULONG) * 8 - n; i >= 0; --i) {
+        // Shift q and r left by 1 bit.
+        bn_lshift(q, 1);
+        bn_lshift(r, 1);
+        
+        // If bit 'i' of a is set, add 1 to r.
+        if (bn_is_bit_set(a, i)) {
+            bn_add_bit(r, 0); // Assuming you have a function to add a bit at position 0.
+        }
+        
+        // If r >= b, set bit 0 of q and subtract b from r.
+        if (bn_cmp(r, b) >= 0) {
+            bn_sub(r, b, r);
+            bn_add_bit(q, 0); // Assuming you have a function to add a bit at position 0.
+        }
+    }
+}
+
+// __device__ void mod_mul(BIGNUM *a, BIGNUM *b, BIGNUM *mod, BIGNUM *result);
+
+#define MAX_BIGNUM_SIZE 16 // For holding up to a 512-bit number
+
+__device__ void mod_mul(BIGNUM *a, BIGNUM *b, BIGNUM *mod, BIGNUM *result) {
+    // Product array to store the intermediate multiplication result
+    BN_ULONG product_d[MAX_BIGNUM_SIZE] ={0}; // All elements initialized to 0
+    // Ensure that 'product' uses this pre-allocated array
+    BIGNUM product = { product_d, 0, MAX_BIGNUM_SIZE };
+
+    // Now, you can call the bn_mul function and pass 'product' to it
+    bn_mul(a, b, &product);
+    bn_mod(&product, mod, result);
+
+    // Wipe the product memory if necessary
+    for (int i = 0; i < MAX_BIGNUM_SIZE; ++i) {
+        product_d[i] = 0;
+    }
+}
 
 __device__ void point_double(EC_POINT *P, EC_POINT *R, BIGNUM *p) {
     // Temporary storage for the calculations
