@@ -139,6 +139,8 @@ __device__ void set_bn(BIGNUM *dest, const BIGNUM *src) {
 
 // A version that uses 0 to signify the point at infinity could be:
 __device__ int point_is_at_infinity(EC_POINT *P) {
+    return P->x.top == 0; // Assuming a valid x coordinate can never have top == 0, except for the point at infinity
+    /*
     // Assuming the x-coordinate is represented as an array of BN_ULONG
     // with 'top' items, and that the point at infinity has all its
     // BN_ULONGs set to 0.
@@ -150,6 +152,7 @@ __device__ int point_is_at_infinity(EC_POINT *P) {
     }
 
     return 0; // P is not the point at infinity
+    */
 }
 
 // __device__ void mod_inv(BIGNUM *value, BIGNUM *mod, BIGNUM *inv);
@@ -221,12 +224,15 @@ __device__ void bn_sub(BIGNUM *a, BIGNUM *b, BIGNUM *r) {
     BN_ULONG borrow = 0;
     
     for (int i = 0; i < max; ++i) {
+        printf("# 4.%d\n", i);
         BN_ULONG ai = (i < a->top) ? a->d[i] : 0;
         BN_ULONG bi = (i < b->top) ? b->d[i] : 0;
 
         // Check if a subtraction would cause a borrow
         if (ai >= bi + borrow) {
+            printf("# 5\n");
             r->d[i] = ai - bi - borrow;
+            printf("# 6\n");
             borrow = 0;
         } else {
             // Borrow from the next highest bit
@@ -234,7 +240,7 @@ __device__ void bn_sub(BIGNUM *a, BIGNUM *b, BIGNUM *r) {
             borrow = 1;
         }
     }
-    
+    printf("# 8\n");
     // Set result top and sign
     r->top = a->top; // r will have at most as many words as a
     for (int i = r->top - 1; i >= 0; --i) {
@@ -458,32 +464,36 @@ __device__ void point_double(EC_POINT *P, EC_POINT *R, BIGNUM *p) {
 }
 
 __device__ void point_add(EC_POINT *P, EC_POINT *Q, EC_POINT *R, BIGNUM *p) {
+    printf("# 1\n");
     // Check if one of the points is the point at infinity
     if (point_is_at_infinity(P)) {
         *R = *Q;
         return;
     }
+    
     if (point_is_at_infinity(Q)) {
         *R = *P;
         return;
     }
-
+    
     // Check if P == Q (point doubling)
     if (bn_cmp(&P->x, &Q->x) == 0 && bn_cmp(&P->y, &Q->y) == 0) {
         // call point_double
         point_double(P, R, p);
         return;
     }
-
+    
     BIGNUM s, m, xR, yR;
 
     // Calculate slope (s = (yQ - yP) * inv(xQ - xP) mod p)
     BIGNUM tmp1, tmp2;
+    printf("# 2\n");
     bn_sub(&Q->y, &P->y, &tmp1); // yQ - yP
+    printf("# 100\n");
     bn_sub(&Q->x, &P->x, &tmp2); // xQ - xP
     mod_inv(&tmp2, p, &tmp2);     // inv(xQ - xP)
     mod_mul(&tmp1, &tmp2, p, &s); // (yQ - yP) * inv(xQ - xP)
-  
+    
     // Calculate xR (xR = s^2 - xP - xQ mod p)
     mod_mul(&s, &s, p, &xR); // s^2
     bn_sub(&xR, &P->x, &xR); // s^2 - xP
@@ -550,16 +560,21 @@ __device__ EC_POINT ec_point_scalar_mul(EC_POINT *point, BIGNUM *scalar, BIGNUM 
         // printf("0 y: %s\n", bignum_to_hex(&current.y));
         bn_print("0 y: ", &current.y);
 
+        
+
         if (bits[i]) {                              // If the i-th bit is set
+            printf("# 0\n");
             // point_add(&result, &current, &result);  // Add current to the result
             // point_add(&result, &current, &result, &field_order);  // Add current to the result
             point_add(&result, &current, &result, curve_order);  // Add current to the result
+            printf("# b\n");
             // printf("1 x: %s\n", bignum_to_hex(&result.x));
             bn_print("1 x: ", &result.x);
             // printf("1 y: %s\n", bignum_to_hex(&result.y));
             bn_print("1 y: ", &result.y);
 
         }
+        printf("# c\n");
 
         //point_double(&current, &current);           // Double current
         // point_double(&current, &current, &field_order);  // Double current and store the result in current
