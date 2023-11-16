@@ -1,4 +1,3 @@
-# Implementing elliptic curve operations for secp256k1
 
 # Constants for secp256k1
 p = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F

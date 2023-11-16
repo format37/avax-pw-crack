@@ -96,6 +96,10 @@ __device__ void robust_BN_nnmod(BIGNUM *r, const BIGNUM *m, const BIGNUM *d) {
 }
 
 // Public key derivation ++
+/*#define MAX_BIGNUM_WORDS 8 // Assuming 256-bit numbers
+#define BN_ULONG_NUM_BITS (sizeof(BN_ULONG) * 8)
+#define MAX_BIGNUM_SIZE 16 // For holding up to a 512-bit number TODO: maybe 256 ?
+//#define MAX_BIGNUM_SIZE 8 // For holding up to a 512-bit number TODO: maybe 256 ?*/
 __device__ BIGNUM CURVE_P;
 __device__ BIGNUM CURVE_A;
 __device__ BIGNUM CURVE_B;
@@ -116,22 +120,43 @@ __device__ void bn_div(BIGNUM *a, BIGNUM *b, BIGNUM *q, BIGNUM *r);
 __device__ void bn_mul(BIGNUM *a, BIGNUM *b, BIGNUM *product);
 __device__ void bn_sub(BIGNUM *a, BIGNUM *b, BIGNUM *r);
 
+/*__device__ void bn_init_zero(BIGNUM *bn, int top) {
+    // Note: This assumes that memory for bn->d has already been allocated
+    // with the appropriate size beforehand.
+    for (int i = 0; i < top; i++) {
+        bn->d[i] = 0; // Set all digits to 0
+    }
+    bn->top = top; // Set the number of active words
+    bn->neg = 0;   // Set the number as positive
+}*/
+
 __device__ void set_bn(BIGNUM *dest, const BIGNUM *src) {
+    printf("set_bn 0\n");
+
+    // Check if dest has enough space to copy from src
+    if (dest->dmax < src->top) {
+        // Handle the situation appropriately
+        // Depending on how memory is managed, this could be an error or resize operation
+        return;
+    }
+
     // Copy over the significant words from source to destination.
     for (int i = 0; i < src->top; ++i) {
+        printf("set_bn 1.%d\n", i);
         dest->d[i] = src->d[i];
     }
 
-    // Set the 'top' to match the source 'BIGNUM'
-    dest->top = src->top;
-
-    // Set the 'neg' flag as per the source 'BIGNUM'
-    dest->neg = src->neg;
-
-    // Zero out any remaining entries in the array if the source 'top' is less than the dest 'top'
-    for (int i = src->top; i < dest->top; ++i) {
+    // Zero out any remaining entries in the array if the source 'top' is less than the dest 'dmax'
+    for (int i = src->top; i < dest->dmax; ++i) {
+        printf("set_bn 2.%d\n", i);
         dest->d[i] = 0;
     }
+
+    printf("set_bn 3\n");
+
+    // Set the 'top' and 'neg' flags after zeroing
+    dest->top = src->top;
+    dest->neg = src->neg;
 }
 
 // In the current structure, we might use a specific value (e.g., 0 or -1) 
@@ -139,6 +164,16 @@ __device__ void set_bn(BIGNUM *dest, const BIGNUM *src) {
 
 // A version that uses 0 to signify the point at infinity could be:
 __device__ int point_is_at_infinity(EC_POINT *P) {
+    /*printf("# point_is_at_infinity:\n");
+    bn_print("P->x: ", &P->x);
+    bn_print("P->y: ", &P->y);
+    printf("# P->x.top: %d\n", P->x.top);*/
+    /*if (P->x.top == 0) {
+        printf("returning 1\n");
+        return 1; // P is the point at infinity
+    }
+    printf("returning 0\n");
+    return 0; // P is not the point at infinity*/
     return P->x.top == 0; // Assuming a valid x coordinate can never have top == 0, except for the point at infinity
     /*
     // Assuming the x-coordinate is represented as an array of BN_ULONG
@@ -204,6 +239,7 @@ __device__ int extended_gcd(BIGNUM *a, BIGNUM *mod, BIGNUM *x, BIGNUM *y) {
 }
 
 __device__ void mod_inv(BIGNUM *value, BIGNUM *mod, BIGNUM *inv) {
+    printf("mod_inv 0\n");
     BIGNUM x, y;
     // You need to make sure that BIGNUM x, y are initialized properly with minted memory
     // You also need a proper gcd implementation on GPU here.
@@ -211,11 +247,16 @@ __device__ void mod_inv(BIGNUM *value, BIGNUM *mod, BIGNUM *inv) {
     
     // In case x is negative, we add mod to it, assuming mod>0
     if (x.neg) {
+        printf("mod_inv a.0\n");
         // BN_ULONG zero = 0;
         bn_add(&x, mod, inv);
+        printf("mod_inv a.1\n");
         bn_mod(inv, mod, inv);
+        printf("mod_inv a.2\n");
     } else {
+        printf("mod_inv b.0\n");
         bn_mod(&x, mod, inv);
+        printf("mod_inv b.1\n");
     }
 }
 
@@ -231,6 +272,12 @@ __device__ void bn_sub(BIGNUM *a, BIGNUM *b, BIGNUM *r) {
         // Check if a subtraction would cause a borrow
         if (ai >= bi + borrow) {
             printf("# 5\n");
+            printf("r->top: %d\n", r->top);
+            printf("i: %d\n", i);
+            printf("r->d[i]: %llu\n", r->d[i]);
+            printf("ai: %llu\n", ai);
+            printf("bi: %llu\n", bi);
+            printf("borrow: %llu\n", borrow);            
             r->d[i] = ai - bi - borrow;
             printf("# 6\n");
             borrow = 0;
@@ -319,8 +366,6 @@ __device__ void bn_add_bit(BIGNUM *a, int bit_index) {
     }
 }
 
-#define BN_ULONG_NUM_BITS (sizeof(BN_ULONG) * 8)
-
 __device__ int bn_is_bit_set(const BIGNUM *bn, int bit_index) {
     // Check if the bit index is within the range of the BIGNUM's length
     if (bit_index < 0 || bit_index >= bn->top * BN_ULONG_NUM_BITS) {
@@ -400,17 +445,18 @@ __device__ void bn_div(BIGNUM *a, BIGNUM *b, BIGNUM *q, BIGNUM *r) {
 
 // __device__ void mod_mul(BIGNUM *a, BIGNUM *b, BIGNUM *mod, BIGNUM *result);
 
-#define MAX_BIGNUM_SIZE 16 // For holding up to a 512-bit number
-
 __device__ void mod_mul(BIGNUM *a, BIGNUM *b, BIGNUM *mod, BIGNUM *result) {
+    printf("mod_mul 0\n");
     // Product array to store the intermediate multiplication result
     BN_ULONG product_d[MAX_BIGNUM_SIZE] ={0}; // All elements initialized to 0
     // Ensure that 'product' uses this pre-allocated array
     BIGNUM product = { product_d, 0, MAX_BIGNUM_SIZE };
-
+    printf("mod_mul 1\n");
     // Now, you can call the bn_mul function and pass 'product' to it
     bn_mul(a, b, &product);
+    printf("mod_mul 2\n");
     bn_mod(&product, mod, result);
+    printf("mod_mul 3\n");
 
     // Wipe the product memory if necessary
     for (int i = 0; i < MAX_BIGNUM_SIZE; ++i) {
@@ -421,33 +467,42 @@ __device__ void mod_mul(BIGNUM *a, BIGNUM *b, BIGNUM *mod, BIGNUM *result) {
 __device__ void point_double(EC_POINT *P, EC_POINT *R, BIGNUM *p) {
     // Temporary storage for the calculations
     BIGNUM s, xR, yR, m;
-
+    printf("point_double 0\n");
     if (point_is_at_infinity(P)) {
+        printf("point_double 1\n");
         // Point doubling at infinity remains at infinity
         set_bn(&R->x, &P->x);  // Copying P->x to R->x, assuming these are in the proper zeroed state
         set_bn(&R->y, &P->y);  // Copying P->y to R->y
+        printf("# 2\n");
         return;
     }
+    printf("point_double 3\n");
 
     // Calculate m = 3x^2 + a (a is zero for secp256k1)
     mod_mul(&P->x, &P->x, p, &m);  // m = x^2 mod p
+    printf("point_double 4\n");
     set_bn(&s, &m);                 // s = x^2 (Since we use a=0 in secp256k1, skip adding 'a')
     bn_add(&m, &m, &s);             // s = 2x^2
     bn_add(&s, &m, &s);             // s = 3x^2
-
+    
     // Calculate s = (3x^2 + a) / (2y) = (s) / (2y)
     // First, compute the modular inverse of (2y)
     BIGNUM two_y;
+    printf("point_double 5\n");
     set_bn(&two_y, &P->y);         // Assuming set_bn simply duplicates P->y
+    printf("point_double 6\n");
     bn_add(&two_y, &two_y, &two_y); // two_y = 2y
     BIGNUM inv_two_y;
+    printf("point_double 7\n");
     mod_inv(&two_y, p, &inv_two_y);  // Compute the inverse of 2y
+    printf("point_double 8\n");
 
     mod_mul(&s, &inv_two_y, p, &s);  // Finally, s = (3x^2 + a) / (2y) mod p
-
+    
     // Compute xR = s^2 - 2x mod p
-    mod_mul(&s, &s, p, &xR);        // xR = s^2 mod p
+    mod_mul(&s, &s, p, &xR);        // xR = s^2 mod p    
     set_bn(&m, &P->x);              // m = x
+    
     bn_add(&m, &m, &m);             // m = 2x
     bn_sub(&xR, &m, &xR);           // xR = s^2 - 2x
     bn_mod(&xR, p, &xR);            // Modulo operation
@@ -463,7 +518,7 @@ __device__ void point_double(EC_POINT *P, EC_POINT *R, BIGNUM *p) {
     set_bn(&R->y, &yR);
 }
 
-__device__ void point_add(EC_POINT *P, EC_POINT *Q, EC_POINT *R, BIGNUM *p) {
+/*__device__ void point_add_v0(EC_POINT *P, EC_POINT *Q, EC_POINT *R, BIGNUM *p) {
     printf("# 1\n");
     // Check if one of the points is the point at infinity
     if (point_is_at_infinity(P)) {
@@ -479,7 +534,10 @@ __device__ void point_add(EC_POINT *P, EC_POINT *Q, EC_POINT *R, BIGNUM *p) {
     // Check if P == Q (point doubling)
     if (bn_cmp(&P->x, &Q->x) == 0 && bn_cmp(&P->y, &Q->y) == 0) {
         // call point_double
-        point_double(P, R, p);
+        // point_double(P, R, p);
+        
+        // We don't need to double the point. We can just add it to itself.
+        point_add(P, P, R, p);
         return;
     }
     
@@ -505,6 +563,58 @@ __device__ void point_add(EC_POINT *P, EC_POINT *Q, EC_POINT *R, BIGNUM *p) {
     mod_mul(&s, &yR, p, &yR); // s * (xP - xR)
     bn_sub(&yR, &P->y, &yR);  // s * (xP - xR) - yP
     bn_mod(&yR, p, &yR);      // mod p
+
+    // Set result
+    set_bn(&R->x, &xR);
+    set_bn(&R->y, &yR);
+}*/
+
+__device__ void point_add(EC_POINT *P, EC_POINT *Q, EC_POINT *R, BIGNUM *p) {
+    // Check if one of the points is the point at infinity
+    if (point_is_at_infinity(P)) {
+        *R = *Q;
+        return;
+    }
+    
+    if (point_is_at_infinity(Q)) {
+        *R = *P;
+        return;
+    }
+    
+    // Calculate slope (s = (yQ - yP) * inv(xQ - xP) mod p)
+    
+    /*BIGNUM s, xR, yR;
+    BIGNUM tmp1, tmp2;
+
+    // Calculate s = (yQ - yP) / (xQ - xP)
+    bn_sub(&Q->y, &P->y, &tmp1); // tmp1 = yQ - yP
+    bn_sub(&Q->x, &P->x, &tmp2); // tmp2 = xQ - xP
+    mod_inv(&tmp2, p, &tmp2);    // tmp2 = inv(xQ - xP)
+    mod_mul(&tmp1, &tmp2, p, &s); // s = (yQ - yP) * inv(xQ - xP)*/
+    // Allocate memory on the stack or in shared/dynamic memory for the BIGNUMs and their 'd' arrays
+    BN_ULONG tmp1_d[MAX_BIGNUM_WORDS], tmp2_d[MAX_BIGNUM_WORDS];
+    BN_ULONG s_d[MAX_BIGNUM_WORDS];
+    BN_ULONG xR_d[MAX_BIGNUM_WORDS], yR_d[MAX_BIGNUM_WORDS];
+
+    // Initialize temporary BIGNUMs used for calculations
+    BIGNUM tmp1, tmp2, s, xR, yR;
+    tmp1.d = tmp1_d; init_zero(&tmp1, MAX_BIGNUM_WORDS);
+    tmp2.d = tmp2_d; init_zero(&tmp2, MAX_BIGNUM_WORDS);
+    s.d = s_d;       init_zero(&s, MAX_BIGNUM_WORDS);
+    xR.d = xR_d;     init_zero(&xR, MAX_BIGNUM_WORDS);
+    yR.d = yR_d;     init_zero(&yR, MAX_BIGNUM_WORDS);
+
+    // Calculate xR = s^2 - xP - xQ
+    mod_mul(&s, &s, p, &xR);   // xR = s^2
+    bn_sub(&xR, &P->x, &xR);   // xR = xR - xP (s^2 - xP)
+    bn_sub(&xR, &Q->x, &xR);   // xR = xR - xQ (s^2 - xP - xQ)
+    bn_mod(&xR, p, &xR);       // xR = xR mod p
+
+    // Calculate yR = s * (xP - xR) - yP
+    bn_sub(&P->x, &xR, &yR);   // yR = xP - xR
+    mod_mul(&s, &yR, p, &yR);  // yR = s * (xP - xR)
+    bn_sub(&yR, &P->y, &yR);   // yR = yR - yP (s * (xP - xR) - yP)
+    bn_mod(&yR, p, &yR);       // yR = yR mod p
 
     // Set result
     set_bn(&R->x, &xR);
@@ -560,8 +670,6 @@ __device__ EC_POINT ec_point_scalar_mul(EC_POINT *point, BIGNUM *scalar, BIGNUM 
         // printf("0 y: %s\n", bignum_to_hex(&current.y));
         bn_print("0 y: ", &current.y);
 
-        
-
         if (bits[i]) {                              // If the i-th bit is set
             printf("# 0\n");
             // point_add(&result, &current, &result);  // Add current to the result
@@ -578,7 +686,11 @@ __device__ EC_POINT ec_point_scalar_mul(EC_POINT *point, BIGNUM *scalar, BIGNUM 
 
         //point_double(&current, &current);           // Double current
         // point_double(&current, &current, &field_order);  // Double current and store the result in current
-        point_double(&current, &current, curve_order);
+        // point_double(&current, &current, curve_order);
+
+        // We don't need to double the point. We can just add it to itself.
+        point_add(&current, &current, &current, curve_order);
+
         // printf("2 x: %s\n", bignum_to_hex(&current.x));
         bn_print("2 x: ", &current.x);
         // printf("2 y: %s\n", bignum_to_hex(&current.y));

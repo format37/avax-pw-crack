@@ -13,7 +13,7 @@ typedef struct bignum_st {
 __device__ void bn_print(char* msg, BIGNUM* a) {
   printf("%s", msg);
   for(int i=0; i<a->top; i++) {
-    printf("%02x", a->d[i]);
+    printf("%08x", a->d[i]);
   }
   printf("\n");
 }
@@ -31,6 +31,20 @@ __device__ BN_ULONG bn_sub_words(BN_ULONG* r, BN_ULONG* a, BN_ULONG* b, int n) {
 
   return borrow;
 }
+
+#define BN_ULONG_NUM_BITS 32 
+#define MAX_BIGNUM_WORDS 8     // For 256-bit numbers
+#define MAX_BIGNUM_SIZE 16     // Allow room for temp calculations
+
+/*__device__ void bn_init_zero(BIGNUM *bn, int top) {
+    // Note: This assumes that memory for bn->d has already been allocated
+    // with the appropriate size beforehand.
+    for (int i = 0; i < top; i++) {
+        bn->d[i] = 0; // Set all digits to 0
+    }
+    bn->top = top; // Set the number of active words
+    bn->neg = 0;   // Set the number as positive
+}*/
 
 __device__ void reverse(BN_ULONG* d, int n) {
   BN_ULONG tmp;
@@ -131,12 +145,21 @@ __device__ void bn_sub_v1(BIGNUM* a, BIGNUM* b, BIGNUM* r) {
 
 }
 
-__device__ void init_zero(BIGNUM* r, int len) {
+/*__device__ void init_zero_v0(BIGNUM* r, int len) {
   for (int i = 0; i < len; i++) {
     r->d[i] = 0;
   }
   r->top = len;
   r->neg = 0;
+}*/
+
+__device__ void init_zero(BIGNUM *bn, int top) {
+    // Assuming bn->d is already allocated and sized correctly
+    for (int i = 0; i < top; i++) {
+        bn->d[i] = 0;
+    }
+    bn->top = (top > 0) ? 1 : 0; // If top is positive, there's at least one 0-word; otherwise, no words
+    bn->neg = 0;
 }
 
 __device__ int bn_cmp(BIGNUM* a, BIGNUM* b) {
@@ -233,60 +256,65 @@ __device__ void bn_add_v1(BIGNUM* a, BIGNUM* b, BIGNUM* r) {
     r->top = (carry != 0) ? max : max - 1; // If the carry is not 0, include it in the length of r
 }
 
-
+ 
 /*__device__ BN_ULONG bn_mod(BN_ULONG num, BN_ULONG divisor) {
   return num % divisor; 
 }*/
 
 __device__ void bn_mod(BIGNUM* r, BIGNUM* m, BIGNUM* d) {
+    printf("bn_mod 0\n");
     // Copy m to r
     for (int i = 0; i < m->top; i++) {
+        printf("bn_mod: 0.%d r_top: %d m_top: %d\n", i, r->top, m->top);
         r->d[i] = m->d[i];
     }
+    printf("bn_mod 1\n");
     r->top = m->top;
     r->neg = 0;
+    printf("bn_mod 2\n");
+
+    // Ensure r has enough space to cover subtraction up to d->top
+    for (int i = m->top; i < d->top; i++) {
+        r->d[i] = 0; // Zero out any remaining indices
+    }
+    printf("bn_mod 3\n");
+    if (d->top > r->top) {
+        r->top = d->top; // Increase the top to match d, if necessary
+    }
+    printf("bn_mod 4\n");
 
     // Keep subtracting d from r until r < d
     while (true) {
-        int borrow = 0;
-        int is_smaller = 0;
+        // Check if r < d or r == d
+        int compare = bn_cmp(r, d); // Need to implement bn_cmp to compare BIGNUMs
 
-        // Subtract d from r, with borrow
-        for (int i = d->top - 1; i >= 0; i--) {
-            long long res = (long long)r->d[i] - d->d[i] - borrow;
+        if (compare < 0) {
+            // r < d, we are done
+            break;
+        } else if (compare == 0) {
+            // r == d, set r to 0 and we are done
+            init_zero(r, MAX_BIGNUM_SIZE);
+            break;
+        }
+
+        // r > d, so subtract d from r
+        int borrow = 0;
+        for (int i = 0; i < r->top; i++) {
+            printf("bn_mod: 1.%d r_top: %d d_top: %d\n", i, r->top, d->top);
+            long long res = (long long)r->d[i] - (long long)((i < d->top) ? d->d[i] : 0) - borrow;
+            borrow = (res < 0) ? 1 : 0;
             if (res < 0) {
-                res += 0x100000000;
-                borrow = 1;
-            } else {
-                borrow = 0;
+                res += (1LL << 32); // Assuming each BN_ULONG is 32 bits
             }
             r->d[i] = (BN_ULONG)res;
-
-            if (r->d[i] < d->d[i]) {
-                is_smaller = 1;
-            }
         }
 
-        // If we had a borrow at the end, add back d to correct
-        if (borrow) {
-            int carry = 0;
-            for (int i = d->top - 1; i >= 0; i--) {
-                long long res = (long long)r->d[i] + d->d[i] + carry;
-                if (res >= 0x100000000) {
-                    res -= 0x100000000;
-                    carry = 1;
-                } else {
-                    carry = 0;
-                }
-                r->d[i] = (BN_ULONG)res;
-            }
-            break;
-        }
-
-        if (is_smaller) {
-            break;
+        // Additional condition to ensure r->top shrinks if top words are zero.
+        while (r->top > 0 && r->d[r->top - 1] == 0) {
+            --r->top;
         }
     }
+    printf("bn_mod end\n");
 }
 
 /*__device__ BN_ULONG bn_mod_big(BIGNUM *num, BIGNUM *divisor) {
