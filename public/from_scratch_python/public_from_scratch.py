@@ -86,7 +86,7 @@ class Point:
                 print('3 x:', hex(result.x))
                 print('3 y:', hex(result.y))
 
-            exit()
+            # exit()
         
         print('3 x:', hex(result.x))
         print('3 y:', hex(result.y))
