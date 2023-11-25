@@ -13,12 +13,23 @@
     * v crypto.h
         * > macros.h
         * > e_os2.h
-        * v safestack.h
-        * v opensslconf.h
-        * x types.h
-        * v cryptoerr.h
-        * x core.h
-        * x symhacks.h
+        * > safestack.h
+            * > macros.h
+            * > stack.h
+                * > macros.h
+            * > e_os2.h
+        * > opensslconf.h
+        * > types.h
+        * > cryptoerr.h
+            * > opensslconf.h
+            * > symhacks.h
+                * > macros.h
+                * > e_os2.h
+            * > cryptoerr_legacy.h
+                * > macros.h
+                * > symhacks.h
+        * v core.h
+        * v symhacks.h
         * > opensslv.h
     * v bnerr.h
 * ec.h

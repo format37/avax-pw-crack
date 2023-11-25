@@ -36,7 +36,7 @@
 # include "types.h"
 # include "opensslconf.h"
 # include "cryptoerr.h"
-# include <openssl/core.h>
+# include "core.h"
 
 # ifdef CHARSET_EBCDIC
 #  include <openssl/ebcdic.h>
@@ -46,10 +46,10 @@
  * Resolve problems on some operating systems with symbol names that clash
  * one way or another
  */
-# include <openssl/symhacks.h>
+# include "symhacks.h"
 
 # ifndef OPENSSL_NO_DEPRECATED_1_1_0
-#  include <openssl/opensslv.h>
+#  include "opensslv.h"
 # endif
 
 #ifdef  __cplusplus
