@@ -17,7 +17,7 @@
 # define OPENSSL_CRYPTO_H
 # pragma once
 
-# include <openssl/macros.h>
+# include "macros.h"
 # ifndef OPENSSL_NO_DEPRECATED_3_0
 #  define HEADER_CRYPTO_H
 # endif
@@ -25,13 +25,13 @@
 # include <stdlib.h>
 # include <time.h>
 
-# include <openssl/e_os2.h>
+# include "e_os2.h"
 
 # ifndef OPENSSL_NO_STDIO
 #  include <stdio.h>
 # endif
 
-# include <openssl/safestack.h>
+# include "safestack.h"
 # include <openssl/opensslv.h>
 # include <openssl/types.h>
 # include <openssl/opensslconf.h>

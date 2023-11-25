@@ -9,13 +9,23 @@
         * > openssl/macros.h  
         * > openssl/opensslconf.h  
     * > openssl/opensslconf.h  
-    * v openssl/types.h  
-    * v openssl/crypto.h  
+    * > openssl/types.h  
+    * v openssl/crypto.h
+        * > openssl/macros.h  
+        * > openssl/e_os2.h  
+        * x openssl/safestack.h
+        * x openssl/opensslconf.h
+        * x openssl/types.h
+        * x openssl/opensslconf.h
+        * x openssl/cryptoerr.h
+        * x openssl/core.h
+        * x openssl/symhacks.h
+        * x openssl/opensslv.h  
     * v openssl/bnerr.h  
 * ec.h  
     * > openssl/macros.h  
     * > openssl/opensslconf.h  
-    * v openssl/types.h  
+    * > openssl/types.h  
     * v openssl/asn1.h  
     * v openssl/symhacks.h  
     * v openssl/bn.h  
