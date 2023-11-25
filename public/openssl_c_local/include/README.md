@@ -1,6 +1,6 @@
 * bn.h  
-** x openssl/macros.h  
-    x openssl/e_os2.h  
+    * x openssl/macros.h  
+    * x openssl/e_os2.h  
     x openssl/opensslconf.h
     x openssl/types.h
     x openssl/crypto.h
