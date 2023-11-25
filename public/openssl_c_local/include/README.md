@@ -1,4 +1,4 @@
-* bn.h
+* > bn.h
     * > macros.h
         * > opensslconf.h
             * > configuration.h
@@ -10,7 +10,7 @@
         * > opensslconf.h
     * > opensslconf.h
     * > types.h
-    * v crypto.h
+    * > crypto.h
         * > macros.h
         * > e_os2.h
         * > safestack.h
@@ -28,16 +28,42 @@
             * > cryptoerr_legacy.h
                 * > macros.h
                 * > symhacks.h
-        * v core.h
-        * v symhacks.h
+        * > core.h
+            * > types.h
+        * > symhacks.h
         * > opensslv.h
-    * v bnerr.h
-* ec.h
+    * > bnerr.h
+* v ec.h
     * > macros.h
     * > opensslconf.h
     * > types.h
-    * v asn1.h
-    * v symhacks.h
-    * v bn.h
-    * v ecerr.h
-    * v params.h
+    * > asn1.h
+        * > macros.h
+        * > e_os2.h
+        * > opensslconf.h
+        * > bio.h
+            * > macros.h
+            * > e_os2.h
+            * > crypto.h
+            * > bioerr.h
+                * > opensslconf.h
+                * > symhacks.h
+                * > cryptoerr_legacy.h
+            * > core.h
+        * > safestack.h
+        * > asn1err.h
+            * > opensslconf.h
+            * > symhacks.h
+            * > cryptoerr_legacy.h
+        * > symhacks.h
+        * > types.h
+        * > bn.h
+    * > symhacks.h
+    * > bn.h
+    * > ecerr.h
+        * > opensslconf.h
+        * > symhacks.h
+        * > cryptoerr_legacy.h
+    * > params.h
+        * > core.h
+        * > bn.h
