@@ -32,10 +32,10 @@
 # endif
 
 # include "safestack.h"
-# include <openssl/opensslv.h>
-# include <openssl/types.h>
-# include <openssl/opensslconf.h>
-# include <openssl/cryptoerr.h>
+# include "opensslv.h"
+# include "types.h"
+# include "opensslconf.h"
+# include "cryptoerr.h"
 # include <openssl/core.h>
 
 # ifdef CHARSET_EBCDIC
