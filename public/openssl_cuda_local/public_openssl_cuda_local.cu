@@ -5,7 +5,7 @@
 #include "openssl/ec.h"
 #include "openssl/obj_mac.h"
 #include "bignum.h"
-//#include "source/crypto/ec/ec_key.c"
+#include "source/crypto/ec/ec_key.c"
 
 
 __device__ void print_as_hex_char(unsigned char *data, int len) {
@@ -14,13 +14,6 @@ __device__ void print_as_hex_char(unsigned char *data, int len) {
     }
     printf("\n");
 }
-
-/*// Debug print for OpenSSL BIGNUM
-void print_bn(const char* label, const BIGNUM* bn) {
-	char* bn_str = BN_bn2dec(bn);
-	printf("%s: %s\n", label, bn_str);
-	OPENSSL_free(bn_str);
-}*/
 
 // Debug print for OpenSSL BIGNUM
 __device__ void print_bn(const char* label, const BIGNUM* bn) {
@@ -32,12 +25,6 @@ __device__ void print_bn(const char* label, const BIGNUM* bn) {
     printf("\n");
 }
 
-/*// Debug print for OpenSSL BIGNUM in Hexadecimal
-void print_bn_hex(const char* label, const BIGNUM* bn) {
-    char* bn_str = BN_bn2hex(bn);
-    printf("%s (Hexadecimal): %s\n", label, bn_str);
-    OPENSSL_free(bn_str);
-}*/
 // Debug print for OpenSSL BIGNUM in Hexadecimal
 __device__ void print_bn_hex(const char* label, const BIGNUM* bn) {
     printf("%s (Hexadecimal): ", label);

@@ -24,8 +24,7 @@
 #endif
 #include "openssl/self_test.h"
 #include "prov/providercommon.h"
-//#include "prov/ecx.h"
-#include "crypto/ecx.h"
+#include "prov/ecx.h"
 #include "crypto/bn.h"
 
 static int ecdsa_keygen_pairwise_test(EC_KEY *eckey, OSSL_CALLBACK *cb,
@@ -759,7 +758,7 @@ void ossl_ec_key_set0_libctx(EC_KEY *key, OSSL_LIB_CTX *libctx)
     /* Do we need to propagate this to the group? */
 }
 
-const EC_GROUP *EC_KEY_get0_group(const EC_KEY *key)
+__device__ const EC_GROUP *EC_KEY_get0_group(const EC_KEY *key)
 {
     return key->group;
 }
@@ -877,7 +876,7 @@ int EC_KEY_set_private_key(EC_KEY *key, const BIGNUM *priv_key)
     return 1;
 }
 
-const EC_POINT *EC_KEY_get0_public_key(const EC_KEY *key)
+__device__ const EC_POINT *EC_KEY_get0_public_key(const EC_KEY *key)
 {
     return key->pub_key;
 }
@@ -1063,7 +1062,8 @@ size_t EC_KEY_priv2buf(const EC_KEY *eckey, unsigned char **pbuf)
     len = EC_KEY_priv2oct(eckey, NULL, 0);
     if (len == 0)
         return 0;
-    if ((buf = OPENSSL_malloc(len)) == NULL)
+    //if ((buf = OPENSSL_malloc(len)) == NULL)
+    if ((buf = (unsigned char*)OPENSSL_malloc(len)) == NULL)
         return 0;
     len = EC_KEY_priv2oct(eckey, buf, len);
     if (len == 0) {

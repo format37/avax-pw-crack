@@ -30,8 +30,11 @@
 typedef struct ex_callback_st EX_CALLBACK;
 DEFINE_STACK_OF(EX_CALLBACK)
 
-typedef struct mem_st MEM;
-DEFINE_LHASH_OF_EX(MEM);
+/*
+Disabled due to not being used. TODO: Remove or re-enable?
+//typedef struct mem_st MEM;
+//DEFINE_LHASH_OF_EX(MEM);
+*/
 
 void OPENSSL_cpuid_setup(void);
 #if defined(__i386)   || defined(__i386__)   || defined(_M_IX86) || \
