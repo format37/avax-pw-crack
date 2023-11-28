@@ -39,7 +39,7 @@
 # include "core.h"
 
 # ifdef CHARSET_EBCDIC
-#  include <openssl/ebcdic.h>
+#  include "openssl/ebcdic.h"
 # endif
 
 /*

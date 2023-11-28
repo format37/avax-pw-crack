@@ -92,7 +92,7 @@ const char *OSSL_EC_curve_nid2name(int nid);
 #  include "asn1.h"
 #  include "symhacks.h"
 #  ifndef OPENSSL_NO_DEPRECATED_1_1_0
-#   include <openssl/bn.h>
+#   include "openssl/bn.h"
 #  endif
 #  include "ecerr.h"
 

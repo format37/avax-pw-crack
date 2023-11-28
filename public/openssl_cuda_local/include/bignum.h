@@ -1,5 +1,5 @@
-#include "bn.h"
-#include "ec_local.h"
+#include "openssl/bn.h"
+#include "openssl/ec_local.h"
 
 typedef struct bignum_st {
   BN_ULONG *d;

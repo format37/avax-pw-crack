@@ -1,10 +1,12 @@
 #include <stdio.h>
 #include <string.h>
 #include <cuda.h>
-#include "bn.h"
-#include "ec.h"
-#include "obj_mac.h"
+#include "openssl/bn.h"
+#include "openssl/ec.h"
+#include "openssl/obj_mac.h"
 #include "bignum.h"
+//#include "source/crypto/ec/ec_key.c"
+
 
 __device__ void print_as_hex_char(unsigned char *data, int len) {
     for (int i = 0; i < len; i++) {
@@ -51,11 +53,11 @@ __device__ void print_bn_hex(const char* label, const BIGNUM* bn) {
 }
 
 // Function to compress public key
-/*__device__ void compress_pubkey(EC_KEY *key, unsigned char *compressed, size_t *compressed_len) {
+__device__ void compress_pubkey(EC_KEY *key, unsigned char *compressed, size_t *compressed_len) {
     const EC_POINT *point = EC_KEY_get0_public_key(key);
-    const EC_GROUP *group = EC_KEY_get0_group(key);
-    *compressed_len = EC_POINT_point2oct(group, point, POINT_CONVERSION_COMPRESSED, compressed, 65, NULL);
-}*/
+    // const EC_GROUP *group = EC_KEY_get0_group(key);
+    // *compressed_len = EC_POINT_point2oct(group, point, POINT_CONVERSION_COMPRESSED, compressed, 65, NULL);
+}
 
 __global__ void testKernel() {
 
