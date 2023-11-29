@@ -17,7 +17,7 @@
 # define OPENSSL_CRYPTO_H
 # pragma once
 
-# include "macros.h"
+# include <openssl/macros.h>
 # ifndef OPENSSL_NO_DEPRECATED_3_0
 #  define HEADER_CRYPTO_H
 # endif
@@ -25,31 +25,31 @@
 # include <stdlib.h>
 # include <time.h>
 
-# include "e_os2.h"
+# include <openssl/e_os2.h>
 
 # ifndef OPENSSL_NO_STDIO
 #  include <stdio.h>
 # endif
 
-# include "safestack.h"
-# include "opensslv.h"
-# include "types.h"
-# include "opensslconf.h"
-# include "cryptoerr.h"
-# include "core.h"
+# include <openssl/safestack.h>
+# include <openssl/opensslv.h>
+# include <openssl/types.h>
+# include <openssl/opensslconf.h>
+# include <openssl/cryptoerr.h>
+# include <openssl/core.h>
 
 # ifdef CHARSET_EBCDIC
-#  include "openssl/ebcdic.h"
+#  include <openssl/ebcdic.h>
 # endif
 
 /*
  * Resolve problems on some operating systems with symbol names that clash
  * one way or another
  */
-# include "symhacks.h"
+# include <openssl/symhacks.h>
 
 # ifndef OPENSSL_NO_DEPRECATED_1_1_0
-#  include "opensslv.h"
+#  include <openssl/opensslv.h>
 # endif
 
 #ifdef  __cplusplus
@@ -341,13 +341,14 @@ void CRYPTO_get_mem_functions(CRYPTO_malloc_fn *malloc_fn,
                               CRYPTO_realloc_fn *realloc_fn,
                               CRYPTO_free_fn *free_fn);
 
-void *CRYPTO_malloc(size_t num, const char *file, int line);
+__device__ void *CRYPTO_malloc(size_t num, const char *file, int line);
 void *CRYPTO_zalloc(size_t num, const char *file, int line);
 void *CRYPTO_memdup(const void *str, size_t siz, const char *file, int line);
 char *CRYPTO_strdup(const char *str, const char *file, int line);
 char *CRYPTO_strndup(const char *str, size_t s, const char *file, int line);
-void CRYPTO_free(void *ptr, const char *file, int line);
-void CRYPTO_clear_free(void *ptr, size_t num, const char *file, int line);
+// __device__ void CRYPTO_free(void *ptr, const char *file, int line);
+__host__ __device__ void CRYPTO_free(void *ptr, const char *file, int line) {}
+__device__ void CRYPTO_clear_free(void *ptr, size_t num, const char *file, int line);
 void *CRYPTO_realloc(void *addr, size_t num, const char *file, int line);
 void *CRYPTO_clear_realloc(void *addr, size_t old_num, size_t num,
                            const char *file, int line);
@@ -357,7 +358,7 @@ int CRYPTO_secure_malloc_done(void);
 void *CRYPTO_secure_malloc(size_t num, const char *file, int line);
 void *CRYPTO_secure_zalloc(size_t num, const char *file, int line);
 void CRYPTO_secure_free(void *ptr, const char *file, int line);
-void CRYPTO_secure_clear_free(void *ptr, size_t num,
+__device__ void CRYPTO_secure_clear_free(void *ptr, size_t num,
                               const char *file, int line);
 int CRYPTO_secure_allocated(const void *ptr);
 int CRYPTO_secure_malloc_initialized(void);

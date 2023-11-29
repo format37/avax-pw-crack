@@ -1,1 +1,1 @@
-./program
+./program >> run.log

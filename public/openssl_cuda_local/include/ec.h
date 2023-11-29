@@ -12,13 +12,13 @@
 # define OPENSSL_EC_H
 # pragma once
 
-# include "macros.h"
+# include <openssl/macros.h>
 # ifndef OPENSSL_NO_DEPRECATED_3_0
 #  define HEADER_EC_H
 # endif
 
-# include "opensslconf.h"
-# include "types.h"
+# include <openssl/opensslconf.h>
+# include <openssl/types.h>
 
 # include <string.h>
 
@@ -89,18 +89,18 @@ typedef enum {
 const char *OSSL_EC_curve_nid2name(int nid);
 
 # ifndef OPENSSL_NO_EC
-#  include "asn1.h"
-#  include "symhacks.h"
+#  include <openssl/asn1.h>
+#  include <openssl/symhacks.h>
 #  ifndef OPENSSL_NO_DEPRECATED_1_1_0
-#   include "openssl/bn.h"
+#   include <openssl/bn.h>
 #  endif
-#  include "ecerr.h"
+#  include <openssl/ecerr.h>
 
 #  ifndef OPENSSL_ECC_MAX_FIELD_BITS
 #   define OPENSSL_ECC_MAX_FIELD_BITS 661
 #  endif
 
-#  include "params.h"
+#  include <openssl/params.h>
 #  ifndef OPENSSL_NO_DEPRECATED_3_0
 typedef struct ec_method_st EC_METHOD;
 #  endif
@@ -738,7 +738,7 @@ OSSL_DEPRECATEDIN_3_0 int EC_POINT_set_compressed_coordinates_GF2m
  *  \param  ctx    BN_CTX object (optional)
  *  \return the length of the encoded octet string or 0 if an error occurred
  */
-__device__ size_t EC_POINT_point2oct(const EC_GROUP *group, const EC_POINT *p,
+size_t EC_POINT_point2oct(const EC_GROUP *group, const EC_POINT *p,
                           point_conversion_form_t form,
                           unsigned char *buf, size_t len, BN_CTX *ctx);
 
@@ -995,7 +995,7 @@ OSSL_DEPRECATEDIN_3_0 EC_KEY *EC_KEY_new_by_curve_name_ex(OSSL_LIB_CTX *ctx,
  *  \param  nid  NID of the named curve.
  *  \return EC_KEY object or NULL if an error occurred.
  */
-OSSL_DEPRECATEDIN_3_0 EC_KEY *EC_KEY_new_by_curve_name(int nid);
+__device__ OSSL_DEPRECATEDIN_3_0 EC_KEY *EC_KEY_new_by_curve_name(int nid);
 
 /** Frees a EC_KEY object.
  *  \param  key  EC_KEY object to be freed.
@@ -1031,7 +1031,7 @@ OSSL_DEPRECATEDIN_3_0 ENGINE *EC_KEY_get0_engine(const EC_KEY *eckey);
  *  \param  key  EC_KEY object
  *  \return the EC_GROUP object (possibly NULL).
  */
-__device__ OSSL_DEPRECATEDIN_3_0 const EC_GROUP *EC_KEY_get0_group(const EC_KEY *key);
+OSSL_DEPRECATEDIN_3_0 const EC_GROUP *EC_KEY_get0_group(const EC_KEY *key);
 
 /** Sets the EC_GROUP of a EC_KEY object.
  *  \param  key    EC_KEY object
@@ -1059,7 +1059,7 @@ OSSL_DEPRECATEDIN_3_0 int EC_KEY_set_private_key(EC_KEY *key, const BIGNUM *prv)
  *  \param  key  the EC_KEY object
  *  \return a EC_POINT object with the public key (possibly NULL)
  */
-__device__ OSSL_DEPRECATEDIN_3_0 const EC_POINT *EC_KEY_get0_public_key(const EC_KEY *key);
+OSSL_DEPRECATEDIN_3_0 const EC_POINT *EC_KEY_get0_public_key(const EC_KEY *key);
 
 /** Sets the public key of a EC_KEY object.
  *  \param  key  EC_KEY object
