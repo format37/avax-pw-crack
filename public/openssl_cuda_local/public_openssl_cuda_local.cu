@@ -854,6 +854,7 @@ __global__ void testKernel() {
 
     // Derive public key 
     EC_POINT publicKey = ec_point_scalar_mul(&G, &newKey, &curveOrder);
+    // ec_point_scalar_mul / point_add / mod_mul / bn_mod <= Issue
 
     // Print public key
     printf("Public key:\n");
