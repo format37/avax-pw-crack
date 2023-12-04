@@ -10,6 +10,12 @@ typedef struct bignum_st {
   int flags;
 } BIGNUM;
 
+__device__ void debug_printf(const char *fmt, ...) {
+    if (debug_print) {
+        printf(fmt);
+    }
+}
+
 __device__ void bn_print(char* msg, BIGNUM* a) {
   printf("%s", msg);
   for(int i=0; i<a->top; i++) {
@@ -175,22 +181,22 @@ __device__ int bn_cmp(BIGNUM* a, BIGNUM* b) {
 __device__ void bn_add(BIGNUM* a, BIGNUM* b, BIGNUM* r) {
     int max = a->top > b->top ? a->top : b->top;
     BN_ULONG carry = 0;
-    //printf("Starting addition... max: %d\n", max);
-    /*printf("Starting addition... [0_0]\n");
+    //debug_printf("Starting addition... max: %d\n", max);
+    /*debug_printf("Starting addition... [0_0]\n");
     // print a
-    printf("a: ");
+    debug_printf("a: ");
     for (int i = 0; i < a->top; i++) {
-        printf("%08x\n", a->d[i]);
+        debug_printf("%08x\n", a->d[i]);
     }
     // print b
-    printf("b: ");
+    debug_printf("b: ");
     for (int i = 0; i < b->top; i++) {
-        printf("%08x\n", b->d[i]);
+        debug_printf("%08x\n", b->d[i]);
     }
     // print r
-    printf("r: ");
+    debug_printf("r: ");
     for (int i = 0; i < r->top; i++) {
-        printf("%08x\n", r->d[i]);
+        debug_printf("%08x\n", r->d[i]);
     }*/
 
     for(int i=max-1; i>=0; i--) {
@@ -198,20 +204,20 @@ __device__ void bn_add(BIGNUM* a, BIGNUM* b, BIGNUM* r) {
         BN_ULONG bi = (i < b->top) ? b->d[i] : 0;
 
         BN_ULONG sum = ai + bi + carry;
-        printf("rdsum\n");
+        debug_printf("rdsum\n");
         r->d[i] = sum;
         //carry = (sum < ai || sum < bi) ? 1 : 0;  // Another way to determine carry
-        printf("carry");
+        debug_printf("carry");
         carry = (sum < ai || (sum - ai) < bi) ? 1 : 0;
 
 
         // Debug prints
-        printf("i: %d", i);
-        printf(", a->d[i]: %08x", ai);    
-        printf(", b->d[i]: %08x", bi);
-        printf(", sum: %08x", sum);
-        printf(", result: %08x", r->d[i]);
-        printf(", carry: %08x\n", carry);
+        debug_printf("i: %d", i);
+        debug_printf(", a->d[i]: %08x", ai);    
+        debug_printf(", b->d[i]: %08x", bi);
+        debug_printf(", sum: %08x", sum);
+        debug_printf(", result: %08x", r->d[i]);
+        debug_printf(", carry: %08x\n", carry);
     }
 
     
@@ -227,11 +233,11 @@ __device__ void bn_add(BIGNUM* a, BIGNUM* b, BIGNUM* r) {
         r->top = max;
     }
 
-    printf("Finished addition.\n");
+    debug_printf("Finished addition.\n");
     // print r
-    printf("r: ");
+    debug_printf("r: ");
     for (int i = 0; i < r->top; i++) {
-        printf("%08x\n", r->d[i]);
+        debug_printf("%08x\n", r->d[i]);
     }
 }
 
@@ -262,26 +268,26 @@ __device__ void bn_add_v1(BIGNUM* a, BIGNUM* b, BIGNUM* r) {
 }*/
 
 __device__ void bn_mod(BIGNUM* r, BIGNUM* m, BIGNUM* d) {
-    printf("bn_mod 0\n");
+    debug_printf("bn_mod 0\n");
     // Copy m to r
     for (int i = 0; i < m->top; i++) {
-        printf("bn_mod: 0.%d r_top: %d m_top: %d\n", i, r->top, m->top);
+        debug_printf("bn_mod: 0.%d r_top: %d m_top: %d\n", i, r->top, m->top);
         r->d[i] = m->d[i];
     }
-    printf("bn_mod 1\n");
+    debug_printf("bn_mod 1\n");
     r->top = m->top;
     r->neg = 0;
-    printf("bn_mod 2\n");
+    debug_printf("bn_mod 2\n");
 
     // Ensure r has enough space to cover subtraction up to d->top
     for (int i = m->top; i < d->top; i++) {
         r->d[i] = 0; // Zero out any remaining indices
     }
-    printf("bn_mod 3\n");
+    debug_printf("bn_mod 3\n");
     if (d->top > r->top) {
         r->top = d->top; // Increase the top to match d, if necessary
     }
-    printf("bn_mod 4\n");
+    debug_printf("bn_mod 4\n");
 
     // Keep subtracting d from r until r < d
     while (true) {
@@ -300,7 +306,7 @@ __device__ void bn_mod(BIGNUM* r, BIGNUM* m, BIGNUM* d) {
         // r > d, so subtract d from r
         int borrow = 0;
         for (int i = 0; i < r->top; i++) {
-            printf("bn_mod: 1.%d r_top: %d d_top: %d\n", i, r->top, d->top);
+            debug_printf("bn_mod: 1.%d r_top: %d d_top: %d\n", i, r->top, d->top);
             long long res = (long long)r->d[i] - (long long)((i < d->top) ? d->d[i] : 0) - borrow;
             borrow = (res < 0) ? 1 : 0;
             if (res < 0) {
@@ -314,7 +320,7 @@ __device__ void bn_mod(BIGNUM* r, BIGNUM* m, BIGNUM* d) {
             --r->top;
         }
     }
-    printf("bn_mod end\n");
+    debug_printf("bn_mod end\n");
 }
 
 /*__device__ BN_ULONG bn_mod_big(BIGNUM *num, BIGNUM *divisor) {

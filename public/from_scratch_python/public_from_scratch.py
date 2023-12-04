@@ -13,6 +13,12 @@ class Point:
         self.y = y
         self.a = a
         self.b = b
+        self.debug_counter = 0
+
+    # Debug print
+    def debug_print(self, *args, **kwargs):
+        if self.debug_counter<1:
+            print(*args, **kwargs)
 
     # Point addition
     def __add__(self, other):
@@ -38,7 +44,7 @@ class Point:
         
         # Case 2: self.x != other.x
         if self.x != other.x:
-            print('self.x != other.x')
+            self.debug_print('self.x != other.x')
             # Formula (x3, y3) = (x1, y1) + (x2, y2)
             s = (other.y - self.y) * pow(other.x - self.x, -1, p)
             x3 = (s ** 2 - self.x - other.x) % p
@@ -47,49 +53,52 @@ class Point:
 
         # Case 3: self.x == other.x
         else:
-            print('self.x == other.x')
+            self.debug_print('self.x == other.x')
             # Formula (x3, y3) = (x1, y1) + (x1, y1)
-            print('self.x:', hex(self.x))
-            print('self.y:', hex(self.y))
-            print('self.a:', hex(self.a))
-            print('p:', hex(p))
+            self.debug_print('self.x:', hex(self.x))
+            self.debug_print('self.y:', hex(self.y))
+            self.debug_print('self.a:', hex(self.a))
+            self.debug_print('p:', hex(p))
             s = (3 * self.x ** 2 + self.a) * pow(2 * self.y, -1, p)
-            print('s:', hex(s))
+            self.debug_print('s:', hex(s))
             x3 = (s ** 2 - 2 * self.x) % p
             y3 = (s * (self.x - x3) - self.y) % p
             return self.__class__(x3, y3, self.a, self.b)
 
     # Point multiplication
     def __rmul__(self, coefficient):
-        debug_counter = 0
+        debug_loop_level = 0
         coef = coefficient
         current = self
         result = self.__class__(None, None, self.a, self.b)  # point at infinity
         print('coef hex:', hex(coef))
         while coef:
-            print('0 x:', hex(current.x))
-            print('0 y:', hex(current.y))
+            if self.debug_counter <= debug_loop_level:
+                print('0 x:', hex(current.x))
+                print('0 y:', hex(current.y))
             if coef & 1:  # if coef is odd
                 result += current
-                print('1 x:', hex(result.x))
-                print('1 y:', hex(result.y))
+                if self.debug_counter <= debug_loop_level:
+                    print('1 x:', hex(result.x))
+                    print('1 y:', hex(result.y))
             # Double current point
             current += current
-            print('2 x:', hex(current.x))
-            print('2 y:', hex(current.y))
+            if self.debug_counter <= debug_loop_level:
+                print('2 x:', hex(current.x))
+                print('2 y:', hex(current.y))
 
             # Halve coef and continue
             coef >>= 1
 
-            debug_counter += 1
-            if debug_counter > 0:
-                print('3 x:', hex(result.x))
-                print('3 y:', hex(result.y))
+            self.debug_counter += 1
+            """if debug_counter > 0:
+                self.debug_print('3 x:', hex(result.x))
+                self.debug_print('3 y:', hex(result.y))"""
 
             # exit()
         
-        print('3 x:', hex(result.x))
-        print('3 y:', hex(result.y))
+        print('Final x:', hex(result.x))
+        print('Final y:', hex(result.y))
 
         return result
 
