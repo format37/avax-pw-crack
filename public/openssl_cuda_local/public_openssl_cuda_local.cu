@@ -460,7 +460,7 @@ __device__ void mod_mul(BIGNUM *a, BIGNUM *b, BIGNUM *mod, BIGNUM *result) {
     debug_printf("mod_mul 2\n");
     
     
-    //bn_mod(&product, mod, result); // TODO: fix it
+    bn_mod(&product, mod, result); // TODO: fix it
 
 
     debug_printf("mod_mul 3\n");
@@ -921,13 +921,24 @@ __device__ void point_add(
     BIGNUM *p, 
     BIGNUM *a
     ) {    // Handle the point at infinity cases
+    //printf("A # Result x.d: %f, y.d: %f\n", result->x.d, result->y.d);
+    bn_print("result.x: ", &result->x);
+    bn_print("result.y: ", &result->y);
+    bn_print("p1.x: ", &p1->x);
+    bn_print("p1.y: ", &p1->y);
+    bn_print("p2.x: ", &p2->x);
+    bn_print("p2.y: ", &p2->y);
+    // bn_print("A result: ", &result.x);
     if (point_is_at_infinity(p1)) {
-        // printf("point_is_at_infinity(p1)\n");
+        printf("point_is_at_infinity(p1)\n");
+        //printf("0 # Result x.d: %f, y.d: %f\n", result->x.d, result->y.d);
+        //printf("0 # p2 x.d: %f, y.d: %f\n", p2->x.d, p2->y.d);        
         copy_point(result, p2);
+        printf("1 # Result x.d: %f, y.d: %f\n", result->x.d, result->y.d);
         return;
     }
     if (point_is_at_infinity(p2)) {
-        // printf("point_is_at_infinity(p2)\n");
+        printf("point_is_at_infinity(p2)\n");
         copy_point(result, p1);
         // printf("copying p1 to result success\n");
         return;
@@ -972,8 +983,11 @@ __device__ void point_add(
     }
 
     // Assign the computed coordinates to the result
+    //Print result->x.d and result->y.d
+    printf("B # Result x.d: %f, y.d: %f\n", result->x.d, result->y.d);
     set_bn(&result->x, &x3);
     set_bn(&result->y, &y3);
+    printf("C # Result x.d: %f, y.d: %f\n", result->x.d, result->y.d);
 
     // Free the temporary variables
     // ... free BIGNUMs ...
