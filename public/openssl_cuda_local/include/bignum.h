@@ -317,22 +317,22 @@ __device__ void bn_mod(BIGNUM* r, BIGNUM* m, BIGNUM* d) {
     while (true) {
         // Check if r < d or r == d
         int compare = bn_cmp(r, d); // Need to implement bn_cmp to compare BIGNUMs
-        printf("bn_mod >> x\n");
-        printf("bn_mod >> compare: %d\n", compare);
+        //printf("bn_mod >> x\n");
+        //printf("bn_mod >> compare: %d\n", compare);
         if (compare < 0) {
             // r < d, we are done
-            printf("bn_mod >> y\n");
+            //printf("bn_mod >> y\n");
             break;
         } else if (compare == 0) {
             // r == d, set r to 0 and we are done
-            printf("bn_mod >> z\n");
+            /*printf("bn_mod >> z\n");
             printf("bn_mod >> r_top: %d\n", r->top);
             printf("bn_mod >> r_neg: %d\n", r->neg);
             printf("bn_mod >> r_dmax: %d\n", r->dmax);
-            printf("bn_mod >> r_flags: %d\n", r->flags);
+            printf("bn_mod >> r_flags: %d\n", r->flags);*/
             init_zero(r, MAX_BIGNUM_SIZE);
             // init_zero(r, MAX_BIGNUM_WORDS);
-            printf("bn_mod >> 0\n");
+            //printf("bn_mod >> 0\n");
             break;
         }
 

@@ -643,7 +643,7 @@ __device__ void point_add_v0(EC_POINT *P, EC_POINT *Q, EC_POINT *R, BIGNUM *p) {
 }
 
 // Utility function to set a BIGNUM to zero
-__device__ void bn_zero(BIGNUM *bn) {
+/*__device__ void bn_zero(BIGNUM *bn) {
     if (bn != nullptr) {
         bn->neg = 0;
         bn->top = 0;
@@ -653,7 +653,7 @@ __device__ void bn_zero(BIGNUM *bn) {
             bn->d[i] = 0;
         }
     }
-}
+}*/
 
 // Helper function to perform a deep copy of BIGNUM
 __device__ void bn_copy(BIGNUM *dest, BIGNUM *src) {
@@ -724,8 +724,11 @@ __device__ void set_point_at_infinity(EC_POINT *point) {
     // that other functions can check for it and treat it as infinity
 
     // To set the point to 0 (as an example sentinel value), do:
-    bn_zero(&point->x); // A function that sets a BIGNUM to 0
-    bn_zero(&point->y); // Ensure that this logic matches how you identify point at infinity elsewhere
+    // bn_zero(&point->x); // A function that sets a BIGNUM to 0
+    init_zero(&point->x, MAX_BIGNUM_WORDS);
+
+    //bn_zero(&point->y); // Ensure that this logic matches how you identify point at infinity elsewhere
+    init_zero(&point->y, MAX_BIGNUM_WORDS);
 }
 
 __device__ void bn_subtract(BIGNUM *result, const BIGNUM *a, const BIGNUM *b) {
@@ -833,31 +836,42 @@ __device__ int bn_get_top_bit(const BIGNUM *bn) {
 
 __device__ void bn_divide(BIGNUM *quotient, BIGNUM *remainder, BIGNUM *dividend, BIGNUM *divisor) {
     // Initialize the quotient and remainder
-    bn_zero(quotient);
-    bn_zero(remainder);
+    // bn_zero(quotient);
+    // bn_zero(remainder);
+    printf(" ++ bn_divide ++\n");
+    init_zero(quotient, MAX_BIGNUM_WORDS);
+    init_zero(remainder, MAX_BIGNUM_WORDS);
 
     // Copy of the dividend which will be reduced as division proceeds
     BIGNUM temp_dividend;
+    init_zero(&temp_dividend, MAX_BIGNUM_WORDS);
     bn_copy(&temp_dividend, dividend); // You might need to ensure proper memory allocation for this copy
-
+    
     // Initialize a temporary variable for subtracted values
     BIGNUM temp_subtract;
-    bn_zero(&temp_subtract);
+    // bn_zero(&temp_subtract);
+    init_zero(&temp_subtract, MAX_BIGNUM_WORDS);
 
     // We need a BIGNUM for 'one' to increment the quotient for each subtraction, assuming we have such function
     BIGNUM one;
+    init_zero(&one, MAX_BIGNUM_WORDS);
     bn_set_word(&one, 1);
+    printf(" ## bn_divide ##\n");
+    return ;
+    
 
     // Long division algorithm
     while (bn_cmp(&temp_dividend, divisor) >= 0) { // As long as the dividend is greater than or equal to the divisor
         int shift_amount = bn_get_top_bit(&temp_dividend) - bn_get_top_bit(divisor); // calculate needed shift to align most significant bits
         BIGNUM shifted_divisor;
+        init_zero(&shifted_divisor, MAX_BIGNUM_WORDS);
         bn_lshift_res(&shifted_divisor, divisor, shift_amount); // shift the divisor to the left to align with high bit of dividend
         
         // subtract the shifted divisor from the dividend until no longer possible
         while (bn_cmp(&temp_dividend, &shifted_divisor) >= 0) {
             bn_subtract(&temp_dividend, &temp_dividend, &shifted_divisor);
             BIGNUM shifted_one;
+            init_zero(&shifted_one, MAX_BIGNUM_WORDS);
             bn_lshift_res(&shifted_one, &one, shift_amount); // the part of the quotient we will increment by corresponds to our shift
             bn_add(quotient, quotient, &shifted_one);
         }
@@ -869,19 +883,87 @@ __device__ void bn_divide(BIGNUM *quotient, BIGNUM *remainder, BIGNUM *dividend,
 
     // Any necessary cleanup of BIGNUMs would be performed here
     // Make sure to handle any dynamic memory you may have allocated within this function
+    printf(" -- bn_divide --\n");
 }
 
-__device__ void bn_mod_inverse(BIGNUM *result, BIGNUM *a, BIGNUM *modulus) {
+__device__ void bn_mod_inverse_fixed(BIGNUM *result, BIGNUM *a, BIGNUM *modulus) {
+    
     // Allocate and initialize working variables
     BIGNUM u, v, inv, u1, u3, v1, v3, t1, t3, q;
     // Initialization of these BIGNUMs with proper handling for the CUDA environment is required
     // Zero-initialize all BIGNUMs: u, v, inv, u1, u3, v1, v3, t1, t3, q
-    bn_zero(&u); bn_zero(&v); bn_zero(&inv); 
+    
+    /*bn_zero(&u); bn_zero(&v); bn_zero(&inv); 
     bn_zero(&u1); bn_zero(&u3); 
     bn_zero(&v1); bn_zero(&v3); 
     bn_zero(&t1); bn_zero(&t3); 
-    bn_zero(&q);
+    bn_zero(&q);*/
+    init_zero(&u, MAX_BIGNUM_WORDS);
+    init_zero(&v, MAX_BIGNUM_WORDS);
+    init_zero(&inv, MAX_BIGNUM_WORDS);
+    init_zero(&u1, MAX_BIGNUM_WORDS);
+    init_zero(&u3, MAX_BIGNUM_WORDS);
+    init_zero(&v1, MAX_BIGNUM_WORDS);
+    init_zero(&v3, MAX_BIGNUM_WORDS);
+    init_zero(&t1, MAX_BIGNUM_WORDS);
+    init_zero(&t3, MAX_BIGNUM_WORDS);
+    init_zero(&q, MAX_BIGNUM_WORDS);
+    
+    // Set initial values: u1 = 1, u = a, v1 = 0, v = modulus
+    bn_set_word(&u1, 1); 
+    
+    bn_copy(&u, a); 
+    // bn_set_word(&v1, 0); -- v1 is already zero-initialized
+    bn_copy(&v, modulus);
+    
+    // The algorithm proceeds to iteratively find the modular inverse
+    while (!bn_is_zero(&u)) { // While u is not zero
+        
+        bn_divide(&q, &u3, &v, &u); // Divide v by u to get quotient (q) and remainder (u3)
+        printf(" ## bn_mod_inverse TEST ##\n");
+        bn_mul(&t3, &q, &v1); // t3 = q * v1
+        bn_subtract(&t1, &u1, &t3); // t1 = u1 - t3
 
+        // Shift: (u1, u) <- (v1, v), (v1, v) <- (t1, u3)
+        bn_copy(&u1, &v1); bn_copy(&u, &v);
+        bn_copy(&v1, &t1); bn_copy(&v, &u3);
+    }
+    
+    // Ensure the result is non-negative
+    if (bn_is_negative(&v1)) {
+        bn_add(&inv, &v1, modulus);
+    } else {
+        bn_copy(&inv, &v1);
+    }
+
+    // Copy the result to the output parameter
+    bn_copy(result, &inv);
+
+}
+
+__device__ void bn_mod_inverse(BIGNUM *result, BIGNUM *a, BIGNUM *modulus) {
+    printf(" ## bn_mod_inverse ##\n");
+    // Allocate and initialize working variables
+    BIGNUM u, v, inv, u1, u3, v1, v3, t1, t3, q;
+    // Initialization of these BIGNUMs with proper handling for the CUDA environment is required
+    // Zero-initialize all BIGNUMs: u, v, inv, u1, u3, v1, v3, t1, t3, q
+    
+    /*bn_zero(&u); bn_zero(&v); bn_zero(&inv); 
+    bn_zero(&u1); bn_zero(&u3); 
+    bn_zero(&v1); bn_zero(&v3); 
+    bn_zero(&t1); bn_zero(&t3); 
+    bn_zero(&q);*/
+    init_zero(&u, MAX_BIGNUM_WORDS);
+    init_zero(&v, MAX_BIGNUM_WORDS);
+    init_zero(&inv, MAX_BIGNUM_WORDS);
+    init_zero(&u1, MAX_BIGNUM_WORDS);
+    init_zero(&u3, MAX_BIGNUM_WORDS);
+    init_zero(&v1, MAX_BIGNUM_WORDS);
+    init_zero(&v3, MAX_BIGNUM_WORDS);
+    init_zero(&t1, MAX_BIGNUM_WORDS);
+    init_zero(&t3, MAX_BIGNUM_WORDS);
+    init_zero(&q, MAX_BIGNUM_WORDS);
+    
     // Set initial values: u1 = 1, u = a, v1 = 0, v = modulus
     bn_set_word(&u1, 1); 
     bn_copy(&u, a); 
@@ -989,12 +1071,16 @@ __device__ void point_add(
         
         bn_mul(&tmp2, &p1->y, &two);    // tmp2 = 2 * p1.y
         bn_mod(&tmp1, p, &tmp1);        // tmp1 = tmp1 mod p
-        printf("== pd ==\n");/*
+        
         bn_mod(&tmp2, p, &tmp2);        // tmp2 = tmp2 mod p
-        bn_mod_inverse(&tmp2, p, &tmp2);// tmp2 = (2 * p1.y)^-1 mod p
+        
+        bn_print("tmp2: ", &tmp2);
+        bn_print("p: ", p);
+        bn_mod_inverse_fixed(&tmp2, p, &tmp2);// tmp2 = (2 * p1.y)^-1 mod p
+        printf("== pd ==\n");/*
         bn_mul(&s, &tmp1, &tmp2);       // s = (3 * p1.x^2 + a) / (2 * p1.y) mod p
         bn_mod(&s, p, &s);
-
+        
         // x3 and y3 calculation:
         bn_mul(&x3, &s, &s);             // x3 = s^2
         bn_sub(&x3, &x3, &p1->x);        
