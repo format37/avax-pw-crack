@@ -922,8 +922,8 @@ __device__ void point_add(
     BIGNUM *a
     ) {    // Handle the point at infinity cases
     //printf("A # Result x.d: %f, y.d: %f\n", result->x.d, result->y.d);
-    bn_print("result.x: ", &result->x);
-    bn_print("result.y: ", &result->y);
+    bn_print("point_add init result.x: ", &result->x);
+    bn_print("point_add init result.y: ", &result->y);
     bn_print("p1.x: ", &p1->x);
     bn_print("p1.y: ", &p1->y);
     bn_print("p2.x: ", &p2->x);
@@ -946,11 +946,67 @@ __device__ void point_add(
 
     // Initialize temporary BIGNUMs for calculation
     BIGNUM s, x3, y3, tmp1, tmp2;
+    init_zero(&s, MAX_BIGNUM_WORDS);
+    init_zero(&x3, MAX_BIGNUM_WORDS);
+    init_zero(&y3, MAX_BIGNUM_WORDS);
+    init_zero(&tmp1, MAX_BIGNUM_WORDS);
+    init_zero(&tmp2, MAX_BIGNUM_WORDS);
     // ... initialization code for BIGNUMs ...
     
     // Case 1: p1.x == p2.x && p1.y != p2.y
-    if (bn_cmp(&p1->x, &p2->x) == 0 && bn_cmp(&p1->y, &p2->y) != 0) {
+    /*if (bn_cmp(&p1->x, &p2->x) == 0 && bn_cmp(&p1->y, &p2->y) != 0) {
         printf("bn_cmp(&p1->x, &p2->x) == 0 && bn_cmp(&p1->y, &p2->y) != 0\n");
+        set_point_at_infinity(result);
+        return;
+    }*/
+    if (bn_cmp(&p1->x, &p2->x) == 0 && bn_cmp(&p1->y, &p2->y) == 0) {
+        printf("Point Doubling\n");
+
+        // Start point doubling calculation
+        // Slope calculation: s = (3 * p1.x^2 + a) / (2 * p1.y)
+        // print MAX_BIGNUM_WORDS
+        printf("MAX_BIGNUM_WORDS: %d\n", MAX_BIGNUM_WORDS);
+        BIGNUM two; 
+        /*BN_ULONG d[8];
+        two.d = d;
+        two.neg = 0;
+        two.top = 0;
+        two.dmax = MAX_BIGNUM_WORDS;
+        two.flags = 0;*/
+        // print two params
+        // printf("two.top: %d, two.neg: %d\n", two.top, two.neg);        
+        init_zero(&two, MAX_BIGNUM_WORDS);
+        
+        bn_set_word(&two, 2);
+        
+        bn_mul(&tmp1, &p1->x, &p1->x); // tmp1 = p1.x^2
+        
+        bn_set_word(&tmp2, 3);
+        
+        bn_mul(&tmp1, &tmp1, &tmp2);   // tmp1 = 3 * p1.x^2
+        
+        bn_add(&tmp1, &tmp1, a); // tmp1 = 3 * p1.x^2 + a
+        
+        bn_mul(&tmp2, &p1->y, &two);    // tmp2 = 2 * p1.y
+        bn_mod(&tmp1, p, &tmp1);        // tmp1 = tmp1 mod p
+        printf("== pd ==\n");/*
+        bn_mod(&tmp2, p, &tmp2);        // tmp2 = tmp2 mod p
+        bn_mod_inverse(&tmp2, p, &tmp2);// tmp2 = (2 * p1.y)^-1 mod p
+        bn_mul(&s, &tmp1, &tmp2);       // s = (3 * p1.x^2 + a) / (2 * p1.y) mod p
+        bn_mod(&s, p, &s);
+
+        // x3 and y3 calculation:
+        bn_mul(&x3, &s, &s);             // x3 = s^2
+        bn_sub(&x3, &x3, &p1->x);        
+        bn_sub(&x3, &x3, &p1->x);        // x3 = s^2 - 2 * p1.x
+        bn_mod(&x3, p, &x3);             // x3 = x3 mod p
+
+        bn_sub(&y3, &p1->x, &x3);        
+        bn_mul(&y3, &s, &y3);            // y3 = s * (p1.x - x3)
+        bn_sub(&y3, &y3, &p1->y);        // y3 = y3 - p1.y
+        bn_mod(&y3, p, &y3);             // y3 = y3 mod p*/
+    } else if (bn_cmp(&p1->x, &p2->x) == 0 && bn_cmp(&p1->y, &p2->y) != 0) {
+        printf("The points are inverses to one another, returning infinity.\n");
         set_point_at_infinity(result);
         return;
     }
@@ -1096,9 +1152,9 @@ __device__ EC_POINT ec_point_scalar_mul(
     for (int i = 0; i < 256; i++) {                 // Assuming 256-bit scalars
         if (i<debug_counter) {
             // debug_printf("0 x: %s\n", bignum_to_hex(&current.x));
-            bn_print("0 x: ", &current.x);
+            bn_print("0 current.x: ", &current.x);
             // debug_printf("0 y: %s\n", bignum_to_hex(&current.y));
-            bn_print("0 y: ", &current.y);
+            bn_print("0 current.y: ", &current.y);
         }
 
         if (bits[i]) {// If the i-th bit is set
@@ -1110,9 +1166,9 @@ __device__ EC_POINT ec_point_scalar_mul(
             point_add(&result, &current, &result, curve_prime, curve_a);  // Add current to the result
              // if (i<debug_counter) printf("# b\n");
             // debug_printf("1 x: %s\n", bignum_to_hex(&result.x));
-             if (i<debug_counter) bn_print("1 x: ", &result.x);
+             if (i<debug_counter) bn_print("1 result.x: ", &result.x);
             // debug_printf("1 y: %s\n", bignum_to_hex(&result.y));
-             if (i<debug_counter) bn_print("1 y: ", &result.y);
+             if (i<debug_counter) bn_print("1 result.y: ", &result.y);
 
         }
         if (i<debug_counter) debug_printf("# c\n");
@@ -1126,9 +1182,10 @@ __device__ EC_POINT ec_point_scalar_mul(
         point_add(&current, &current, &current, curve_prime, curve_a);  // Double current by adding to itself
 
         // debug_printf("2 x: %s\n", bignum_to_hex(&current.x));
-        if (i<debug_counter) bn_print("2 x: ", &current.x);
+        if (i<debug_counter) bn_print("2 current.x: ", &current.x);
         // debug_printf("2 y: %s\n", bignum_to_hex(&current.y));
-        if (i<debug_counter) bn_print("2 y: ", &current.y);
+        if (i<debug_counter) bn_print("2 current.y: ", &current.y);
+        break; // TODO: remove this
     }
 
     // debug_printf("Final x: %s\n", bignum_to_hex(&result.x));

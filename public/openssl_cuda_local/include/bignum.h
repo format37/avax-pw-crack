@@ -18,9 +18,12 @@ __device__ void debug_printf(const char *fmt, ...) {
 
 __device__ void bn_print(char* msg, BIGNUM* a) {
   printf("%s", msg);
+  int if_zero = true;
   for(int i=0; i<a->top; i++) {
     printf("%08x", a->d[i]);
+    if (a->d[i] != 0) if_zero = false;
   }
+  if (if_zero) printf("0");
   printf("\n");
 }
 
@@ -161,11 +164,31 @@ __device__ void bn_sub_v1(BIGNUM* a, BIGNUM* b, BIGNUM* r) {
 
 __device__ void init_zero(BIGNUM *bn, int top) {
     // Assuming bn->d is already allocated and sized correctly
-    for (int i = 0; i < top; i++) {
-        bn->d[i] = 0;
+    if (top == MAX_BIGNUM_WORDS) {
+      BN_ULONG d[MAX_BIGNUM_WORDS];
+      bn->d = d;
+      printf("===== < init_zero: top: %d\n", top);
+      for (int i = 0; i < top; i++) {
+          printf("===== < init_zero: i: %d\n", i);
+          bn->d[i] = 0;
+      }
+      
+      bn->top = (top > 0) ? 1 : 0; // If top is positive, there's at least one 0-word; otherwise, no words
+      bn->neg = 0;
     }
-    bn->top = (top > 0) ? 1 : 0; // If top is positive, there's at least one 0-word; otherwise, no words
-    bn->neg = 0;
+    else {
+      BN_ULONG d[MAX_BIGNUM_SIZE];    
+      bn->d = d;
+      printf("===== < init_zero: top: %d\n", top);
+      for (int i = 0; i < top; i++) {
+          printf("===== < init_zero: i: %d\n", i);
+          bn->d[i] = 0;
+      }
+      
+      bn->top = (top > 0) ? 1 : 0; // If top is positive, there's at least one 0-word; otherwise, no words
+      bn->neg = 0;
+    }
+    
 }
 
 __device__ int bn_cmp(BIGNUM* a, BIGNUM* b) {
@@ -268,45 +291,55 @@ __device__ void bn_add_v1(BIGNUM* a, BIGNUM* b, BIGNUM* r) {
 }*/
 
 __device__ void bn_mod(BIGNUM* r, BIGNUM* m, BIGNUM* d) {
-    debug_printf("bn_mod 0\n");
+    //debug_printf("bn_mod 0\n");
+    printf("bn_mod 0\n");
     // Copy m to r
     for (int i = 0; i < m->top; i++) {
         debug_printf("bn_mod: 0.%d r_top: %d m_top: %d\n", i, r->top, m->top);
         r->d[i] = m->d[i];
     }
-    debug_printf("bn_mod 1\n");
+    printf("bn_mod 1\n");
     r->top = m->top;
     r->neg = 0;
-    debug_printf("bn_mod 2\n");
+    printf("bn_mod 2\n");
 
     // Ensure r has enough space to cover subtraction up to d->top
     for (int i = m->top; i < d->top; i++) {
         r->d[i] = 0; // Zero out any remaining indices
     }
-    debug_printf("bn_mod 3\n");
+    printf("bn_mod 3\n");
     if (d->top > r->top) {
         r->top = d->top; // Increase the top to match d, if necessary
     }
-    debug_printf("bn_mod 4\n");
+    printf("bn_mod 4\n");
 
     // Keep subtracting d from r until r < d
     while (true) {
         // Check if r < d or r == d
         int compare = bn_cmp(r, d); // Need to implement bn_cmp to compare BIGNUMs
-
+        printf("bn_mod >> x\n");
+        printf("bn_mod >> compare: %d\n", compare);
         if (compare < 0) {
             // r < d, we are done
+            printf("bn_mod >> y\n");
             break;
         } else if (compare == 0) {
             // r == d, set r to 0 and we are done
+            printf("bn_mod >> z\n");
+            printf("bn_mod >> r_top: %d\n", r->top);
+            printf("bn_mod >> r_neg: %d\n", r->neg);
+            printf("bn_mod >> r_dmax: %d\n", r->dmax);
+            printf("bn_mod >> r_flags: %d\n", r->flags);
             init_zero(r, MAX_BIGNUM_SIZE);
+            // init_zero(r, MAX_BIGNUM_WORDS);
+            printf("bn_mod >> 0\n");
             break;
         }
 
         // r > d, so subtract d from r
         int borrow = 0;
         for (int i = 0; i < r->top; i++) {
-            debug_printf("bn_mod: 1.%d r_top: %d d_top: %d\n", i, r->top, d->top);
+            printf(">> bn_mod: 1.%d r_top: %d d_top: %d\n", i, r->top, d->top);
             long long res = (long long)r->d[i] - (long long)((i < d->top) ? d->d[i] : 0) - borrow;
             borrow = (res < 0) ? 1 : 0;
             if (res < 0) {
@@ -320,7 +353,7 @@ __device__ void bn_mod(BIGNUM* r, BIGNUM* m, BIGNUM* d) {
             --r->top;
         }
     }
-    debug_printf("bn_mod end\n");
+    printf("bn_mod end\n");
 }
 
 /*__device__ BN_ULONG bn_mod_big(BIGNUM *num, BIGNUM *divisor) {
