@@ -167,9 +167,9 @@ __device__ void init_zero(BIGNUM *bn, int top) {
     if (top == MAX_BIGNUM_WORDS) {
       BN_ULONG d[MAX_BIGNUM_WORDS];
       bn->d = d;
-      printf("===== < init_zero: top: %d\n", top);
+      // printf("===== < init_zero: top: %d\n", top);
       for (int i = 0; i < top; i++) {
-          printf("===== < init_zero: i: %d\n", i);
+          // printf("===== < init_zero: i: %d\n", i);
           bn->d[i] = 0;
       }
       
@@ -179,9 +179,9 @@ __device__ void init_zero(BIGNUM *bn, int top) {
     else {
       BN_ULONG d[MAX_BIGNUM_SIZE];    
       bn->d = d;
-      printf("===== < init_zero: top: %d\n", top);
+      //printf("===== < init_zero: top: %d\n", top);
       for (int i = 0; i < top; i++) {
-          printf("===== < init_zero: i: %d\n", i);
+          //printf("===== < init_zero: i: %d\n", i);
           bn->d[i] = 0;
       }
       

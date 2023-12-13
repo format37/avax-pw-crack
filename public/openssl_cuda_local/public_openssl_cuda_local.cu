@@ -585,6 +585,30 @@ __device__ bool bn_is_zero(BIGNUM *a) {
     return true;
 }
 
+__device__ bool bn_is_one(BIGNUM *a) {
+    // Assuming that BIGNUM stores the number in an array 'd' of integers
+    // and 'top' indicates the number of chunks being used.
+    // We also assume that 'd' is big-endian and 'top' is the index of the highest non-zero digit.
+    
+    // The number one would be represented with only the least significant digit being one
+    // and all other digits being zero.
+    if (a->top != 1) {  // If there are more than one digits in use, it cannot be one
+        return false;
+    }
+    if (a->d[0] != 1) {  // The number one should only have the least significant digit set to one
+        return false;
+    }
+    // Ensure that any other digits (if they exist in memory) are zero
+    // This isn't strictly necessary if the 'top' index is always accurate
+    // but is a good sanity check if there's any possibility of memory corruption or improper initialization.
+    for (int i = 1; i < MAX_BIGNUM_WORDS; ++i) {
+        if (a->d[i] != 0) {
+            return false;
+        }
+    }
+    return true;
+}
+
 /*__device__ void bn_neg(BIGNUM *a, BIGNUM *result, BIGNUM *p) {
     if (bn_is_zero(a)) {
         // If a is 0, then -a (mod p) is also 0
@@ -731,12 +755,13 @@ __device__ void set_point_at_infinity(EC_POINT *point) {
     init_zero(&point->y, MAX_BIGNUM_WORDS);
 }
 
-__device__ void bn_subtract(BIGNUM *result, const BIGNUM *a, const BIGNUM *b) {
+__device__ void bn_subtract(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
     BN_ULONG borrow = 0;
     BN_ULONG temp_borrow;
 
     // It's assumed that BN_ULONG is an unsigned type like uint32_t or uint64_t and that
     // a and b have the same number of words (this can be adjusted as needed)
+    
     for (int i = 0; i < MAX_BIGNUM_WORDS; ++i) {
         temp_borrow = (a->d[i] < b->d[i] + borrow); // Calculate if we need to borrow from the next digit
         result->d[i] = a->d[i] - b->d[i] - borrow;   // Perform the subtraction with previous borrow, if any
@@ -838,7 +863,7 @@ __device__ void bn_divide(BIGNUM *quotient, BIGNUM *remainder, BIGNUM *dividend,
     // Initialize the quotient and remainder
     // bn_zero(quotient);
     // bn_zero(remainder);
-    printf(" ++ bn_divide ++\n");
+    //printf(" ++ bn_divide ++\n");
     init_zero(quotient, MAX_BIGNUM_WORDS);
     init_zero(remainder, MAX_BIGNUM_WORDS);
 
@@ -856,7 +881,7 @@ __device__ void bn_divide(BIGNUM *quotient, BIGNUM *remainder, BIGNUM *dividend,
     BIGNUM one;
     init_zero(&one, MAX_BIGNUM_WORDS);
     bn_set_word(&one, 1);
-    printf(" ## bn_divide ##\n");
+    //printf(" ## bn_divide ##\n");
     return ;
     
 
@@ -883,10 +908,10 @@ __device__ void bn_divide(BIGNUM *quotient, BIGNUM *remainder, BIGNUM *dividend,
 
     // Any necessary cleanup of BIGNUMs would be performed here
     // Make sure to handle any dynamic memory you may have allocated within this function
-    printf(" -- bn_divide --\n");
+    // printf(" -- bn_divide --\n");
 }
 
-__device__ void bn_mod_inverse_fixed(BIGNUM *result, BIGNUM *a, BIGNUM *modulus) {
+__device__ void bn_mod_inverse_fixed_v0(BIGNUM *result, BIGNUM *a, BIGNUM *modulus) {
     
     // Allocate and initialize working variables
     BIGNUM u, v, inv, u1, u3, v1, v3, t1, t3, q;
@@ -908,27 +933,67 @@ __device__ void bn_mod_inverse_fixed(BIGNUM *result, BIGNUM *a, BIGNUM *modulus)
     init_zero(&t1, MAX_BIGNUM_WORDS);
     init_zero(&t3, MAX_BIGNUM_WORDS);
     init_zero(&q, MAX_BIGNUM_WORDS);
-    
+
     // Set initial values: u1 = 1, u = a, v1 = 0, v = modulus
     bn_set_word(&u1, 1); 
     
     bn_copy(&u, a); 
     // bn_set_word(&v1, 0); -- v1 is already zero-initialized
     bn_copy(&v, modulus);
-    
+    unsigned int i = 0; // TODO: remove this
     // The algorithm proceeds to iteratively find the modular inverse
+    printf("++ bmi ++\n");    
+    // BIGNUM remainder;
     while (!bn_is_zero(&u)) { // While u is not zero
+        if (i>10) break; // TODO: remove this
+        printf("\n%d", i); // TODO: remove this
+
+        bn_print("u: ", &u);
+        bn_print("v: ", &v);
+        
         
         bn_divide(&q, &u3, &v, &u); // Divide v by u to get quotient (q) and remainder (u3)
-        printf(" ## bn_mod_inverse TEST ##\n");
+        // bn_divide(&q, remainder, &v, &u);  
+        // bn_copy(&u, remainder);
+
+        bn_print("q: ", &q);
+        bn_print("u3: ", &u3);
+
+        //printf(" ## bn_mod_inverse TEST ##\n");
         bn_mul(&t3, &q, &v1); // t3 = q * v1
+        bn_print("t3: ", &t3);
+        bn_print("u1: ", &u1);
         bn_subtract(&t1, &u1, &t3); // t1 = u1 - t3
+        bn_print("t1: ", &t1);
 
         // Shift: (u1, u) <- (v1, v), (v1, v) <- (t1, u3)
         bn_copy(&u1, &v1); bn_copy(&u, &v);
         bn_copy(&v1, &t1); bn_copy(&v, &u3);
+        
+
+
+        // After all calculations for this iteration
+        BIGNUM temp_u1, temp_u;
+        
+
+        bn_copy(&temp_u1, &v1);
+        bn_copy(&temp_u, &v);
+        
+        bn_copy(&v1, &t1);
+        bn_copy(&v, &u3);
+
+        bn_copy(&u1, &temp_u1);
+        bn_copy(&u, &temp_u);
+
+        // TODO: remove this ++
+        bn_print("u: ", &u);
+        bn_print("v: ", &v);
+        bn_print("u1: ", &u1);
+        bn_print("v1: ", &v1);
+        i++;
+        // TODO: remove this --
     }
-    
+    printf("CC bmi CC\n"); /*
     // Ensure the result is non-negative
     if (bn_is_negative(&v1)) {
         bn_add(&inv, &v1, modulus);
@@ -938,7 +1003,166 @@ __device__ void bn_mod_inverse_fixed(BIGNUM *result, BIGNUM *a, BIGNUM *modulus)
 
     // Copy the result to the output parameter
     bn_copy(result, &inv);
+    */
+}
 
+__device__ void bn_abs(BIGNUM *result, BIGNUM *a) {
+    // Assuming the BIGNUM structure includes an attribute to indicate the sign (e.g., 'sign')
+    // Copy the number from a to result
+    // In actual code, this would likely need to loop over each digit and copy them.
+    for (int i = 0; i < a->top; ++i) {
+        result->d[i] = a->d[i];
+    }
+    // Ensure result uses the same number of digits as 'a'
+    result->top = a->top;
+
+    // Set the sign of the result to be non-negative (0 for positive in many conventions)
+    // result->sign = 0;
+    result->neg = 0;
+}
+
+__device__ void bn_set_signed_word(BIGNUM *r, int64_t value) {
+    // Clear any existing value in r.
+    // Assuming MAX_BIGNUM_WORDS is defined and represents the maximum size of d[].
+    for (int i = 0; i < MAX_BIGNUM_WORDS; ++i) {
+        r->d[i] = 0;
+    }
+
+    // Set the sign in r. Assuming the sign is represented by a simple integer where
+    // negative numbers have sign = -1 and non-negatives have sign = 0.
+    // r->sign = (value < 0) ? -1 : 0;
+    r->neg = (value < 0) ? -1 : 0;
+
+    // Store the absolute value of the word in the least significant part of r.
+    // Assuming the magnitude can fit in a single 'word' of the BIGNUM data structure.
+    // Depending on how BIGNUM is structured, you might need to handle cases where
+    // the magnitude of the integer does not fit into a single array element.
+    r->d[0] = (value < 0) ? -value : value;
+
+    // Set 'top' to reflect that we're now using the least significant word only.
+    // Assuming 'top' is an index of the highest non-zero element.
+    r->top = (value != 0) ? 1 : 0;
+}
+
+__device__ void bn_swap(BIGNUM *a, BIGNUM *b) {
+    // Swap the dynamic parts
+    // mp_ptr temp_d = a->d;
+    BN_ULONG *temp_d = a->d;
+    a->d = b->d;
+    b->d = temp_d;
+    
+    // Swap the scalar components such as top, sign etc.
+    int temp_top = a->top;
+    a->top = b->top;
+    b->top = temp_top;
+
+    int temp_sign = a->neg;
+    a->neg = b-> neg;
+    b->neg = temp_sign;
+    
+    // ... Repeat for other scalar elements of BIGNUM as necessary
+}
+
+__device__ void bn_gcdext(BIGNUM *g, BIGNUM *s, BIGNUM *t, BIGNUM *a, BIGNUM *b) {
+    // Assuming you've defined BIGNUM type, bn_copy, bn_abs_compare, bn_swap, bn_divide, bn_multiply, bn_zero, etc.
+    
+    // Temporary BIGNUM variables, you would need to provide memory allocation for them
+    BIGNUM as, bs, rs, qs, ts;
+    /*bn_zero(&as);
+    bn_zero(&bs);
+    bn_zero(&rs);
+    bn_zero(&qs);
+    bn_zero(&ts);*/
+    init_zero(&as, MAX_BIGNUM_WORDS);
+    init_zero(&bs, MAX_BIGNUM_WORDS);
+    init_zero(&rs, MAX_BIGNUM_WORDS);
+    init_zero(&qs, MAX_BIGNUM_WORDS);
+    init_zero(&ts, MAX_BIGNUM_WORDS);
+    
+    // if (bn_abs_compare(a, b) < 0) {
+    if (bn_cmp(a, b) < 0) {
+        // Ensure a >= b for the algorithm to work properly
+        bn_copy(&as, b);
+        bn_copy(&bs, a);
+        bn_swap(s, t); // Swap s and t pointers, assuming bn_swap swaps pointers
+    } else {
+        bn_copy(&as, a);
+        bn_copy(&bs, b);
+    }
+    
+
+    if (bn_is_zero(b)) {
+        // Base case: if b is zero, gcd is abs(a) and s is sign(a)
+        bn_abs(g, a);
+        bn_set_signed_word(s, bn_is_negative(a) ? -1 : 1);
+        // bn_zero(t); // t is zero
+        init_zero(t, MAX_BIGNUM_WORDS);
+        return;
+    }
+    
+    // Extended Euclidean Algorithm iteration
+    unsigned int i = 0; // TODO: remove this
+    while (!bn_is_zero(&bs)) {
+        printf("\n\ni: %d\n", i);
+        bn_print("as: ", &as);
+        bn_print("bs: ", &bs);
+        bn_print("rs: ", &rs);
+        bn_print("qs: ", &qs);
+        bn_divide(&qs, &rs, &as, &bs); // qs = as / bs, rs = as % bs
+        printf("after bn_divide\n");
+        bn_print("qs: ", &qs);
+        bn_copy(&as, &bs); // Copying bs to as
+        bn_print("as: ", &as);
+        bn_copy(&bs, &rs); // Copying rs to bs
+        bn_print("bs: ", &bs);
+        
+        // At this point, implement updating logic for s and t using the quotients (qs)
+        // This will involve multiplying and subtracting to update s, t
+        // This is a non-trivial part and requires careful implementation
+        // ...
+        i++;
+        if (i>2) break; // TODO: remove this
+    }
+    printf("BN gcd BN\n"); /*
+    // Once done with the main loop, set g to as, and if g, s, t are negative, 
+    // adjust them to be positive as done in the GMP code
+    
+    // Make sure to free any resources you've allocated if you're manually managing memory
+    */
+}
+
+__device__ void bn_mod_inverse_fixed(BIGNUM *inverse, BIGNUM *x, BIGNUM *n) {
+    // This assumes bn_gcdext has been implemented which calculates the gcd and the coefficient as gcdext does
+    printf("++ bmi ++\n");
+    BIGNUM gcd, coefficient;
+    
+    // You must implement init and zero functions if not already existing
+    // Initialize gcd and coefficient
+    init_zero(&gcd, MAX_BIGNUM_WORDS);
+    init_zero(&coefficient, MAX_BIGNUM_WORDS);
+    //printf("FF CONTINUE FROM THIS POINT FF\n"); return; // TODO: remove this CONTINUE FROM THIS POINT
+    // Calculate gcd and coefficient where x * coefficient = gcd (mod n)
+    bn_gcdext(&gcd, &coefficient, NULL, x, n);
+    printf("TEST PASSED: bn_gcdext\n");
+    // Check that the GCD is 1, ensuring an inverse exists
+    if (!bn_is_one(&gcd)) {
+        // return 0; // No inverse exists
+        // printf(" -- bmi --\n");
+        // bn_init(inverse);
+        return;
+    }
+
+    // Ensure the coefficient (inverse) is positive
+    if (bn_is_negative(&coefficient)) {
+        bn_add(inverse, &coefficient, n);
+    } else {
+        bn_copy(inverse, &coefficient);
+    }
+    
+    // The inverse has been successfully calculated
+    //return 1;
+    printf(" -- bmi --\n");
+    return;
 }
 
 __device__ void bn_mod_inverse(BIGNUM *result, BIGNUM *a, BIGNUM *modulus) {
@@ -1076,8 +1300,9 @@ __device__ void point_add(
         
         bn_print("tmp2: ", &tmp2);
         bn_print("p: ", p);
+        
         bn_mod_inverse_fixed(&tmp2, p, &tmp2);// tmp2 = (2 * p1.y)^-1 mod p
-        printf("== pd ==\n");/*
+        printf("== pd ==\n"); /*
         bn_mul(&s, &tmp1, &tmp2);       // s = (3 * p1.x^2 + a) / (2 * p1.y) mod p
         bn_mod(&s, p, &s);
         
