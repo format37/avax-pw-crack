@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <cuda.h>
-#define debug_print false
 #include "bignum.h"
 
 //__device__ EC_POINT ec_point_scalar_mul(EC_POINT *point, BIGNUM *scalar, BIGNUM *curve_order) {

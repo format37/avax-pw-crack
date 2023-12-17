@@ -1,5 +1,5 @@
 #include "bn.h"
-
+#define debug_print false
 #define BN_MASK2 0xffffffff;
 
 typedef struct bignum_st {
@@ -16,7 +16,7 @@ __device__ void debug_printf(const char *fmt, ...) {
     }
 }
 
-__device__ void bn_print(char* msg, BIGNUM* a) {
+/*__device__ void bn_print_v0(char* msg, BIGNUM* a) {
   printf("%s", msg);
   int if_zero = true;
   for(int i=0; i<a->top; i++) {
@@ -25,6 +25,16 @@ __device__ void bn_print(char* msg, BIGNUM* a) {
   }
   if (if_zero) printf("0");
   printf("\n");
+}*/
+__device__ void bn_print(char* msg, BIGNUM* a) {
+    printf("%s", msg);
+    int if_zero = true;
+    for (int i = a->top - 1; i >= 0; i--) {
+        printf("%016llx", a->d[i]); // Use the correct format specifier for 64-bit types
+        if (a->d[i] != 0) if_zero = false;
+    }
+    if (if_zero) printf("0");
+    printf("\n");
 }
 
 __device__ BN_ULONG bn_sub_words(BN_ULONG* r, BN_ULONG* a, BN_ULONG* b, int n) {
@@ -43,7 +53,8 @@ __device__ BN_ULONG bn_sub_words(BN_ULONG* r, BN_ULONG* a, BN_ULONG* b, int n) {
 
 #define BN_ULONG_NUM_BITS 32 
 #define MAX_BIGNUM_WORDS 8     // For 256-bit numbers
-#define MAX_BIGNUM_SIZE 16     // Allow room for temp calculations
+// #define MAX_BIGNUM_SIZE 16     // Allow room for temp calculations
+#define MAX_BIGNUM_SIZE 20     // Allow room for temp calculations
 
 /*__device__ void bn_init_zero(BIGNUM *bn, int top) {
     // Note: This assumes that memory for bn->d has already been allocated
@@ -162,7 +173,7 @@ __device__ void bn_sub_v1(BIGNUM* a, BIGNUM* b, BIGNUM* r) {
   r->neg = 0;
 }*/
 
-__device__ void init_zero(BIGNUM *bn, int top) {
+/*__device__ void init_zero_v1(BIGNUM *bn, int top) {
     // Assuming bn->d is already allocated and sized correctly
     if (top == MAX_BIGNUM_WORDS) {
       BN_ULONG d[MAX_BIGNUM_WORDS];
@@ -189,6 +200,17 @@ __device__ void init_zero(BIGNUM *bn, int top) {
       bn->neg = 0;
     }
     
+}*/
+
+__device__ void init_zero(BIGNUM *bn, int capacity) {
+    bn->d = new BN_ULONG[capacity]; // Dynamically allocate the required number of words.
+    for (int i = 0; i < capacity; i++) {
+        bn->d[i] = 0;
+    }
+
+    bn->top = (capacity > 0) ? 1 : 0;
+    bn->neg = 0;
+    bn->dmax = capacity; // Make sure to track the capacity in dmax.
 }
 
 __device__ int bn_cmp(BIGNUM* a, BIGNUM* b) {
@@ -1203,6 +1225,7 @@ __device__ void bn_set_word(BIGNUM *bn, BN_ULONG word) {
 }
 
 __device__ void bn_lshift_res(BIGNUM *result, BIGNUM *a, int shift) {
+    printf("++ bn_lshift_res ++\n");
     if (shift <= 0) {
         // No shift or invalid shift count; copy input to output with no modifications.
         bn_copy(result, a);
@@ -1245,7 +1268,7 @@ __device__ void bn_lshift_res(BIGNUM *result, BIGNUM *a, int shift) {
     for (int i = result->top; i < result->dmax; ++i) {
         result->d[i] = 0;
     }
-    printf("bn_lshift_res 3\n");
+    printf("-- bn_lshift_res --\n");
 }
 
 #define WORD_BITS 32  // or: #define WORD_BITS (8 * sizeof(BN_ULONG))
@@ -1278,7 +1301,7 @@ __device__ void bn_divide(BIGNUM *quotient, BIGNUM *remainder, BIGNUM *dividend,
     // Initialize the quotient and remainder
     // bn_zero(quotient);
     // bn_zero(remainder);
-    //printf(" ++ bn_divide ++\n");
+    printf(" ++ bn_divide ++\n");
     init_zero(quotient, MAX_BIGNUM_WORDS);
     init_zero(remainder, MAX_BIGNUM_WORDS);
 
@@ -1311,7 +1334,7 @@ __device__ void bn_divide(BIGNUM *quotient, BIGNUM *remainder, BIGNUM *dividend,
 
             /*To resolve the issue:
 
-            x Ensure that the bn_lshift_res function correctly shifts one by shift_amount bits to the left. It appears to be not working as intended since shifted_one does not change.
+            v Ensure that the bn_lshift_res function correctly shifts one by shift_amount bits to the left. It appears to be not working as intended since shifted_one does not change.
 
             x Verify the bn_subtract implementation. It correctly zeroed temp_dividend after one subtraction, which may be correct if shifted_divisor was properly aligned and temp_dividend consisted solely of the bit that was aligned to.
 
@@ -1323,6 +1346,7 @@ __device__ void bn_divide(BIGNUM *quotient, BIGNUM *remainder, BIGNUM *dividend,
 
             bn_print("0 temp_dividend: ", &temp_dividend);
             bn_print("0 shifted_divisor: ", &shifted_divisor);
+            printf("BREAK bn_divide BREAK\n");return; // TODO: Remove this!!
             bn_subtract(&temp_dividend, &temp_dividend, &shifted_divisor); // subtract the shifted divisor from the dividend
             bn_print("1 temp_dividend: ", &temp_dividend);
             init_zero(&shifted_one, MAX_BIGNUM_WORDS);
@@ -1346,101 +1370,6 @@ __device__ void bn_divide(BIGNUM *quotient, BIGNUM *remainder, BIGNUM *dividend,
     // Any necessary cleanup of BIGNUMs would be performed here
     // Make sure to handle any dynamic memory you may have allocated within this function
     printf(" -- bn_divide --\n");
-}
-
-__device__ void bn_mod_inverse_fixed_v0(BIGNUM *result, BIGNUM *a, BIGNUM *modulus) {
-    
-    // Allocate and initialize working variables
-    BIGNUM u, v, inv, u1, u3, v1, v3, t1, t3, q;
-    // Initialization of these BIGNUMs with proper handling for the CUDA environment is required
-    // Zero-initialize all BIGNUMs: u, v, inv, u1, u3, v1, v3, t1, t3, q
-    
-    /*bn_zero(&u); bn_zero(&v); bn_zero(&inv); 
-    bn_zero(&u1); bn_zero(&u3); 
-    bn_zero(&v1); bn_zero(&v3); 
-    bn_zero(&t1); bn_zero(&t3); 
-    bn_zero(&q);*/
-    init_zero(&u, MAX_BIGNUM_WORDS);
-    init_zero(&v, MAX_BIGNUM_WORDS);
-    init_zero(&inv, MAX_BIGNUM_WORDS);
-    init_zero(&u1, MAX_BIGNUM_WORDS);
-    init_zero(&u3, MAX_BIGNUM_WORDS);
-    init_zero(&v1, MAX_BIGNUM_WORDS);
-    init_zero(&v3, MAX_BIGNUM_WORDS);
-    init_zero(&t1, MAX_BIGNUM_WORDS);
-    init_zero(&t3, MAX_BIGNUM_WORDS);
-    init_zero(&q, MAX_BIGNUM_WORDS);
-
-    // Set initial values: u1 = 1, u = a, v1 = 0, v = modulus
-    bn_set_word(&u1, 1); 
-    
-    bn_copy(&u, a); 
-    // bn_set_word(&v1, 0); -- v1 is already zero-initialized
-    bn_copy(&v, modulus);
-    unsigned int i = 0; // TODO: remove this
-    // The algorithm proceeds to iteratively find the modular inverse
-    printf("++ bmi ++\n");    
-    // BIGNUM remainder;
-    while (!bn_is_zero(&u)) { // While u is not zero
-        if (i>10) break; // TODO: remove this
-        printf("\n%d", i); // TODO: remove this
-
-        bn_print("u: ", &u);
-        bn_print("v: ", &v);
-        
-        
-        bn_divide(&q, &u3, &v, &u); // Divide v by u to get quotient (q) and remainder (u3)
-        // bn_divide(&q, remainder, &v, &u);  
-        // bn_copy(&u, remainder);
-
-        bn_print("q: ", &q);
-        bn_print("u3: ", &u3);
-
-        //printf(" ## bn_mod_inverse TEST ##\n");
-        bn_mul(&t3, &q, &v1); // t3 = q * v1
-        bn_print("t3: ", &t3);
-        bn_print("u1: ", &u1);
-        bn_subtract(&t1, &u1, &t3); // t1 = u1 - t3
-        bn_print("t1: ", &t1);
-
-        // Shift: (u1, u) <- (v1, v), (v1, v) <- (t1, u3)
-        bn_copy(&u1, &v1); bn_copy(&u, &v);
-        bn_copy(&v1, &t1); bn_copy(&v, &u3);
-        
-
-
-        // After all calculations for this iteration
-        BIGNUM temp_u1, temp_u;
-        
-
-        bn_copy(&temp_u1, &v1);
-        bn_copy(&temp_u, &v);
-        
-        bn_copy(&v1, &t1);
-        bn_copy(&v, &u3);
-
-        bn_copy(&u1, &temp_u1);
-        bn_copy(&u, &temp_u);
-
-        // TODO: remove this ++
-        bn_print("u: ", &u);
-        bn_print("v: ", &v);
-        bn_print("u1: ", &u1);
-        bn_print("v1: ", &v1);
-        i++;
-        // TODO: remove this --
-    }
-    printf("CC bmi CC\n"); /*
-    // Ensure the result is non-negative
-    if (bn_is_negative(&v1)) {
-        bn_add(&inv, &v1, modulus);
-    } else {
-        bn_copy(&inv, &v1);
-    }
-
-    // Copy the result to the output parameter
-    bn_copy(result, &inv);
-    */
 }
 
 __device__ void bn_abs(BIGNUM *result, BIGNUM *a) {
@@ -1501,6 +1430,7 @@ __device__ void bn_swap(BIGNUM *a, BIGNUM *b) {
 }
 
 __device__ void bn_gcdext(BIGNUM *g, BIGNUM *s, BIGNUM *t, BIGNUM *a, BIGNUM *b) {
+    printf("++ bn_gcdext ++\n");
     // Assuming you've defined BIGNUM type, bn_copy, bn_abs_compare, bn_swap, bn_divide, bn_multiply, bn_zero, etc.
     
     // Temporary BIGNUM variables, you would need to provide memory allocation for them
@@ -1516,6 +1446,7 @@ __device__ void bn_gcdext(BIGNUM *g, BIGNUM *s, BIGNUM *t, BIGNUM *a, BIGNUM *b)
     init_zero(&qs, MAX_BIGNUM_WORDS);
     init_zero(&ts, MAX_BIGNUM_WORDS);
     
+    
     // if (bn_abs_compare(a, b) < 0) {
     if (bn_cmp(a, b) < 0) {
         // Ensure a >= b for the algorithm to work properly
@@ -1526,26 +1457,36 @@ __device__ void bn_gcdext(BIGNUM *g, BIGNUM *s, BIGNUM *t, BIGNUM *a, BIGNUM *b)
         bn_copy(&as, a);
         bn_copy(&bs, b);
     }
+
+    
     
 
     if (bn_is_zero(b)) {
+        printf("bn_is_zero(b)\n");
         // Base case: if b is zero, gcd is abs(a) and s is sign(a)
         bn_abs(g, a);
+        
         bn_set_signed_word(s, bn_is_negative(a) ? -1 : 1);
+        printf("## bn_gcdext ##\n");
+        // print t
+        bn_print("t: ", t);
         // bn_zero(t); // t is zero
         init_zero(t, MAX_BIGNUM_WORDS);
+        printf(" -- bn_gcdext r0 --\n");
         return;
-    }
-    
+    }    
     // Extended Euclidean Algorithm iteration
     unsigned int i = 0; // TODO: remove this
     while (!bn_is_zero(&bs)) {
+        
         printf("\n\ni: %d\n", i);
         bn_print("as: ", &as);
         bn_print("bs: ", &bs);
         bn_print("rs: ", &rs);
         bn_print("qs: ", &qs);
+        printf("BREAK bn_gcdext BREAK\n");return;
         bn_divide(&qs, &rs, &as, &bs); // qs = as / bs, rs = as % bs
+        
         printf("after bn_divide\n");
         bn_print("qs: ", &qs);
         bn_copy(&as, &bs); // Copying bs to as
@@ -1560,12 +1501,12 @@ __device__ void bn_gcdext(BIGNUM *g, BIGNUM *s, BIGNUM *t, BIGNUM *a, BIGNUM *b)
         i++;
         if (i>2) break; // TODO: remove this
     }
-    printf("BN gcd BN\n"); /*
+
     // Once done with the main loop, set g to as, and if g, s, t are negative, 
     // adjust them to be positive as done in the GMP code
     
     // Make sure to free any resources you've allocated if you're manually managing memory
-    */
+    printf(" -- bn_gcdext --\n");
 }
 
 __device__ void bn_mod_inverse_fixed(BIGNUM *inverse, BIGNUM *x, BIGNUM *n) {
