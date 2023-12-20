@@ -254,15 +254,10 @@ __device__ void init_zero(BIGNUM *bn, int capacity) {
     bn->dmax = capacity; // Make sure to track the capacity in dmax.
 }
 
-__device__ void init_zero_v0(BIGNUM *bn, int capacity) {
-    bn->d = new BN_ULONG[capacity]; // Dynamically allocate the required number of words.
-    for (int i = 0; i < capacity; i++) {
-        bn->d[i] = 0;
-    }
-
-    bn->top = (capacity > 0) ? 1 : 0;
-    bn->neg = 0;
-    bn->dmax = capacity; // Make sure to track the capacity in dmax.
+__device__ void init_one(BIGNUM *bn, int capacity) {
+    init_zero(bn, capacity); // Initialize the BIGNUM to zero first
+    bn->d[0] = 1;           // Set the least significant word to 1
+    bn->top = (capacity > 0) ? 1 : 0; // There is one significant digit if capacity allows
 }
 
 __device__ int bn_cmp(BIGNUM* a, BIGNUM* b) {
@@ -285,16 +280,6 @@ __device__ int bn_cmp(BIGNUM* a, BIGNUM* b) {
   }
 
   // Numbers are equal
-  return 0;
-}
-
-__device__ int bn_cmp_v0(BIGNUM* a, BIGNUM* b) {
-  if (a->top > b->top) return 1;
-  if (a->top < b->top) return -1;
-  for (int i = a->top - 1; i >= 0; i--) {
-    if (a->d[i] > b->d[i]) return 1;
-    if (a->d[i] < b->d[i]) return -1;
-  }
   return 0;
 }
 
@@ -881,8 +866,45 @@ __device__ void bn_sub(BIGNUM *a, BIGNUM *b, BIGNUM *r) {
     r->neg = 0; // Assuming we don't want negative numbers, otherwise set sign properly
 }
 
-
 __device__ void bn_mul(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
+    // Assuming all BIGNUMs are initialized and `d` arrays have enough allocated memory.
+    
+    // Initialize product to zero.
+    for (int i = 0; i < product->dmax; i++) {
+        product->d[i] = 0;
+    }
+    product->top = 0;
+
+    // Multiply each digit of a by each digit of b, accumulate results in product
+    for (int i = 0; i < a->top; i++) {
+        BN_ULONG carry = 0;
+        for (int j = 0; j < b->top || carry; j++) {
+            // Calculate the full multiplication result (including carry)
+            unsigned long long sum = (unsigned long long)product->d[i + j] + carry;
+            
+            // If we don't exceed b's digits, include the multiplication result
+            if (j < b->top) {
+                sum += (unsigned long long)a->d[i] * b->d[j];
+            }
+            
+            product->d[i + j] = (BN_ULONG)sum; // Store the lower half of the result
+            carry = (BN_ULONG)(sum >> BN_ULONG_NUM_BITS); // Shift right to get the upper half (carry)
+        }
+
+        // Make sure to check the next cell if a carry is present
+        if (carry && (i + b->top + 1 > product->top)) {
+            product->d[i + b->top] = carry;
+            product->top = i + b->top + 1; // Include the extra cell used by carry
+        } else if (i + b->top > product->top) {
+            product->top = i + b->top; // Update top based on position
+        }
+    }
+
+    // Now 'product' contains the product of 'a' and 'b', without modulo operation.
+    // Perform a modulo operation here if necessary (modular reduction).
+}
+
+__device__ void bn_mul_v0(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
     // Assuming all BIGNUMs are initialized, and all the `d` arrays have enough allocated memory.
     
     // Initialize product to zero.
@@ -915,6 +937,8 @@ __device__ void bn_mul(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
     // Now product contains the product of a and b, without modulo operation.
     // If necessary, perform a modulo operation here (modular reduction), or separately after calling bn_mul.
 }
+
+
 
 __device__ void bn_add_bit(BIGNUM *a, int bit_index) {
     // Determine the word in the array where this bit resides.
@@ -1889,15 +1913,56 @@ __device__ void bn_swap(BIGNUM *a, BIGNUM *b) {
 
 __device__ void bn_gcdext(BIGNUM *g, BIGNUM *s, BIGNUM *t, BIGNUM *a, BIGNUM *b) {
     printf("++ bn_gcdext ++\n");
+
+    // Temporary BIGNUM variables for intermediate calculations
+    BIGNUM prev_s, prev_t, quotient, temp;
+    init_zero(&prev_s, MAX_BIGNUM_WORDS);
+    init_zero(&prev_t, MAX_BIGNUM_WORDS);
+    init_zero(&quotient, MAX_BIGNUM_WORDS);
+    init_zero(&temp, MAX_BIGNUM_WORDS);
+
+    // Initialize s and t coefficients for the extended GCD algorithm
+    init_one(s, MAX_BIGNUM_WORDS);     // s = 1
+    init_zero(&prev_s, MAX_BIGNUM_WORDS);  // prev_s = 0
+
+    init_zero(t, MAX_BIGNUM_WORDS);    // t = 0
+    init_one(&prev_t, MAX_BIGNUM_WORDS);  // prev_t = 1
+
+    // Initialize g and b for the gcd calculation
+    bn_copy(g, a);
+    bn_copy(b, b);
+
+    while (!bn_is_zero(b)) {
+        bn_divide(&quotient, &temp, g, b);
+        
+        // g = b
+        bn_copy(g, b);
+        // b = temp (remainder)
+        bn_copy(b, &temp);
+
+        // temp = (s - quotient * prev_s)
+        bn_mul(&temp, &quotient, &prev_s); // temp = quotient * prev_s
+        bn_subtract(&temp, s, &temp);      // temp = s - temp
+        bn_copy(s, &prev_s);
+        bn_copy(&prev_s, &temp);
+
+        // temp = (t - quotient * prev_t)
+        bn_mul(&temp, &quotient, &prev_t); // temp = quotient * prev_t
+        bn_subtract(&temp, t, &temp);      // temp = t - temp
+        bn_copy(t, &prev_t);
+        bn_copy(&prev_t, &temp);
+    }
+
+    // Now g contains gcd(a, b), and s and t contain the Bezout coefficients
+    printf(" -- bn_gcdext --\n");
+}
+
+__device__ void bn_gcdext_v0(BIGNUM *g, BIGNUM *s, BIGNUM *t, BIGNUM *a, BIGNUM *b) {
+    printf("++ bn_gcdext ++\n");
     // Assuming you've defined BIGNUM type, bn_copy, bn_abs_compare, bn_swap, bn_divide, bn_multiply, bn_zero, etc.
     
     // Temporary BIGNUM variables, you would need to provide memory allocation for them
     BIGNUM as, bs, rs, qs, ts;
-    /*bn_zero(&as);
-    bn_zero(&bs);
-    bn_zero(&rs);
-    bn_zero(&qs);
-    bn_zero(&ts);*/
     init_zero(&as, MAX_BIGNUM_WORDS);
     init_zero(&bs, MAX_BIGNUM_WORDS);
     init_zero(&rs, MAX_BIGNUM_WORDS);
@@ -1916,9 +1981,6 @@ __device__ void bn_gcdext(BIGNUM *g, BIGNUM *s, BIGNUM *t, BIGNUM *a, BIGNUM *b)
         bn_copy(&bs, b);
     }
 
-    
-    
-
     if (bn_is_zero(b)) {
         printf("bn_is_zero(b)\n");
         // Base case: if b is zero, gcd is abs(a) and s is sign(a)
@@ -1930,7 +1992,7 @@ __device__ void bn_gcdext(BIGNUM *g, BIGNUM *s, BIGNUM *t, BIGNUM *a, BIGNUM *b)
         bn_print("t: ", t);
         // bn_zero(t); // t is zero
         init_zero(t, MAX_BIGNUM_WORDS);
-        printf(" -- bn_gcdext r0 --\n");
+        // printf(" -- bn_gcdext r0 --\n");
         return;
     }    
     // Extended Euclidean Algorithm iteration
@@ -1942,7 +2004,7 @@ __device__ void bn_gcdext(BIGNUM *g, BIGNUM *s, BIGNUM *t, BIGNUM *a, BIGNUM *b)
         bn_print("bs: ", &bs);
         bn_print("rs: ", &rs);
         bn_print("qs: ", &qs);
-        printf("BREAK bn_gcdext BREAK\n");return;
+        // printf("BREAK bn_gcdext BREAK\n");return;
         bn_divide(&qs, &rs, &as, &bs); // qs = as / bs, rs = as % bs
         
         printf("after bn_divide\n");
@@ -1956,8 +2018,6 @@ __device__ void bn_gcdext(BIGNUM *g, BIGNUM *s, BIGNUM *t, BIGNUM *a, BIGNUM *b)
         // This will involve multiplying and subtracting to update s, t
         // This is a non-trivial part and requires careful implementation
         // ...
-        i++;
-        if (i>2) break; // TODO: remove this
     }
 
     // Once done with the main loop, set g to as, and if g, s, t are negative, 
