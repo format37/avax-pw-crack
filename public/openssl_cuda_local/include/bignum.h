@@ -243,12 +243,52 @@ __device__ void init_zero(BIGNUM *bn, int capacity) {
         bn->d[i] = 0;
     }
 
+    // top is used for representing the actual size of the 
+    // significant part of the number for calculation purposes.
+    bn->top = 0; // There are no significant digits when all words are zero.
+
+    bn->neg = 0;
+    
+    // dmax is used to manage the memory allocation and ensure you 
+    // do not access out-of-bounds memory.
+    bn->dmax = capacity; // Make sure to track the capacity in dmax.
+}
+
+__device__ void init_zero_v0(BIGNUM *bn, int capacity) {
+    bn->d = new BN_ULONG[capacity]; // Dynamically allocate the required number of words.
+    for (int i = 0; i < capacity; i++) {
+        bn->d[i] = 0;
+    }
+
     bn->top = (capacity > 0) ? 1 : 0;
     bn->neg = 0;
     bn->dmax = capacity; // Make sure to track the capacity in dmax.
 }
 
 __device__ int bn_cmp(BIGNUM* a, BIGNUM* b) {
+  // Skip leading zeroes and find the actual top for a
+  int a_top = a->top - 1;
+  while (a_top >= 0 && a->d[a_top] == 0) a_top--;
+
+  // Skip leading zeroes and find the actual top for b
+  int b_top = b->top - 1;
+  while (b_top >= 0 && b->d[b_top] == 0) b_top--;
+
+  // Now, use the actual tops for comparison
+  if (a_top > b_top) return 1;
+  if (a_top < b_top) return -1;
+
+  // Both numbers have the same number of significant digits, so compare them starting from the most significant
+  for (int i = a_top; i >= 0; i--) {
+    if (a->d[i] > b->d[i]) return 1;
+    if (a->d[i] < b->d[i]) return -1;
+  }
+
+  // Numbers are equal
+  return 0;
+}
+
+__device__ int bn_cmp_v0(BIGNUM* a, BIGNUM* b) {
   if (a->top > b->top) return 1;
   if (a->top < b->top) return -1;
   for (int i = a->top - 1; i >= 0; i--) {
@@ -1286,6 +1326,15 @@ __device__ void set_point_at_infinity(EC_POINT *point) {
     init_zero(&point->y, MAX_BIGNUM_WORDS);
 }
 
+__device__ int find_top(BIGNUM *bn, int max_words) {
+    for (int i = max_words - 1; i >= 0; i--) {
+        if (bn->d[i] != 0) {
+            return i + 1; // We return the index of the highest non-zero word plus one
+        }
+    }
+    return 0; // If all words are zero, the top is 0
+}
+
 __device__ void bn_subtract(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
     BN_ULONG borrow = 0;
     BN_ULONG temp_borrow;
@@ -1429,7 +1478,113 @@ __device__ void bn_normalize(BIGNUM *bn) {
     }
 }
 
+#define BN_ULONG_BITS (sizeof(BN_ULONG) * 8)
+
+__device__ int get_msb_bit(BIGNUM *n) {
+  for (int i = n->top - 1; i >= 0; i--) {
+    BN_ULONG word = n->d[i]; 
+    for (int j = BN_ULONG_BITS - 1; j >= 0; j--) {
+      if (word & ((BN_ULONG)1 << j)) { 
+        return (i * BN_ULONG_BITS) + j;
+      }
+    }
+  }
+  return -1; // All zero
+}
+
+__device__ void bn_rshift_one(BIGNUM *bn) {
+    if (bn_is_zero(bn)) {
+        return; // If the big number is zero, there's nothing to shift
+    }
+
+    BN_ULONG carry = 0;
+    for (int i = bn->top - 1; i >= 0; --i) {
+        // Take the current digit and the previous carry to create a composite
+        BN_ULONG composite = (carry << (BN_ULONG_NUM_BITS - 1)) | (bn->d[i] >> 1);
+        carry = bn->d[i] & 1; // Save the LSB before shifting as the next carry
+        bn->d[i] = composite;
+    }
+
+    // If the most significant digit is now zero, update the `top` counter
+    if (bn->top > 0 && bn->d[bn->top - 1] == 0) {
+        bn->top--;
+    }
+}
+
 __device__ void bn_divide(BIGNUM *quotient, BIGNUM *remainder, BIGNUM *dividend, BIGNUM *divisor) {
+    printf(" ++ bn_divide ++ \n");
+
+    // Initialize quotient and remainder
+    init_zero(quotient, MAX_BIGNUM_WORDS);
+    init_zero(remainder, MAX_BIGNUM_WORDS);
+    bn_copy(remainder, dividend);
+
+    if (bn_is_zero(divisor)) {
+        printf("Division by zero!\n");
+        return;
+    }
+
+    BIGNUM temp_divisor;
+    init_zero(&temp_divisor, MAX_BIGNUM_WORDS);
+
+    int word_shift, bit_shift;
+    
+    int debug_count = 0; // Counter to prevent infinite loop
+
+    //while (bn_cmp(remainder, divisor) >= 0 && debug_count < 10) {
+    while (bn_cmp(remainder, divisor) >= 0) {
+        // Calculate needed shifts
+        word_shift = remainder->top - divisor->top;
+        bit_shift = get_msb_bit(remainder) - get_msb_bit(divisor);
+
+        // Handle negative shift
+        if (bit_shift < 0) {
+            bit_shift += BN_ULONG_NUM_BITS;
+            word_shift--;
+        }
+
+        // Print debug shifts
+        printf("Word shift: %d, Bit shift: %d\n", word_shift, bit_shift);
+
+        // Shift divisor
+        bn_lshift_res(&temp_divisor, divisor, bit_shift + (word_shift * BN_ULONG_NUM_BITS));
+
+        // Print debug values
+        bn_print("Shifted divisor", &temp_divisor);
+        bn_print("Remainder", remainder);
+        bn_print("Quotient ", quotient);
+
+        // If the shifted divisor is greater, decrease shift
+        if (bn_cmp(&temp_divisor, remainder) > 0) {
+            bit_shift--;
+            bn_rshift_one(&temp_divisor);
+        }
+
+        // Main division step
+        bn_subtract(remainder, remainder, &temp_divisor);
+
+        // Add the shift to quotient
+        if (quotient->top < word_shift + 1) {
+            quotient->top = word_shift + 1; // Update the number of digits
+        }
+        quotient->d[word_shift] |= ((BN_ULONG)1 << bit_shift);
+
+        // Print debug values
+        bn_print("After Subtraction - Shifted divisor", &temp_divisor);
+        bn_print("After Subtraction - Remainder", remainder);
+        bn_print("After Subtraction - Quotient ", quotient);
+
+        debug_count++;
+    }
+
+    if (debug_count >= 10) {
+        printf("Error: debug_count >= 10 in bn_divide.\n");
+    }
+
+    printf(" -- bn_divide --\n");
+}
+
+__device__ void bn_divide_v2(BIGNUM *quotient, BIGNUM *remainder, BIGNUM *dividend, BIGNUM *divisor) {
     printf(" ++ bn_divide ++\n");
 
     // Initialize the quotient and remainder
