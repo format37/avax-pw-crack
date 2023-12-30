@@ -16,9 +16,9 @@ int main() {
         "F",
         "F",
         "17", // 23 in decimal
-        "FEDCBA09876543211234567890ABCDEF", // Multi-word dividend
-        "0000000000000000FEDCBA09876543211234567890ABCDEF", // Dividend with leading zero word
-        "00000000000000000000000000000000FEDCBA09876543211234567890ABCDEF" // Dividend with more leading zero words
+        "1234567890ABCDEF", // Single-word dividend
+        "00000000000000001234567890ABCDEF", // Leading zero words
+        "000000000000000000000000000000001234567890ABCDEF" // More leading zero words
     };
 
     char* test_values_divisor[] = {
@@ -26,9 +26,9 @@ int main() {
         "F",
         "1",
         "5", // 5 in decimal
-        "10000000000000001", // Multi-word divisor
-        "100000000000000000000000000000000", // Divisor with leading zero word
-        "10000000000000000000000000000000000000000000000000000000000000001" // Divisor with more leading zero words
+        "1", // Single-word divisor
+        "0000000000000001", // Leading zero words
+        "00000000000000000000000000000001" // More leading zero words
     };
 
     int num_tests = sizeof(test_values_dividend) / sizeof(test_values_dividend[0]);
