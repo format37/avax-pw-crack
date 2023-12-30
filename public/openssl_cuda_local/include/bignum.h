@@ -1144,8 +1144,13 @@ __device__ void bn_swap(BIGNUM *a, BIGNUM *b) {
     // ... Repeat for other scalar elements of BIGNUM as necessary
 }
 
-__device__ void bn_gcdext(BIGNUM *g, BIGNUM *s, BIGNUM *t, BIGNUM *a, BIGNUM *b) {
+__device__ void bn_gcdext(BIGNUM *g, BIGNUM *s, BIGNUM *t, BIGNUM *a, BIGNUM *b_original) {
     printf("++ bn_gcdext ++\n");
+
+    // Temporary BIGNUM for b, to avoid modifying the original b
+    BIGNUM b_temp;
+    init_zero(&b_temp, MAX_BIGNUM_WORDS);
+    bn_copy(&b_temp, b_original); // Copy original b to temporary variable
 
     // Temporary BIGNUM variables for intermediate calculations
     BIGNUM prev_s, prev_t, quotient, temp;
@@ -1163,15 +1168,15 @@ __device__ void bn_gcdext(BIGNUM *g, BIGNUM *s, BIGNUM *t, BIGNUM *a, BIGNUM *b)
 
     // Initialize g and b for the gcd calculation
     bn_copy(g, a);
-    bn_copy(b, b);
+    //bn_copy(b, b);
 
-    while (!bn_is_zero(b)) {
-        bn_divide(&quotient, &temp, g, b);
+    while (!bn_is_zero(&b_temp)) {
+        bn_divide(&quotient, &temp, g, &b_temp);
         
         // g = b
-        bn_copy(g, b);
+        bn_copy(g, &b_temp);
         // b = temp (remainder)
-        bn_copy(b, &temp);
+        bn_copy(&b_temp, &temp);
 
         // temp = (s - quotient * prev_s)
         bn_mul(&temp, &quotient, &prev_s); // temp = quotient * prev_s

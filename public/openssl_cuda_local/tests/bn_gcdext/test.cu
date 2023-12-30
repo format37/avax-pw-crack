@@ -7,32 +7,49 @@
 #define BN_ULONG unsigned long long int
 #define BN_ULONG_NUM_BITS (sizeof(BN_ULONG)*8)
 
-// Test cases for bn_gcdext
 __global__ void testKernel() {
     printf("++ testKernel for bn_gcdext ++\n");
-    // Initialize BIGNUMs for testing
-    BIGNUM a, b, g, s, t;
-    init_zero(&a, MAX_BIGNUM_WORDS);
-    init_zero(&b, MAX_BIGNUM_WORDS);
-    init_zero(&g, MAX_BIGNUM_WORDS);
-    init_zero(&s, MAX_BIGNUM_WORDS);
-    init_zero(&t, MAX_BIGNUM_WORDS);
+    
+    // Test cases like in C
+    BN_ULONG test_values_a[] = {
+        0x123456789ABCDEFULL,
+        0x1FFF3ULL,
+        0xFEDCBA9876543210ULL
+    };
+    
+    BN_ULONG test_values_b[] = {
+        0xFEDCBA987654321ULL,
+        0x2468ACEULL,
+        0xFEDCBA9876543210ULL
+    };
+    
+    int num_tests = sizeof(test_values_a) / sizeof(test_values_a[0]);
+    
+    for (int test = 0; test < num_tests; ++test) {
+        // Initialize BIGNUMs for testing
+        BIGNUM a, b, g, s, t;
+        init_zero(&a, MAX_BIGNUM_WORDS);
+        init_zero(&b, MAX_BIGNUM_WORDS);
+        init_zero(&g, MAX_BIGNUM_WORDS);
+        init_zero(&s, MAX_BIGNUM_WORDS);
+        init_zero(&t, MAX_BIGNUM_WORDS);
 
-    // Initialize 'a' and 'b' with some values for gcd calculation
-    // Choose arbitrary values for a and b here; for a real test, use meaningful values
-    a.d[0] = 0x12345; a.top = 1;
-    b.d[0] = 0x6789;  b.top = 1;
+        // Initialize 'a' and 'b' with the test values
+        a.d[0] = test_values_a[test]; a.top = 1;
+        b.d[0] = test_values_b[test];  b.top = 1;
 
-    // Test gcdext
-    bn_gcdext(&g, &s, &t, &a, &b);
+        // Test gcdext
+        bn_gcdext(&g, &s, &t, &a, &b);
 
-    // Print result
-    printf("Testing bn_gcdext function:\n");
-    bn_print("a: ", &a);
-    bn_print("b: ", &b);
-    bn_print("gcd: ", &g);
-    bn_print("s: ", &s);
-    bn_print("t: ", &t);
+        // Print result
+        printf("Test %d:\n", test + 1);
+        bn_print("a: ", &a);
+        bn_print("b: ", &b);
+        bn_print("gcd: ", &g);
+        bn_print("s: ", &s);
+        bn_print("t: ", &t);
+    }
+    
     printf("-- Finished testKernel for bn_gcdext --\n");
 }
 
