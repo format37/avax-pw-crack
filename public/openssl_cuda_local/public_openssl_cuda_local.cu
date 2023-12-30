@@ -9,6 +9,7 @@ __device__ EC_POINT ec_point_scalar_mul(
     BIGNUM *curve_prime, 
     BIGNUM *curve_a
     ) {
+    printf("++ ec_point_scalar_mul ++\n");
     EC_POINT current = *point;                       // This initializes the current point with the input point
     EC_POINT result;                                 // Initialize the result variable, which accumulates the result
     init_point_at_infinity(&result);                 // Initialize it to the point at infinity
@@ -58,6 +59,7 @@ __device__ EC_POINT ec_point_scalar_mul(
         if (i<debug_counter) bn_print("2 current.x: ", &current.x);
         // debug_printf("2 y: %s\n", bignum_to_hex(&current.y));
         if (i<debug_counter) bn_print("2 current.y: ", &current.y);
+        printf("BREAKING\n");
         break; // TODO: remove this
     }
 
@@ -65,7 +67,7 @@ __device__ EC_POINT ec_point_scalar_mul(
     bn_print("Final x: ", &result.x);
     // debug_printf("Final y: %s\n", bignum_to_hex(&result.y));
     bn_print("Final y: ", &result.y);
-
+    printf("-- ec_point_scalar_mul --\n");
     return result;
 }
 // Public key derivation --

@@ -1,4 +1,5 @@
 #include "bn.h"
+#include <assert.h>
 #define debug_print false
 #define BN_MASK2 0xffffffff;
 
@@ -499,7 +500,7 @@ __device__ void bn_sub(BIGNUM *a, BIGNUM *b, BIGNUM *r) {
     r->neg = 0; // Assuming we don't want negative numbers, otherwise set sign properly
 }
 
-__device__ void bn_mul(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
+/*__device__ void bn_mul_v0(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
     // Assuming all BIGNUMs are initialized and `d` arrays have enough allocated memory.
     
     // Initialize product to zero.
@@ -535,7 +536,228 @@ __device__ void bn_mul(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
 
     // Now 'product' contains the product of 'a' and 'b', without modulo operation.
     // Perform a modulo operation here if necessary (modular reduction).
+}*/
+__device__ void bn_mul_v1_top_ok(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
+    // Initialize product to zero.
+    for (int i = 0; i < product->dmax; i++) {
+        product->d[i] = 0;
+    }
+    
+    // Set product 'top' to 0 initially.
+    product->top = 0;
+
+    // Multiply each digit of a by each digit of b, accumulate results in product
+    for (int i = 0; i < a->top; i++) {
+        BN_ULONG carry = 0;
+        int j = 0;
+        for (j = 0; j < b->top; j++) {
+            // Calculate the full multiplication result (including carry)
+            unsigned long long sum = (unsigned long long)product->d[i + j] +
+                                     (unsigned long long)a->d[i] * b->d[j] +
+                                     carry;
+            
+            product->d[i + j] = (BN_ULONG)sum; // Store the lower part of the result
+            carry = (BN_ULONG)(sum >> BN_ULONG_NUM_BITS); // Shift right to get the upper part (carry)
+        }
+        if (carry > 0) {
+            product->d[i + j] = carry; // Store the last carry, if any
+            product->top = i + j + 1; // Update 'top' to reflect the true size
+        } else {
+            product->top = i + j; // Update 'top' to reflect the true size
+        }
+    }
+
+    // Sanitize the 'top' value to ensure it does not include any leading zero words.
+    while (product->top > 0 && product->d[product->top - 1] == 0) {
+        product->top--;
+    }
+
+    // Now 'product' contains the product of 'a' and 'b', without modulo operation.
 }
+
+__device__ void bn_mul_v2_bad(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
+    // Initialize the product to zero.
+    for (int i = 0; i < a->top + b->top; i++) {
+        product->d[i] = 0;
+    }
+
+    // Perform the multiplication and accumulate the results.
+    for (int i = 0; i < a->top; i++) {
+        BN_ULONG carry = 0;
+        int j;
+        for (j = 0; j < b->top; j++) {
+            unsigned long long sum = (unsigned long long)product->d[i + j] +
+                                     (unsigned long long)a->d[i] * (unsigned long long)b->d[j] +
+                                     (unsigned long long)carry;
+            product->d[i + j] = (BN_ULONG)(sum & 0xFFFFFFFFFFFFFFFFULL);  // Assume 64-bit words
+            carry = (BN_ULONG)(sum >> BN_ULONG_NUM_BITS);
+        }
+
+        // If there is carry left at the end of the inner loop, it should be added to the next position
+        product->d[i + j] = carry;
+    }
+
+    // Find the most significant non-zero word and update the 'top'
+    for (int k = a->top + b->top - 1; k >= 0; k--) {
+        if (product->d[k] != 0) {
+            product->top = k + 1;
+            break;
+        }
+    }
+
+    // If after the multiplication the 'top' is zero, set 'top' to 1
+    // because even with a zero product, there should be at least one word in length.
+    if (product->top == 0) {
+        product->top = 1;
+    }
+}
+
+__device__ void bn_mul_v3_bad(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
+    // Initialize the product to zero.
+    for (int i = 0; i < a->top + b->top; i++) {
+        product->d[i] = 0;
+    }
+
+    // Perform the multiplication and accumulate the results.
+    for (int i = 0; i < a->top; i++) {
+        BN_ULONG carry = 0;
+        int j;
+        for (j = 0; j < b->top; j++) {
+            unsigned long long sum = (unsigned long long)product->d[i + j] +
+                                     (unsigned long long)a->d[i] * (unsigned long long)b->d[j] +
+                                     (unsigned long long)carry;
+            product->d[i + j] = (BN_ULONG)(sum & 0xFFFFFFFFFFFFFFFFULL);  // Assume 64-bit words
+            carry = (BN_ULONG)(sum >> BN_ULONG_NUM_BITS);
+        }
+        product->d[i + j] = carry;  // Store the carry in the next word of the product.
+    }
+
+    // Set the top to reflect the actual size of the product.
+    for (int k = a->top + b->top; k > 0; k--) {
+        if (product->d[k - 1] != 0) {
+            product->top = k;
+            break;
+        }
+    }
+
+    if (product->top == 0) {
+        // Even a zero product should have a top of 1.
+        product->top = 1;
+    }
+}
+
+__device__ void bn_add_words(BN_ULONG *a, unsigned long long carry, int idx, int dmax) {
+    // Since carry could be more than one word, propagate it if necessary.
+    while (carry != 0 && idx < dmax) {
+        unsigned long long sum = (unsigned long long) a[idx] + (carry & 0xFFFFFFFFFFFFFFFFULL);
+        a[idx] = (BN_ULONG)(sum & 0xFFFFFFFFFFFFFFFFULL);
+        carry = sum >> BN_ULONG_NUM_BITS;
+        idx++;
+    }
+}
+
+__device__ void bn_mul(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
+    // Print the input values.
+    /*printf("a = %016llx\n", a->d[0]);
+    printf("b = %016llx\n", b->d[0]);*/
+
+    // Set high parts to zero for single BN_ULONG multiplication
+    unsigned long long alow = a->d[0], blow = b->d[0];  // Low 64 bits
+    unsigned long long ahigh = 0, bhigh = 0;
+    unsigned long long lolo, lohi, hilo, hihi; // partial products
+
+    // Perform multiplication of the lower words.
+    lolo = a->d[0] * b->d[0];
+    lohi = __umul64hi(a->d[0], b->d[0]);
+
+    // Since higher words are zero, these multiplications will also be zero.
+    hihi = ahigh * bhigh; // would be a higher overflow part (not needed for single word each).
+    hilo = ahigh * blow; // not needed for single word each
+
+    // Print the partial products
+    /*printf("lolo = %016llx\n", lolo);
+    printf("lohi = %016llx\n", lohi);
+    printf("hilo = %016llx\n", hilo); // will always be zero in this context
+    printf("hihi = %016llx\n", hihi); // will always be zero in this context*/
+
+    // Clear the product BIGNUM
+    product->d[0] = product->d[1] = 0;
+    product->top = 0;
+
+    // Set the product's lower and higher words
+    product->d[0] = lolo;
+    product->d[1] = lohi + hilo; // As hilo and hihi are zero, no additional carry will be added.
+
+    // Print the intermediate product result before considering overflow
+    //printf("Intermediate product = %016llx %016llx\n", product->d[1], product->d[0]);
+
+    // Check if there is any overflow beyond 128 bits (should not be in this context)
+    if ((lohi + hilo) < lohi) {
+        // This means carrying into another higher word would be necessary
+        //printf("Carry overflow occurred! Need to handle additional word.\n");
+        // Assuming there's space for another word
+        unsigned long long carry = 1;
+        int i = 2; //next index after 0,1
+        while (carry != 0 && i < a->top + b->top) {
+            unsigned long long sum = product->d[i] + carry;
+            product->d[i] = sum;
+            carry = sum < carry ? 1 : 0; // Carry continues if the sum is less than carried value
+            i++;
+        }
+    }
+
+    // Update the 'top' based on the product.
+    product->top = (product->d[1] != 0) ? 2 : (product->d[0] != 0) ? 1 : 0;
+
+    // Print the final product and 'top' value
+    /*printf("Final product = %016llx %016llx\n", product->d[1], product->d[0]);
+    printf("Final top = %d\n", product->top);*/
+}
+
+/*__device__ void bn_mul_multi_word_wrong(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
+    // Initialize the product
+    for (int i = 0; i < a->top + b->top; i++) {
+        product->d[i] = 0;
+    }
+    
+    // Perform multiplication for each word of 'BIGNUM a' with each word of 'BIGNUM b'.
+    for (int i = 0; i < a->top; i++) {
+        unsigned long long carry = 0;
+        for (int j = 0; j < b->top; j++) {
+            // Multiply current words.
+            unsigned long long product_ij = (unsigned long long)a->d[i] * b->d[j];
+            
+            // Add product to the current spot in the result, taking into account the carry.
+            unsigned long long sum = product->d[i + j] + (BN_ULONG)product_ij + carry;
+            
+            // Set the current spot in the result.
+            product->d[i + j] = (BN_ULONG)sum;
+            
+            // Calculate carry for the next iteration.
+            carry = (product_ij >> 64) + (sum >> 64);
+        }
+        
+        // Propagate remaining carry
+        int k = i + b->top;
+        while (carry > 0 && k < a->top + b->top) {
+            unsigned long long sum = (unsigned long long)product->d[k] + (carry & 0xFFFFFFFFFFFFFFFFULL);
+            product->d[k] = (BN_ULONG)sum; // Store lower 64 bits of the sum
+            carry = sum >> 64;  // The carry for the next word will be the upper 64 bits
+            k++;
+        }
+    }
+    
+    // Set top of the product correctly
+    product->top = a->top + b->top;
+    while (product->top > 0 && product->d[product->top - 1] == 0)
+        product->top--; // Shrink the top value if the higher words are zero.
+}*/
+
+// Important Note: This function assumes that `product` has been allocated with enough space
+// to hold at least two words (BN_ULONG values), as the result may require up to 128-bits of space.
+
+// Your CUDA kernel and main() function code would remain the same,
+// call bn_mul(a, b, product) just like before within your kernel.
 
 __device__ void bn_add_bit(BIGNUM *a, int bit_index) {
     // Determine the word in the array where this bit resides.
@@ -1031,8 +1253,6 @@ __device__ void bn_divide(BIGNUM *quotient, BIGNUM *remainder, BIGNUM *dividend,
     init_zero(&temp_divisor, MAX_BIGNUM_WORDS);
 
     int word_shift, bit_shift;
-    
-    int debug_count = 0; // Counter to prevent infinite loop  // TODO: remove this
 
     //while (bn_cmp(remainder, divisor) >= 0 && debug_count < 10) {
     while (bn_cmp(remainder, divisor) >= 0) {
@@ -1076,8 +1296,6 @@ __device__ void bn_divide(BIGNUM *quotient, BIGNUM *remainder, BIGNUM *dividend,
         /*bn_print("After Subtraction - Shifted divisor", &temp_divisor);
         bn_print("After Subtraction - Remainder", remainder);
         bn_print("After Subtraction - Quotient ", quotient);*/
-
-        debug_count++; // TODO: remove this
     }
 
     /*if (debug_count >= 10) {
@@ -1158,14 +1376,16 @@ __device__ void bn_gcdext(BIGNUM *g, BIGNUM *s, BIGNUM *t, BIGNUM *a, BIGNUM *b_
     init_zero(&prev_t, MAX_BIGNUM_WORDS);
     init_zero(&quotient, MAX_BIGNUM_WORDS);
     init_zero(&temp, MAX_BIGNUM_WORDS);
-
+    
     // Initialize s and t coefficients for the extended GCD algorithm
     init_one(s, MAX_BIGNUM_WORDS);     // s = 1
+    
     init_zero(&prev_s, MAX_BIGNUM_WORDS);  // prev_s = 0
-
+    
     init_zero(t, MAX_BIGNUM_WORDS);    // t = 0
+    printf("## bn_gcdext ##\n");
     init_one(&prev_t, MAX_BIGNUM_WORDS);  // prev_t = 1
-
+    
     // Initialize g and b for the gcd calculation
     bn_copy(g, a);
     //bn_copy(b, b);
@@ -1195,24 +1415,20 @@ __device__ void bn_gcdext(BIGNUM *g, BIGNUM *s, BIGNUM *t, BIGNUM *a, BIGNUM *b_
     printf(" -- bn_gcdext --\n");
 }
 
-__device__ void bn_mod_inverse_fixed(BIGNUM *inverse, BIGNUM *x, BIGNUM *n) {
+/*__device__ void bn_mod_inverse_fixed_v0(BIGNUM *inverse, BIGNUM *x, BIGNUM *n) {
     // This assumes bn_gcdext has been implemented which calculates the gcd and the coefficient as gcdext does
     printf("++ bmi ++\n");
-    BIGNUM gcd, coefficient;
+    BIGNUM gcd, coefficient, gcd_t;
     
-    // You must implement init and zero functions if not already existing
     // Initialize gcd and coefficient
     init_zero(&gcd, MAX_BIGNUM_WORDS);
     init_zero(&coefficient, MAX_BIGNUM_WORDS);
-    //printf("FF CONTINUE FROM THIS POINT FF\n"); return; // TODO: remove this CONTINUE FROM THIS POINT
+    init_zero(&gcd_t, MAX_BIGNUM_WORDS);
     // Calculate gcd and coefficient where x * coefficient = gcd (mod n)
-    bn_gcdext(&gcd, &coefficient, NULL, x, n);
-    printf("TEST PASSED: bn_gcdext\n");
+    bn_gcdext(&gcd, &coefficient, &gcd_t, x, n);
     // Check that the GCD is 1, ensuring an inverse exists
     if (!bn_is_one(&gcd)) {
-        // return 0; // No inverse exists
-        // printf(" -- bmi --\n");
-        // bn_init(inverse);
+        printf(" -- bmi: !bn_is_one(&gcd) --\n");
         return;
     }
 
@@ -1222,11 +1438,53 @@ __device__ void bn_mod_inverse_fixed(BIGNUM *inverse, BIGNUM *x, BIGNUM *n) {
     } else {
         bn_copy(inverse, &coefficient);
     }
-    
+
     // The inverse has been successfully calculated
-    //return 1;
     printf(" -- bmi --\n");
-    return;
+}*/
+
+__device__ void bn_mod_inverse_fixed(BIGNUM *inverse, BIGNUM *a, BIGNUM *n) {
+    printf("++ bn_mod_inverse_fixed ++\n");
+
+    // Make sure bn_gcdext is implemented which calculates the gcd and the coefficient
+    BIGNUM gcd, s, t, n_temp;
+
+    // Initialize BIGNUM variables for intermediate calculations
+    init_zero(&gcd, MAX_BIGNUM_WORDS);
+    init_zero(&s, MAX_BIGNUM_WORDS);
+    init_zero(&t, MAX_BIGNUM_WORDS);
+    init_zero(&n_temp, MAX_BIGNUM_WORDS);
+
+    // If n is 1 or zero, then inverse does not exist
+    if (bn_is_one(n) || bn_is_zero(n)) {
+        printf("No inverse exists for the given 'a' and 'n'.\n");
+        return;
+    }
+    
+    // Perform the extended GCD calculation (a, n, g, s, t)
+    // On completion, s holds the modular inverse of a modulo n, if gcd(a, n) = 1
+    bn_gcdext(&gcd, &s, &t, a, n);
+
+    // Check if the GCD is one to make sure the inverse exists
+    if (!bn_is_one(&gcd)) {
+        printf("No inverse exists for the given 'a' and 'n'.\n");
+        return;
+    }
+
+    // Print s and n
+    bn_print("s: ", &s);
+    bn_print("n: ", n);
+    // The modular inverse can be negative, so if it's negative, add 'n' to make it positive
+    if (bn_is_negative(&s)) {
+        printf("bn_is_negative(&s)");
+        bn_add(&n_temp, &s, n);   // n_temp = s + n
+        bn_copy(inverse, &n_temp); // inverse = n_temp
+    } else {
+        printf("NOT bn_is_negative(&s)");
+        bn_copy(inverse, &s); // inverse = s
+    }
+
+    printf(" -- bn_mod_inverse_fixed --\n");
 }
 
 __device__ void bn_mod_inverse(BIGNUM *result, BIGNUM *a, BIGNUM *modulus) {
