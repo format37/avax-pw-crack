@@ -12,26 +12,25 @@ int main() {
     BN_CTX *ctx = BN_CTX_new();
     OPENSSL_assert(ctx != NULL);
 
+    // New test values for subtraction
     char* test_values_a[] = {
         "1", 
-        "F", 
-        "FF", 
-        "ABC", 
+        "DEF", 
+        "10000", 
         "1234567890ABCDEF", 
-        "10", 
-        "FFFFFFFFFFFFFFFFF",
-        "1234567890ABCDEFFEDCBA0987654321"
+        "123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0", 
+        "FFFFFFFFFFFFFFFF",
+        "1234567890ABCDEFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
     };
 
     char* test_values_b[] = {
-        "2", 
+        "0", 
+        "ABC", 
         "F", 
-        "101", 
-        "10", 
-        "FEDCBA0987654321", 
-        "10", 
-        "10000000000000000",
-        "1234567890ABCDEFFEDCBA0987654321"
+        "1000000000000000", 
+        "111111111111111100000000000000000000000000000000", 
+        "FFFFFFFFFFFFFFFE",
+        "10000000000000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
     };
 
     int num_tests = sizeof(test_values_a) / sizeof(test_values_a[0]);
@@ -44,12 +43,15 @@ int main() {
         BN_hex2bn(&a, test_values_a[test]);
         BN_hex2bn(&b, test_values_b[test]);
 
-        BN_mul(result, a, b, ctx);
+        // Test subtraction (a - b)
+        if(!BN_sub(result, a, b)) {
+            fprintf(stderr, "Subtraction failed for test case %d\\n", test + 1);
+        }
 
-        printf("Test %d:\n", test + 1);
+        printf("\nTest %d:\n", test + 1);
         print_bn("a", a);
         print_bn("b", b);
-        print_bn("a * b", result);
+        print_bn("a - b", result);
 
         BN_free(a);
         BN_free(b);

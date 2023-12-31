@@ -30,7 +30,7 @@ __global__ void test_mod_inverse_kernel() {
 
     for (int test = 0; test < num_tests; ++test) {
         // Check for errors and print results
-        printf("Test %d:\n", test + 1);
+        printf("\nTest %d:\n", test + 1);
         // Initialize BIGNUMs for testing
         BIGNUM a, n, inverse;
         init_zero(&a, MAX_BIGNUM_WORDS);

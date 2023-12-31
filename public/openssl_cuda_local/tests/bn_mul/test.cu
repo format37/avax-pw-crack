@@ -30,9 +30,9 @@ __global__ void test_bn_mul_kernel() {
         0xABCULL,
         0x1234567890ABCDEFULL,
         0x10ULL,
-        0xFFFFFFFFFFFFFFFFULL/*,
-        // Additional test cases
         0xFFFFFFFFFFFFFFFFULL,
+        // Additional test cases
+        /*0xFFFFFFFFFFFFFFFFULL,
         0x2ULL,
         0xFFFFFFFFFFFFFFFFULL,
         0x1ULL,
@@ -90,6 +90,23 @@ __global__ void test_bn_mul_kernel() {
         // Print product top
         printf("product.top = %d\n", product.top);
     }
+
+    // Test for multiple words
+    printf("Test for multiple words:\n");
+    // Initialize BIGNUMs for testing
+    BIGNUM a, b, product;
+    init_zero(&a, MAX_BIGNUM_WORDS);
+    init_zero(&b, MAX_BIGNUM_WORDS);
+    init_zero(&product, MAX_BIGNUM_WORDS);
+    
+    a.top = 2;
+    a.d[0] = 0x1234567890ABCDEFULL; a.d[1] = 0xFEDCBA0987654321ULL;
+    b.top = 2;
+    b.d[0] = 0x1234567890ABCDEFULL; b.d[1] = 0xFEDCBA0987654321ULL;
+    bn_mul(&a, &b, &product);
+    bn_print("a: ", &a);
+    bn_print("b: ", &b);
+    bn_print("a * b = product: ", &product);
 
     printf("-- Finished test_bn_mul_kernel --\n");
 }

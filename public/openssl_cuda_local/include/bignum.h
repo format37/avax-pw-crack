@@ -17,7 +17,7 @@ __device__ void debug_printf(const char *fmt, ...) {
     }
 }
 
-__device__ void bn_print(char* msg, BIGNUM* a) {
+__device__ void bn_print_v0(char* msg, BIGNUM* a) {
     printf("%s", msg);
     if (a->top == 0 || (a->top == 1 && a->d[0] == 0)) {
         printf("0\n"); // Handle the case where BIGNUM is zero.
@@ -29,6 +29,23 @@ __device__ void bn_print(char* msg, BIGNUM* a) {
             printf("%llx", a->d[i]);
         } else {
             // Print other words with leading zeros
+            printf(" %016llx", a->d[i]);
+        }
+    }
+    printf("\n");
+}
+
+__device__ void bn_print(char* msg, BIGNUM* a) {
+    printf("%s", msg);
+    if (a->top == 0) {
+        printf("0\n");  // Handle the case where BIGNUM is zero
+        return;
+    }
+    for (int i = a->top - 1; i >= 0; i--) {
+        // Print words up to top - 1 with appropriate formatting
+        if (i == a->top - 1) {
+            printf("%llx", a->d[i]);
+        } else {
             printf(" %016llx", a->d[i]);
         }
     }
@@ -111,6 +128,13 @@ __device__ int bn_cmp(BIGNUM* a, BIGNUM* b) {
 }
 
 __device__ void bn_add(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
+    // if a.top > 1 or b.top > 1, print a warning
+    if (a->top > 1) {
+        printf("ATTENTION! bn_add: a.top > 1\n");
+    }
+    if (b->top > 1) {
+        printf("ATTENTION! bn_add: b.top > 1\n");
+    }
     // Determine the maximum size to iterate over
     int max_top = max(a->top, b->top);
     BN_ULONG carry = 0;
@@ -660,6 +684,13 @@ __device__ void bn_mul(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
     // Print the input values.
     /*printf("a = %016llx\n", a->d[0]);
     printf("b = %016llx\n", b->d[0]);*/
+    // Notify if a.top>1 or b.top>1
+    if (a->top > 1) {
+        printf("ATTENTION! bn_mul: a.top > 1\n");
+    }
+    if (b->top > 1) {
+        printf("ATTENTION! bn_mul: b.top > 1\n");
+    }
 
     // Set high parts to zero for single BN_ULONG multiplication
     unsigned long long alow = a->d[0], blow = b->d[0];  // Low 64 bits
@@ -1051,7 +1082,7 @@ __device__ void set_point_at_infinity(EC_POINT *point) {
     init_zero(&point->y, MAX_BIGNUM_WORDS);
 }
 
-__device__ int find_top(BIGNUM *bn, int max_words) {
+__device__ int find_top_v0(BIGNUM *bn, int max_words) {
     for (int i = max_words - 1; i >= 0; i--) {
         if (bn->d[i] != 0) {
             return i + 1; // We return the index of the highest non-zero word plus one
@@ -1060,7 +1091,32 @@ __device__ int find_top(BIGNUM *bn, int max_words) {
     return 0; // If all words are zero, the top is 0
 }
 
-__device__ void bn_subtract(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
+__device__ int find_top(BIGNUM *bn, int max_words) {
+    for (int i = max_words - 1; i >= 0; i--) {
+        if (bn->d[i] != 0) {
+            return i + 1;  // The top index is the index of the last non-zero word plus one
+        }
+    }
+    return 0; // If all words are zero, the top is 0
+}
+
+/*__device__ int find_top_inverse(BIGNUM *bn, int max_words) {
+    for (int i = 0; i < max_words; i++) {
+        if (bn->d[i] != 0) {
+            return i + 1; // We return the index of the highest non-zero word plus one
+        }
+    }
+    return 0; // If all words are zero, the top is 0
+}*/
+
+__device__ void bn_subtract_v0(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
+    // If a or b is bigger than one, then notify
+    if (a->top > 2) {
+        printf("ATTENTION! bn_subtract: a.top > 2: %d\n", a->top);
+    }
+    if (b->top > 2) {
+        printf("ATTENTION! bn_subtract: b.top > 2: %d\n", b->top);
+    }
     BN_ULONG borrow = 0;
     BN_ULONG temp_borrow;
 
@@ -1081,6 +1137,46 @@ __device__ void bn_subtract(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
     // Update the metadata (top) if necessary
     // The 'top' can be adjusted based on the significant digits after subtraction.
     // result->top = ... (code to update the 'top' field of result, if BIGNUM has such a field)
+}
+
+__device__ void bn_subtract(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
+    BN_ULONG borrow = 0;
+    int i;
+    
+    // Perform the subtraction with borrow logic.
+    for (i = 0; i < MAX_BIGNUM_WORDS; ++i) {
+        // Borrow could only occur if we're still processing non-zero words of 'b' or 'a'
+        if (i < b->top || borrow) {
+            if (a->d[i] >= b->d[i] + borrow) {
+                result->d[i] = a->d[i] - b->d[i] - borrow;
+                borrow = 0;
+            } else {
+                // borrow from the next word
+                result->d[i] = a->d[i] + ((BN_ULONG)1 << BN_ULONG_NUM_BITS) - b->d[i] - borrow;
+                borrow = 1;
+            }
+        } else { // when 'b' has no more significant words, copy the rest of 'a'    
+            result->d[i] = a->d[i] - borrow;
+            borrow = 0; // no more borrows since we're only dealing with 'a' now.
+        }
+    }
+
+    // Check for any remaining borrow
+    if (borrow) {
+        printf("Error: Borrow at the end of subtraction is not zero! This should not happen.\n");
+    }
+
+    // Find the top-most non-zero word for 'top'
+    /*for (i = MAX_BIGNUM_WORDS - 1; i >= 0; i--) {
+        if (result->d[i] != 0) {
+            break;
+        }
+    }*/
+    // result->top = i + 1;
+    result->top = find_top(result, MAX_BIGNUM_WORDS);
+
+    // Debug: Print the updated 'top' for the result.
+    printf("Debug: Updated result.top to %d\n", result->top);
 }
 
 __device__ void bn_set_word(BIGNUM *bn, BN_ULONG word) {
@@ -1237,6 +1333,13 @@ __device__ void bn_rshift_one(BIGNUM *bn) {
 }
 
 __device__ void bn_divide(BIGNUM *quotient, BIGNUM *remainder, BIGNUM *dividend, BIGNUM *divisor) {
+    // If divident top or divisor top is bigger than one, then notify
+    if (dividend->top > 1) {
+        printf("ATTENTION! bn_divide: dividend.top > 1\n");
+    }
+    if (divisor->top > 1) {
+        printf("ATTENTION! bn_divide: divisor.top > 1\n");
+    }
     //printf(" ++ bn_divide ++ \n");
 
     // Initialize quotient and remainder

@@ -59,10 +59,29 @@ def simulate_word_mul(a, b, word_size=64):
 
 
 # Testing the simulate_word_mul function with 2-word (64-bit each) multiplication
-test_values_a = ["1", "F", "FF", "ABC", "1234567890ABCDEF", "10", "FFFFFFFFFFFFFFFFF"]
-test_values_b = ["2", "F", "101", "10", "FEDCBA0987654321", "10", "10000000000000000"]
+test_values_a = [
+    "1", 
+    "F", 
+    "FF", 
+    "ABC", 
+    "1234567890ABCDEF", 
+    "10", 
+    "FFFFFFFFFFFFFFFFF",
+    "1234567890ABCDEFFEDCBA0987654321"
+    ]
+test_values_b = [
+    "2", 
+    "F", 
+    "101", 
+    "10", 
+    "FEDCBA0987654321", 
+    "10", 
+    "10000000000000000",
+    "1234567890ABCDEFFEDCBA0987654321"
+    ]
 for i in range(len(test_values_a)):
     print(
+        f"Test {i}: ",
         "a: ", test_values_a[i], 
         "b: ", test_values_b[i], 
         "result: ",  

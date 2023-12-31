@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <cuda_runtime.h>
+#define debug_print false
 #include "bignum.h"
 
 // Define your BIGNUM structure based on your project definitions
@@ -11,25 +12,20 @@
 __global__ void testKernel() {
     printf("++ testKernel for bn_subtract ++\n");
 
-    // Update the test values for subtraction based on previous OpenSSL test cases
-    const int num_tests = 7;
+    const int num_tests = 4;
+    // Initialize 'a' and 'b' with test values for each test
     BN_ULONG test_values_a[num_tests][MAX_BIGNUM_WORDS] = {
-        {0x1}, // 1-word
-        {0x0, 0xDEF}, // 2-word
-        {0x0, 0x0, 0x0, 0x10000}, // 4-word
-        {0x0, 0x0, 0x0, 0x1234567890ABCDEFULL}, // 4-word
-        {0x0, 0x0, 0x123456789ABCDEF0ULL, 0x123456789ABCDEF0ULL, 0x123456789ABCDEF0ULL, 0x12}, // 6-word
-        {0xFFFFFFFFFFFFFFFFULL, 0xFFFFFFFFFFFFFFFFULL}, // 2-word
-        {0x1, 0x0, 0x0, 0x0, 0xFFFFFFFFFFFFFFFFULL, 0xFFFFFFFFFFFFFFFFULL, 0x1234567890ABCDEFULL} // 7-word
+        {0x1}, // a small number to subtract from itself
+        {0x0, 0x1}, // a larger number
+        {0xFFFFFFFFFFFFFFFFULL, 0x1}, // a large number that will cause borrow
+        {0xFFFFFFFFFFFFFFFFULL, 0x0} // a large number with a trailing zero
     };
+
     BN_ULONG test_values_b[num_tests][MAX_BIGNUM_WORDS] = {
-        {0x0}, // 1-word
-        {0x0, 0xABC}, // 2-word
-        {0x0, 0x0, 0x0, 0xF}, // 4-word
-        {0x0, 0x0, 0x0, 0x1000000000000000ULL}, // 4-word
-        {0x0, 0x0, 0x1111111111111111ULL, 0x0, 0x0, 0x0}, // 6-word
-        {0xFFFFFFFFFFFFFFFEULL, 0xFFFFFFFFFFFFFFFFULL}, // 2-word
-        {0x00, 0x0, 0x0, 0x0, 0x0, 0xFFFFFFFFFFFFFFFFULL, 0xFFFFFFFFFFFFFFFFULL} // 7-word
+        {0x1}, // same small number for subtraction
+        {0x0, 0x0}, // smaller number
+        {0x1}, // a smaller number that will cause borrow
+        {0xFFFFFFFFFFFFFFFFULL} // the second large number with a leading zero
     };
   
     // Run tests
@@ -54,7 +50,7 @@ __global__ void testKernel() {
         result.top = find_top(&result, MAX_BIGNUM_WORDS);
 
         // Print results
-        printf("\nTest %d:\n", test + 1);
+        printf("Test %d:\n", test + 1);
         bn_print("a: ", &a);
         bn_print("b: ", &b);
         bn_print("result: ", &result);
