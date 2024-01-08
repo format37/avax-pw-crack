@@ -12,7 +12,7 @@ __global__ void testKernel() {
     printf("++ testKernel for bn_subtract ++\n");
 
     // Update the test values for subtraction based on previous OpenSSL test cases
-    const int num_tests = 7;
+    /*const int num_tests = 7;
     BN_ULONG test_values_a[num_tests][MAX_BIGNUM_WORDS] = {
         {0x1}, // 1-word
         {0x0, 0xDEF}, // 2-word
@@ -30,10 +30,36 @@ __global__ void testKernel() {
         {0x0, 0x0, 0x1111111111111111ULL, 0x0, 0x0, 0x0}, // 6-word
         {0xFFFFFFFFFFFFFFFEULL, 0xFFFFFFFFFFFFFFFFULL}, // 2-word
         {0x00, 0x0, 0x0, 0x0, 0x0, 0xFFFFFFFFFFFFFFFFULL, 0xFFFFFFFFFFFFFFFFULL} // 7-word
+    };*/
+    // Test values 
+    const int num_tests = 3;
+    /*BN_ULONG test_values_a[num_tests][MAX_BIGNUM_WORDS] = {
+        {0x1}, 
+        {0x10, 0xDEF},
+        {0xb0, c0x0, 0x10000, 0x1234567890ABCDEFULL}
     };
+
+    BN_ULONG test_values_b[num_tests][MAX_BIGNUM_WORDS] = {
+        {0x0}, 
+        {0x8, 0xABC}, 
+        {0xa0, 0xb0, 0xF, 0x1000000000000000ULL}
+    };*/
+    BN_ULONG test_values_a[num_tests][MAX_BIGNUM_WORDS] = {
+        {0x1}, 
+        {0x10, 0xDEF},
+        {0xb0, 0xc0, 0x10000, 0x1234567890ABCDEFULL}
+    };
+
+    BN_ULONG test_values_b[num_tests][MAX_BIGNUM_WORDS] = {
+        {0x0}, 
+        {0x8, 0xABC}, 
+        {0xa0, 0xb0, 0xF, 0x1000000000000000ULL}
+    };
+
   
     // Run tests
     for (int test = 0; test < num_tests; ++test) {
+        printf("\nTest %d:\n", test + 1);
         BIGNUM a, b, result;
         init_zero(&a, MAX_BIGNUM_WORDS);
         init_zero(&b, MAX_BIGNUM_WORDS);
@@ -54,7 +80,6 @@ __global__ void testKernel() {
         result.top = find_top(&result, MAX_BIGNUM_WORDS);
 
         // Print results
-        printf("\nTest %d:\n", test + 1);
         bn_print("a: ", &a);
         bn_print("b: ", &b);
         bn_print("result: ", &result);

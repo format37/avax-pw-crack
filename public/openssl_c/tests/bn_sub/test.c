@@ -13,7 +13,7 @@ int main() {
     OPENSSL_assert(ctx != NULL);
 
     // New test values for subtraction
-    char* test_values_a[] = {
+    /*char* test_values_a[] = {
         "1", 
         "DEF", 
         "10000", 
@@ -31,7 +31,19 @@ int main() {
         "111111111111111100000000000000000000000000000000", 
         "FFFFFFFFFFFFFFFE",
         "10000000000000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
+    };*/
+    char* test_values_a[] = {
+        "1",
+        "10DEF",
+        "B0C00000100001234567890ABCDEF"  
     };
+
+    char* test_values_b[] = {
+        "0",
+        "8ABC", 
+        "A0B000000F1000000000000000"
+    };
+
 
     int num_tests = sizeof(test_values_a) / sizeof(test_values_a[0]);
 

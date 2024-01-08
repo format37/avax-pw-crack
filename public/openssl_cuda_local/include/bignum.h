@@ -1139,7 +1139,7 @@ __device__ void bn_subtract_v0(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
     // result->top = ... (code to update the 'top' field of result, if BIGNUM has such a field)
 }
 
-__device__ void bn_subtract(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
+__device__ void bn_subtract_v1(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
     BN_ULONG borrow = 0;
     int i;
     
@@ -1176,6 +1176,52 @@ __device__ void bn_subtract(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
     result->top = find_top(result, MAX_BIGNUM_WORDS);
 
     // Debug: Print the updated 'top' for the result.
+    printf("Debug: Updated result.top to %d\n", result->top);
+}
+
+__device__ void bn_subtract(BIGNUM *result, const BIGNUM *a, const BIGNUM *b) {
+    BN_ULONG borrow = 0;
+    // Assume maximum size based on input 'a', adjust later if necessary
+    result->top = a->top;
+
+    // Subtract each word of 'b' from 'a', handling borrowing
+    for (int i = 0; i < result->top; i++) {
+        BN_ULONG ai = (i < a->top) ? a->d[i] : 0;
+        BN_ULONG bi = (i < b->top) ? b->d[i] : 0;
+
+        // First, handle the subtract borrow from the previous iteration
+        if (ai < borrow) {
+            // Underflow means we need to borrow from the next higher word
+            ai += (1ULL << BN_ULONG_NUM_BITS);
+            ai -= borrow;
+            borrow = 1; // Set borrow for the next iteration
+        } else {
+            ai -= borrow; // No underflow, simply subtract the borrow
+            borrow = 0;
+        }
+
+        if (ai < bi) {
+            // ai cannot cover bi, so we will underflow and need to borrow
+            ai += (1ULL << BN_ULONG_NUM_BITS);
+            result->d[i] = ai - bi; // Perform the subtraction
+            borrow = 1; // We continue borrowing to the next higher word
+        } else {
+            result->d[i] = ai - bi; // Perform the subtraction without borrowing
+        }
+        
+        if (i == result->top - 1 && borrow == 1) {
+            // If we borrowed on the last iteration, there's no higher word to borrow from; underflow
+            result->top = 0; // Invalidate the result
+            printf("Error: Underflow in subtraction, result is invalid.\n");
+            return;
+        }
+    }
+
+    // Reduce the result->top if the high words are zero after subtraction
+    while (result->top > 0 && result->d[result->top - 1] == 0) {
+        result->top--;
+    }
+
     printf("Debug: Updated result.top to %d\n", result->top);
 }
 
