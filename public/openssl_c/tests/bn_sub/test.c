@@ -1,11 +1,50 @@
 #include <stdio.h>
+//#include <cuda_runtime.h>
+#include <stdbool.h>
 #include <openssl/bn.h>
 #include <openssl/crypto.h>
 
-void print_bn(const char* label, const BIGNUM* bn) {
+/*void print_bn(const char* label, const BIGNUM* bn) {
     char* bn_str = BN_bn2hex(bn);
     printf("%s: %s\n", label, bn_str);
     OPENSSL_free(bn_str);
+}*/
+void print_bn(const char* label, const BIGNUM* bn) {
+
+  bool isNeg = BN_is_negative(bn);
+  
+  int len = BN_num_bytes(bn);
+  if (len == 0) {
+    printf("%s: 0\n", label);
+    return; 
+  }
+  
+  unsigned char* str = (unsigned char*)malloc(len);
+  BN_bn2bin(bn, str);
+
+  printf("%s: ", label);
+  
+  if (isNeg) {
+    printf("-");
+  }
+  
+  bool reachedNonZero = false;
+  for(int i = 0; i < len; i++) {
+    if(!reachedNonZero && str[i] == 0) continue;
+    
+    reachedNonZero = true;
+    
+    if(i == 0) {
+      printf("%02x", str[i]);
+    }
+    else {
+      printf("%02x", str[i]); 
+    }
+  }
+
+  printf("\n");
+  
+  free(str);
 }
 
 int main() {
@@ -33,6 +72,25 @@ int main() {
         "10000000000000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
     };*/
     char* test_values_a[] = {
+        "1",                       // Test case 1: Equal values
+        "8",                       // Test case 2: Simple subtraction without borrowing
+        "100000000",               // Test case 3: Borrowing from a single higher word
+        "1000000000000",           // Test case 4: Borrowing across multiple words
+        "10000000000000000",       // Test case 5: Zero high words trimmed in result
+        "123456789ABCDEF0",        // Test case 6: Large number subtraction
+        "0"                        // Test case 7: Underflow error
+    };
+
+    char* test_values_b[] = {
+        "1",                       // Test case 1: Equal values
+        "5",                       // Test case 2: Simple subtraction without borrowing
+        "1",                       // Test case 3: Borrowing from a single higher word
+        "1",                       // Test case 4: Borrowing across multiple words
+        "1",                       // Test case 5: Zero high words trimmed in result
+        "FEDCBA9876543210",        // Test case 6: Large number subtraction
+        "1"                        // Test case 7: Underflow error
+    };
+    /*char* test_values_a[] = {
         "1",
         "10DEF",
         "B0C00000100001234567890ABCDEF"  
@@ -42,7 +100,7 @@ int main() {
         "0",
         "8ABC", 
         "A0B000000F1000000000000000"
-    };
+    };*/
 
 
     int num_tests = sizeof(test_values_a) / sizeof(test_values_a[0]);

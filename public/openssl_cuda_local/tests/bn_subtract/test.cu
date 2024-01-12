@@ -1,61 +1,42 @@
 #include <stdio.h>
 #include <cuda_runtime.h>
 #include "bignum.h"
+//#include "bignum_test.h"
 
 // Define your BIGNUM structure based on your project definitions
-#define MAX_BIGNUM_WORDS 20
-#define BN_ULONG unsigned long long int
-#define BN_ULONG_NUM_BITS (sizeof(BN_ULONG) * 8)
+//#define MAX_BIGNUM_WORDS 20
+//#define MAX_BIGNUM_WORDS 4
+//#define BN_ULONG unsigned long long int
+//#define BN_ULONG_NUM_BITS (sizeof(BN_ULONG) * 8)
 
 // Test kernel for bn_subtract
 __global__ void testKernel() {
     printf("++ testKernel for bn_subtract ++\n");
 
-    // Update the test values for subtraction based on previous OpenSSL test cases
-    /*const int num_tests = 7;
-    BN_ULONG test_values_a[num_tests][MAX_BIGNUM_WORDS] = {
-        {0x1}, // 1-word
-        {0x0, 0xDEF}, // 2-word
-        {0x0, 0x0, 0x0, 0x10000}, // 4-word
-        {0x0, 0x0, 0x0, 0x1234567890ABCDEFULL}, // 4-word
-        {0x0, 0x0, 0x123456789ABCDEF0ULL, 0x123456789ABCDEF0ULL, 0x123456789ABCDEF0ULL, 0x12}, // 6-word
-        {0xFFFFFFFFFFFFFFFFULL, 0xFFFFFFFFFFFFFFFFULL}, // 2-word
-        {0x1, 0x0, 0x0, 0x0, 0xFFFFFFFFFFFFFFFFULL, 0xFFFFFFFFFFFFFFFFULL, 0x1234567890ABCDEFULL} // 7-word
-    };
-    BN_ULONG test_values_b[num_tests][MAX_BIGNUM_WORDS] = {
-        {0x0}, // 1-word
-        {0x0, 0xABC}, // 2-word
-        {0x0, 0x0, 0x0, 0xF}, // 4-word
-        {0x0, 0x0, 0x0, 0x1000000000000000ULL}, // 4-word
-        {0x0, 0x0, 0x1111111111111111ULL, 0x0, 0x0, 0x0}, // 6-word
-        {0xFFFFFFFFFFFFFFFEULL, 0xFFFFFFFFFFFFFFFFULL}, // 2-word
-        {0x00, 0x0, 0x0, 0x0, 0x0, 0xFFFFFFFFFFFFFFFFULL, 0xFFFFFFFFFFFFFFFFULL} // 7-word
-    };*/
-    // Test values 
-    const int num_tests = 3;
-    /*BN_ULONG test_values_a[num_tests][MAX_BIGNUM_WORDS] = {
-        {0x1}, 
-        {0x10, 0xDEF},
-        {0xb0, c0x0, 0x10000, 0x1234567890ABCDEFULL}
+    // Define test cases for simplified debugging
+    const int num_tests = 7; // Update this based on the number of tests you're running
+
+    // Test values for 'a'
+    BN_ULONG test_values_a[7][MAX_BIGNUM_WORDS] = {
+        {0x1}, // Test case 1: Equal values
+        {0x8}, // Test case 2: Simple subtraction without borrowing
+        {0x100000000}, // Test case 3: Borrowing from a single higher word
+        {0x1000000000000}, // Test case 4: Borrowing across multiple words 
+        {0x1000000000000000, 0x0}, // Test case 5: Zero high words trimmed in result
+        {0x123456789ABCDEF0}, // Test case 6: Large number subtraction
+        {0x0} // Test case 7: Underflow error
     };
 
-    BN_ULONG test_values_b[num_tests][MAX_BIGNUM_WORDS] = {
-        {0x0}, 
-        {0x8, 0xABC}, 
-        {0xa0, 0xb0, 0xF, 0x1000000000000000ULL}
-    };*/
-    BN_ULONG test_values_a[num_tests][MAX_BIGNUM_WORDS] = {
-        {0x1}, 
-        {0x10, 0xDEF},
-        {0xb0, 0xc0, 0x10000, 0x1234567890ABCDEFULL}
+    // Test values for 'b' 
+    BN_ULONG test_values_b[7][MAX_BIGNUM_WORDS] = {
+        {0x1}, // Test case 1: Equal values 
+        {0x5}, // Test case 2: Simple subtraction without borrowing
+        {0x1}, // Test case 3: Borrowing from a single higher word
+        {0x1}, // Test case 4: Borrowing across multiple words
+        {0x1}, // Test case 5: Zero high words trimmed in result 
+        {0xFEDCBA9876543210}, // Test case 6: Large number subtraction
+        {0x1} // Test case 7: Underflow error
     };
-
-    BN_ULONG test_values_b[num_tests][MAX_BIGNUM_WORDS] = {
-        {0x0}, 
-        {0x8, 0xABC}, 
-        {0xa0, 0xb0, 0xF, 0x1000000000000000ULL}
-    };
-
   
     // Run tests
     for (int test = 0; test < num_tests; ++test) {
@@ -82,7 +63,7 @@ __global__ void testKernel() {
         // Print results
         bn_print("a: ", &a);
         bn_print("b: ", &b);
-        bn_print("result: ", &result);
+        bn_print("a - b: ", &result);
     }
 
     printf("-- Finished testKernel for bn_subtract --\n");

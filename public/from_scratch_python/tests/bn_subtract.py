@@ -94,9 +94,28 @@ def create_bignum_from_hex(hex_str, max_words=4):
 
 # List of test cases - hex strings for 'a' and 'b'
 
-test_values_a = ["1", "10DEF", "B0C00000100001234567890ABCDEF"]
+# test_values_a = ["1", "10DEF", "B0C00000100001234567890ABCDEF"]
+# test_values_b = ["0", "8ABC", "A0B000000F1000000000000000"]
+test_values_a = [
+    "1",                      # Test case 1: Equal values
+    "8",                      # Test case 2: Simple subtraction without borrowing
+    "100000000",              # Test case 3: Borrowing from a single higher word
+    "10000000000",            # Test case 4: Borrowing across multiple words
+    "1000000000000",          # Test case 5: Zero high words trimmed in result
+    "123456789ABCDEF0",       # Test case 6: Large number subtraction
+    "0"                       # Test case 7: Underflow error
+]
 
-test_values_b = ["0", "8ABC", "A0B000000F1000000000000000"]
+test_values_b = [
+    "1",                      # Test case 1: Equal values
+    "5",                      # Test case 2: Simple subtraction without borrowing
+    "1",                      # Test case 3: Borrowing from a single higher word
+    "1",                      # Test case 4: Borrowing across multiple words
+    "1",                      # Test case 5: Zero high words trimmed in result
+    "FEDCBA9876543210",       # Test case 6: Large number subtraction
+    "1"                       # Test case 7: Underflow error
+]
+
 
 
 # Function to test BIGNUM subtraction for a list of hex-string cases
