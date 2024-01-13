@@ -3,39 +3,43 @@
 #include "bignum.h"
 //#include "bignum_test.h"
 
-// Define your BIGNUM structure based on your project definitions
-//#define MAX_BIGNUM_WORDS 20
-//#define MAX_BIGNUM_WORDS 4
-//#define BN_ULONG unsigned long long int
-//#define BN_ULONG_NUM_BITS (sizeof(BN_ULONG) * 8)
-
 // Test kernel for bn_subtract
 __global__ void testKernel() {
     printf("++ testKernel for bn_subtract ++\n");
 
     // Define test cases for simplified debugging
-    const int num_tests = 7; // Update this based on the number of tests you're running
+    const int num_tests = 12; // Update this based on the number of tests you're running
 
     // Test values for 'a'
-    BN_ULONG test_values_a[7][MAX_BIGNUM_WORDS] = {
+    BN_ULONG test_values_a[num_tests][MAX_BIGNUM_WORDS] = {
         {0x1}, // Test case 1: Equal values
         {0x8}, // Test case 2: Simple subtraction without borrowing
         {0x100000000}, // Test case 3: Borrowing from a single higher word
         {0x1000000000000}, // Test case 4: Borrowing across multiple words 
         {0x1000000000000000, 0x0}, // Test case 5: Zero high words trimmed in result
         {0x123456789ABCDEF0}, // Test case 6: Large number subtraction
-        {0x0} // Test case 7: Underflow error
+        {0x0}, // Test case 7: Underflow error
+        {0x1, 0x1},                           // Test case 8: Simple 2-word subtraction without borrowing
+        {0xFFFFFFFFFFFFFFF1, 0x000000000000000F},            // Test case 9: Max value in lower word
+        {0xFFFFFFFFFFFFFFFF, 0x1},            // Test case 10: Carry from lower to upper word
+        {0xFFFFFFFFFFFFFFFF, 0x100000000},    // Test case 11: Large value spanning two words
+        {0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF} // Test case 12: Max 2-word value
     };
 
     // Test values for 'b' 
-    BN_ULONG test_values_b[7][MAX_BIGNUM_WORDS] = {
+    BN_ULONG test_values_b[num_tests][MAX_BIGNUM_WORDS] = {
         {0x1}, // Test case 1: Equal values 
         {0x5}, // Test case 2: Simple subtraction without borrowing
         {0x1}, // Test case 3: Borrowing from a single higher word
         {0x1}, // Test case 4: Borrowing across multiple words
         {0x1}, // Test case 5: Zero high words trimmed in result 
         {0xFEDCBA9876543210}, // Test case 6: Large number subtraction
-        {0x1} // Test case 7: Underflow error
+        {0x1}, // Test case 7: Underflow error
+        {0x1, 0x0},                           // Test case 8: Simple 2-word subtraction without borrowing
+        {0xFFFFFFFFFFFFFFFF, 0x0000000000000000},            // Test case 9: Max value in lower word
+        {0xFFFFFFFFFFFFFFFF, 0x0},            // Test case 10: Carry from lower to upper word
+        {0xFFFFFFFFFFFFFFFF, 0x0},            // Test case 11: Large value spanning two words
+        {0x1, 0x0}                            // Test case 12: Max 2-word value
     };
   
     // Run tests
@@ -49,7 +53,9 @@ __global__ void testKernel() {
         // Assign test values to 'a' and 'b', and initialize top accordingly
         for (int i = 0; i < MAX_BIGNUM_WORDS; ++i) {
             a.d[i] = test_values_a[test][i];
+            // printf("* a.d[%d]: %lx\n", i, a.d[i]);
             b.d[i] = test_values_b[test][i];
+            // printf("* b.d[%d]: %lx\n", i, b.d[i]);
         }
         a.top = find_top(&a, MAX_BIGNUM_WORDS);
         b.top = find_top(&b, MAX_BIGNUM_WORDS);

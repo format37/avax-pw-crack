@@ -11,21 +11,6 @@ typedef struct bignum_st {
   int flags;
 } BIGNUM;
 
-__device__ int find_top(BIGNUM *bn, int max_words) {
-    for (int i = max_words - 1; i >= 0; i--) {
-        if (bn->d[i] != 0) {
-            return i + 1;  // The top index is the index of the last non-zero word plus one
-        }
-    }
-    return 0; // If all words are zero, the top is 0
-}
-
-__device__ void debug_printf(const char *fmt, ...) {
-    if (debug_print) {
-        printf(fmt);
-    }
-}
-
 __device__ void bn_print(const char* msg, BIGNUM* a) {
     printf("%s", msg);
     if (a->top == 0) {
@@ -44,6 +29,25 @@ __device__ void bn_print(const char* msg, BIGNUM* a) {
         }
     }
     printf("\n");
+}
+
+__device__ int find_top(BIGNUM *bn, int max_words) {
+    for (int i = max_words - 1; i >= 0; i--) {
+        // printf(">> find_top [%d]: %llx", i, bn->d[i]);
+        // bn_print("", bn);
+        if (bn->d[i] != 0) {
+            // printf(">> find_top returning %d\n", i + 1);
+            return i + 1;  // The top index is the index of the last non-zero word plus one
+        }
+    }
+    // printf(">> find_top returning 0\n");
+    return 0; // If all words are zero, the top is 0
+}
+
+__device__ void debug_printf(const char *fmt, ...) {
+    if (debug_print) {
+        printf(fmt);
+    }
 }
 
 __device__ BN_ULONG bn_sub_words(BN_ULONG* r, BN_ULONG* a, BN_ULONG* b, int n) {
@@ -111,12 +115,10 @@ __device__ int bn_cmp(BIGNUM* a, BIGNUM* b) {
 
   // Both numbers have the same number of significant digits, so compare them starting from the most significant
   for (int i = a_top; i >= 0; i--) {
-    if (a->d[i] > b->d[i]) return 1;
-    if (a->d[i] < b->d[i]) return -1;
+    if (a->d[i] > b->d[i]) return 1; // a is larger
+    if (a->d[i] < b->d[i]) return -1; // b is larger
   }
-
-  // Numbers are equal
-  return 0;
+  return 0; // Numbers are equal
 }
 
 __device__ void bn_add(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
@@ -1148,29 +1150,31 @@ __device__ int find_top_v0(BIGNUM *bn, int max_words) {
     return 0; // If all words are zero, the top is 0
 }
 
-/*__device__ int find_top_inverse(BIGNUM *bn, int max_words) {
-    for (int i = 0; i < max_words; i++) {
-        if (bn->d[i] != 0) {
-            return i + 1; // We return the index of the highest non-zero word plus one
-        }
-    }
-    return 0; // If all words are zero, the top is 0
-}*/
-
 __device__ void bn_subtract(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
+    // bn_cmp logic:
+    //  1 when a is larger
+    // -1 when b is larger
+    //  0 wneh a and b are equal  
+
     // If bn_cmp(a, b) < 0, then a < b, and the result is negative.
     if (bn_cmp(a, b) < 0) {
-        printf("Attention: Negative result in subtraction, result is invalid.\n");
-        // Set negative
+        // printf("Attention: Negative result in subtraction\n");
+        result->top = b->top; // b is larger
+        // Set negative result flag
         result->neg = 1;
         // Swap a and b
-        BIGNUM *temp = a;
-        a = b;
-        b = temp;
+        BIGNUM temp;
+        init_zero(&temp, MAX_BIGNUM_WORDS);
+        bn_copy(&temp, a);
+        bn_copy(a, b);
+        bn_copy(b, &temp);        
+        // printf("[b] bn_subtract:result->top: %d\n", result->top);
+    }
+    else {
+        result->top = a->top; // a is larger
+        // printf("[a] bn_subtract:result->top: %d\n", result->top);
     }
     BN_ULONG borrow = 0;
-    // Assume maximum size based on input 'a', adjust later if necessary
-    result->top = a->top;
 
     // Subtract each word of 'b' from 'a', handling borrowing
     for (int i = 0; i < result->top; i++) {
@@ -1192,9 +1196,13 @@ __device__ void bn_subtract(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
             // ai cannot cover bi, so we will underflow and need to borrow
             ai += (1ULL << BN_ULONG_NUM_BITS);
             result->d[i] = ai - bi; // Perform the subtraction
+            // printf("[%d] ai < bi ", i);
+            // bn_print("result: ", result);
             borrow = 1; // We continue borrowing to the next higher word
         } else {
             result->d[i] = ai - bi; // Perform the subtraction without borrowing
+            // printf("[%d] ai >= bi ", i);
+            // bn_print("result: ", result);
         }
         
         if (i == result->top - 1 && borrow == 1) {
@@ -1206,9 +1214,11 @@ __device__ void bn_subtract(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
     }
 
     // Reduce the result->top if the high words are zero after subtraction
-    while (result->top > 0 && result->d[result->top - 1] == 0) {
+    /*while (result->top > 0 && result->d[result->top - 1] == 0) {
         result->top--;
-    }
+    }*/
+    find_top(result, MAX_BIGNUM_WORDS);
+    // printf("result->top: %d\n", result->top);
 }
 
 __device__ void bn_set_word(BIGNUM *bn, BN_ULONG word) {

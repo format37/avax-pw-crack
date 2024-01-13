@@ -1,14 +1,8 @@
 #include <stdio.h>
-//#include <cuda_runtime.h>
 #include <stdbool.h>
 #include <openssl/bn.h>
 #include <openssl/crypto.h>
 
-/*void print_bn(const char* label, const BIGNUM* bn) {
-    char* bn_str = BN_bn2hex(bn);
-    printf("%s: %s\n", label, bn_str);
-    OPENSSL_free(bn_str);
-}*/
 void print_bn(const char* label, const BIGNUM* bn) {
 
   bool isNeg = BN_is_negative(bn);
@@ -51,26 +45,6 @@ int main() {
     BN_CTX *ctx = BN_CTX_new();
     OPENSSL_assert(ctx != NULL);
 
-    // New test values for subtraction
-    /*char* test_values_a[] = {
-        "1", 
-        "DEF", 
-        "10000", 
-        "1234567890ABCDEF", 
-        "123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0", 
-        "FFFFFFFFFFFFFFFF",
-        "1234567890ABCDEFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
-    };
-
-    char* test_values_b[] = {
-        "0", 
-        "ABC", 
-        "F", 
-        "1000000000000000", 
-        "111111111111111100000000000000000000000000000000", 
-        "FFFFFFFFFFFFFFFE",
-        "10000000000000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
-    };*/
     char* test_values_a[] = {
         "1",                       // Test case 1: Equal values
         "8",                       // Test case 2: Simple subtraction without borrowing
@@ -78,7 +52,12 @@ int main() {
         "1000000000000",           // Test case 4: Borrowing across multiple words
         "10000000000000000",       // Test case 5: Zero high words trimmed in result
         "123456789ABCDEF0",        // Test case 6: Large number subtraction
-        "0"                        // Test case 7: Underflow error
+        "0",                        // Test case 7: Underflow error
+        "10000000000000001",           // Test case 8: Simple 2-word subtraction without borrowing
+        "000000000000000FFFFFFFFFFFFFFFF1",           // Test case 9: Max value in lower word
+        "1FFFFFFFFFFFFFFFF",           // Test case 10: Carry from lower to upper word
+        "100000000FFFFFFFFFFFFFFFF",   // Test case 11: Large value spanning two words
+        "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF" // Test case 12: Max 2-word value
     };
 
     char* test_values_b[] = {
@@ -88,21 +67,14 @@ int main() {
         "1",                       // Test case 4: Borrowing across multiple words
         "1",                       // Test case 5: Zero high words trimmed in result
         "FEDCBA9876543210",        // Test case 6: Large number subtraction
-        "1"                        // Test case 7: Underflow error
+        "1",                        // Test case 7: Underflow error
+        "1",                           // Test case 8: Simple 2-word subtraction without borrowing
+        "0000000000000000FFFFFFFFFFFFFFFF",            // Test case 9: Max value in lower word
+        "FFFFFFFFFFFFFFFF",            // Test case 10: Carry from lower to upper word
+        "FFFFFFFFFFFFFFFF",            // Test case 11: Large value spanning two words
+        "1"                            // Test case 12: Max 2-word value
     };
-    /*char* test_values_a[] = {
-        "1",
-        "10DEF",
-        "B0C00000100001234567890ABCDEF"  
-    };
-
-    char* test_values_b[] = {
-        "0",
-        "8ABC", 
-        "A0B000000F1000000000000000"
-    };*/
-
-
+    
     int num_tests = sizeof(test_values_a) / sizeof(test_values_a[0]);
 
     for (int test = 0; test < num_tests; ++test) {
