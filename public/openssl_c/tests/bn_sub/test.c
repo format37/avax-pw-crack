@@ -45,7 +45,7 @@ int main() {
     BN_CTX *ctx = BN_CTX_new();
     OPENSSL_assert(ctx != NULL);
 
-    char* test_values_a[] = {
+    /*char* test_values_a[] = {
         "1",                       // Test case 1: Equal values
         "8",                       // Test case 2: Simple subtraction without borrowing
         "100000000",               // Test case 3: Borrowing from a single higher word
@@ -73,11 +73,34 @@ int main() {
         "FFFFFFFFFFFFFFFF",            // Test case 10: Carry from lower to upper word
         "FFFFFFFFFFFFFFFF",            // Test case 11: Large value spanning two words
         "1"                            // Test case 12: Max 2-word value
+    };*/
+
+    char* test_values_a[] = {
+        "1", // 1: neg - neg
+        "1", // 2: pos - neg
+        "1" // 3: neg - pos
     };
+    int multipliers_a[] = {
+        1, // 1: neg - neg
+        0, // 2: pos - neg
+        1 // 3: neg - pos
+    };
+    char* test_values_b[] = {
+        "1", // 1: neg - neg
+        "1", // 2: pos - neg
+        "1" // 3: neg - pos
+    };
+    int multipliers_b[] = {
+        1, // 1: neg - neg
+        1, // 2: pos - neg
+        0 // 3: neg - pos
+    };
+
     
     int num_tests = sizeof(test_values_a) / sizeof(test_values_a[0]);
 
     for (int test = 0; test < num_tests; ++test) {
+        printf("\nTest %d:\n", test + 1);
         BIGNUM *a = BN_new();
         BIGNUM *b = BN_new();
         BIGNUM *result = BN_new();
@@ -85,12 +108,22 @@ int main() {
         BN_hex2bn(&a, test_values_a[test]);
         BN_hex2bn(&b, test_values_b[test]);
 
+        // Set sign of a according to multiplier
+        BN_set_negative(a, multipliers_a[test]);
+        // Set sign of b according to multiplier
+        BN_set_negative(b, multipliers_b[test]);
+
+        // Print sign of a
+        printf("Sign of a: %d\n", BN_is_negative(a));
+        // Print sign of b
+        printf("Sign of b: %d\n", BN_is_negative(b));
+
         // Test subtraction (a - b)
         if(!BN_sub(result, a, b)) {
             fprintf(stderr, "Subtraction failed for test case %d\\n", test + 1);
         }
 
-        printf("\nTest %d:\n", test + 1);
+        
         print_bn("a", a);
         print_bn("b", b);
         print_bn("a - b", result);

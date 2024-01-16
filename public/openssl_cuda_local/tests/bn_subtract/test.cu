@@ -8,10 +8,31 @@ __global__ void testKernel() {
     printf("++ testKernel for bn_subtract ++\n");
 
     // Define test cases for simplified debugging
-    const int num_tests = 12; // Update this based on the number of tests you're running
+    const int num_tests = 3; // Update this based on the number of tests you're running
+
+    BN_ULONG test_values_a[num_tests][MAX_BIGNUM_WORDS] = {
+        {0x1}, // 1: 1: neg - neg
+        {0x1},  // 3: 1: pos - neg
+        {0x1} // 2: 1: neg - pos
+    };
+    int negative_a[num_tests] = {
+        1, // 1: neg - neg
+        0, // 2: pos - neg
+        1 // 3: neg - pos
+    };
+    BN_ULONG test_values_b[num_tests][MAX_BIGNUM_WORDS] = {
+        {0x1}, // 1: 1: neg - neg
+        {0x1}, // 3: 1: pos - neg
+        {0x1} // 2: 1: neg - pos
+    };
+    int negative_b[num_tests] = {
+        1, // 1: neg - neg
+        1, // 2: pos - neg
+        0 // 3: neg - pos
+    };
 
     // Test values for 'a'
-    BN_ULONG test_values_a[num_tests][MAX_BIGNUM_WORDS] = {
+    /*BN_ULONG test_values_a[num_tests][MAX_BIGNUM_WORDS] = {
         {0x1}, // Test case 1: Equal values
         {0x8}, // Test case 2: Simple subtraction without borrowing
         {0x100000000}, // Test case 3: Borrowing from a single higher word
@@ -40,14 +61,23 @@ __global__ void testKernel() {
         {0xFFFFFFFFFFFFFFFF, 0x0},            // Test case 10: Carry from lower to upper word
         {0xFFFFFFFFFFFFFFFF, 0x0},            // Test case 11: Large value spanning two words
         {0x1, 0x0}                            // Test case 12: Max 2-word value
-    };
+    };*/
+
   
     // Run tests
     for (int test = 0; test < num_tests; ++test) {
         printf("\nTest %d:\n", test + 1);
         BIGNUM a, b, result;
         init_zero(&a, MAX_BIGNUM_WORDS);
+        // Set sign of 'a' based on test case
+        if (negative_a[test]) {
+            a.neg = 1;
+        }
         init_zero(&b, MAX_BIGNUM_WORDS);
+        // Set sign of 'b' based on test case
+        if (negative_b[test]) {
+            b.neg = 1;
+        }
         init_zero(&result, MAX_BIGNUM_WORDS);
 
         // Assign test values to 'a' and 'b', and initialize top accordingly
