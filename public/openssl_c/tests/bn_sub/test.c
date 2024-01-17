@@ -78,22 +78,46 @@ int main() {
     char* test_values_a[] = {
         "1", // 1: neg - neg
         "1", // 2: pos - neg
-        "1" // 3: neg - pos
+        "1", // 3: neg - pos
+        "4", // 4: neg - pos
+        "4", // 5: pos - neg
+        "1", // 6: neg - pos
+        "1",  // 7: pos - neg
+        "1", // 8: Two-word positive-neg test case (low word, high word)
+        "1FFFFFFFFFFFFFFFF" // 9: Two-word neg-pos overflow test case (low word, high word)
     };
     int multipliers_a[] = {
-        1, // 1: neg - neg
-        0, // 2: pos - neg
-        1 // 3: neg - pos
+        1, // 1: neg
+        0, // 2: pos
+        1, // 3: neg
+        1, // 4: neg
+        0, // 5: pos
+        1, // 6: neg
+        0,  // 7: pos
+        0, // 8: pos
+        1  // 9: neg
     };
     char* test_values_b[] = {
         "1", // 1: neg - neg
         "1", // 2: pos - neg
-        "1" // 3: neg - pos
+        "1", // 3: neg - pos
+        "1", // 4: neg - pos
+        "1", // 5: pos - neg
+        "4", // 6: neg - pos
+        "4", // 7: pos - neg
+        "2", // 8: Two-word negative-neg test case (low word, high word)
+        "1", // 9: Two-word neg-pos overflow test case (low word, high word)
     };
     int multipliers_b[] = {
-        1, // 1: neg - neg
-        1, // 2: pos - neg
-        0 // 3: neg - pos
+        1, // 1: neg
+        1, // 2: neg
+        0, // 3: pos
+        0, // 4: pos
+        1, // 5: neg
+        0, // 6: pos
+        1,  // 7: neg
+        1, // 8: neg
+        0  // 9: pos
     };
 
     

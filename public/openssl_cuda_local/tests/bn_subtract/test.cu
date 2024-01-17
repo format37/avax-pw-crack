@@ -8,27 +8,51 @@ __global__ void testKernel() {
     printf("++ testKernel for bn_subtract ++\n");
 
     // Define test cases for simplified debugging
-    const int num_tests = 3; // Update this based on the number of tests you're running
+    const int num_tests = 9; // Update this based on the number of tests you're running
 
     BN_ULONG test_values_a[num_tests][MAX_BIGNUM_WORDS] = {
-        {0x1}, // 1: 1: neg - neg
-        {0x1},  // 3: 1: pos - neg
-        {0x1} // 2: 1: neg - pos
+        {0x1}, // 1: neg - neg
+        {0x1}, // 2: pos - neg
+        {0x1}, // 3: neg - pos
+        {0x4}, // 4: neg - pos
+        {0x4}, // 5: pos - neg
+        {0x1}, // 6: neg - pos
+        {0x1},  // 7: pos - neg
+        {0x1, 0x0},                // 8: Two-word positive-neg test case (low word, high word)
+        {0xFFFFFFFFFFFFFFFF, 0x1}  // 9: Two-word neg-pos overflow test case (low word, high word)
     };
     int negative_a[num_tests] = {
         1, // 1: neg - neg
         0, // 2: pos - neg
-        1 // 3: neg - pos
+        1, // 3: neg - pos
+        1, // 4: neg - pos
+        0, // 5: pos - neg
+        1, // 6: neg - pos
+        0,  // 7: pos - neg
+        0,  // 8: pos
+        1   // 9: neg
     };
     BN_ULONG test_values_b[num_tests][MAX_BIGNUM_WORDS] = {
-        {0x1}, // 1: 1: neg - neg
-        {0x1}, // 3: 1: pos - neg
-        {0x1} // 2: 1: neg - pos
+        {0x1}, // 1: neg - neg
+        {0x1}, // 2: pos - neg
+        {0x1}, // 3: neg - pos
+        {0x1}, // 4: neg - pos
+        {0x1}, // 5: pos - neg
+        {0x4}, // 6: neg - pos
+        {0x4},  // 7: pos - neg
+        {0x2, 0x0},                // 8: Two-word negative-neg test case (low word, high word)
+        {0x1, 0x0}                 // 9: Two-word pos-neg overflow test case (low word, high word)
     };
     int negative_b[num_tests] = {
         1, // 1: neg - neg
         1, // 2: pos - neg
-        0 // 3: neg - pos
+        0, // 3: neg - pos
+        0, // 4: neg - pos
+        1, // 5: pos - neg
+        0, // 6: neg - pos
+        1,  // 7: pos - neg
+        1,  // 8: neg
+        0   // 9: pos
     };
 
     // Test values for 'a'

@@ -11,6 +11,8 @@ typedef struct bignum_st {
   int flags;
 } BIGNUM;
 
+__device__ void bn_add(BIGNUM *result, BIGNUM *a, BIGNUM *b);
+
 __device__ void bn_print(const char* msg, BIGNUM* a) {
     printf("%s", msg);
     if (a->top == 0) {
@@ -101,6 +103,39 @@ __device__ void init_one(BIGNUM *bn, int capacity) {
 }
 
 __device__ int bn_cmp(BIGNUM* a, BIGNUM* b) {
+    // bn_cmp logic:
+    //  1 when a is larger
+    // -1 when b is larger
+    //  0 wneh a and b are equal
+
+  // Skip leading zeroes and find the actual top for a
+  int a_top = a->top - 1;
+  while (a_top >= 0 && a->d[a_top] == 0) a_top--;
+
+  // Skip leading zeroes and find the actual top for b
+  int b_top = b->top - 1;
+  while (b_top >= 0 && b->d[b_top] == 0) b_top--;
+
+  // Compare signs
+  if (a->neg && !b->neg) return -1; // a is negative, b is positive: a < b
+  if (!a->neg && b->neg) return 1;  // a is positive, b is negative: a > b
+
+  // If both numbers are negative, we need to reverse the comparison of their magnitudes
+  int sign_factor = (a->neg && b->neg) ? -1 : 1;
+
+  // Now, use the actual tops for comparison
+  if (a_top > b_top) return sign_factor * 1; // Consider sign for magnitude comparison
+  if (a_top < b_top) return sign_factor * -1;
+
+  // Both numbers have the same number of significant digits, so compare them starting from the most significant digit
+  for (int i = a_top; i >= 0; i--) {
+    if (a->d[i] > b->d[i]) return sign_factor * 1; // a is larger (or smaller if both are negative)
+    if (a->d[i] < b->d[i]) return sign_factor * -1; // b is larger (or smaller if both are negative)
+  }
+  return 0; // Numbers are equal
+}
+
+__device__ int bn_cmp_v0(BIGNUM* a, BIGNUM* b) {
   // Skip leading zeroes and find the actual top for a
   int a_top = a->top - 1;
   while (a_top >= 0 && a->d[a_top] == 0) a_top--;
@@ -142,15 +177,141 @@ __device__ void bn_copy(BIGNUM *dest, BIGNUM *src) {
     }
 }
 
+__device__ void absolute_add(BIGNUM *result, const BIGNUM *a, const BIGNUM *b) {
+    // Determine the maximum size to iterate over
+    int max_top = max(a->top, b->top);
+    BN_ULONG carry = 0;
+
+    // Initialize result
+    for (int i = 0; i <= max_top; ++i) {
+        result->d[i] = 0;
+    }
+    result->top = max_top;
+
+    for (int i = 0; i <= max_top; ++i) {
+        // Extract current words or zero if one bignum is shorter
+        BN_ULONG ai = (i < a->top) ? a->d[i] : 0;
+        BN_ULONG bi = (i < b->top) ? b->d[i] : 0;
+
+        // Calculate sum and carry
+        BN_ULONG sum = ai + bi + carry;
+
+        // Store result
+        result->d[i] = sum & ((1ULL << BN_ULONG_NUM_BITS) - 1); // Full sum with carry included, mask with the appropriate number of bits
+
+        // Calculate carry, respecting the full width of BN_ULONG
+        carry = (sum < ai) || (carry > 0 && sum == ai) ? 1 : 0;
+    }
+
+    // Handle carry out, expand result if necessary
+    if (carry > 0) {
+        if (result->top < MAX_BIGNUM_WORDS - 1) {
+            result->d[result->top] = carry; // Assign carry to the new word
+            result->top++;
+        } else {
+            // Handle error: Result BIGNUM doesn't have space for an additional word.
+            // This should potentially be reported back to the caller.
+        }
+    }
+
+    // Find the real top after addition (no leading zeroes)
+    result->top = find_top(result, MAX_BIGNUM_WORDS);
+}
+
+__device__ void absolute_subtract(BIGNUM *result, const BIGNUM *a, const BIGNUM *b) {
+    // This function assumes both 'a' and 'b' are positive.
+    // It subtracts the absolute values |b| from |a|, where |a| >= |b|.
+    // If |a| < |b|, it's the caller's responsibility to set result->neg appropriately.
+
+    int max_top = max(a->top, b->top);
+    BN_ULONG borrow = 0;
+    result->top = max_top;
+
+    for (int i = 0; i < max_top; ++i) {
+        BN_ULONG ai = (i < a->top) ? a->d[i] : 0;
+        BN_ULONG bi = (i < b->top) ? b->d[i] : 0;
+
+        // Calculate the word subtraction with borrow
+        BN_ULONG sub = ai - bi - borrow;
+        result->d[i] = sub;
+        
+        // Update borrow which is 1 if subtraction underflowed, 0 otherwise.
+        borrow = (ai < bi + borrow) ? 1 : 0;
+    }
+
+    // If there's a borrow left at the last word, this means |a| was less than |b|. Set top to 0 to denote invalid result.
+    if (borrow != 0) {
+        result->top = 0;  // Set to 0 to denote invalid bignum
+        printf("Error: Underflow in subtraction, result is invalid.\n");
+    }
+}
+
 __device__ void bn_subtract(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
+    // Determine the real sign of the result based on the signs of a and b.
+    if (a->neg != b->neg) {
+        // If one is negative and the other is positive, it's essentially an addition.
+        result->neg = a->neg;  // The sign will be the same as the sign of 'a'.
+        // Should perform an addition of magnitudes here because b is negative.
+        absolute_add(result, a, b); // This line should be added to perform the absolute value addition.
+        return;
+    } else {
+        // Else, signs are same, and it's a subtraction.
+        // The result will have the sign of 'a' if |a| >= |b|, otherwise, it will
+        // be the opposite of 'a' sign because |a| < |b|.
+        result->neg = (bn_cmp(a, b) >= 0) ? a->neg : !a->neg;
+    }
+
+    // Perform the absolute subtraction without altering 'a' and 'b'.
+    // The function 'absolute_subtract' needs to be implemented as subtraction of |a| and |b|.
+    absolute_subtract(result, a, b);
+
+    // Find the top of the resulting bignum to remove leading zeros
+    find_top(result, MAX_BIGNUM_WORDS);
+
+    // If 'a' and 'b' were of different signs, we already set result->neg accordingly.
+    // We are dealing with the scenario where |a| - |b| or |b| - |a| is performed.
+}
+
+
+
+__device__ void bn_subtract_v0(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
     // bn_cmp logic:
     //  1 when a is larger
     // -1 when b is larger
-    //  0 wneh a and b are equal  
+    //  0 wneh a and b are equal
+
+    // We need to account logic:
+    //   a<0, b<0
+    //      mod(a) > mod(b)
+    //      mod(a) ==mod(b)
+    //      mod(a) < mod(b)
+    
+    // ======= this =======
+    //   a<0, b>0
+    //      mod(a) > mod(b)
+    //      mod(a) ==mod(b)
+    //      mod(a) < mod(b)
+    
+    //   a>0, b>0
+    //      mod(a) > mod(b)
+    //      mod(a) ==mod(b)
+    //      mod(a) < mod(b)
+    //   a>0, b<0
+    //      mod(a) > mod(b)
+    //      mod(a) ==mod(b)
+    //      mod(a) < mod(b)
+    
+    // If b is negative, then we need to invert b and perform addition
+    if (b->neg) {
+        b->neg = 0; // Set b to positive
+        bn_add(result, a, b); // Perform addition
+        b->neg = 1; // Restore b to negative
+        return;
+    }
     bool swap = false;
     // If bn_cmp(a, b) < 0, then a < b, and the result is negative.
     if (bn_cmp(a, b) < 0) {
-        // printf("Attention: Negative result in subtraction\n");
+        printf("a < b. Swapping +\n");
         result->top = b->top; // b is larger
         // Set negative result flag
         result->neg = 1;
@@ -213,14 +374,33 @@ __device__ void bn_subtract(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
     find_top(result, MAX_BIGNUM_WORDS);
     // printf("result->top: %d\n", result->top);
     // Swap a and b back
+    /*if (swap) {
+        printf("Swapping -\n");
+        BIGNUM temp;
+        init_zero(&temp, MAX_BIGNUM_WORDS);
+        bn_copy(&temp, a);
+        bn_copy(a, b);
+        bn_copy(b, &temp);
+    }*/
+
+
+    // Swap a and b back
     if (swap) {
+        // Set the 'neg' flag based on the current values of swapped 'a' and 'b'
+        result->neg = 1; // The result will always be negative if a swap was necessary
+        printf("Swapping -\n");
         BIGNUM temp;
         init_zero(&temp, MAX_BIGNUM_WORDS);
         bn_copy(&temp, a);
         bn_copy(a, b);
         bn_copy(b, &temp);
     }
-    if (a->neg && b->neg) {
+    else {
+        // Since a >= b, the result will always be non-negative if no swap occurred
+        result->neg = 0;
+    }
+
+    /*if (a->neg && b->neg) {
         result->neg = 1;
     }
     // 'a' is negative, 'b' is positive
@@ -234,7 +414,7 @@ __device__ void bn_subtract(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
     // Both numbers are positive
     else {
         result->neg = 0;
-    }
+    }*/
 }
 
 __device__ void bn_add(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
