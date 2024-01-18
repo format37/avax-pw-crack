@@ -2,6 +2,9 @@
 #include <assert.h>
 #define debug_print false
 #define BN_MASK2 0xffffffff;
+#define BN_ULONG_NUM_BITS 64
+#define MAX_BIGNUM_WORDS 4     // For 256-bit numbers
+#define MAX_BIGNUM_SIZE 6     // Allow room for temp calculations
 
 typedef struct bignum_st {
   BN_ULONG *d;
@@ -65,10 +68,6 @@ __device__ BN_ULONG bn_sub_words(BN_ULONG* r, BN_ULONG* a, BN_ULONG* b, int n) {
 
   return borrow;
 }
-
-#define BN_ULONG_NUM_BITS 64
-#define MAX_BIGNUM_WORDS 4     // For 256-bit numbers
-#define MAX_BIGNUM_SIZE 6     // Allow room for temp calculations
 
 __device__ void reverse(BN_ULONG* d, int n) {
   BN_ULONG tmp;
@@ -270,151 +269,6 @@ __device__ void bn_subtract(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
 
     // If 'a' and 'b' were of different signs, we already set result->neg accordingly.
     // We are dealing with the scenario where |a| - |b| or |b| - |a| is performed.
-}
-
-
-
-__device__ void bn_subtract_v0(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
-    // bn_cmp logic:
-    //  1 when a is larger
-    // -1 when b is larger
-    //  0 wneh a and b are equal
-
-    // We need to account logic:
-    //   a<0, b<0
-    //      mod(a) > mod(b)
-    //      mod(a) ==mod(b)
-    //      mod(a) < mod(b)
-    
-    // ======= this =======
-    //   a<0, b>0
-    //      mod(a) > mod(b)
-    //      mod(a) ==mod(b)
-    //      mod(a) < mod(b)
-    
-    //   a>0, b>0
-    //      mod(a) > mod(b)
-    //      mod(a) ==mod(b)
-    //      mod(a) < mod(b)
-    //   a>0, b<0
-    //      mod(a) > mod(b)
-    //      mod(a) ==mod(b)
-    //      mod(a) < mod(b)
-    
-    // If b is negative, then we need to invert b and perform addition
-    if (b->neg) {
-        b->neg = 0; // Set b to positive
-        bn_add(result, a, b); // Perform addition
-        b->neg = 1; // Restore b to negative
-        return;
-    }
-    bool swap = false;
-    // If bn_cmp(a, b) < 0, then a < b, and the result is negative.
-    if (bn_cmp(a, b) < 0) {
-        printf("a < b. Swapping +\n");
-        result->top = b->top; // b is larger
-        // Set negative result flag
-        result->neg = 1;
-        // Swap a and b
-        BIGNUM temp;
-        init_zero(&temp, MAX_BIGNUM_WORDS);
-        bn_copy(&temp, a);
-        bn_copy(a, b);
-        bn_copy(b, &temp);        
-        // printf("[b] bn_subtract:result->top: %d\n", result->top);
-        swap = true;
-    }
-    else {
-        result->top = a->top; // a is larger
-        // printf("[a] bn_subtract:result->top: %d\n", result->top);
-    }
-    BN_ULONG borrow = 0;
-
-    // Subtract each word of 'b' from 'a', handling borrowing
-    for (int i = 0; i < result->top; i++) {
-        BN_ULONG ai = (i < a->top) ? a->d[i] : 0;
-        BN_ULONG bi = (i < b->top) ? b->d[i] : 0;
-
-        // First, handle the subtract borrow from the previous iteration
-        if (ai < borrow) {
-            // Underflow means we need to borrow from the next higher word
-            ai += (1ULL << BN_ULONG_NUM_BITS);
-            ai -= borrow;
-            borrow = 1; // Set borrow for the next iteration
-        } else {
-            ai -= borrow; // No underflow, simply subtract the borrow
-            borrow = 0;
-        }
-
-        if (ai < bi) {
-            // ai cannot cover bi, so we will underflow and need to borrow
-            ai += (1ULL << BN_ULONG_NUM_BITS);
-            result->d[i] = ai - bi; // Perform the subtraction
-            // printf("[%d] ai < bi ", i);
-            // bn_print("result: ", result);
-            borrow = 1; // We continue borrowing to the next higher word
-        } else {
-            result->d[i] = ai - bi; // Perform the subtraction without borrowing
-            // printf("[%d] ai >= bi ", i);
-            // bn_print("result: ", result);
-        }
-        
-        if (i == result->top - 1 && borrow == 1) {
-            // If we borrowed on the last iteration, there's no higher word to borrow from; underflow
-            result->top = 0; // Invalidate the result
-            printf("Error: Underflow in subtraction, result is invalid.\n");
-            return;
-        }
-    }
-
-    // Reduce the result->top if the high words are zero after subtraction
-    /*while (result->top > 0 && result->d[result->top - 1] == 0) {
-        result->top--;
-    }*/
-    find_top(result, MAX_BIGNUM_WORDS);
-    // printf("result->top: %d\n", result->top);
-    // Swap a and b back
-    /*if (swap) {
-        printf("Swapping -\n");
-        BIGNUM temp;
-        init_zero(&temp, MAX_BIGNUM_WORDS);
-        bn_copy(&temp, a);
-        bn_copy(a, b);
-        bn_copy(b, &temp);
-    }*/
-
-
-    // Swap a and b back
-    if (swap) {
-        // Set the 'neg' flag based on the current values of swapped 'a' and 'b'
-        result->neg = 1; // The result will always be negative if a swap was necessary
-        printf("Swapping -\n");
-        BIGNUM temp;
-        init_zero(&temp, MAX_BIGNUM_WORDS);
-        bn_copy(&temp, a);
-        bn_copy(a, b);
-        bn_copy(b, &temp);
-    }
-    else {
-        // Since a >= b, the result will always be non-negative if no swap occurred
-        result->neg = 0;
-    }
-
-    /*if (a->neg && b->neg) {
-        result->neg = 1;
-    }
-    // 'a' is negative, 'b' is positive
-    else if (a->neg && !b->neg) {
-        result->neg = (bn_cmp(a, b) > 0) ? 1 : 0;
-    }
-    // 'a' is positive, 'b' is negative
-    else if (!a->neg && b->neg) {
-        result->neg = (bn_cmp(a, b) < 0) ? 1 : 0;
-    }
-    // Both numbers are positive
-    else {
-        result->neg = 0;
-    }*/
 }
 
 __device__ void bn_add(BIGNUM *result, BIGNUM *a, BIGNUM *b) {

@@ -73,16 +73,6 @@ __global__ void testKernel() {
         {0xA}, // -10 (by sign)
         {0xA}  // -10 (by sign)
     };
-
-    BN_ULONG test_values_b[num_tests][MAX_BIGNUM_WORDS] = {
-        {0x5}, // -5 (by sign)
-        {0xA}, // -10 (by sign)
-        {0xA}, // 10
-        {0x5}, // -5 (by sign)
-        {0x5}, // 5
-        {0xF}  // 15
-    };
-
     // Signs for 'a' and 'b'
     int bn_signs_a[num_tests] = {
         0, // +10
@@ -91,6 +81,15 @@ __global__ void testKernel() {
         1, // -10
         1, // -10
         1  // -10
+    };
+
+    BN_ULONG test_values_b[num_tests][MAX_BIGNUM_WORDS] = {
+        {0x5}, // -5 (by sign)
+        {0xA}, // -10 (by sign)
+        {0xA}, // 10
+        {0x5}, // -5 (by sign)
+        {0x5}, // 5
+        {0xF}  // 15
     };
 
     int bn_signs_b[num_tests] = {
