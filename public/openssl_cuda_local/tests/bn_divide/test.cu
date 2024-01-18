@@ -11,33 +11,31 @@
 __global__ void testKernel() {
     printf("++ testKernel for bn_divide ++\n");
     // Set the maximum number of test cases
-    const int num_tests = 7;  // Updated number of tests
+    const int num_tests = 6;  // Updated number of tests
     // Initialize the word_num array
-    int word_num[num_tests] = {1, 1, 1, 1, 1, 2, 3};
+    int word_num[num_tests] = {1, 1, 1, 1, 1, 2};
 
     BN_ULONG test_values_dividend[][MAX_BIGNUM_WORDS] = {
         {0x1}, // Test 1
         {0xF}, // Test 2
         {0xF}, // Test 3
-        {0x17}, // Test 4 // 23 in decimal
+        {0x17}, // Test 4
         {0x1234567890ABCDEF}, // Test 5
-        {0x1234567890ABCDEF, 0}, // Test 6
-        {0x1234567890ABCDEF, 0, 0} // Test 7
-
+        {0x1234567890ABCDEF, 0x1234567890ABCDEF} // Test 6
     };
 
     BN_ULONG test_values_divisor[][MAX_BIGNUM_WORDS] = {
-        {0x2},
-        {0xF}, 
-        {0x1},
-        {0x5},
-        {0x1},
-        {0x1, 0}, 
-        {0x1, 0, 0}
+        {0x2}, // 1
+        {0xF}, // 2
+        {0x1}, // 3
+        {0x5}, // 4
+        {0x1}, // 5
+        {0x2, 0}  // 6
     };
 
     // Initialize 'dividend' and 'divisor' with test values for each test
     for (int test = 0; test < num_tests; ++test) {
+        printf("\nTest %d:\n", test + 1);
         BIGNUM dividend, divisor, quotient, remainder;
         init_zero(&dividend, MAX_BIGNUM_WORDS);
         init_zero(&divisor, MAX_BIGNUM_WORDS);
@@ -57,7 +55,7 @@ __global__ void testKernel() {
         bn_divide(&quotient, &remainder, &dividend, &divisor);
 
         // Print results
-        printf("Test %d:\n", test + 1);
+        
         bn_print("dividend : ", &dividend);
         bn_print("divisor  : ", &divisor);
         bn_print("quotient : ", &quotient);

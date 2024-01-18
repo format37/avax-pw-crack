@@ -1298,7 +1298,9 @@ __device__ void bn_divide(BIGNUM *quotient, BIGNUM *remainder, BIGNUM *dividend,
     if (divisor->top > 1) {
         printf("ATTENTION! bn_divide: divisor.top > 1\n");
     }
-    //printf(" ++ bn_divide ++ \n");
+    
+    printf(" ++ bn_divide ++ \n");
+    
 
     // Initialize quotient and remainder
     init_zero(quotient, MAX_BIGNUM_WORDS);
@@ -1357,6 +1359,8 @@ __device__ void bn_divide(BIGNUM *quotient, BIGNUM *remainder, BIGNUM *dividend,
         /*bn_print("After Subtraction - Shifted divisor", &temp_divisor);
         bn_print("After Subtraction - Remainder", remainder);
         bn_print("After Subtraction - Quotient ", quotient);*/
+        printf("## bn_divide ##\n");
+        return;
     }
 
     /*if (debug_count >= 10) {

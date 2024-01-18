@@ -12,28 +12,27 @@ int main() {
 
     // Expanded Test values for 'dividend' and 'divisor' with accurate multi-word representation
     char* test_values_dividend[] = {
-        "1",
-        "F",
-        "F",
-        "17", // 23 in decimal
-        "1234567890ABCDEF", // Single-word dividend
-        "00000000000000001234567890ABCDEF", // Leading zero words
-        "000000000000000000000000000000001234567890ABCDEF" // More leading zero words
+        "1", // 1
+        "F", // 2
+        "F", // 3
+        "17", // 4
+        "1234567890ABCDEF", // 5
+        "1234567890ABCDEF1234567890ABCDEF"  // 6
     };
 
     char* test_values_divisor[] = {
-        "2",
-        "F",
-        "1",
-        "5", // 5 in decimal
-        "1", // Single-word divisor
-        "0000000000000001", // Leading zero words
-        "00000000000000000000000000000001" // More leading zero words
+        "2", // 1
+        "F", // 2
+        "1", // 3
+        "5", // 4 
+        "1", // 5
+        "2"  // 6
     };
 
     int num_tests = sizeof(test_values_dividend) / sizeof(test_values_dividend[0]);
 
     for (int test = 0; test < num_tests; ++test) {
+        printf("\nTest %d:\n", test + 1);
         BIGNUM *dividend = BN_new();
         BIGNUM *divisor = BN_new();
         BIGNUM *quotient = BN_new();
@@ -44,7 +43,7 @@ int main() {
 
         BN_div(quotient, remainder, dividend, divisor, ctx);
 
-        printf("Test %d:\n", test + 1);
+        
         print_bn("Dividend", dividend);
         print_bn("Divisor", divisor);
         print_bn("Quotient", quotient);
