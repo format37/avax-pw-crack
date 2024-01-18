@@ -3,12 +3,12 @@
 #include "bignum.h"
 
 // Define your BIGNUM structure based on your project definitions
-#define MAX_BIGNUM_WORDS 20
+/*#define MAX_BIGNUM_WORDS 20
 #define BN_ULONG unsigned long long int
-#define BN_ULONG_NUM_BITS (sizeof(BN_ULONG) * 8)
+#define BN_ULONG_NUM_BITS (sizeof(BN_ULONG) * 8)*/
 
 // Function prototypes for the bn_add function test
-__device__ void bn_add(BIGNUM *a, BIGNUM *b, BIGNUM *r);
+// __device__ void bn_add(BIGNUM *a, BIGNUM *b, BIGNUM *r);
 
 // Test kernel for bn_add
 __global__ void testKernel() {
@@ -25,7 +25,7 @@ __global__ void testKernel() {
     // -10 + 15 = 5 # sub 15 - 10
 
     // Test values for 'a' and 'b'
-    /*BN_ULONG test_values_a[num_tests][MAX_BIGNUM_WORDS] = {
+    BN_ULONG test_values_a[num_tests][MAX_BIGNUM_WORDS] = {
         {0x1},
         {0xFFFFFFFFFFFFFFFF},
         {0x0, 0x1}, // Representing 1 << 64 (2^64)
@@ -63,7 +63,8 @@ __global__ void testKernel() {
         1, //test 5
         0, //test 6
         1 //test 7
-    };*/
+    };
+    /*
     // Test values for 'a' and 'b'
     BN_ULONG test_values_a[num_tests][MAX_BIGNUM_WORDS] = {
         {0xA}, // 10
@@ -99,7 +100,7 @@ __global__ void testKernel() {
         1, // -5
         0, // +5
         0  // +15
-    };
+    };*/
 
 
     // Initialize 'a' and 'b' with test values for each test

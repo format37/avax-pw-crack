@@ -4,109 +4,68 @@
 
 __global__ void test_bn_mul_kernel() {
     printf("++ test_bn_mul_kernel ++\n");
-
-    /*Additional test cases:
-
-    0x0000000000000000,0x0000000000000002 * 0x0000000000000000,0x0000000000000002
-    0x0000000000000000,0x0000000000000002 * 0x0000000000000002,0x0000000000000000
-    0x0000000000000002,0x0000000000000000 * 0x0000000000000000,0x0000000000000002
-    0x0000000000000002,0x0000000000000000 * 0x0000000000000002,0x0000000000000000
-    0x0000000000000001,0x0000000000000001 * 0x0000000000000001,0x0000000000000001
-    0x0000000000000001,0x0000000000000000 * 0x0000000000000000,0x0000000000000001
-    0x0000000000000001,0x0000000000000002 * 0x0000000000000003,0x0000000000000004
-    0x0000000000000002,0x0000000000000001 * 0x0000000000000001,0x0000000000000003
-    0xffffffffffffffff,0xffffffffffffffff * 0xffffffffffffffff,0xffffffffffffffff
-    0xffffffffffffffff,0x0000000000000000 * 0x0000000000000000,0xffffffffffffffff
-    0x00000000ffffffff,0x00000000ffffffff * 0xffffffff00000000,0xffffffff00000000
-    0x0000000000000002,0x0000000000000000 * 0x0000000000000000,0x0000000000000001
-    0x8000000000000000,0x0000000000000000 * 0x0000000000000002,0x0000000000000000
-    0x8000000000000000,0x8000000000000000 * 0x0000000000000002,0x0000000000000002*/
-
-    // Test cases similar to the ones used in the OpenSSL BN_mul test
-    BN_ULONG test_values_a[] = {
-        0x1ULL,
-        0xFULL,
-        0xFFULL,
-        0xABCULL,
-        0x1234567890ABCDEFULL,
-        0x10ULL,
-        0xFFFFFFFFFFFFFFFFULL,
-        // Additional test cases
-        /*0xFFFFFFFFFFFFFFFFULL,
-        0x2ULL,
-        0xFFFFFFFFFFFFFFFFULL,
-        0x1ULL,
-        0x0ULL,
-        0xFFFFFFFFFFFFFFFFULL,
-        0x8000000000000000ULL,
-        0x8000000000000000ULL,
-        0xFFFFFFFFFFFFFFFFULL,
-        0x7FFFFFFFFFFFFFFFULL*/
+    // Multi-word and sign test cases
+    BN_ULONG test_values_a[][MAX_BIGNUM_WORDS] = {
+        {0x1ULL},
+        {0xFULL},
+        {0xFFULL},
+        {0xABCULL},
+        {0x1234567890ABCDEFULL},
+        {0x10ULL},
+        {0xFFFFFFFFFFFFFFFFULL},
+        {0xFEDCBA0987654321ULL, 0x1234567890ABCDEFULL}
+    };
+    BN_ULONG test_values_b[][MAX_BIGNUM_WORDS] = {
+        {0x2ULL},
+        {0xFULL},
+        {0x101ULL},
+        {0x10ULL},
+        {0xFEDCBA0987654321ULL},
+        {0x10ULL},
+        {0x1000000000000000ULL},
+        {0xFEDCBA0987654321ULL, 0x1234567890ABCDEFULL}
     };
 
-    BN_ULONG test_values_b[] = {
-        0x2ULL,
-        0xFULL,
-        0x101ULL,
-        0x10ULL,
-        0xFEDCBA0987654321ULL,
-        0x10ULL,
-        0x1000000000000000ULL
-        /*,// Additional test cases corresponding to the extended test values in 'a'
-        0x2ULL,
-        0xFFFFFFFFFFFFFFFFULL,
-        0x1ULL,
-        0xFFFFFFFFFFFFFFFFULL,
-        0x0ULL,
-        0x8000000000000000ULL,
-        0x2ULL,
-        0x8000000000000000ULL,
-        0xFFFFFFFFFFFFFFFFULL,
-        0x2ULL*/
-    };
+    int sign_a[] = {0, 0, 0, 0, 0, 0, 0, 0}; // Signs for 'a'
+    int sign_b[] = {0, 0, 0, 0, 0, 0, 0, 1}; // Signs for 'b'
 
     int num_tests = sizeof(test_values_a) / sizeof(test_values_a[0]);
 
     for (int test = 0; test < num_tests; ++test) {
-        printf("Test %d:\n", test + 1);
+        printf("\nTest %d:\n", test + 1);
         // Initialize BIGNUMs for testing
         BIGNUM a, b, product;
         init_zero(&a, MAX_BIGNUM_WORDS);
         init_zero(&b, MAX_BIGNUM_WORDS);
         init_zero(&product, MAX_BIGNUM_WORDS);
 
-        // Initialize 'a' and 'b' with the test values
-        a.d[0] = test_values_a[test]; a.top = 1;
-        b.d[0] = test_values_b[test]; b.top = 1;
+        
+
+        // Initialize 'a' and 'b' with the test values and set the top
+        for (int i = 0; i < MAX_BIGNUM_WORDS; ++i) {
+            a.d[i] = test_values_a[test][i];
+            b.d[i] = test_values_b[test][i];
+        }
+
+        // Determine number of words for 'a' and 'b'
+        a.top = find_top(&a, MAX_BIGNUM_WORDS);
+        b.top = find_top(&b, MAX_BIGNUM_WORDS);
+        
+        // Set signs
+        a.neg = sign_a[test];
+        b.neg = sign_b[test];
 
         // Test bn_mul operation
         bn_mul(&a, &b, &product);
 
-        // Print result
-        
+        // Update product's top
+        product.top = find_top(&product, MAX_BIGNUM_WORDS);
+
+        // Print the results
         bn_print("a: ", &a);
         bn_print("b: ", &b);
         bn_print("a * b = product: ", &product);
-        // Print product top
-        printf("product.top = %d\n", product.top);
     }
-
-    // Test for multiple words
-    printf("Test for multiple words:\n");
-    // Initialize BIGNUMs for testing
-    BIGNUM a, b, product;
-    init_zero(&a, MAX_BIGNUM_WORDS);
-    init_zero(&b, MAX_BIGNUM_WORDS);
-    init_zero(&product, MAX_BIGNUM_WORDS);
-    
-    a.top = 2;
-    a.d[0] = 0x1234567890ABCDEFULL; a.d[1] = 0xFEDCBA0987654321ULL;
-    b.top = 2;
-    b.d[0] = 0x1234567890ABCDEFULL; b.d[1] = 0xFEDCBA0987654321ULL;
-    bn_mul(&a, &b, &product);
-    bn_print("a: ", &a);
-    bn_print("b: ", &b);
-    bn_print("a * b = product: ", &product);
 
     printf("-- Finished test_bn_mul_kernel --\n");
 }
@@ -129,6 +88,3 @@ int main() {
 
     return 0;
 }
-
-// Compile this program with:
-// nvcc test_bn_mul.cu -o test_bn_mul -I<path_to_bignum_header>

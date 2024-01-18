@@ -271,7 +271,7 @@ __device__ void bn_subtract(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
     // We are dealing with the scenario where |a| - |b| or |b| - |a| is performed.
 }
 
-__device__ void bn_add(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
+__device__ void bn_add_v0(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
     if (a->neg != b->neg) {
         // Handle the case where a and b have different signs
         // This is a subtraction operation
@@ -330,6 +330,68 @@ __device__ void bn_add(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
         result->neg = 0;
     }
 
+}
+
+__device__ int absolute_compare(const BIGNUM* a, const BIGNUM* b) {
+    // absolute_compare logic:
+    //  1 when |a| is larger
+    // -1 when |b| is larger
+    //  0 when |a| and |b| are equal in absolute value
+
+    // Skip leading zeros and find the actual top for a
+    int a_top = a->top - 1;
+    while (a_top >= 0 && a->d[a_top] == 0) a_top--;
+
+    // Skip leading zeros and find the actual top for b
+    int b_top = b->top - 1;
+    while (b_top >= 0 && b->d[b_top] == 0) b_top--;
+
+    // Compare actual tops
+    if (a_top > b_top) return 1; // |a| is larger
+    if (a_top < b_top) return -1; // |b| is larger
+
+    // Both numbers have the same number of significant digits, compare digit by digit
+    for (int i = a_top; i >= 0; i--) {
+        if (a->d[i] > b->d[i]) return 1; // |a| is larger
+        if (a->d[i] < b->d[i]) return -1; // |b| is larger
+    }
+    return 0; // |a| and |b| are equal in absolute value
+}
+
+//__device__ void bn_add_v0(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
+__device__ void bn_add(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
+    // Clear the result first.
+    result->top = 0;
+    for (int i = 0; i < MAX_BIGNUM_WORDS; i++) {
+        result->d[i] = 0;
+    }
+
+    if (a->neg == b->neg) {
+        // Both numbers have the same sign, so we can directly add them.
+        absolute_add(result, a, b);
+        result->neg = a->neg; // The sign will be the same as both operands.
+    } else {
+        // The numbers have different signs, so we need to compare their absolute values to decide on the operation.
+        int cmp_result = absolute_compare(a, b);
+        if (cmp_result < 0) {
+            // |b| is greater than |a|, so we'll do b - a and assign the sign of b to the result.
+            absolute_subtract(result, b, a);
+            result->neg = b->neg;
+        } else if (cmp_result > 0) {
+            // |a| is greater than |b|, so we'll do a - b and assign the sign of a to the result.
+            absolute_subtract(result, a, b);
+            result->neg = a->neg;
+        } else {
+            // |a| is equal to |b|, so the result is 0.
+            // The result of adding two numbers with different signs but equal magnitude is 0.
+            result->neg = 0; // Set sign to 0 for non-negative.
+            result->top = 1; // The result is 0, so top is 1 to denote one valid word which is zero.
+            result->d[0] = 0;
+        }
+    }
+
+    // Lastly, normalize the result to remove any leading zeros that could have appeared.
+    find_top(result, MAX_BIGNUM_WORDS);
 }
 
 __device__ void bn_mod(BIGNUM* r, BIGNUM* m, BIGNUM* d) {
@@ -751,43 +813,6 @@ __device__ void bn_sub(BIGNUM *r, BIGNUM *a, BIGNUM *b) {
     r->neg = 0; // Assuming we don't want negative numbers, otherwise set sign properly
 }
 
-/*__device__ void bn_mul_v0(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
-    // Assuming all BIGNUMs are initialized and `d` arrays have enough allocated memory.
-    
-    // Initialize product to zero.
-    for (int i = 0; i < product->dmax; i++) {
-        product->d[i] = 0;
-    }
-    product->top = 0;
-
-    // Multiply each digit of a by each digit of b, accumulate results in product
-    for (int i = 0; i < a->top; i++) {
-        BN_ULONG carry = 0;
-        for (int j = 0; j < b->top || carry; j++) {
-            // Calculate the full multiplication result (including carry)
-            unsigned long long sum = (unsigned long long)product->d[i + j] + carry;
-            
-            // If we don't exceed b's digits, include the multiplication result
-            if (j < b->top) {
-                sum += (unsigned long long)a->d[i] * b->d[j];
-            }
-            
-            product->d[i + j] = (BN_ULONG)sum; // Store the lower half of the result
-            carry = (BN_ULONG)(sum >> BN_ULONG_NUM_BITS); // Shift right to get the upper half (carry)
-        }
-
-        // Make sure to check the next cell if a carry is present
-        if (carry && (i + b->top + 1 > product->top)) {
-            product->d[i + b->top] = carry;
-            product->top = i + b->top + 1; // Include the extra cell used by carry
-        } else if (i + b->top > product->top) {
-            product->top = i + b->top; // Update top based on position
-        }
-    }
-
-    // Now 'product' contains the product of 'a' and 'b', without modulo operation.
-    // Perform a modulo operation here if necessary (modular reduction).
-}*/
 __device__ void bn_mul_v1_top_ok(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
     // Initialize product to zero.
     for (int i = 0; i < product->dmax; i++) {
@@ -908,9 +933,49 @@ __device__ void bn_add_words(BN_ULONG *a, unsigned long long carry, int idx, int
 }
 
 __device__ void bn_mul(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
-    // Print the input values.
-    /*printf("a = %016llx\n", a->d[0]);
-    printf("b = %016llx\n", b->d[0]);*/
+    // Reset the product
+    for(int i = 0; i < a->top + b->top; i++)
+        product->d[i] = 0;
+    
+    // Perform multiplication of each word of a with each word of b
+    for(int i = 0; i < a->top; ++i) {
+        unsigned long long carry = 0;
+        for(int j = 0; j < b->top || carry != 0; ++j) {
+            unsigned long long alow = a->d[i];
+            unsigned long long blow = (j < b->top) ? b->d[j] : 0;
+            unsigned long long lolo = alow * blow;
+            unsigned long long lohi = __umul64hi(alow, blow);
+
+            unsigned long long sum = product->d[i + j] + lolo + carry;
+            carry = lohi + (sum < lolo ? 1 : 0); // update the carry
+
+            product->d[i + j] = sum; // store the sum
+        }
+
+        // If there is still carry after processing both a and b, store it on the next word.
+        if(carry != 0) {
+            product->d[i + b->top] = carry;
+        }
+    }
+
+    // Update the top to reflect the number of significant words in the product
+    product->top = 0;
+    for(int i = a->top + b->top - 1; i >= 0; --i) {
+        if(product->d[i] != 0) {
+            product->top = i + 1;
+            break;
+        }
+    }
+
+    // If the result has no significant words, ensure that top is at least 1
+    if(product->top == 0)
+        product->top = 1;
+    
+    // Determine if the result should be negative
+    product->neg = (a->neg != b->neg) ? 1 : 0;
+}
+
+__device__ void bn_mul_original(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
     // Notify if a.top>1 or b.top>1
     if (a->top > 1) {
         printf("ATTENTION! bn_mul: a.top > 1\n");
@@ -967,55 +1032,7 @@ __device__ void bn_mul(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
     // Update the 'top' based on the product.
     product->top = (product->d[1] != 0) ? 2 : (product->d[0] != 0) ? 1 : 0;
 
-    // Print the final product and 'top' value
-    /*printf("Final product = %016llx %016llx\n", product->d[1], product->d[0]);
-    printf("Final top = %d\n", product->top);*/
 }
-
-/*__device__ void bn_mul_multi_word_wrong(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
-    // Initialize the product
-    for (int i = 0; i < a->top + b->top; i++) {
-        product->d[i] = 0;
-    }
-    
-    // Perform multiplication for each word of 'BIGNUM a' with each word of 'BIGNUM b'.
-    for (int i = 0; i < a->top; i++) {
-        unsigned long long carry = 0;
-        for (int j = 0; j < b->top; j++) {
-            // Multiply current words.
-            unsigned long long product_ij = (unsigned long long)a->d[i] * b->d[j];
-            
-            // Add product to the current spot in the result, taking into account the carry.
-            unsigned long long sum = product->d[i + j] + (BN_ULONG)product_ij + carry;
-            
-            // Set the current spot in the result.
-            product->d[i + j] = (BN_ULONG)sum;
-            
-            // Calculate carry for the next iteration.
-            carry = (product_ij >> 64) + (sum >> 64);
-        }
-        
-        // Propagate remaining carry
-        int k = i + b->top;
-        while (carry > 0 && k < a->top + b->top) {
-            unsigned long long sum = (unsigned long long)product->d[k] + (carry & 0xFFFFFFFFFFFFFFFFULL);
-            product->d[k] = (BN_ULONG)sum; // Store lower 64 bits of the sum
-            carry = sum >> 64;  // The carry for the next word will be the upper 64 bits
-            k++;
-        }
-    }
-    
-    // Set top of the product correctly
-    product->top = a->top + b->top;
-    while (product->top > 0 && product->d[product->top - 1] == 0)
-        product->top--; // Shrink the top value if the higher words are zero.
-}*/
-
-// Important Note: This function assumes that `product` has been allocated with enough space
-// to hold at least two words (BN_ULONG values), as the result may require up to 128-bits of space.
-
-// Your CUDA kernel and main() function code would remain the same,
-// call bn_mul(a, b, product) just like before within your kernel.
 
 __device__ void bn_add_bit(BIGNUM *a, int bit_index) {
     // Determine the word in the array where this bit resides.
@@ -1626,34 +1643,6 @@ __device__ void bn_gcdext(BIGNUM *g, BIGNUM *s, BIGNUM *t, BIGNUM *a, BIGNUM *b_
     // Now g contains gcd(a, b), and s and t contain the Bezout coefficients
     printf(" -- bn_gcdext --\n");
 }
-
-/*__device__ void bn_mod_inverse_fixed_v0(BIGNUM *inverse, BIGNUM *x, BIGNUM *n) {
-    // This assumes bn_gcdext has been implemented which calculates the gcd and the coefficient as gcdext does
-    printf("++ bmi ++\n");
-    BIGNUM gcd, coefficient, gcd_t;
-    
-    // Initialize gcd and coefficient
-    init_zero(&gcd, MAX_BIGNUM_WORDS);
-    init_zero(&coefficient, MAX_BIGNUM_WORDS);
-    init_zero(&gcd_t, MAX_BIGNUM_WORDS);
-    // Calculate gcd and coefficient where x * coefficient = gcd (mod n)
-    bn_gcdext(&gcd, &coefficient, &gcd_t, x, n);
-    // Check that the GCD is 1, ensuring an inverse exists
-    if (!bn_is_one(&gcd)) {
-        printf(" -- bmi: !bn_is_one(&gcd) --\n");
-        return;
-    }
-
-    // Ensure the coefficient (inverse) is positive
-    if (bn_is_negative(&coefficient)) {
-        bn_add(inverse, &coefficient, n);
-    } else {
-        bn_copy(inverse, &coefficient);
-    }
-
-    // The inverse has been successfully calculated
-    printf(" -- bmi --\n");
-}*/
 
 __device__ void bn_mod_inverse_fixed(BIGNUM *inverse, BIGNUM *a, BIGNUM *n) {
     printf("++ bn_mod_inverse_fixed ++\n");

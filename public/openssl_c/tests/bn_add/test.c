@@ -13,7 +13,7 @@ int main() {
     OPENSSL_assert(ctx != NULL);
 
     // Define test values for 'a' and 'b' corresponding to your CUDA test cases
-    /*char* test_values_a[] = {
+    char* test_values_a[] = {
         "1",
         "FFFFFFFFFFFFFFFF",
         "10000000000000000",
@@ -31,8 +31,9 @@ int main() {
         "-1", // test 5
         "FFFFFFFFFFFFFFFF", // test 6
         "-FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE" // test 7: -2 in two's complement (two words)
-    };*/
-    char* test_values_a[] = {
+    };
+    
+    /*char* test_values_a[] = {
         "A",    // 10
         "A",    // 10
         "F",    // 15
@@ -48,7 +49,7 @@ int main() {
         "-5",   // -5
         "5",    // 5
         "F"     // 15
-    };
+    };*/
 
     int num_tests = sizeof(test_values_a) / sizeof(test_values_a[0]);
 
