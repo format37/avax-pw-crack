@@ -823,6 +823,26 @@ __device__ void bn_add_words(BN_ULONG *a, unsigned long long carry, int idx, int
     }
 }
 
+__device__ void bn_add_bignum_words(BIGNUM *r, BIGNUM *a, int n) {
+    BN_ULONG carry = 0;
+    // Ensure that the 'a' BIGNUM is shifted left by 'n' words before adding
+    for (int i = 0; i < r->top; i++) {
+        unsigned long long sum = (unsigned long long) r->d[i] + (i - n >= 0 ? a->d[i - n] : 0) + carry;
+        r->d[i] = (BN_ULONG)(sum & 0xFFFFFFFFFFFFFFFFULL); // Keep the lower bits
+        carry = sum >> BN_ULONG_NUM_BITS; // Propagate the carry
+    }
+
+    // If there is still carry left after the last word processed,
+    // propagate it further. This assumes that r has space for at least r->top + 1 words
+    if (carry) {
+        if (r->top < r->dmax) { // Check if there is space for the carry
+            r->d[r->top] += carry; // Add the carry
+        }
+        // If r->d[r->top] overflows, we need to handle additional carry which could lead to incrementing r->top
+        // ... additional code may be required here to handle that case properly
+    }
+}
+
 __device__ void bn_mul(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
     // Reset the product
     for(int i = 0; i < a->top + b->top; i++)
@@ -934,6 +954,7 @@ __device__ void bn_lshift_deprecated(BIGNUM *a, int shift) {
     }
 }
 
+// TODO: Replace with bn_subtract & then rename bn_subtract to bn_sub
 __device__ void bn_div(BIGNUM *a, BIGNUM *b, BIGNUM *q, BIGNUM *r) {
     // Initialize quotient and remainder to zero.
     for (int i = 0; i < q->dmax; ++i) q->d[i] = 0;
@@ -1159,7 +1180,58 @@ __device__ void bn_set_word(BIGNUM *bn, BN_ULONG word) {
     }
 }
 
+/*__device__ int get_msb_bit(BIGNUM *a) {
+    if (a->top == 0) return 0;
+
+    // Find the most significant bit in the most significant word.
+    BN_ULONG word = a->d[a->top - 1];
+    int msb = 0;
+
+    // While loop or built-in functions can be used to find the MSB (e.g., __builtin_clzll for GCC)
+    while (word != 0) {
+        word >>= 1;
+        msb++;
+    }
+
+    // The position of the MSB is offset by the number of less significant words.
+    return (a->top - 1) * BN_ULONG_NUM_BITS + msb;
+}*/
+
+__device__ int get_msb_bit(BIGNUM *n) {
+    if (n->top == 0) return -1; // All zero
+
+    BN_ULONG word = n->d[n->top - 1]; 
+    if (word == 0) return -1; // Top word should not be zero 
+
+    // Use __clzll to count the leading zeros in the most significant word
+    unsigned int leading_zeros = __clzll(word);
+
+    // The position of the most significant bit is the number of bits in the word
+    // minus the number of leading zeros
+    return (n->top - 1) * BN_ULONG_NUM_BITS + (BN_ULONG_NUM_BITS - 1 - leading_zeros);
+}
+
+__device__ void bn_init_for_shift(BIGNUM *result, BIGNUM *a, int shift) {
+    // Calculate the number of words needed for the result after the shift.
+    int extra_word = (get_msb_bit(a) + shift) / BN_ULONG_NUM_BITS;
+    int new_top = a->top + extra_word;
+
+    // Ensure result has enough space to hold the new value.
+    // It should at least match the new_top or be the maximum allowed by MAX_BIGNUM_WORDS.
+    result->dmax = min(new_top, MAX_BIGNUM_WORDS);
+
+    // Initialize the 'result' words to zero.
+    for (int i = 0; i < result->dmax; i++) {
+        result->d[i] = 0;
+    }
+
+    // Set the 'top' field for 'result'.
+    result->top = 0; // Will be set correctly in bn_lshift_res
+}
+
+
 __device__ void bn_lshift_res(BIGNUM *result, BIGNUM *a, int shift) {
+    bn_init_for_shift(result, a, shift);
     //printf("++ bn_lshift_res ++\n");
     if (shift <= 0) {
         // No shift or invalid shift count; copy input to output with no modifications.
@@ -1206,13 +1278,31 @@ __device__ void bn_lshift_res(BIGNUM *result, BIGNUM *a, int shift) {
     //printf("-- bn_lshift_res --\n");
 }
 
-#define WORD_BITS 32  // or: #define WORD_BITS (8 * sizeof(BN_ULONG))
+__device__ void bn_rshift_one(BIGNUM *bn) {
+    if (bn_is_zero(bn)) {
+        return; // If the big number is zero, there's nothing to shift
+    }
+
+    BN_ULONG carry = 0;
+    for (int i = bn->top - 1; i >= 0; --i) {
+        // Take the current digit and the previous carry to create a composite
+        BN_ULONG composite = (carry << (BN_ULONG_NUM_BITS - 1)) | (bn->d[i] >> 1);
+        carry = bn->d[i] & 1; // Save the LSB before shifting as the next carry
+        bn->d[i] = composite;
+    }
+
+    // If the most significant digit is now zero, update the `top` counter
+    if (bn->top > 0 && bn->d[bn->top - 1] == 0) {
+        bn->top--;
+    }
+}
 
 // Helper function to get the index of the MSB within a single word
 __device__ int get_msb_index(BN_ULONG word) {
     // This is a simple example using a linear scan; this can be made more efficient, for example,
     // by using the built-in __clz() or similar instructions specific to your architecture.
-    for (int i = WORD_BITS - 1; i >= 0; --i) {
+    //for (int i = WORD_BITS - 1; i >= 0; --i) {
+    for (int i = BN_ULONG_NUM_BITS - 1; i >= 0; --i) {
         if ((word >> i) & 1) {
             return i;
         }
@@ -1225,7 +1315,8 @@ __device__ int bn_get_top_bit(BIGNUM *bn) {
     for (int i = bn->top - 1; i >= 0; --i) {
         int msb_index = get_msb_index(bn->d[i]);
         if (msb_index != -1) {  // If a bit is set in this word
-            return i * WORD_BITS + msb_index;  // Return the global index of the MSB
+            //return i * WORD_BITS + msb_index;  // Return the global index of the MSB
+            return i * BN_ULONG_NUM_BITS + msb_index;  // Return the global index of the MSB
         }
     }
     // If no bit is set in any word, this represents the number zero, and there is no MSB.
@@ -1257,40 +1348,21 @@ __device__ void bn_normalize(BIGNUM *bn) {
     }
 }
 
-#define BN_ULONG_BITS (sizeof(BN_ULONG) * 8)
-
-__device__ int get_msb_bit(BIGNUM *n) {
+/*__device__ int get_msb_bit_v0(BIGNUM *n) {
   for (int i = n->top - 1; i >= 0; i--) {
     BN_ULONG word = n->d[i]; 
-    for (int j = BN_ULONG_BITS - 1; j >= 0; j--) {
+    for (int j = BN_ULONG_NUM_BITS - 1; j >= 0; j--) {
       if (word & ((BN_ULONG)1 << j)) { 
-        return (i * BN_ULONG_BITS) + j;
+        return (i * BN_ULONG_NUM_BITS) + j;
       }
     }
   }
   return -1; // All zero
-}
+}*/
 
-__device__ void bn_rshift_one(BIGNUM *bn) {
-    if (bn_is_zero(bn)) {
-        return; // If the big number is zero, there's nothing to shift
-    }
 
-    BN_ULONG carry = 0;
-    for (int i = bn->top - 1; i >= 0; --i) {
-        // Take the current digit and the previous carry to create a composite
-        BN_ULONG composite = (carry << (BN_ULONG_NUM_BITS - 1)) | (bn->d[i] >> 1);
-        carry = bn->d[i] & 1; // Save the LSB before shifting as the next carry
-        bn->d[i] = composite;
-    }
 
-    // If the most significant digit is now zero, update the `top` counter
-    if (bn->top > 0 && bn->d[bn->top - 1] == 0) {
-        bn->top--;
-    }
-}
-
-__device__ void bn_divide(BIGNUM *quotient, BIGNUM *remainder, BIGNUM *dividend, BIGNUM *divisor) {
+__device__ void bn_divide_v0(BIGNUM *quotient, BIGNUM *remainder, BIGNUM *dividend, BIGNUM *divisor) {
     // If divident top or divisor top is bigger than one, then notify
     if (dividend->top > 1) {
         printf("ATTENTION! bn_divide: dividend.top > 1\n");
@@ -1368,6 +1440,376 @@ __device__ void bn_divide(BIGNUM *quotient, BIGNUM *remainder, BIGNUM *dividend,
     }*/
 
     //printf(" -- bn_divide --\n");
+}
+
+/*__device__ BN_ULONG bn_div_2_words(BN_ULONG high, BN_ULONG low, BN_ULONG divisor) {
+    // A production-level implementation should use a more efficient algorithm 
+    // such as the Newton-Raphson division, Barrett reduction, or reciprocal 
+    // multiplication.
+    BN_ULONG remainder = high;
+    BN_ULONG quotient = 0;
+    BN_ULONG divisor_shifted = divisor << (BN_ULONG_NUM_BITS / 2);
+    BN_ULONG mask = (1UL << (BN_ULONG_NUM_BITS / 2)) - 1;
+
+    for (int i = 0; i < BN_ULONG_NUM_BITS; i++) {
+        quotient <<= 1;
+        remainder <<= 1;
+        remainder |= (low >> (BN_ULONG_NUM_BITS - 1));
+        low <<= 1;
+        if (remainder >= divisor_shifted) {
+            remainder -= divisor_shifted;
+            quotient |= 1;
+        }
+    }
+    return quotient;
+}*/
+__device__ BN_ULONG bn_div_2_words(BN_ULONG high, BN_ULONG low, BN_ULONG divisor) {
+
+  BN_ULONG quotient = 0;
+  BN_ULONG remainder = 0;
+  
+  // Left shift high word to upper part 
+  remainder = (high << BN_ULONG_NUM_BITS); 
+
+  // Or in low word to lower part
+  remainder |= low;
+
+  BN_ULONG divisor_shifted;
+
+  for (int i = 0; i < BN_ULONG_NUM_BITS; ++i) {
+
+    // Shift divisor left to align with remainder 
+    divisor_shifted = divisor << i;
+    
+    // Check if divisor <= remainder
+    if (remainder >= divisor_shifted) {
+
+      // Subtract divisor and set quotient bit
+      remainder -= divisor_shifted;  
+      quotient |= (1UL << i);
+
+    }
+
+  }
+
+  return quotient;
+
+}
+
+/*__device__ void bn_lshift(BIGNUM *r, BIGNUM *a, int n) {
+    // Left shift bignum a by n bits and store the result in r.
+}*/
+
+__device__ void bn_rshift(BIGNUM *result, BIGNUM *a, int shift) {
+    // Assuming a function init_rshift_for_shift should be there similar to bn_init_for_shift.
+    bn_init_for_shift(result, a, -shift);
+
+    if (shift <= 0) {
+        bn_copy(result, a);
+        return;
+    }
+
+    // Initialize result BIGNUM according to your BIGNUM structure definition
+    // Ensure that result->d has enough space to hold the result
+
+    BN_ULONG carry = 0;
+    int word_shift = shift / BN_ULONG_NUM_BITS;
+    int bit_shift = shift % BN_ULONG_NUM_BITS;
+
+    // Perform the bit shift for each word from the most significant downwards.
+    for (int i = a->top - 1; i >= 0; --i) {
+        BN_ULONG new_carry = a->d[i] << (BN_ULONG_NUM_BITS - bit_shift); // Capture the shifted-in bits
+        result->d[i - word_shift] = (a->d[i] >> bit_shift) | carry; // Shift and add carry
+        carry = new_carry; // Update carry for the next iteration
+    }
+
+    // Note: Negative indexing into result->d array should be handled, i.e., don't attempt to write
+    // to indices less than zero. This also includes updating result->top appropriately.
+
+    // Update top according to the number of shifted-out words
+    result->top = a->top - word_shift;
+    if (bit_shift > 0 && a->top > 0 && result->d[a->top - 1] == 0) {
+        result->top--;
+    }
+
+    // Initialize remaining higher-order words to zero
+    for (int i = result->top; i < result->dmax; ++i) {
+        result->d[i] = 0;
+    }
+}
+
+__device__ BN_ULONG bn_mul_words(BN_ULONG* result, BN_ULONG* a, BN_ULONG q, int n) {
+    BN_ULONG carry = 0;
+    for (int i = 0; i < n; i++) {
+        // Unsigned long multiplication and addition
+        // Note that we're using a 128-bit type to capture the full product
+        unsigned __int128 full_product = (unsigned __int128)a[i] * (unsigned __int128)q + carry;
+        carry = full_product >> BN_ULONG_NUM_BITS; // extract the higher part as carry
+        result[i] = (BN_ULONG)full_product; // keep the lower part in the result
+    }
+    return carry; // The last carry may need to be added to the subtraction part
+}
+
+__device__ BN_ULONG bn_mul_sub_words(BIGNUM *r, BIGNUM *a, int n, BN_ULONG q) {
+    // Assuming result has enough space
+    BN_ULONG temp[MAX_BIGNUM_SIZE];
+    // Initialize temp array to 0
+    for (int i = 0; i < MAX_BIGNUM_SIZE; i++) temp[i] = 0;
+    
+    // First, multiply a by q, store in temp
+    BN_ULONG carry = bn_mul_words(temp, a->d, q, a->top);
+
+    // Store the carry if required
+    temp[a->top] = carry;
+
+    // Now shift temp to the left by n words
+    for (int i = MAX_BIGNUM_SIZE - 1; i >= n; i--) {
+        temp[i] = temp[i - n];
+    }
+    for (int i = 0; i < n; i++) {
+        temp[i] = 0; // Fill shifted in words with 0
+    }
+
+    // Finally, subtract temp from r using bn_sub_words and return the borrow
+    return bn_sub_words(r->d, r->d, temp, r->top); // Note: r->top should be adjusted considering the n shift
+}
+
+__device__ void bn_divide(BIGNUM *quotient, BIGNUM *remainder, BIGNUM *dividend, BIGNUM *divisor) {
+    // Refactored to handle up to 2-word cases for division
+
+    // Initialize quotient and remainder
+    init_zero(quotient, MAX_BIGNUM_WORDS);
+    init_zero(remainder, MAX_BIGNUM_WORDS);
+    bn_copy(remainder, dividend);
+    
+    if (bn_is_zero(divisor)) {
+        // Handle division by zero if necessary
+        printf("bn_divide: Division by zero!\n");
+        return;
+    }
+
+    // Temp divisors and normalization shift
+    BIGNUM temp_divisor;
+    init_zero(&temp_divisor, MAX_BIGNUM_WORDS);
+    BIGNUM temp_remainder;
+    init_zero(&temp_remainder, MAX_BIGNUM_WORDS);
+    int shift = BN_ULONG_NUM_BITS - get_msb_bit(divisor);
+
+    // Normalization: shift the divisor to the left by shift bits
+    bn_lshift_res(&temp_divisor, divisor, shift);
+    bn_lshift_res(&temp_remainder, remainder, shift);
+
+    // In case the normalization step increased the number of words
+    if (temp_remainder.top < dividend->top + 1) {
+        temp_remainder.d[temp_remainder.top++] = 0;
+    }
+
+    // Division algorithm for two-word dividend
+    for (int j = dividend->top - divisor->top; j >= 0; j--) {
+        // Estimate the quotient word q_hat
+        BN_ULONG q_hat = bn_div_2_words(temp_remainder.d[j + divisor->top],
+                                        temp_remainder.d[j + divisor->top - 1],
+                                        temp_divisor.d[divisor->top - 1]);
+
+        // Multiply and subtract
+        BN_ULONG borrow = bn_mul_sub_words(&temp_remainder, &temp_divisor, j, q_hat);
+
+        // If borrow, fix the estimation
+        if (borrow) {
+            q_hat--; // Decrease the quotient
+            bn_add_bignum_words(&temp_remainder, &temp_divisor, j); // Revert the subtraction
+        }
+
+        // Set the quotient word
+        quotient->d[j] = q_hat;
+        if (q_hat) quotient->top = max(quotient->top, j + 1);
+    }
+
+    // Unnormalize remainder
+    bn_rshift(remainder, &temp_remainder, shift);
+
+    // Final remainder has at most the same number of words as the divisor
+    remainder->top = min(remainder->top, divisor->top);
+}
+
+__device__ void convert_word_to_binary(BN_ULONG word, int bits[]) {
+
+  for (int i = 0; i < BN_ULONG_NUM_BITS; ++i) {
+    
+    bits[i] = (word >> i) & 1;
+  
+  }
+
+}
+
+__device__ BN_ULONG convert_binary_to_word(int bits[]) {
+
+  BN_ULONG word = 0;
+
+  for (int i = 0; i < BN_ULONG_NUM_BITS; ++i) {
+
+    word <<= 1;
+    word |= bits[i];
+  
+  }
+
+  return word;
+
+}
+
+/*__device__ void binary_divide(int dividend_bits[], int divisor_bits[], 
+                   int quotient_bits[], int remainder_bits[]) {
+
+  int n = BN_ULONG_NUM_BITS * 2;
+  //int n = BN_ULONG_NUM_BITS * MAX_BIGNUM_WORDS; // TODO: Enable
+
+  
+  // Initialize quotient and remainder
+  for(int i = 0; i < n; ++i) {
+    quotient_bits[i] = 0;
+    remainder_bits[i] = dividend_bits[i]; 
+  }
+
+  // Main loop
+  for(int i = n-1; i >= 0; --i) {
+
+    // Shift remainder left by 1
+    remainder_bits[i] <<= 1;
+    remainder_bits[i] |= remainder_bits[i+1] >> (BN_ULONG_NUM_BITS - 1);
+
+    // If remainder >= divisor
+    if(remainder_bits[i] >= divisor_bits[i]) {
+      // Subtract divisor from remainder
+      remainder_bits[i] -= divisor_bits[i];
+      // Set quotient bit
+      quotient_bits[i] = 1; 
+    }
+
+  }
+
+  // Ignore any leading zeros in quotient  
+}*/
+
+__device__ int compare_bits(int a_bits[], int b_bits[], int n) {
+  for(int i = n-1; i >= 0; --i) {
+    if (a_bits[i] < b_bits[i]) {
+      return -1;
+    } else if (a_bits[i] > b_bits[i]) {
+      return 1;
+    }
+  }
+  return 0;
+}
+
+__device__ void subtract_bits(int a_bits[], int b_bits[], int n) {
+  int borrow = 0;
+  for(int i = 0; i < n; ++i) {
+    a_bits[i] -= b_bits[i] + borrow;
+    if (a_bits[i] < 0) {
+      a_bits[i] += 2;
+      borrow = 1;
+    } else {
+      borrow = 0;
+    }
+  }
+}
+
+/*__device__ void binary_divide(int dividend_bits[], int divisor_bits[], 
+                   int quotient_bits[], int remainder_bits[]) {
+
+  int n = BN_ULONG_NUM_BITS * MAX_BIGNUM_WORDS;
+  
+  // Initialize quotient and remainder
+  for(int i = 0; i < n; ++i) {
+    quotient_bits[i] = 0;
+    remainder_bits[i] = 0;
+  }
+
+  // Copy dividend into remainder to begin
+  for(int i = 0; i < n; ++i) {
+    remainder_bits[i] = dividend_bits[i];
+  }
+
+  // Main loop
+  for(int i = n-1; i >= 0; --i) {
+    // Shift remainder left by 1
+    for (int j = n-1; j > 0; --j) {
+      remainder_bits[j] = remainder_bits[j-1];
+    }
+    // Fetch the next bit from the dividend
+    remainder_bits[0] = dividend_bits[i];
+
+    // If remainder >= divisor
+    if(compare_bits(remainder_bits, divisor_bits, n) >= 0) {
+      // Subtract divisor from remainder
+      subtract_bits(remainder_bits, divisor_bits, n);
+      // Set quotient bit
+      quotient_bits[i] = 1; 
+    }
+  }
+  // Ignore any leading zeros in quotient might be handled by BN_ULONG to BIGNUM conversion
+}*/
+
+__device__ void shift_left(int bits[], int num_bits) {
+
+    int carry = 0;
+
+    for(int i = 0; i < num_bits; ++i) {
+        
+        int prev = bits[i];
+        
+        bits[i] <<= 1;
+        bits[i] |= carry;
+
+        carry = (prev >> (BN_ULONG_NUM_BITS - 1)) & 1;
+
+    }
+
+}
+
+__device__ void binary_divide(int dividend_bits[], int divisor_bits[], 
+                              int quotient_bits[], int remainder_bits[]) {
+
+    // Determine size
+    int n = MAX_BIGNUM_WORDS * BN_ULONG_NUM_BITS; 
+
+    // Align dividend and divisor
+    // Left shift dividend by 1 bit until MSB matches
+
+    while (dividend_bits[n-1] < divisor_bits[n-1]) {
+        shift_left(dividend_bits, 1); 
+    }
+
+    // Initialize quotient and remainder  
+    for(int i = 0; i < n; ++i) {
+        quotient_bits[i] = 0;
+        remainder_bits[i] = dividend_bits[i];
+    }
+
+    // Main divide loop
+    for(int i = n-1; i >= 0; --i) {
+      
+      // Handle carry bit from previous shift
+      remainder_bits[i] = (remainder_bits[i] << 1) | (remainder_bits[i+1] >> 63);
+
+      if (remainder_bits[i] >= divisor_bits[i]) {
+          
+        // Subtract  
+        remainder_bits[i] -= divisor_bits[i];
+        
+        // Handle borrow if needed  
+        if (remainder_bits[i] >> 63) {
+            remainder_bits[i] += divisor_bits[i]; 
+        }
+
+        quotient_bits[i] = 1; 
+
+      }
+
+    }
+    
+    // Trim leading zeros from quotient  
+
 }
 
 __device__ void bn_abs(BIGNUM *result, BIGNUM *a) {

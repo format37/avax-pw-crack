@@ -16,8 +16,7 @@ __global__ void testKernel() {
         {0xF}, // Test 3
         {0x17}, // Test 4
         {0x1234567890ABCDEF}, // Test 5
-        {0x1234567890ABCDEF, 0x1234567890ABCDEF}, // Test 6
-        {0x2, 0} // 6
+        {0x1234567890ABCDEF, 0x1234567890ABCDEF} // Test 6
     };
 
     BN_ULONG test_values_divisor[][MAX_BIGNUM_WORDS] = {
@@ -25,7 +24,8 @@ __global__ void testKernel() {
         {0xF}, // 2
         {0x1}, // 3
         {0x5}, // 4
-        {0x1}  // 5
+        {0x1}, // 5
+        {0x2, 0} // 6
     };
 
     // Initialize 'dividend' and 'divisor' with test values for each test
@@ -47,10 +47,30 @@ __global__ void testKernel() {
         divisor.top = word_num[test];
 
         // Test division
-        bn_divide(&quotient, &remainder, &dividend, &divisor);
+        // bn_divide(&quotient, &remainder, &dividend, &divisor);
+        int dividend_bits[BN_ULONG_NUM_BITS * 2];
+        int divisor_bits[BN_ULONG_NUM_BITS * 2];
+        // Convert BIGNUM dividend to binary array 
+        for(int i = 0; i < dividend.top; ++i) {
+            convert_word_to_binary(dividend.d[i], dividend_bits + i*BN_ULONG_NUM_BITS); 
+        }
+        // Same for divisor 
+        for(int i = 0; i < divisor.top; ++i) {
+            convert_word_to_binary(divisor.d[i], divisor_bits + i*BN_ULONG_NUM_BITS);
+        }
+        int quotient_bits[BN_ULONG_NUM_BITS * 2];
+        int remainder_bits[BN_ULONG_NUM_BITS * 2];
+        binary_divide(dividend_bits, divisor_bits, quotient_bits, remainder_bits);
+        // Convert quotient binary to BIGNUM
+        for(int i = 0; i < MAX_BIGNUM_WORDS; ++i) {
+            quotient.d[i] = convert_binary_to_word(quotient_bits + i*BN_ULONG_NUM_BITS);
+        }
+        // Same for remainder
+        for(int i = 0; i < MAX_BIGNUM_WORDS; ++i) {
+            remainder.d[i] = convert_binary_to_word(remainder_bits + i*BN_ULONG_NUM_BITS); 
+        }
 
-        // Print results
-        
+        // Print results        
         bn_print("dividend : ", &dividend);
         bn_print("divisor  : ", &divisor);
         bn_print("quotient : ", &quotient);
