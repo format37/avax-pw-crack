@@ -2,11 +2,6 @@
 #include <cuda_runtime.h>
 #include "bignum.h"
 
-// Define your BIGNUM structure based on your project definitions
-#define MAX_BIGNUM_WORDS 20
-#define BN_ULONG unsigned long long int
-#define BN_ULONG_NUM_BITS (sizeof(BN_ULONG) * 8)
-
 // Test kernel for bn_divide
 __global__ void testKernel() {
     printf("++ testKernel for bn_divide ++\n");
@@ -21,7 +16,8 @@ __global__ void testKernel() {
         {0xF}, // Test 3
         {0x17}, // Test 4
         {0x1234567890ABCDEF}, // Test 5
-        {0x1234567890ABCDEF, 0x1234567890ABCDEF} // Test 6
+        {0x1234567890ABCDEF, 0x1234567890ABCDEF}, // Test 6
+        {0x2, 0} // 6
     };
 
     BN_ULONG test_values_divisor[][MAX_BIGNUM_WORDS] = {
@@ -29,8 +25,7 @@ __global__ void testKernel() {
         {0xF}, // 2
         {0x1}, // 3
         {0x5}, // 4
-        {0x1}, // 5
-        {0x2, 0}  // 6
+        {0x1}  // 5
     };
 
     // Initialize 'dividend' and 'divisor' with test values for each test

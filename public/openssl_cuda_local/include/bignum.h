@@ -1308,7 +1308,7 @@ __device__ void bn_divide(BIGNUM *quotient, BIGNUM *remainder, BIGNUM *dividend,
     bn_copy(remainder, dividend);
 
     if (bn_is_zero(divisor)) {
-        //printf("Division by zero!\n");
+        printf("bn_divide: Division by zero!\n");
         return;
     }
 
@@ -1359,8 +1359,8 @@ __device__ void bn_divide(BIGNUM *quotient, BIGNUM *remainder, BIGNUM *dividend,
         /*bn_print("After Subtraction - Shifted divisor", &temp_divisor);
         bn_print("After Subtraction - Remainder", remainder);
         bn_print("After Subtraction - Quotient ", quotient);*/
-        printf("## bn_divide ##\n");
-        return;
+        //printf("## bn_divide ##\n");
+        //return;
     }
 
     /*if (debug_count >= 10) {
