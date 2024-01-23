@@ -76,7 +76,7 @@ int main() {
     BN_ULONG A[WORDS] = {0x1234567890ABCDEF, 0x1234567890ABCDEF}; // Example values for A
     //BN_ULONG B[WORDS] = {0xFEDCBA0987654321, 0xFEDCBA0987654321}; // Example values for B
     //BN_ULONG A[WORDS] = {0x6, 0x0}; // Example values for B
-    BN_ULONG B[WORDS] = {0, 0x2}; // Example values for B
+    BN_ULONG B[WORDS] = {0x2, 0}; // Example values for B
 
     int binary_A[WORDS * BN_ULONG_NUM_BITS];
     int binary_B[WORDS * BN_ULONG_NUM_BITS];
@@ -90,7 +90,7 @@ int main() {
     convert_to_binary_array(B, binary_B, WORDS);
 
     // Print the binary arrays
-    /*printf("\nBinary dividend: ");
+    printf("\nBinary dividend: ");
     for (int i = 0; i < WORDS * BN_ULONG_NUM_BITS; ++i) {
         printf("%d", binary_A[i]);
     }
@@ -98,12 +98,12 @@ int main() {
     for (int i = 0; i < WORDS * BN_ULONG_NUM_BITS; ++i) {
         printf("%d", binary_B[i]);
     }
-    printf("\n");*/
+    printf("\n");
     
     binary_division(binary_A, binary_B, binary_quotient, binary_remainder, WORDS);
 
     // Print the binary arrays
-    /*printf("\nBinary quotient: ");
+    printf("\nBinary quotient: ");
     for (int i = 0; i < WORDS * BN_ULONG_NUM_BITS; ++i) {
         printf("%d", binary_quotient[i]);
     }
@@ -111,7 +111,7 @@ int main() {
     for (int i = 0; i < WORDS * BN_ULONG_NUM_BITS; ++i) {
         printf("%d", binary_remainder[i]);
     }
-    printf("\n");*/
+    printf("\n");
 
     BN_ULONG quotient[WORDS];
     BN_ULONG remainder[WORDS];

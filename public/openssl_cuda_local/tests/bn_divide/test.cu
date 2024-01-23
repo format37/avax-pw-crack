@@ -34,7 +34,7 @@ __global__ void testKernel() {
         {0x1}, // 3
         {0x5}, // 4
         {0x1}, // 5
-        {0x2, 0} // 6
+        {0, 0x2} // 6
     };
     
     // Initialize 'dividend' and 'divisor' with test values for each test
