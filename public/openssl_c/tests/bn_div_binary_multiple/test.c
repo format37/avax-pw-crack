@@ -14,6 +14,7 @@ void convert_to_binary_array(BN_ULONG value[], int binary[], int words) {
 }
 
 void convert_back_to_bn_ulong(int binary[], BN_ULONG value[], int words) {
+    printf("convert_back_to_bn_ulong value: %p words: %d\n", value, words);
     for (int word = 0; word < words; ++word) {
         value[word] = 0;
         for (int i = 0; i < BN_ULONG_NUM_BITS; ++i) {
@@ -87,8 +88,30 @@ int main() {
 
     convert_to_binary_array(A, binary_A, WORDS);
     convert_to_binary_array(B, binary_B, WORDS);
+
+    // Print the binary arrays
+    /*printf("\nBinary dividend: ");
+    for (int i = 0; i < WORDS * BN_ULONG_NUM_BITS; ++i) {
+        printf("%d", binary_A[i]);
+    }
+    printf("\nBinary divisor: ");
+    for (int i = 0; i < WORDS * BN_ULONG_NUM_BITS; ++i) {
+        printf("%d", binary_B[i]);
+    }
+    printf("\n");*/
     
     binary_division(binary_A, binary_B, binary_quotient, binary_remainder, WORDS);
+
+    // Print the binary arrays
+    /*printf("\nBinary quotient: ");
+    for (int i = 0; i < WORDS * BN_ULONG_NUM_BITS; ++i) {
+        printf("%d", binary_quotient[i]);
+    }
+    printf("\nBinary remainder: ");
+    for (int i = 0; i < WORDS * BN_ULONG_NUM_BITS; ++i) {
+        printf("%d", binary_remainder[i]);
+    }
+    printf("\n");*/
 
     BN_ULONG quotient[WORDS];
     BN_ULONG remainder[WORDS];

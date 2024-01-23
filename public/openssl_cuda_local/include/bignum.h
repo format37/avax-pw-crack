@@ -1574,7 +1574,7 @@ __device__ BN_ULONG bn_mul_sub_words(BIGNUM *r, BIGNUM *a, int n, BN_ULONG q) {
     return bn_sub_words(r->d, r->d, temp, r->top); // Note: r->top should be adjusted considering the n shift
 }
 
-__device__ void bn_divide(BIGNUM *quotient, BIGNUM *remainder, BIGNUM *dividend, BIGNUM *divisor) {
+__device__ void bn_divide_v1(BIGNUM *quotient, BIGNUM *remainder, BIGNUM *dividend, BIGNUM *divisor) {
     // Refactored to handle up to 2-word cases for division
 
     // Initialize quotient and remainder
@@ -1767,7 +1767,7 @@ __device__ void shift_left(int bits[], int num_bits) {
 
 }
 
-__device__ void binary_divide(int dividend_bits[], int divisor_bits[], 
+/*__device__ void binary_divide(int dividend_bits[], int divisor_bits[], 
                               int quotient_bits[], int remainder_bits[]) {
 
     // Determine size
@@ -1810,6 +1810,133 @@ __device__ void binary_divide(int dividend_bits[], int divisor_bits[],
     
     // Trim leading zeros from quotient  
 
+}*/
+
+__device__ void convert_to_binary_array(BN_ULONG value[], int binary[], int words) {
+    for (int word = 0; word < words; ++word) {
+        for (int i = 0; i < BN_ULONG_NUM_BITS; ++i) {
+            binary[word * BN_ULONG_NUM_BITS + i] = (value[word] >> (BN_ULONG_NUM_BITS - 1 - i)) & 1;
+        }
+    }
+}
+
+__device__ void convert_back_to_bn_ulong(int binary[], BN_ULONG value[], int words) {
+    for (int word = 0; word < words; ++word) {
+        value[word] = 0;
+        for (int i = 0; i < BN_ULONG_NUM_BITS; ++i) {
+            value[word] |= ((BN_ULONG)binary[word * BN_ULONG_NUM_BITS + i] << (BN_ULONG_NUM_BITS - 1 - i));
+        }
+    }
+}
+
+__device__ void bn_div_binary(int dividend[], int divisor[], int quotient[], int remainder[]) {
+    const int total_bits = MAX_BIGNUM_WORDS * BN_ULONG_NUM_BITS;
+    //const int total_bits = 2 * BN_ULONG_NUM_BITS; // TODO: Remove this line
+    // Init temp with zeros
+    int temp[total_bits];
+    memset(temp, 0, sizeof(temp));
+    
+    for (int i = 0; i < total_bits; ++i) {
+        // Shift temp left by 1
+        for (int j = 0; j < total_bits - 1; ++j) {
+            temp[j] = temp[j+1];
+        }
+        temp[total_bits - 1] = dividend[i];
+        
+        // Check if temp is greater than or equal to divisor
+        int can_subtract = 1;
+        for (int j = 0; j < total_bits; ++j) {
+            if (temp[j] != divisor[j]) {
+                can_subtract = temp[j] > divisor[j];
+                break;
+            }
+        }
+
+        // Subtract divisor from temp if temp >= divisor
+        if(can_subtract) {
+            quotient[i] = 1;
+            for (int j = total_bits - 1; j >= 0; --j) {
+                temp[j] -= divisor[j];
+                if (temp[j] < 0) {  // Borrow from the next bit if needed
+                    temp[j] += 2;
+                    temp[j-1] -= 1;
+                }
+            }
+        } else {
+            quotient[i] = 0;
+        }
+    }
+
+    // Remainder is in temp after division
+    memcpy(remainder, temp, total_bits * sizeof(int));
+}
+
+// Helper function to determine the 'top' field value for a BIGNUM from a binary array
+__device__ int get_bn_top_from_binary_array(const int binary[], int total_bits) {
+    for (int i = total_bits - 1; i >= 0; --i) {
+        if (binary[i]) {
+            return (i / BN_ULONG_NUM_BITS) + 1;
+        }
+    }
+    return 0; // If every bit is zero, top is zero
+}
+
+__device__ void bn_divide(BIGNUM *quotient, BIGNUM *remainder, BIGNUM *dividend, BIGNUM *divisor) {
+    const int total_bits = MAX_BIGNUM_WORDS * BN_ULONG_NUM_BITS;
+    //const int total_bits = 2 * BN_ULONG_NUM_BITS; // TODO: Remove this
+    int binary_dividend[total_bits];
+    int binary_divisor[total_bits];
+    int binary_quotient[total_bits];
+    int binary_remainder[total_bits];
+    
+    // Initialize binary arrays
+    memset(binary_quotient, 0, total_bits * sizeof(int));
+    memset(binary_remainder, 0, total_bits * sizeof(int));
+    
+    // Convert the BIGNUMs to binary arrays
+    convert_to_binary_array(dividend->d, binary_dividend, dividend->top);
+    convert_to_binary_array(divisor->d, binary_divisor, divisor->top);
+
+    // Print the binary arrays
+    /*printf("\nBinary dividend: ");
+    for (int i = 0; i < total_bits; ++i) {
+        printf("%d", binary_dividend[i]);
+    }
+    printf("\n");
+    printf("\nBinary divisor: ");
+    for (int i = 0; i < total_bits; ++i) {
+        printf("%d", binary_divisor[i]);
+    }
+    printf("\n");*/
+
+    // Call the binary division function
+    bn_div_binary(binary_dividend, binary_divisor, binary_quotient, binary_remainder);
+
+    // Print the binary arrays
+    /*printf("\nBinary quotient: ");
+    for (int i = 0; i < total_bits; ++i) {
+        printf("%d", binary_quotient[i]);
+    }
+    printf("\n");
+    printf("\nBinary remainder: ");
+    for (int i = 0; i < total_bits; ++i) {
+        printf("%d", binary_remainder[i]);
+    }
+    printf("\n");*/
+
+    // Fix the 'top' fields of quotient and remainder
+    quotient->top = get_bn_top_from_binary_array(binary_quotient, total_bits);
+    remainder->top = get_bn_top_from_binary_array(binary_remainder, total_bits);
+    // Convert the binary arrays back to BIGNUMs
+    convert_back_to_bn_ulong(binary_quotient, quotient->d, quotient->top);
+    convert_back_to_bn_ulong(binary_remainder, remainder->d, remainder->top);
+    // Determine the current top
+    //quotient->top = find_top(quotient, MAX_BIGNUM_WORDS);
+    //quotient->top = 2;
+    //printf("quotient->top: %d\n", quotient->top);
+    //remainder->top = find_top(remainder, MAX_BIGNUM_WORDS);
+    //remainder->top = 1;
+    //printf("remainder->top: %d\n", remainder->top);
 }
 
 __device__ void bn_abs(BIGNUM *result, BIGNUM *a) {

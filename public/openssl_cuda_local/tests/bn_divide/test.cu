@@ -6,6 +6,15 @@
 __global__ void testKernel() {
     printf("++ testKernel for bn_divide ++\n");
     // Set the maximum number of test cases
+    /*const int num_tests = 1;  // Updated number of tests
+    int word_num[num_tests] = {2};
+    BN_ULONG test_values_dividend[][MAX_BIGNUM_WORDS] = {
+        {0x1234567890ABCDEF, 0x1234567890ABCDEF} // Example values for A
+        }; 
+    BN_ULONG test_values_divisor[][MAX_BIGNUM_WORDS] = {
+        {0, 0x2} // Example values for B
+        };*/
+    
     const int num_tests = 6;  // Updated number of tests
     // Initialize the word_num array
     int word_num[num_tests] = {1, 1, 1, 1, 1, 2};
@@ -27,7 +36,7 @@ __global__ void testKernel() {
         {0x1}, // 5
         {0x2, 0} // 6
     };
-
+    
     // Initialize 'dividend' and 'divisor' with test values for each test
     for (int test = 0; test < num_tests; ++test) {
         printf("\nTest %d:\n", test + 1);
@@ -47,8 +56,8 @@ __global__ void testKernel() {
         divisor.top = word_num[test];
 
         // Test division
-        // bn_divide(&quotient, &remainder, &dividend, &divisor);
-        int dividend_bits[BN_ULONG_NUM_BITS * 2];
+        bn_divide(&quotient, &remainder, &dividend, &divisor);
+        /*int dividend_bits[BN_ULONG_NUM_BITS * 2];
         int divisor_bits[BN_ULONG_NUM_BITS * 2];
         // Convert BIGNUM dividend to binary array 
         for(int i = 0; i < dividend.top; ++i) {
@@ -60,6 +69,7 @@ __global__ void testKernel() {
         }
         int quotient_bits[BN_ULONG_NUM_BITS * 2];
         int remainder_bits[BN_ULONG_NUM_BITS * 2];
+        // Binary divide
         binary_divide(dividend_bits, divisor_bits, quotient_bits, remainder_bits);
         // Convert quotient binary to BIGNUM
         for(int i = 0; i < MAX_BIGNUM_WORDS; ++i) {
@@ -68,7 +78,7 @@ __global__ void testKernel() {
         // Same for remainder
         for(int i = 0; i < MAX_BIGNUM_WORDS; ++i) {
             remainder.d[i] = convert_binary_to_word(remainder_bits + i*BN_ULONG_NUM_BITS); 
-        }
+        }*/
 
         // Print results        
         bn_print("dividend : ", &dividend);
