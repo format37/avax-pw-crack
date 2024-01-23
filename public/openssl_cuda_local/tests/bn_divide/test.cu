@@ -55,6 +55,8 @@ __global__ void testKernel() {
         dividend.top = word_num[test];
         divisor.top = word_num[test];
 
+        divisor.neg = 1;
+
         // Test division
         bn_divide(&quotient, &remainder, &dividend, &divisor);
         /*int dividend_bits[BN_ULONG_NUM_BITS * 2];

@@ -1180,23 +1180,6 @@ __device__ void bn_set_word(BIGNUM *bn, BN_ULONG word) {
     }
 }
 
-/*__device__ int get_msb_bit(BIGNUM *a) {
-    if (a->top == 0) return 0;
-
-    // Find the most significant bit in the most significant word.
-    BN_ULONG word = a->d[a->top - 1];
-    int msb = 0;
-
-    // While loop or built-in functions can be used to find the MSB (e.g., __builtin_clzll for GCC)
-    while (word != 0) {
-        word >>= 1;
-        msb++;
-    }
-
-    // The position of the MSB is offset by the number of less significant words.
-    return (a->top - 1) * BN_ULONG_NUM_BITS + msb;
-}*/
-
 __device__ int get_msb_bit(BIGNUM *n) {
     if (n->top == 0) return -1; // All zero
 
@@ -1348,121 +1331,6 @@ __device__ void bn_normalize(BIGNUM *bn) {
     }
 }
 
-/*__device__ int get_msb_bit_v0(BIGNUM *n) {
-  for (int i = n->top - 1; i >= 0; i--) {
-    BN_ULONG word = n->d[i]; 
-    for (int j = BN_ULONG_NUM_BITS - 1; j >= 0; j--) {
-      if (word & ((BN_ULONG)1 << j)) { 
-        return (i * BN_ULONG_NUM_BITS) + j;
-      }
-    }
-  }
-  return -1; // All zero
-}*/
-
-
-
-__device__ void bn_divide_v0(BIGNUM *quotient, BIGNUM *remainder, BIGNUM *dividend, BIGNUM *divisor) {
-    // If divident top or divisor top is bigger than one, then notify
-    if (dividend->top > 1) {
-        printf("ATTENTION! bn_divide: dividend.top > 1\n");
-    }
-    if (divisor->top > 1) {
-        printf("ATTENTION! bn_divide: divisor.top > 1\n");
-    }
-    
-    printf(" ++ bn_divide ++ \n");
-    
-
-    // Initialize quotient and remainder
-    init_zero(quotient, MAX_BIGNUM_WORDS);
-    init_zero(remainder, MAX_BIGNUM_WORDS);
-    bn_copy(remainder, dividend);
-
-    if (bn_is_zero(divisor)) {
-        printf("bn_divide: Division by zero!\n");
-        return;
-    }
-
-    BIGNUM temp_divisor;
-    init_zero(&temp_divisor, MAX_BIGNUM_WORDS);
-
-    int word_shift, bit_shift;
-
-    //while (bn_cmp(remainder, divisor) >= 0 && debug_count < 10) {
-    while (bn_cmp(remainder, divisor) >= 0) {
-        // Calculate needed shifts
-        word_shift = remainder->top - divisor->top;
-        bit_shift = get_msb_bit(remainder) - get_msb_bit(divisor);
-
-        // Handle negative shift
-        if (bit_shift < 0) {
-            bit_shift += BN_ULONG_NUM_BITS;
-            word_shift--;
-        }
-
-        // Print debug shifts
-        //printf("Word shift: %d, Bit shift: %d\n", word_shift, bit_shift);
-
-        // Shift divisor
-        bn_lshift_res(&temp_divisor, divisor, bit_shift + (word_shift * BN_ULONG_NUM_BITS));
-
-        // Print debug values
-        /*bn_print("Shifted divisor", &temp_divisor);
-        bn_print("Remainder", remainder);
-        bn_print("Quotient ", quotient);*/
-
-        // If the shifted divisor is greater, decrease shift
-        if (bn_cmp(&temp_divisor, remainder) > 0) {
-            bit_shift--;
-            bn_rshift_one(&temp_divisor);
-        }
-
-        // Main division step
-        bn_subtract(remainder, remainder, &temp_divisor);
-
-        // Add the shift to quotient
-        if (quotient->top < word_shift + 1) {
-            quotient->top = word_shift + 1; // Update the number of digits
-        }
-        quotient->d[word_shift] |= ((BN_ULONG)1 << bit_shift);
-
-        // Print debug values
-        /*bn_print("After Subtraction - Shifted divisor", &temp_divisor);
-        bn_print("After Subtraction - Remainder", remainder);
-        bn_print("After Subtraction - Quotient ", quotient);*/
-        //printf("## bn_divide ##\n");
-        //return;
-    }
-
-    /*if (debug_count >= 10) {
-        printf("Error: debug_count >= 10 in bn_divide.\n");
-    }*/
-
-    //printf(" -- bn_divide --\n");
-}
-
-/*__device__ BN_ULONG bn_div_2_words(BN_ULONG high, BN_ULONG low, BN_ULONG divisor) {
-    // A production-level implementation should use a more efficient algorithm 
-    // such as the Newton-Raphson division, Barrett reduction, or reciprocal 
-    // multiplication.
-    BN_ULONG remainder = high;
-    BN_ULONG quotient = 0;
-    BN_ULONG divisor_shifted = divisor << (BN_ULONG_NUM_BITS / 2);
-    BN_ULONG mask = (1UL << (BN_ULONG_NUM_BITS / 2)) - 1;
-
-    for (int i = 0; i < BN_ULONG_NUM_BITS; i++) {
-        quotient <<= 1;
-        remainder <<= 1;
-        remainder |= (low >> (BN_ULONG_NUM_BITS - 1));
-        low <<= 1;
-        if (remainder >= divisor_shifted) {
-            remainder -= divisor_shifted;
-            quotient |= 1;
-        }
-    }
-    return quotient;
-}*/
 __device__ BN_ULONG bn_div_2_words(BN_ULONG high, BN_ULONG low, BN_ULONG divisor) {
 
   BN_ULONG quotient = 0;
@@ -1657,39 +1525,6 @@ __device__ BN_ULONG convert_binary_to_word(int bits[]) {
 
 }
 
-/*__device__ void binary_divide(int dividend_bits[], int divisor_bits[], 
-                   int quotient_bits[], int remainder_bits[]) {
-
-  int n = BN_ULONG_NUM_BITS * 2;
-  //int n = BN_ULONG_NUM_BITS * MAX_BIGNUM_WORDS; // TODO: Enable
-
-  
-  // Initialize quotient and remainder
-  for(int i = 0; i < n; ++i) {
-    quotient_bits[i] = 0;
-    remainder_bits[i] = dividend_bits[i]; 
-  }
-
-  // Main loop
-  for(int i = n-1; i >= 0; --i) {
-
-    // Shift remainder left by 1
-    remainder_bits[i] <<= 1;
-    remainder_bits[i] |= remainder_bits[i+1] >> (BN_ULONG_NUM_BITS - 1);
-
-    // If remainder >= divisor
-    if(remainder_bits[i] >= divisor_bits[i]) {
-      // Subtract divisor from remainder
-      remainder_bits[i] -= divisor_bits[i];
-      // Set quotient bit
-      quotient_bits[i] = 1; 
-    }
-
-  }
-
-  // Ignore any leading zeros in quotient  
-}*/
-
 __device__ int compare_bits(int a_bits[], int b_bits[], int n) {
   for(int i = n-1; i >= 0; --i) {
     if (a_bits[i] < b_bits[i]) {
@@ -1714,42 +1549,6 @@ __device__ void subtract_bits(int a_bits[], int b_bits[], int n) {
   }
 }
 
-/*__device__ void binary_divide(int dividend_bits[], int divisor_bits[], 
-                   int quotient_bits[], int remainder_bits[]) {
-
-  int n = BN_ULONG_NUM_BITS * MAX_BIGNUM_WORDS;
-  
-  // Initialize quotient and remainder
-  for(int i = 0; i < n; ++i) {
-    quotient_bits[i] = 0;
-    remainder_bits[i] = 0;
-  }
-
-  // Copy dividend into remainder to begin
-  for(int i = 0; i < n; ++i) {
-    remainder_bits[i] = dividend_bits[i];
-  }
-
-  // Main loop
-  for(int i = n-1; i >= 0; --i) {
-    // Shift remainder left by 1
-    for (int j = n-1; j > 0; --j) {
-      remainder_bits[j] = remainder_bits[j-1];
-    }
-    // Fetch the next bit from the dividend
-    remainder_bits[0] = dividend_bits[i];
-
-    // If remainder >= divisor
-    if(compare_bits(remainder_bits, divisor_bits, n) >= 0) {
-      // Subtract divisor from remainder
-      subtract_bits(remainder_bits, divisor_bits, n);
-      // Set quotient bit
-      quotient_bits[i] = 1; 
-    }
-  }
-  // Ignore any leading zeros in quotient might be handled by BN_ULONG to BIGNUM conversion
-}*/
-
 __device__ void shift_left(int bits[], int num_bits) {
 
     int carry = 0;
@@ -1766,51 +1565,6 @@ __device__ void shift_left(int bits[], int num_bits) {
     }
 
 }
-
-/*__device__ void binary_divide(int dividend_bits[], int divisor_bits[], 
-                              int quotient_bits[], int remainder_bits[]) {
-
-    // Determine size
-    int n = MAX_BIGNUM_WORDS * BN_ULONG_NUM_BITS; 
-
-    // Align dividend and divisor
-    // Left shift dividend by 1 bit until MSB matches
-
-    while (dividend_bits[n-1] < divisor_bits[n-1]) {
-        shift_left(dividend_bits, 1); 
-    }
-
-    // Initialize quotient and remainder  
-    for(int i = 0; i < n; ++i) {
-        quotient_bits[i] = 0;
-        remainder_bits[i] = dividend_bits[i];
-    }
-
-    // Main divide loop
-    for(int i = n-1; i >= 0; --i) {
-      
-      // Handle carry bit from previous shift
-      remainder_bits[i] = (remainder_bits[i] << 1) | (remainder_bits[i+1] >> 63);
-
-      if (remainder_bits[i] >= divisor_bits[i]) {
-          
-        // Subtract  
-        remainder_bits[i] -= divisor_bits[i];
-        
-        // Handle borrow if needed  
-        if (remainder_bits[i] >> 63) {
-            remainder_bits[i] += divisor_bits[i]; 
-        }
-
-        quotient_bits[i] = 1; 
-
-      }
-
-    }
-    
-    // Trim leading zeros from quotient  
-
-}*/
 
 __device__ void convert_to_binary_array(BN_ULONG value[], int binary[], int words) {
     for (int word = 0; word < words; ++word) {
@@ -1886,14 +1640,6 @@ __device__ void bn_divide(BIGNUM *quotient, BIGNUM *remainder, BIGNUM *dividend,
     // -------- = quotient, remainder
     // divisor
     const int total_bits = MAX_BIGNUM_WORDS * BN_ULONG_NUM_BITS;
-    //const int total_bits = 3 * BN_ULONG_NUM_BITS; // TODO: Remove this
-    //const int total_bits = (dividend->top > divisor->top) ? dividend->top * BN_ULONG_NUM_BITS : divisor->top * BN_ULONG_NUM_BITS;
-    /*if (dividend->top > divisor->top) {
-        total_bits = dividend->top * BN_ULONG_NUM_BITS;
-    }
-    else {
-        total_bits = divisor->top * BN_ULONG_NUM_BITS;
-    }*/
     
     int binary_dividend[total_bits];
     int binary_divisor[total_bits];
@@ -1908,47 +1654,20 @@ __device__ void bn_divide(BIGNUM *quotient, BIGNUM *remainder, BIGNUM *dividend,
     convert_to_binary_array(dividend->d, binary_dividend, dividend->top);
     convert_to_binary_array(divisor->d, binary_divisor, divisor->top);
 
-    // Print the binary arrays
-    /*printf("\nBinary dividend: ");
-    for (int i = 0; i < dividend->top * BN_ULONG_NUM_BITS; ++i) {
-        printf("%d", binary_dividend[i]);
-    }
-    printf("\n");
-    printf("\nBinary divisor: ");
-    for (int i = 0; i < divisor->top * BN_ULONG_NUM_BITS; ++i) {
-        printf("%d", binary_divisor[i]);
-    }
-    printf("\n");*/
-
     // Call the binary division function
     bn_div_binary(binary_dividend, binary_divisor, binary_quotient, binary_remainder);
 
     // Fix the 'top' fields of quotient and remainder
     quotient->top = get_bn_top_from_binary_array(binary_quotient, total_bits);
     remainder->top = get_bn_top_from_binary_array(binary_remainder, total_bits);
-
-    // Print the binary arrays
-    /*printf("\nBinary quotient: ");
-    for (int i = 0; i < quotient->top * BN_ULONG_NUM_BITS; ++i) {
-        printf("%d", binary_quotient[i]);
-    }
-    printf("\n");
-    printf("\nBinary remainder: ");
-    for (int i = 0; i < remainder->top * BN_ULONG_NUM_BITS; ++i) {
-        printf("%d", binary_remainder[i]);
-    }
-    printf("\n");*/
     
     // Convert the binary arrays back to BIGNUMs
     convert_back_to_bn_ulong(binary_quotient, quotient->d, quotient->top);
     convert_back_to_bn_ulong(binary_remainder, remainder->d, remainder->top);
-    // Determine the current top
-    //quotient->top = find_top(quotient, MAX_BIGNUM_WORDS);
-    //quotient->top = 2;
-    //printf("quotient->top: %d\n", quotient->top);
-    //remainder->top = find_top(remainder, MAX_BIGNUM_WORDS);
-    //remainder->top = 1;
-    //printf("remainder->top: %d\n", remainder->top);
+
+    // Determine sign of quotient and remainder
+    quotient->neg = dividend->neg ^ divisor->neg;
+    remainder->neg = dividend->neg;
 }
 
 __device__ void bn_abs(BIGNUM *result, BIGNUM *a) {
