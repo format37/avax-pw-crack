@@ -1775,6 +1775,18 @@ __device__ void bn_gcd(BIGNUM* r, BIGNUM* in_a, BIGNUM* in_b) {
     bn_copy(&a, in_a);
     bn_copy(&b, in_b);
 
+    // Check if either a or b is zero at the start and set r accordingly
+    if (bn_is_zero(&a)) {
+        // Since a is zero, GCD(a, b) = b by definition
+        bn_copy(r, &b);
+        return; // Exit the function early
+    }
+    if (bn_is_zero(&b)) {
+        // Since b is zero, GCD(a, b) = a by definition
+        bn_copy(r, &a);
+        return; // Exit the function early
+    }
+
     // Step 1: remove common factors of 2 from a and b
     while (is_even(&a) && is_even(&b)) {
         bn_rshift_one(&a); // equivalent to a /= 2;

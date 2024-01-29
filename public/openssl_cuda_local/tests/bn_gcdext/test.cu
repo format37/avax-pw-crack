@@ -25,7 +25,7 @@ __global__ void testKernel() {
         {0x123456789ABCDEFULL, 0x0}, // Original example 1
         {0x1FFF3ULL, 0x0}, // Original example 2
         {0xFEDCBA9876543210ULL, 0x0}, // Original example 3
-        //{0xFFFFFFFFFFFFFFFFULL, 0x1}, // Two-word case 1: Max value + 1 (overflow into the second word)
+        {0xFFFFFFFFFFFFFFFFULL, 0x1}, // Two-word case 1: Max value + 1 (overflow into the second word)
         {0x0, 0x1}, // Two-word case 2: A larger number that occupies the second word
         {0x123456789ABCDEFULL, 0xFEDCBA9876543210ULL} // Two-word case 3: Fully make use of two words
     };
@@ -34,15 +34,15 @@ __global__ void testKernel() {
         {0xFEDCBA987654321ULL, 0x0}, // Original example 1
         {0x2468ACEULL, 0x0}, // Original example 2
         {0xFEDCBA9876543210ULL, 0x0}, // Original example 3
-        //{0x0, 0x0}, // Edge case: One of the numbers is 0
+        {0x0, 0x0}, // Edge case: One of the numbers is 0
         {0xFFFFFFFFFFFFFFFFULL, 0xFFFFFFFFFFFFFFFFULL}, // Edge case: Both numbers equal, also a two-word case
         {0xFFFFFFFFFFFFFFFFULL, 0x1} // Mixed case: Significantly different values across words
     };
 
-    int sign_a[] = {0, 0, 0, 0, 0}; // Signs for 'a', add -1 for negative numbers as needed
-    int sign_b[] = {0, 0, 0, 0, 0}; // Signs for 'b', add -1 for negative numbers as needed
-    //int sign_a[] = {0, 0, 0, 0, 0, 0}; // Signs for 'a', add -1 for negative numbers as needed    
-    //int sign_b[] = {0, 0, 0, 0, 0, 0}; // Signs for 'b', add -1 for negative numbers as needed
+    // int sign_a[] = {0, 0, 0, 0, 0}; // Signs for 'a', add -1 for negative numbers as needed
+    // int sign_b[] = {0, 0, 0, 0, 0}; // Signs for 'b', add -1 for negative numbers as needed
+    int sign_a[] = {0, 0, 0, 0, 0, 0}; // Signs for 'a', add -1 for negative numbers as needed    
+    int sign_b[] = {0, 0, 0, 0, 0, 0}; // Signs for 'b', add -1 for negative numbers as needed
     
     int num_tests = sizeof(test_values_a) / (sizeof(BN_ULONG) * TEST_BIGNUM_WORDS);
 
