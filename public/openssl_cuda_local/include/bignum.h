@@ -1280,6 +1280,25 @@ __device__ void bn_rshift_one(BIGNUM *bn) {
     }
 }
 
+__device__ void bn_lshift_one(BIGNUM *bn) {
+    if (bn_is_zero(bn)) {
+        return; // If the big number is zero, there's nothing to shift
+    }
+
+    BN_ULONG carry = 0;
+    for (int i = 0; i < bn->top; ++i) {
+        // Take the current digit and the previous carry to create a composite
+        BN_ULONG composite = (carry >> (BN_ULONG_NUM_BITS - 1)) | (bn->d[i] << 1);
+        carry = bn->d[i] & (1 << (BN_ULONG_NUM_BITS - 1)); // Save the MSB before shifting as the next carry
+        bn->d[i] = composite;
+    }
+
+    // If the most significant digit is now zero, update the `top` counter
+    if (carry != 0) {
+        bn->top++;
+    }
+}
+
 // Helper function to get the index of the MSB within a single word
 __device__ int get_msb_index(BN_ULONG word) {
     // This is a simple example using a linear scan; this can be made more efficient, for example,
@@ -1727,8 +1746,199 @@ __device__ void bn_swap(BIGNUM *a, BIGNUM *b) {
     // ... Repeat for other scalar elements of BIGNUM as necessary
 }
 
-__device__ void bn_gcdext(BIGNUM *g, BIGNUM *s, BIGNUM *t, BIGNUM *a, BIGNUM *b_original) {
-    printf("++ bn_gcdext ++\n");
+__device__ int is_even(const BIGNUM* num) {
+    // Considering that the least significant part of the number
+    // is stored at the start of the array.
+    // And assuming that your BIGNUM structure uses an array of integers
+    // to represent the number, named `d` for the data.
+    
+    // Check the least significant bit of the least significant part.
+    // num->d[0] represents the least significant part of the BIGNUM.
+    // If the LSB is 0, it means the number is even.
+    if (num->d[0] & 1) {
+        return 0; // Odd number
+    } else {
+        return 1; // Even number
+    }
+}
+
+__device__ void bn_gcd(BIGNUM* r, BIGNUM* in_a, BIGNUM* in_b) {
+    BIGNUM a, b, temp;
+    int shifts = 0;
+
+    // Initialize BIGNUM variables
+    init_zero(&a, MAX_BIGNUM_WORDS);
+    init_zero(&b, MAX_BIGNUM_WORDS);
+    init_zero(&temp, MAX_BIGNUM_WORDS);
+
+    // Copy in_a and in_b to a and b respectively because we need to modify them
+    bn_copy(&a, in_a);
+    bn_copy(&b, in_b);
+
+    // Step 1: remove common factors of 2 from a and b
+    while (is_even(&a) && is_even(&b)) {
+        bn_rshift_one(&a); // equivalent to a /= 2;
+        bn_rshift_one(&b); // equivalent to b /= 2;
+        shifts++;
+    }
+
+    // Make sure a is odd
+    while (is_even(&a)) {
+        bn_rshift_one(&a);
+    }
+
+    do {
+        // Remove factors of 2 from b, as b will eventually become the GCD
+        while (is_even(&b)) {
+            bn_rshift_one(&b);
+        }
+
+        // Swap if necessary to ensure that a <= b
+        if (bn_cmp(&a, &b) > 0) {
+            // Swap a and b
+            bn_swap(&a, &b);
+        }
+
+        bn_subtract(&b, &b, &a); // b = b - a
+    } while (!bn_is_zero(&b));
+    
+    //bn_print(">>GCD: ", &a);
+    //printf(">>Shifts: %d\n", shifts);
+
+    // Step 3: adjust the result to include the factors of 2 we removed earlier
+    BIGNUM temp_a;
+    init_zero(&temp_a, MAX_BIGNUM_WORDS);
+    bn_lshift_res(&temp_a, &a, shifts); // equivalent to a *= 2^shifts;
+
+    //bn_print("<<GCD: ", &temp_a);
+
+    // Copy the result to r
+    bn_copy(r, &temp_a);
+}
+/*
+__device__ int bn_num_bits(BIGNUM *a) {
+    if(a->top == 0) 
+        return 0;
+
+    int bitlen = (a->top - 1) * BN_ULONG_NUM_BITS;
+    BN_ULONG l = a->d[a->top-1];
+    int i;
+    
+    // Find position of highest bit set
+    for (i = BN_ULONG_NUM_BITS - 1; i >= 0; i--) {
+        if (((l >> i) & ((BN_ULONG)1)) != 0)
+            break;
+    }
+
+    bitlen += i + 1;
+
+    return bitlen;
+}
+
+__device__ int bn_gcd(BIGNUM *r, BIGNUM *a, BIGNUM *b) {
+
+    int max_words = max(a->top, b->top) + 1;
+
+    BIGNUM *g = (BIGNUM*) malloc(sizeof(BIGNUM));
+    init_zero(g, max_words);
+
+    BIGNUM *temp = (BIGNUM*) malloc(sizeof(BIGNUM));
+    init_zero(temp, max_words);
+    
+    if (bn_is_zero(b)) {
+        bn_copy(r, a);
+        r->neg = 0;
+        return 1;
+    }
+    
+    if (bn_is_zero(a)) {
+        bn_copy(r, b); 
+        r->neg = 0;
+        return 1;
+    }
+
+    // Make r and g odd by left shifting if necessary
+    if (g->d[0] % 2 == 0) {
+        bn_lshift_one(g); 
+    }
+    
+    if (r->d[0] % 2 == 0) {
+        bn_lshift_one(r);
+    }
+
+    // Find common powers of 2 between a and b    
+    int shifts = 0;
+    BN_ULONG mask;
+    
+    for (int i = 0; i < min(a->top, b->top); ++i) {
+        mask = ~(a->d[i] | b->d[i]); 
+        for (int j = 0; j < BN_ULONG_NUM_BITS; ++j) {
+            if ((mask & 1) == 0) {
+               ++shifts; 
+            }
+            mask >>= 1;
+        }
+    }
+    
+    // Remove common powers of 2
+    if (shifts > 0) {
+        bn_rshift(r, r, shifts);
+        bn_rshift(g, g, shifts);
+    }
+
+    // Ensure working space
+    int top = max(a->top, b->top) + 1;
+    if (bn_wexpand(r, top) == 0 || bn_wexpand(g, top) == 0 || bn_wexpand(temp, top) == 0) {
+        return 0;
+    }
+
+    // Ensure r is odd
+    if (r->d[0] % 2 == 0) {
+        bn_swap(g, r);
+    }
+
+    // Number of iterations
+    int max_bits = max(bn_num_bits(r), bn_num_bits(g));
+    int num_iters = 4 + 3 * max_bits;
+
+    int delta = 1;
+        
+    for (int i = 0; i < num_iters; ++i) {
+
+        // Conditionally flip signs
+        int cond = (delta < 0) & (g->d[0] & 1); 
+        delta = (-cond & -delta) | ((cond - 1) & delta);
+        r->neg ^= cond;
+
+        // Swap
+        if (cond) {
+            bn_swap(g, r);
+        }
+        
+        // Elimination step
+        delta++;        
+        bn_add(temp, g, r);
+        if (g->d[0] & 1) { 
+           bn_swap(g, temp);
+        }
+        bn_rshift_one(g);
+    }
+    
+    // Finalize
+    r->neg = 0;
+    bn_lshift_res(r, r, shifts); 
+    bn_rshift_one(r);
+
+    // Cleanup
+    free(g);
+    free(temp);
+    
+    return 1;
+}
+*/
+
+__device__ void bn_gcdext_deprecated(BIGNUM *g, BIGNUM *s, BIGNUM *t, BIGNUM *a, BIGNUM *b_original) {
+    // printf("++ bn_gcdext ++\n");
 
     // Temporary BIGNUM for b, to avoid modifying the original b
     BIGNUM b_temp;
@@ -1748,7 +1958,7 @@ __device__ void bn_gcdext(BIGNUM *g, BIGNUM *s, BIGNUM *t, BIGNUM *a, BIGNUM *b_
     init_zero(&prev_s, MAX_BIGNUM_WORDS);  // prev_s = 0
     
     init_zero(t, MAX_BIGNUM_WORDS);    // t = 0
-    printf("## bn_gcdext ##\n");
+    // printf("## bn_gcdext ##\n");
     init_one(&prev_t, MAX_BIGNUM_WORDS);  // prev_t = 1
     
     // Initialize g and b for the gcd calculation
@@ -1777,7 +1987,7 @@ __device__ void bn_gcdext(BIGNUM *g, BIGNUM *s, BIGNUM *t, BIGNUM *a, BIGNUM *b_
     }
 
     // Now g contains gcd(a, b), and s and t contain the Bezout coefficients
-    printf(" -- bn_gcdext --\n");
+    // printf(" -- bn_gcdext --\n");
 }
 
 __device__ void bn_mod_inverse_fixed(BIGNUM *inverse, BIGNUM *a, BIGNUM *n) {
@@ -1800,7 +2010,8 @@ __device__ void bn_mod_inverse_fixed(BIGNUM *inverse, BIGNUM *a, BIGNUM *n) {
     
     // Perform the extended GCD calculation (a, n, g, s, t)
     // On completion, s holds the modular inverse of a modulo n, if gcd(a, n) = 1
-    bn_gcdext(&gcd, &s, &t, a, n);
+    bn_gcdext_deprecated(&gcd, &s, &t, a, n); // TODO: Use bn_gcd instead of bn_gcdext_deprecated
+    
 
     // Check if the GCD is one to make sure the inverse exists
     if (!bn_is_one(&gcd)) {

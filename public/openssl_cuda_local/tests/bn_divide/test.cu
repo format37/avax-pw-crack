@@ -6,14 +6,6 @@
 __global__ void testKernel() {
     printf("++ testKernel for bn_divide ++\n");
     // Set the maximum number of test cases
-    /*const int num_tests = 1;  // Updated number of tests
-    int word_num[num_tests] = {2};
-    BN_ULONG test_values_dividend[][MAX_BIGNUM_WORDS] = {
-        {0x1234567890ABCDEF, 0x1234567890ABCDEF} // Example values for A
-        }; 
-    BN_ULONG test_values_divisor[][MAX_BIGNUM_WORDS] = {
-        {0, 0x2} // Example values for B
-        };*/
     
     const int num_tests = 6;  // Updated number of tests
     // Initialize the word_num array
@@ -59,28 +51,6 @@ __global__ void testKernel() {
 
         // Test division
         bn_divide(&quotient, &remainder, &dividend, &divisor);
-        /*int dividend_bits[BN_ULONG_NUM_BITS * 2];
-        int divisor_bits[BN_ULONG_NUM_BITS * 2];
-        // Convert BIGNUM dividend to binary array 
-        for(int i = 0; i < dividend.top; ++i) {
-            convert_word_to_binary(dividend.d[i], dividend_bits + i*BN_ULONG_NUM_BITS); 
-        }
-        // Same for divisor 
-        for(int i = 0; i < divisor.top; ++i) {
-            convert_word_to_binary(divisor.d[i], divisor_bits + i*BN_ULONG_NUM_BITS);
-        }
-        int quotient_bits[BN_ULONG_NUM_BITS * 2];
-        int remainder_bits[BN_ULONG_NUM_BITS * 2];
-        // Binary divide
-        binary_divide(dividend_bits, divisor_bits, quotient_bits, remainder_bits);
-        // Convert quotient binary to BIGNUM
-        for(int i = 0; i < MAX_BIGNUM_WORDS; ++i) {
-            quotient.d[i] = convert_binary_to_word(quotient_bits + i*BN_ULONG_NUM_BITS);
-        }
-        // Same for remainder
-        for(int i = 0; i < MAX_BIGNUM_WORDS; ++i) {
-            remainder.d[i] = convert_binary_to_word(remainder_bits + i*BN_ULONG_NUM_BITS); 
-        }*/
 
         // Print results        
         bn_print("dividend : ", &dividend);
