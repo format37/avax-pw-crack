@@ -3,9 +3,9 @@
 #include "bignum.h"
 
 // Define your BIGNUM structure based on your project definitions
-#define MAX_BIGNUM_WORDS 20
+/*#define MAX_BIGNUM_WORDS 20
 #define BN_ULONG unsigned long long int
-#define BN_ULONG_NUM_BITS (sizeof(BN_ULONG)*8)
+#define BN_ULONG_NUM_BITS (sizeof(BN_ULONG)*8)*/
 
 __global__ void test_mod_inverse_kernel() {
     printf("++ test_mod_inverse_kernel ++\n");
@@ -13,17 +13,17 @@ __global__ void test_mod_inverse_kernel() {
     // Test values similar to the ones used in your original bn_mod_inverse test
     BN_ULONG test_values_a[] = {
         0x123456789ABCDEFULL,
-        0x1FFF3ULL,
+        /*0x1FFF3ULL,
         0x10001ULL,
-        0x10001ULL
+        0x10001ULL*/
     };
 
     // 'n' values using prime numbers (make sure they are real prime numbers)
     BN_ULONG test_values_n[] = {
         0xFEDCBA987654323ULL,
-        0x100000000000003ULL,
+        /*0x100000000000003ULL,
         0x461ULL, // Replace this with the actual hex representation of the prime you want to use
-        0xFFFFFFFFFFFFFFFFULL
+        0xFFFFFFFFFFFFFFFFULL*/
     };
 
     int num_tests = sizeof(test_values_a) / sizeof(test_values_a[0]);
@@ -41,15 +41,39 @@ __global__ void test_mod_inverse_kernel() {
         a.d[0] = test_values_a[test]; a.top = 1;
         n.d[0] = test_values_n[test]; n.top = 1;
 
-        // Clear any previous errors
-        // cudaGetLastError();
-
-        // Test bn_mod_inverse_fixed
-        bn_mod_inverse_fixed(&inverse, &a, &n);
-
-        
         bn_print("a: ", &a);
         bn_print("n: ", &n);
+
+        bn_mod_inverse_3(&inverse, &a, &n);
+
+        //bn_mod_inverse_2(&inverse, &a, &n);
+        /*Initial Value u: 123456789abcdef
+        Initial Value v: fedcba987654323
+        Final Value x1: 0
+        Final Values v: f000000000000000
+        Inverse does not exist.
+        modular inverse: 0*/
+
+        //bn_mod_inverse(&inverse, &a, &n);
+        //modular inverse: 0
+        
+        //bn_mod_inverse_claude(&inverse, &a, &n);
+        // Stuck in an infinite loop
+        
+        //bn_mod_inverse_fixed(&inverse, &a, &n);
+        /*a: 123456789abcdef
+        n: fedcba987654323
+        ++ bn_mod_inverse_fixed ++
+        Error: Underflow in subtraction, result is invalid.
+        Error: Underflow in subtraction, result is invalid.
+        Error: Underflow in subtraction, result is invalid.
+        Error: Underflow in subtraction, result is invalid.
+        Error: Underflow in subtraction, result is invalid.
+        s: 0
+        n: fedcba987654323
+        NOT bn_is_negative(&s) -- bn_mod_inverse_fixed --
+        modular inverse: 0*/
+        
         bn_print("modular inverse: ", &inverse);
     }
 
