@@ -31,18 +31,38 @@ int main() {
         return 1;
     }
 
-    BN_ULONG test_values_a[][TEST_BIGNUM_WORDS] = {
-        {0x123456789ABCDEFULL},
+    //BN_ULONG test_values_a[][TEST_BIGNUM_WORDS] = {
+      //  {0x123456789ABCDEFULL},
         /*0x1FFF3ULL,
         0x10001ULL,
         0x10001ULL*/
-    };
+    //};
 
-    BN_ULONG test_values_n[][TEST_BIGNUM_WORDS] = {
-        {0xFEDCBA987654323ULL},
+    //BN_ULONG test_values_n[][TEST_BIGNUM_WORDS] = {
+      //  {0xFEDCBA987654323ULL},
         /*0x100000000000003ULL,
         0x461ULL, // Replace this with the actual hex representation of the prime you want to use
         0xFFFFFFFFFFFFFFFFULL*/
+    //};
+
+    // Test values for 'a'
+    BN_ULONG test_values_a[][TEST_BIGNUM_WORDS] = {
+        {0x3ULL},           // Test Case 1
+        {0x64ULL},          // Test Case 2: 100 in decimal
+        {0x1ULL},           // Test Case 3
+        {0x4ULL},           // Test Case 4
+        {0x100003ULL},       // Test Case 5: Simplified large number for demonstration*/
+        {0x123456789ABCDEFULL} // Test Case 6: Large prime number
+    };
+
+    // 'n' values (ensure these are real prime numbers for valid tests, except where prime is not required)
+    BN_ULONG test_values_n[][TEST_BIGNUM_WORDS] = {
+        {0xBULL},           // Test Case 1: 11 in decimal
+        {0x65ULL},          // Test Case 2: 101 in decimal
+        {0xDULL},           // Test Case 3: 13 in decimal
+        {0x8ULL},           // Test Case 4: Non-prime, to show no inverse exists
+        {0x100019ULL},       // Test Case 5: Simplified large prime number for demonstration*/
+        {0xFEDCBA987654323ULL} // Test Case 6: Large prime number
     };
 
     int sign_a[] = {0, 0, 0, 0, 0, 0}; // Signs for 'a', add -1 for negative numbers as needed

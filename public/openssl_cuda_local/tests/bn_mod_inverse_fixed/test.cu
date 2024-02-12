@@ -6,24 +6,29 @@
 /*#define MAX_BIGNUM_WORDS 20
 #define BN_ULONG unsigned long long int
 #define BN_ULONG_NUM_BITS (sizeof(BN_ULONG)*8)*/
+#define TEST_BIGNUM_WORDS 1 // Adjust based on the highest number of words needed
 
 __global__ void test_mod_inverse_kernel() {
     printf("++ test_mod_inverse_kernel ++\n");
 
-    // Test values similar to the ones used in your original bn_mod_inverse test
+    // Test values for 'a'
     BN_ULONG test_values_a[] = {
-        0x123456789ABCDEFULL,
-        /*0x1FFF3ULL,
-        0x10001ULL,
-        0x10001ULL*/
+        0x3ULL           // Test Case 1
+        /*0x64ULL,          // Test Case 2: 100 in decimal
+        0x1ULL,           // Test Case 3
+        0x4ULL,           // Test Case 4
+        0x100003ULL,       // Test Case 5: Simplified large number for demonstration
+        0x123456789ABCDEFULL // Test Case 6: Large prime number*/
     };
 
-    // 'n' values using prime numbers (make sure they are real prime numbers)
+    // 'n' values (ensure these are real prime numbers for valid tests, except where prime is not required)
     BN_ULONG test_values_n[] = {
-        0xFEDCBA987654323ULL,
-        /*0x100000000000003ULL,
-        0x461ULL, // Replace this with the actual hex representation of the prime you want to use
-        0xFFFFFFFFFFFFFFFFULL*/
+        0xBULL           // Test Case 1: 11 in decimal
+        /*0x65ULL,          // Test Case 2: 101 in decimal
+        0xDULL,           // Test Case 3: 13 in decimal
+        0x8ULL,           // Test Case 4: Non-prime, to show no inverse exists
+        0x100019ULL,       // Test Case 5: Simplified large prime number for demonstration
+        0xFEDCBA987654323ULL // Test Case 6: Large prime number*/
     };
 
     int num_tests = sizeof(test_values_a) / sizeof(test_values_a[0]);
@@ -54,13 +59,13 @@ __global__ void test_mod_inverse_kernel() {
         Inverse does not exist.
         modular inverse: 0*/
 
-        //bn_mod_inverse(&inverse, &a, &n);
+        // bn_mod_inverse(&inverse, &a, &n);
         //modular inverse: 0
         
-        //bn_mod_inverse_claude(&inverse, &a, &n);
+        // bn_mod_inverse_claude(&inverse, &a, &n);
         // Stuck in an infinite loop
         
-        //bn_mod_inverse_fixed(&inverse, &a, &n);
+        // bn_mod_inverse_fixed(&inverse, &a, &n);
         /*a: 123456789abcdef
         n: fedcba987654323
         ++ bn_mod_inverse_fixed ++
