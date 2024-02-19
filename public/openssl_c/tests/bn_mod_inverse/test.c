@@ -97,6 +97,8 @@ int main() {
         if (sign_n[i]) BN_set_negative(n, 1);
 
         mod_inverse = BN_mod_inverse(NULL, a, n, ctx);
+        // mod_inverse = BN_mod_inverse_b(NULL, a, n, ctx);
+        // mod_inverse = bn_mod_inverse_no_branch(NULL, a, n, ctx, 0);
 
         if (mod_inverse == NULL) {
             unsigned long err_code = ERR_get_error();  // Get the error code

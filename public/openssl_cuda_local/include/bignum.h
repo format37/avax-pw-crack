@@ -415,6 +415,10 @@ __device__ void bn_add(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
     find_top(result, MAX_BIGNUM_WORDS);
 }
 
+/*BIGNUM divide_tmp;
+init_zero(&divide_tmp, MAX_BIGNUM_WORDS);
+#define bn_mod(r, m, d) bn_divide(divide_tmp, (r), (m), (d))*/
+
 __device__ void bn_mod(BIGNUM* r, BIGNUM* m, BIGNUM* d) {
     //debug_printf("bn_mod 0\n");
     printf("bn_mod 0\n");
@@ -2027,6 +2031,400 @@ __device__ void swap_bignum_pointers(BIGNUM** a, BIGNUM** b) {
     BIGNUM* temp = *a;
     *a = *b;
     *b = temp;
+}
+
+__device__ void bn_mod_inverse_5_claude(BIGNUM *inverse, BIGNUM *a, BIGNUM *n) {
+
+    int sign = -1, *pnoinv = 0;
+    
+    BIGNUM A, B, X, Y, M, D, R;
+    BIGNUM temp;
+
+    /*bn_init(&A);
+    bn_init(&B); 
+    bn_init(&X);
+    bn_init(&Y);
+    bn_init(&M); 
+    bn_init(&D);*/
+    init_zero(&A, MAX_BIGNUM_WORDS);
+    init_zero(&B, MAX_BIGNUM_WORDS);
+    init_zero(&X, MAX_BIGNUM_WORDS);
+    init_zero(&Y, MAX_BIGNUM_WORDS);
+    init_zero(&M, MAX_BIGNUM_WORDS);
+    init_zero(&D, MAX_BIGNUM_WORDS);
+    init_zero(&R, MAX_BIGNUM_WORDS);    
+    
+
+    if (inverse == NULL) {
+        //bn_init(&R);
+        init_zero(&R, MAX_BIGNUM_WORDS);
+    } else {
+        bn_copy(&R, inverse); 
+    }
+
+    bn_copy(&A, n);
+    bn_copy(&B, a);
+
+    //bn_set_one(&X);
+    init_one(&X, MAX_BIGNUM_WORDS);
+    //bn_set_zero(&Y);
+    init_zero(&Y, MAX_BIGNUM_WORDS);
+
+    while (!bn_is_zero(&B)) {
+
+        bn_div(&D, &M, &A, &B);
+       
+        bn_mul(&temp, &D, &X);
+        bn_add(&Y, &Y, &temp);
+
+        bn_swap(&A, &B);
+        bn_swap(&X, &Y);
+
+        bn_mod(&B, &B, n);
+        bn_mod(&Y, &Y, n);
+        
+        sign = -sign;
+    }
+
+    if (!bn_is_one(&A)) {
+        *pnoinv = 1; 
+        //goto cleanup;
+        return;
+    }
+    
+    if (sign < 0) {
+        bn_sub(&Y, n, &Y);
+    }
+    bn_mod(&Y, &Y, n);
+
+    bn_copy(&R, &Y);
+
+    /*cleanup:
+    if(inverse == NULL) {
+        bn_free(&R);
+    }
+
+    bn_free(&A);
+    bn_free(&B);
+    bn_free(&X);
+    bn_free(&Y);
+    bn_free(&M);
+    bn_free(&D);*/
+}
+
+__device__ void bn_mod_for_div(BIGNUM *r, BIGNUM *a, BIGNUM *n) {
+    BIGNUM q;
+    init_zero(&q, MAX_BIGNUM_WORDS);
+    bn_divide(&q, r, a, n);
+}
+
+__device__ void bn_mod_inverse_7(BIGNUM *inverse, BIGNUM *a, BIGNUM *n) {
+    int sign = 1, pnoinv = 0;
+    BIGNUM A, B, X, Y, M, D, R;
+    
+    // Initialize BIGNUMs with zeros.
+    init_zero(&A, MAX_BIGNUM_WORDS);
+    init_zero(&B, MAX_BIGNUM_WORDS);
+    init_zero(&X, MAX_BIGNUM_WORDS);
+    init_zero(&Y, MAX_BIGNUM_WORDS);
+    init_zero(&M, MAX_BIGNUM_WORDS);
+    init_zero(&D, MAX_BIGNUM_WORDS);
+    init_zero(&R, MAX_BIGNUM_WORDS);
+    // set top to a.top
+    A.top = a->top;
+    B.top = a->top;
+    X.top = a->top;
+    Y.top = a->top;
+    M.top = a->top;
+    D.top = a->top;
+    R.top = a->top;
+
+    // Check valid input. If n is 1 or zero, inverse does not exist.
+    if (bn_is_one(n) || bn_is_zero(n)) {
+        printf("Inverse does not exist due to invalid input.\n");
+        return;
+    }
+
+    // Setup initial conditions.
+    bn_copy(&A, n);
+    bn_copy(&B, a);
+    init_one(&X, MAX_BIGNUM_WORDS);  // X = 1
+    init_zero(&Y, MAX_BIGNUM_WORDS); // Y = 0
+    // set top
+    X.top = a->top;
+    Y.top = a->top;
+
+    // Main loop of Extended Euclidean Algorithm.
+    while (!bn_is_zero(&B)) {
+        bn_divide(&D, &M, &A, &B); // D = A / B, M = A % B
+
+        // Swapping A with B (M), and X with Y.
+        bn_copy(&A, &B); 
+        bn_copy(&B, &M);
+
+        // Update Y = Y - D * X.
+        bn_mul(&M, &D, &X); // M = D * X
+        if (sign < 0) {
+            bn_add(&Y, &Y, &M); // Y = Y + M
+        } else {
+            bn_sub(&Y, &Y, &M); // Y = Y - M
+        }
+
+        bn_copy(&M, &X);         // M = X
+        bn_copy(&X, &Y);         // X = Y
+        bn_copy(&Y, &M);         // Y = M
+        bn_mod_for_div(&Y, &Y, n);       // Y = Y % n
+        //bn_mod(&Y, &Y, n);       // Y = Y % n
+
+        sign = -sign;
+        // Debug prints to watch variables at significant points
+        bn_print("Updated A:", &A);
+        bn_print("Updated B:", &B);
+        bn_print("Updated X:", &X);
+        bn_print("Updated Y:", &Y);
+        //bn_print("Updated n:", n);
+    }
+
+    // Final adjustments.
+    if (sign < 0) {
+        bn_subtract(&Y, n, &Y); // Y = n - Y to make Y positive
+    }
+    bn_mod_for_div(&Y, &Y, n); // Y = Y % n
+    //bn_mod(&Y, &Y, n); // Y = Y % n
+
+    // Check if inverse exists (A should be 1).
+    if (!bn_is_one(&A)) {
+        printf("Inverse does not exist.\n");
+        pnoinv = 1;
+    } else {
+        if (inverse == NULL) {
+            init_zero(&R, MAX_BIGNUM_WORDS);
+            bn_copy(&R, &Y); // Copy the inverse to R
+        } else {
+            bn_copy(inverse, &Y); // Y holds the inverse
+        }
+    }
+    
+    // Optionally, print the modular inverse.
+    if (!pnoinv) {
+        if (inverse) {
+            bn_print("Modular Inverse:", inverse);
+        } else {
+            bn_print("Modular Inverse:", &R);
+        }
+    }
+}
+
+__device__ void bn_mod_inverse_6(BIGNUM *inverse, BIGNUM *a, BIGNUM *n) {
+    int sign = 1, pnoinv = 0;
+
+    BIGNUM A, B, X, Y, M, D, temp, R;
+    
+    // Initializing BIGNUMs
+    init_zero(&A, MAX_BIGNUM_WORDS);
+    init_zero(&B, MAX_BIGNUM_WORDS);
+    init_zero(&X, MAX_BIGNUM_WORDS);
+    init_zero(&Y, MAX_BIGNUM_WORDS);
+    init_zero(&M, MAX_BIGNUM_WORDS);
+    init_zero(&D, MAX_BIGNUM_WORDS);
+    init_zero(&R, MAX_BIGNUM_WORDS);
+    init_zero(&temp, MAX_BIGNUM_WORDS);
+
+    // Check valid input. If n is 1 or zero, inverse does not exist
+    if (bn_is_one(n) || bn_is_zero(n)) {
+        printf("Inverse does not exist due to invalid input.\n");
+        return;
+    }
+
+    // Setup initial conditions
+    bn_copy(&A, n);
+    bn_copy(&B, a);
+    init_one(&X, MAX_BIGNUM_WORDS); // X = 1
+    init_zero(&Y, MAX_BIGNUM_WORDS); // Y = 0
+
+    unsigned int debug_counter = 0;
+
+    // Main loop of Extended Euclidean Algorithm
+    while (!bn_is_zero(&B)) {
+        bn_divide(&D, &M, &A, &B); // D = A / B, M = A % B
+
+        // Update temp to Y + D * X
+        bn_mul(&temp, &D, &X);
+        bn_add(&Y, &Y, &temp);
+
+        // Swapping A with B (M), and X with Y
+        bn_copy(&A, &B); 
+        bn_copy(&X, &Y);
+        bn_copy(&B, &M);
+        bn_copy(&Y, &temp);
+
+        // Reduce B modulo n
+        bn_divide(&temp, &B, &B, n); // Quotient not used, B = B % n
+        bn_divide(&temp, &Y, &Y, n); // Quotient not used, Y = Y % n
+
+        sign = -sign;
+        
+        // Debug prints to watch variables at significant points
+        bn_print("Updated A:", &A);
+        bn_print("Updated B:", &B);
+        bn_print("Updated X:", &X);
+        bn_print("Updated Y:", &Y);
+        bn_print("Updated n:", n);
+
+        debug_counter++;
+        printf("Debug counter: %d\n", debug_counter);
+        if (debug_counter > 7) {
+            printf("Debug counter exceeded.\n");
+            break; // TODO: Remove this line
+        }
+    }
+
+    // Final adjustments
+    if (sign < 0) {
+        bn_subtract(&Y, n, &Y); // Y = n - Y to make Y positive
+    }
+    
+    // Reduce Y modulo n
+    bn_divide(&temp, &Y, &Y, n); // Quotient not used, Y = Y % n
+
+    // Check if inverse exists (A should be 1)
+    if (!bn_is_one(&A)) {
+        printf("Inverse does not exist.\n");
+        pnoinv = 1;
+    } else {
+        if (inverse == NULL) {
+            init_zero(&R, MAX_BIGNUM_WORDS);
+            bn_copy(&R, &Y); // Copy the inverse to R
+        } else {
+            bn_copy(inverse, &Y); // Y holds the inverse
+        }
+    }
+    
+    // Optionally, print the modular inverse
+    if (!pnoinv) {
+        if (inverse) {
+            bn_print("Modular Inverse:", inverse);
+        } else {
+            bn_print("Modular Inverse:", &R);
+        }
+    }
+}
+
+__device__ void bn_mod_inverse_4(BIGNUM *inverse, BIGNUM *a, BIGNUM *n) {
+    int sign = -1, *pnoinv = 0;
+    
+    // BIGNUM *A, *B, *X, *Y, *M, *D, *R;
+    BIGNUM A, B, X, Y, M, D, R;
+    BIGNUM temp; // Using stack allocation for simplicity, consider using dynamic allocation if necessary.
+    
+    // Initializing BIGNUMs
+    /*bn_init(A); bn_init(B);
+    bn_init(X); bn_init(Y);
+    bn_init(M); bn_init(D);*/
+    init_zero(&A, MAX_BIGNUM_WORDS);
+    init_zero(&B, MAX_BIGNUM_WORDS);
+    init_zero(&X, MAX_BIGNUM_WORDS);
+    init_zero(&Y, MAX_BIGNUM_WORDS);
+    init_zero(&M, MAX_BIGNUM_WORDS);
+    init_zero(&D, MAX_BIGNUM_WORDS);
+    init_zero(&R, MAX_BIGNUM_WORDS);
+    init_zero(&temp, MAX_BIGNUM_WORDS);
+    
+    if (inverse == NULL) {
+        //R = new BIGNUM; // Or equivalent allocation in CUDA
+        //bn_init(R);
+        init_zero(&R, MAX_BIGNUM_WORDS);
+    } else {
+        // R = inverse;
+        bn_copy(&R, inverse);
+    }
+    
+    // Check valid input. If n is 1 or zero, inverse does not exist
+    if (bn_is_one(n) || bn_is_zero(n)) {
+        printf("Inverse does not exist due to invalid input.\n");
+        *pnoinv = 1;
+        return;
+    }
+
+    // Setup initial conditions
+    bn_copy(&A, n);
+    bn_copy(&B, a);
+    // bn_set_one(X);
+    init_one(&X, MAX_BIGNUM_WORDS);
+    //bn_set_zero(Y);
+    init_zero(&Y, MAX_BIGNUM_WORDS);
+
+    // Debug print initial values
+    bn_print("Initial A:", &A);
+    bn_print("Initial B:", &B);
+
+    unsigned int debug_counter = 0;
+
+    BIGNUM temp_quotient;
+    init_zero(&temp_quotient, MAX_BIGNUM_WORDS);
+
+    // Main loop of the Extended Euclidean Algorithm
+    while (!bn_is_zero(&B)) {
+        // (D, M) := (A/B, A%B)
+        bn_divide(&D, &M, &A, &B);
+
+        // Calculating X and Y updates
+        bn_mul(&temp, &D, &X);
+        bn_add(&Y, &Y, &temp); // Y = Y + D * X
+
+        // Swapping A with B, and X with Y for the next iteration
+        bn_swap(&A, &B); 
+        bn_swap(&X, &Y); 
+
+        // Reducing 'B' and 'Y' modulo 'n'
+        //bn_mod(&B, &B, n);
+        bn_divide(&temp_quotient, &B, &B, n); // B = B % n
+        //bn_mod(&Y, &Y, n);
+        bn_divide(&temp_quotient, &Y, &Y, n); // Y = Y % n
+
+        sign = -sign; // Adjusting sign for next iteration
+
+        // Debug prints to watch variables at significant points
+        bn_print("Updated A:", &A);
+        bn_print("Updated B:", &B);
+        bn_print("Updated X:", &X);
+        bn_print("Updated Y:", &Y);
+        bn_print("Updated n:", n);
+
+        /*debug_counter++;
+        printf("Debug counter: %d\n", debug_counter);
+        if (debug_counter > 4) {
+            printf("Debug counter exceeded.\n");
+            break; // TODO: Remove this line
+        }*/
+    }
+
+    // Final adjustments to ensure inverse is positive and correctly modulo n
+    if (sign < 0) {
+        //bn_sub(&Y, n, &Y); // Make Y positive
+        bn_subtract(&Y, n, &Y); // Make Y positive
+    }
+    //bn_mod(&Y, &Y, n); // Ensure Y is in the range [0, n-1]
+    bn_divide(&temp_quotient, &Y, &Y, n); // Y = Y % n
+
+    // Check if the obtained result is valid
+    if (!bn_is_one(&A)) {
+        printf("Inverse does not exist.\n");
+        *pnoinv = 1;
+    } else {
+        bn_copy(&R, &Y); // Y holds the inverse at this point
+    }
+
+    // Cleanup if needed
+    /*if (inverse == NULL) {
+        delete &R; // Or equivalent deallocation in CUDA
+    }*/
+
+    // Final debug print
+    bn_print("Modular Inverse:", &R);
+
+    /*printf("## bn_mod_inverse_4 ##\n");
+    return;*/
 }
 
 __device__ void bn_mod_inverse_3(BIGNUM *inverse, BIGNUM *a, BIGNUM *n) {

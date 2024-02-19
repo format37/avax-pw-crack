@@ -23,7 +23,7 @@ __global__ void test_mod_inverse_kernel() {
 
     // 'n' values (ensure these are real prime numbers for valid tests, except where prime is not required)
     BN_ULONG test_values_n[] = {
-        0xBULL           // Test Case 1: 11 in decimal
+        0xBULL,           // Test Case 1: 11 in decimal
         /*0x65ULL,          // Test Case 2: 101 in decimal
         0xDULL,           // Test Case 3: 13 in decimal
         0x8ULL,           // Test Case 4: Non-prime, to show no inverse exists
@@ -49,7 +49,12 @@ __global__ void test_mod_inverse_kernel() {
         bn_print("a: ", &a);
         bn_print("n: ", &n);
 
-        bn_mod_inverse_3(&inverse, &a, &n);
+        bn_mod_inverse_7(&inverse, &a, &n);
+        //bn_mod_inverse_6(&inverse, &a, &n);
+        //bn_mod_inverse_4(&inverse, &a, &n);
+        //bn_mod_inverse_5_claude(&inverse, &a, &n);
+
+        //bn_mod_inverse_3(&inverse, &a, &n);
 
         //bn_mod_inverse_2(&inverse, &a, &n);
         /*Initial Value u: 123456789abcdef
