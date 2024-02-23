@@ -1679,7 +1679,70 @@ __device__ int get_bn_top_from_binary_array(const int binary[], int total_bits) 
     return 0; // If every bit is zero, top is zero
 }
 
+__device__ int bn_divide_rev2(BIGNUM *quotient, BIGNUM *remainder, BIGNUM *dividend, BIGNUM *divisor) {
+    /*
+    - `dv` (quotient) is where the result of the division is stored.
+    - `rem` (remainder) is where the remainder of the division is stored.
+    - `m` is the dividend.
+    - `d` is the divisor.
+    - `ctx` is the context used for memory management during the operation in original OpenSSL implementation.
+    */
+
+    // dividend
+    // -------- = quotient, remainder
+    // divisor
+    // Error checks similar to OpenSSL
+    if (divisor == NULL || bn_is_zero(divisor)) {
+        // Handle division by zero or similar error
+        return 0;
+    }
+    if (dividend == NULL) {
+        // Handle invalid dividend
+        return 0;
+    }
+
+    const int total_bits = MAX_BIGNUM_WORDS * BN_ULONG_NUM_BITS;
+    
+    int binary_dividend[total_bits];
+    int binary_divisor[total_bits];
+    int binary_quotient[total_bits];
+    int binary_remainder[total_bits];
+    
+    // Initialize binary arrays
+    memset(binary_quotient, 0, total_bits * sizeof(int));
+    memset(binary_remainder, 0, total_bits * sizeof(int));
+    
+    // Convert the BIGNUMs to binary arrays
+    convert_to_binary_array(dividend->d, binary_dividend, dividend->top);
+    convert_to_binary_array(divisor->d, binary_divisor, divisor->top);
+
+    // Call the binary division function
+    bn_div_binary(binary_dividend, binary_divisor, binary_quotient, binary_remainder);
+
+    // Fix the 'top' fields of quotient and remainder
+    quotient->top = get_bn_top_from_binary_array(binary_quotient, total_bits);
+    remainder->top = get_bn_top_from_binary_array(binary_remainder, total_bits);
+    
+    // Convert the binary arrays back to BIGNUMs
+    convert_back_to_bn_ulong(binary_quotient, quotient->d, quotient->top);
+    convert_back_to_bn_ulong(binary_remainder, remainder->d, remainder->top);
+
+    // Determine sign of quotient and remainder
+    quotient->neg = dividend->neg ^ divisor->neg;
+    remainder->neg = dividend->neg;
+
+    return 1;
+}
+
 __device__ void bn_divide(BIGNUM *quotient, BIGNUM *remainder, BIGNUM *dividend, BIGNUM *divisor) {
+    /*
+    - `dv` (quotient) is where the result of the division is stored.
+    - `rem` (remainder) is where the remainder of the division is stored.
+    - `m` is the dividend.
+    - `d` is the divisor.
+    - `ctx` is the context used for memory management during the operation in original OpenSSL implementation.
+    */
+
     // dividend
     // -------- = quotient, remainder
     // divisor
@@ -2112,10 +2175,28 @@ __device__ void bn_mod_inverse_5_claude(BIGNUM *inverse, BIGNUM *a, BIGNUM *n) {
     bn_free(&D);*/
 }
 
-__device__ void bn_mod_for_div(BIGNUM *r, BIGNUM *a, BIGNUM *n) {
+__device__ int bn_mod_for_div(BIGNUM *r, BIGNUM *a, BIGNUM *n) {
+    // int BN_nnmod(BIGNUM *r, const BIGNUM *m, const BIGNUM *d, BN_CTX *ctx)
     BIGNUM q;
     init_zero(&q, MAX_BIGNUM_WORDS);
-    bn_divide(&q, r, a, n);
+
+    /*
+     * like BN_mod, but returns non-negative remainder (i.e., 0 <= r < |d|
+     * always holds)
+     */
+    /*if (r == n) {
+        printf("bn_mod_for_div: ERR_R_PASSED_INVALID_ARGUMENT")
+        return 0;
+    }*/
+
+    /*
+    - `dv` (quotient) is where the result of the division is stored.
+    - `rem` (remainder) is where the remainder of the division is stored.
+    - `m` is the dividend.
+    - `d` is the divisor.
+    - `ctx` is the context used for memory management during the operation in original OpenSSL implementation.
+    */
+    return bn_divide_rev2(&q, r, a, n); // quotient, remainder, 
 }
 
 __device__ void bn_mod_inverse_7(BIGNUM *inverse, BIGNUM *a, BIGNUM *n) {
