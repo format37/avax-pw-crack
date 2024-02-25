@@ -84,7 +84,9 @@ int main() {
         "1", // 6: neg - pos
         "1",  // 7: pos - neg
         "1", // 8: Two-word positive-neg test case (low word, high word)
-        "1FFFFFFFFFFFFFFFF" // 9: Two-word neg-pos overflow test case (low word, high word)
+        "1FFFFFFFFFFFFFFFF", // 9: Two-word neg-pos overflow test case (low word, high word)
+        "0", // 10: Zero - pos
+        "0", // 11: Zero - neg
     };
     int multipliers_a[] = {
         1, // 1: neg
@@ -95,7 +97,9 @@ int main() {
         1, // 6: neg
         0,  // 7: pos
         0, // 8: pos
-        1  // 9: neg
+        1,  // 9: neg
+        0,  // 10: Zero - pos
+        0,  // 11: Zero - neg
     };
     char* test_values_b[] = {
         "1", // 1: neg - neg
@@ -107,6 +111,8 @@ int main() {
         "4", // 7: pos - neg
         "2", // 8: Two-word negative-neg test case (low word, high word)
         "1", // 9: Two-word neg-pos overflow test case (low word, high word)
+        "1", // 10: Zero - pos
+        "1", // 11: Zero - neg
     };
     int multipliers_b[] = {
         1, // 1: neg
@@ -117,7 +123,9 @@ int main() {
         0, // 6: pos
         1,  // 7: neg
         1, // 8: neg
-        0  // 9: pos
+        0,  // 9: pos
+        0,  // 10: Zero - pos
+        1,  // 11: Zero - neg
     };
 
     

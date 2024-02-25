@@ -23,7 +23,7 @@ __global__ void test_mod_inverse_kernel() {
 
     // 'n' values (ensure these are real prime numbers for valid tests, except where prime is not required)
     BN_ULONG test_values_n[] = {
-        0xBULL,           // Test Case 1: 11 in decimal
+        0xBULL           // Test Case 1: 11 in decimal
         /*0x65ULL,          // Test Case 2: 101 in decimal
         0xDULL,           // Test Case 3: 13 in decimal
         0x8ULL,           // Test Case 4: Non-prime, to show no inverse exists
@@ -43,8 +43,8 @@ __global__ void test_mod_inverse_kernel() {
         init_zero(&inverse, MAX_BIGNUM_WORDS);
 
         // Initialize 'a' and 'n' with the test values
-        a.d[0] = test_values_a[test]; a.top = 1;
-        n.d[0] = test_values_n[test]; n.top = 1;
+        a.d[0] = test_values_a[test];
+        n.d[0] = test_values_n[test];
 
         bn_print("a: ", &a);
         bn_print("n: ", &n);

@@ -8,7 +8,7 @@ __global__ void testKernel() {
     printf("++ testKernel for bn_subtract ++\n");
 
     // Define test cases for simplified debugging
-    const int num_tests = 9; // Update this based on the number of tests you're running
+    const int num_tests = 11; // Update this based on the number of tests you're running
 
     BN_ULONG test_values_a[num_tests][MAX_BIGNUM_WORDS] = {
         {0x1}, // 1: neg - neg
@@ -19,7 +19,9 @@ __global__ void testKernel() {
         {0x1}, // 6: neg - pos
         {0x1},  // 7: pos - neg
         {0x1, 0x0},                // 8: Two-word positive-neg test case (low word, high word)
-        {0xFFFFFFFFFFFFFFFF, 0x1}  // 9: Two-word neg-pos overflow test case (low word, high word)
+        {0xFFFFFFFFFFFFFFFF, 0x1},  // 9: Two-word neg-pos overflow test case (low word, high word)
+        {0x0}, // 0 - pos
+        {0x0}, // 0 - neg
     };
     int negative_a[num_tests] = {
         1, // 1: neg - neg
@@ -30,7 +32,9 @@ __global__ void testKernel() {
         1, // 6: neg - pos
         0,  // 7: pos - neg
         0,  // 8: pos
-        1   // 9: neg
+        1,   // 9: neg
+        0, // 0 - pos
+        0, // 0 - neg
     };
     BN_ULONG test_values_b[num_tests][MAX_BIGNUM_WORDS] = {
         {0x1}, // 1: neg - neg
@@ -41,7 +45,9 @@ __global__ void testKernel() {
         {0x4}, // 6: neg - pos
         {0x4},  // 7: pos - neg
         {0x2, 0x0},                // 8: Two-word negative-neg test case (low word, high word)
-        {0x1, 0x0}                 // 9: Two-word pos-neg overflow test case (low word, high word)
+        {0x1, 0x0},                 // 9: Two-word pos-neg overflow test case (low word, high word)
+        {0x1}, // 0 - pos
+        {0x1}, // 0 - neg
     };
     int negative_b[num_tests] = {
         1, // 1: neg - neg
@@ -52,7 +58,9 @@ __global__ void testKernel() {
         0, // 6: neg - pos
         1,  // 7: pos - neg
         1,  // 8: neg
-        0   // 9: pos
+        0,   // 9: pos
+        0, // 0 - pos
+        1, // 0 - neg
     };
 
     // Test values for 'a'
@@ -113,6 +121,8 @@ __global__ void testKernel() {
         }
         a.top = find_top(&a, MAX_BIGNUM_WORDS);
         b.top = find_top(&b, MAX_BIGNUM_WORDS);
+        bn_print("a: ", &a);
+        bn_print("b: ", &b);
 
         // Perform the subtraction
         bn_subtract(&result, &a, &b);
@@ -121,8 +131,6 @@ __global__ void testKernel() {
         result.top = find_top(&result, MAX_BIGNUM_WORDS);
 
         // Print results
-        bn_print("a: ", &a);
-        bn_print("b: ", &b);
         bn_print("a - b: ", &result);
     }
 

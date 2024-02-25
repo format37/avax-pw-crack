@@ -81,7 +81,7 @@ __global__ void testKernel() {
         a.top = TEST_BIGNUM_WORDS;
         n.top = TEST_BIGNUM_WORDS;
 
-        mod = bn_mod_for_div(&remainder, &a, &n);
+        mod = bn_mod(&remainder, &a, &n);
 
         // Print results
         bn_print("remainder: ", &remainder);

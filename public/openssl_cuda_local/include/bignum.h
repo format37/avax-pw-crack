@@ -15,6 +15,8 @@ typedef struct bignum_st {
 } BIGNUM;
 
 __device__ void bn_add(BIGNUM *result, BIGNUM *a, BIGNUM *b);
+__device__ int bn_divide_rev2(BIGNUM *quotient, BIGNUM *remainder, BIGNUM *dividend, BIGNUM *divisor);
+__device__ int bn_mod(BIGNUM *r, BIGNUM *m, BIGNUM *d);
 
 __device__ void bn_print(const char* msg, BIGNUM* a) {
     printf("%s", msg);
@@ -102,36 +104,71 @@ __device__ void init_one(BIGNUM *bn, int capacity) {
 }
 
 __device__ int bn_cmp(BIGNUM* a, BIGNUM* b) {
+    // bn_print("[0] bn_cmp a: ", a);
     // bn_cmp logic:
     //  1 when a is larger
     // -1 when b is larger
     //  0 wneh a and b are equal
 
   // Skip leading zeroes and find the actual top for a
-  int a_top = a->top - 1;
-  while (a_top >= 0 && a->d[a_top] == 0) a_top--;
+  // int a_top = a->top - 1;
+  // while (a_top >= 0 && a->d[a_top] == 0) a_top--;
+  int a_top = find_top(a, MAX_BIGNUM_WORDS);
 
   // Skip leading zeroes and find the actual top for b
-  int b_top = b->top - 1;
-  while (b_top >= 0 && b->d[b_top] == 0) b_top--;
+  // int b_top = b->top - 1;
+  // while (b_top >= 0 && b->d[b_top] == 0) b_top--;
+  int b_top = find_top(b, MAX_BIGNUM_WORDS);
 
   // Compare signs
   if (a->neg && !b->neg) return -1; // a is negative, b is positive: a < b
   if (!a->neg && b->neg) return 1;  // a is positive, b is negative: a > b
+  // bn_print("[1] bn_cmp a: ", a);
 
   // If both numbers are negative, we need to reverse the comparison of their magnitudes
   int sign_factor = (a->neg && b->neg) ? -1 : 1;
-
+  // bn_print("[2] bn_cmp a: ", a);
   // Now, use the actual tops for comparison
   if (a_top > b_top) return sign_factor * 1; // Consider sign for magnitude comparison
+  // bn_print("[3] bn_cmp a: ", a);
   if (a_top < b_top) return sign_factor * -1;
-
+  // bn_print("[4] bn_cmp a: ", a);
+    
   // Both numbers have the same number of significant digits, so compare them starting from the most significant digit
   for (int i = a_top; i >= 0; i--) {
     if (a->d[i] > b->d[i]) return sign_factor * 1; // a is larger (or smaller if both are negative)
     if (a->d[i] < b->d[i]) return sign_factor * -1; // b is larger (or smaller if both are negative)
   }
   return 0; // Numbers are equal
+}
+
+__device__ int bn_cmp_abs(BIGNUM *a, BIGNUM *b) {
+    // Check tops
+    if (find_top(a, MAX_BIGNUM_WORDS) != a->top) {
+        printf("### bn_cmp_abs ### Error: Top is not set correctly in the source BIGNUM.\n");
+        printf("a->top: %d, actual top: %d\n", a->top, find_top(a, MAX_BIGNUM_WORDS));
+        // Print bn value
+        bn_print("a: ", a);
+    }
+    if (find_top(b, MAX_BIGNUM_WORDS) != b->top) {
+        printf("### bn_cmp_abs ### Error: Top is not set correctly in the source BIGNUM.\n");
+        printf("b->top: %d, actual top: %d\n", b->top, find_top(b, MAX_BIGNUM_WORDS));
+        // Print bn value
+        bn_print("b: ", b);
+    }
+
+    if (a->top > b->top)
+        return 1;
+    if (b->top > a->top)
+        return -1;
+
+    for (int i = a->top - 1; i >= 0; i--) {
+        if (a->d[i] > b->d[i])
+            return 1;
+        if (b->d[i] > a->d[i])
+            return -1;
+    }
+    return 0;
 }
 
 __device__ int bn_cmp_one(BIGNUM* a) {
@@ -180,6 +217,16 @@ __device__ int bn_cmp_one(BIGNUM* a) {
 __device__ void bn_copy(BIGNUM *dest, BIGNUM *src) {
     // printf("bn_copy");
     if (dest == nullptr || src == nullptr) return;
+
+    // Check top
+    int top = find_top(src, MAX_BIGNUM_WORDS);
+    if (top != src->top) {
+        printf("### bn_copy ### Error: Top is not set correctly in the source BIGNUM.\n");
+        printf("src->top: %d, actual top: %d\n", src->top, top);
+        src->top = top;
+        // Print bn value
+        bn_print("src: ", src);
+    }
 
     // Copy the neg and top fields
     dest->neg = src->neg;
@@ -238,7 +285,7 @@ __device__ void absolute_add(BIGNUM *result, const BIGNUM *a, const BIGNUM *b) {
     result->top = find_top(result, MAX_BIGNUM_WORDS);
 }
 
-__device__ void absolute_subtract(BIGNUM *result, const BIGNUM *a, const BIGNUM *b) {
+__device__ void absolute_subtract(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
     // This function assumes both 'a' and 'b' are positive.
     // It subtracts the absolute values |b| from |a|, where |a| >= |b|.
     // If |a| < |b|, it's the caller's responsibility to set result->neg appropriately.
@@ -267,6 +314,39 @@ __device__ void absolute_subtract(BIGNUM *result, const BIGNUM *a, const BIGNUM 
 }
 
 __device__ void bn_subtract(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
+    printf("bn_subtract\n");
+
+    // If one is negative and the other is positive, it's essentially an addition.
+    if (a->neg != b->neg) {
+        result->neg = a->neg; // The sign will be the same as the sign of 'a'.
+        absolute_add(result, a, b); // Perform the addition of magnitudes here because signs are different.
+        return;
+    }
+
+    // Compare the absolute values to decide the order of subtraction and sign of the result.
+    int cmp_res = bn_cmp_abs(a, b); // This function should compare the absolute values of 'a' and 'b'.
+    
+    if (cmp_res >= 0) {
+        // |a| >= |b|, perform a - b, result takes sign from 'a'.
+        result->neg = a->neg;
+        absolute_subtract(result, a, b);
+    } else {
+        // |b| > |a|, perform b - a instead, result takes opposite sign from 'a'.
+        result->neg = !a->neg;
+        absolute_subtract(result, b, a);
+    }
+
+    // Update result.top based on the actual data in result.
+    result->top = find_top(result, MAX_BIGNUM_WORDS);
+
+    // Perform additional logic if underflow has been detected in absolute_subtract.
+    if (result->top == 0) { 
+        // Handle underflow if needed. 
+    }
+}
+
+/*__device__ void bn_subtract_v0(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
+    printf("bn_subtract\n");
     // Determine the real sign of the result based on the signs of a and b.
     if (a->neg != b->neg) {
         // If one is negative and the other is positive, it's essentially an addition.
@@ -278,7 +358,12 @@ __device__ void bn_subtract(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
         // Else, signs are same, and it's a subtraction.
         // The result will have the sign of 'a' if |a| >= |b|, otherwise, it will
         // be the opposite of 'a' sign because |a| < |b|.
-        result->neg = (bn_cmp(a, b) >= 0) ? a->neg : !a->neg;
+        // result->neg = (bn_cmp(a, b) >= 0) ? a->neg : !a->neg;
+        if (bn_cmp(a, b) >= 0) {
+            result->neg = a->neg;  // If the comparison is true (a is greater or equal to b), take the sign from 'a'
+        } else {
+            result->neg = !a->neg; // If the comparison is false (a is less than b), take the opposite of 'a''s sign
+        }
     }
 
     // Perform the absolute subtraction without altering 'a' and 'b'.
@@ -290,7 +375,7 @@ __device__ void bn_subtract(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
 
     // If 'a' and 'b' were of different signs, we already set result->neg accordingly.
     // We are dealing with the scenario where |a| - |b| or |b| - |a| is performed.
-}
+}*/
 
 __device__ void bn_add_v0(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
     if (a->neg != b->neg) {
@@ -419,7 +504,7 @@ __device__ void bn_add(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
 init_zero(&divide_tmp, MAX_BIGNUM_WORDS);
 #define bn_mod(r, m, d) bn_divide(divide_tmp, (r), (m), (d))*/
 
-__device__ void bn_mod(BIGNUM* r, BIGNUM* m, BIGNUM* d) {
+__device__ void bn_mod_deprecated(BIGNUM* r, BIGNUM* m, BIGNUM* d) {
     //debug_printf("bn_mod 0\n");
     printf("bn_mod 0\n");
     // Copy m to r
@@ -1011,6 +1096,30 @@ __device__ void bn_div(BIGNUM *a, BIGNUM *b, BIGNUM *q, BIGNUM *r) {
             bn_add_bit(q, 0); // Assuming you have a function to add a bit at position 0.
         }
     }
+}
+
+__device__ int bn_mod(BIGNUM *r, BIGNUM *a, BIGNUM *n) {
+    // int BN_nnmod(BIGNUM *r, const BIGNUM *m, const BIGNUM *d, BN_CTX *ctx)
+    BIGNUM q;
+    init_zero(&q, MAX_BIGNUM_WORDS);
+
+    /*
+     * like BN_mod, but returns non-negative remainder (i.e., 0 <= r < |d|
+     * always holds)
+     */
+    /*if (r == n) {
+        printf("bn_mod_for_div: ERR_R_PASSED_INVALID_ARGUMENT")
+        return 0;
+    }*/
+
+    /*
+    - `dv` (quotient) is where the result of the division is stored.
+    - `rem` (remainder) is where the remainder of the division is stored.
+    - `m` is the dividend.
+    - `d` is the divisor.
+    - `ctx` is the context used for memory management during the operation in original OpenSSL implementation.
+    */
+    return bn_divide_rev2(&q, r, a, n); // quotient, remainder, 
 }
 
 __device__ void mod_mul(BIGNUM *a, BIGNUM *b, BIGNUM *mod, BIGNUM *result) {
@@ -2066,7 +2175,7 @@ __device__ void bn_gcdext_deprecated(BIGNUM *g, BIGNUM *s, BIGNUM *t, BIGNUM *a,
     //bn_copy(b, b);
 
     while (!bn_is_zero(&b_temp)) {
-        bn_divide(&quotient, &temp, g, &b_temp);
+        bn_divide_rev2(&quotient, &temp, g, &b_temp);
         
         // g = b
         bn_copy(g, &b_temp);
@@ -2096,19 +2205,13 @@ __device__ void swap_bignum_pointers(BIGNUM** a, BIGNUM** b) {
     *b = temp;
 }
 
-__device__ void bn_mod_inverse_5_claude(BIGNUM *inverse, BIGNUM *a, BIGNUM *n) {
+/*__device__ void bn_mod_inverse_5_claude(BIGNUM *inverse, BIGNUM *a, BIGNUM *n) {
 
     int sign = -1, *pnoinv = 0;
     
     BIGNUM A, B, X, Y, M, D, R;
     BIGNUM temp;
 
-    /*bn_init(&A);
-    bn_init(&B); 
-    bn_init(&X);
-    bn_init(&Y);
-    bn_init(&M); 
-    bn_init(&D);*/
     init_zero(&A, MAX_BIGNUM_WORDS);
     init_zero(&B, MAX_BIGNUM_WORDS);
     init_zero(&X, MAX_BIGNUM_WORDS);
@@ -2162,46 +2265,11 @@ __device__ void bn_mod_inverse_5_claude(BIGNUM *inverse, BIGNUM *a, BIGNUM *n) {
 
     bn_copy(&R, &Y);
 
-    /*cleanup:
-    if(inverse == NULL) {
-        bn_free(&R);
-    }
-
-    bn_free(&A);
-    bn_free(&B);
-    bn_free(&X);
-    bn_free(&Y);
-    bn_free(&M);
-    bn_free(&D);*/
-}
-
-__device__ int bn_mod_for_div(BIGNUM *r, BIGNUM *a, BIGNUM *n) {
-    // int BN_nnmod(BIGNUM *r, const BIGNUM *m, const BIGNUM *d, BN_CTX *ctx)
-    BIGNUM q;
-    init_zero(&q, MAX_BIGNUM_WORDS);
-
-    /*
-     * like BN_mod, but returns non-negative remainder (i.e., 0 <= r < |d|
-     * always holds)
-     */
-    /*if (r == n) {
-        printf("bn_mod_for_div: ERR_R_PASSED_INVALID_ARGUMENT")
-        return 0;
-    }*/
-
-    /*
-    - `dv` (quotient) is where the result of the division is stored.
-    - `rem` (remainder) is where the remainder of the division is stored.
-    - `m` is the dividend.
-    - `d` is the divisor.
-    - `ctx` is the context used for memory management during the operation in original OpenSSL implementation.
-    */
-    return bn_divide_rev2(&q, r, a, n); // quotient, remainder, 
-}
+}*/
 
 __device__ void bn_mod_inverse_7(BIGNUM *inverse, BIGNUM *a, BIGNUM *n) {
     int sign = 1, pnoinv = 0;
-    BIGNUM A, B, X, Y, M, D, R;
+    BIGNUM A, B, X, Y, M, D, R, tmp;
     
     // Initialize BIGNUMs with zeros.
     init_zero(&A, MAX_BIGNUM_WORDS);
@@ -2211,6 +2279,7 @@ __device__ void bn_mod_inverse_7(BIGNUM *inverse, BIGNUM *a, BIGNUM *n) {
     init_zero(&M, MAX_BIGNUM_WORDS);
     init_zero(&D, MAX_BIGNUM_WORDS);
     init_zero(&R, MAX_BIGNUM_WORDS);
+    init_zero(&tmp, MAX_BIGNUM_WORDS);
     // set top to a.top
     A.top = a->top;
     B.top = a->top;
@@ -2219,13 +2288,14 @@ __device__ void bn_mod_inverse_7(BIGNUM *inverse, BIGNUM *a, BIGNUM *n) {
     M.top = a->top;
     D.top = a->top;
     R.top = a->top;
+    tmp.top = a->top;
 
     // Check valid input. If n is 1 or zero, inverse does not exist.
     if (bn_is_one(n) || bn_is_zero(n)) {
         printf("Inverse does not exist due to invalid input.\n");
         return;
     }
-
+    
     // Setup initial conditions.
     bn_copy(&A, n);
     bn_copy(&B, a);
@@ -2234,43 +2304,56 @@ __device__ void bn_mod_inverse_7(BIGNUM *inverse, BIGNUM *a, BIGNUM *n) {
     // set top
     X.top = a->top;
     Y.top = a->top;
-
+    
     // Main loop of Extended Euclidean Algorithm.
     while (!bn_is_zero(&B)) {
-        bn_divide(&D, &M, &A, &B); // D = A / B, M = A % B
+        bn_divide_rev2(&D, &M, &A, &B); // D = A / B, M = A % B
 
         // Swapping A with B (M), and X with Y.
         bn_copy(&A, &B); 
         bn_copy(&B, &M);
-
+        
         // Update Y = Y - D * X.
         bn_mul(&M, &D, &X); // M = D * X
+        printf("0: Y.top: %d\n", Y.top);
         if (sign < 0) {
             bn_add(&Y, &Y, &M); // Y = Y + M
+            printf("1: Y.top: %d\n", Y.top);
         } else {
-            bn_sub(&Y, &Y, &M); // Y = Y - M
+            printf("Subtracting Y - M (Y.top: %d, M.top: %d)\n", Y.top, M.top);
+            bn_print("Y:", &Y);
+            bn_print("M:", &M);
+            bn_subtract(&tmp, &Y, &M); // Y = Y - M
+            bn_cmp(&Y, &tmp);
+            printf("2: Y.top: %d\n", Y.top);
         }
+        
 
         bn_copy(&M, &X);         // M = X
-        bn_copy(&X, &Y);         // X = Y
+        printf("Y.top: %d\n", Y.top);
+        printf("X.top: %d\n", X.top);
+        bn_copy(&X, &Y);         // X = Y // INCORRECT TOP INT THE SOURCE
+        return; // TODO: Remove this line
         bn_copy(&Y, &M);         // Y = M
-        bn_mod_for_div(&Y, &Y, n);       // Y = Y % n
+        bn_mod(&Y, &Y, n);       // Y = Y % n
         //bn_mod(&Y, &Y, n);       // Y = Y % n
-
+        
         sign = -sign;
         // Debug prints to watch variables at significant points
         bn_print("Updated A:", &A);
         bn_print("Updated B:", &B);
         bn_print("Updated X:", &X);
         bn_print("Updated Y:", &Y);
-        //bn_print("Updated n:", n);
+        printf("### bn_mod_inverse_7 ###\n");
+        break;
     }
-
+    
     // Final adjustments.
     if (sign < 0) {
-        bn_subtract(&Y, n, &Y); // Y = n - Y to make Y positive
+        bn_subtract(&tmp, n, &Y); // Y = n - Y to make Y positive
+        bn_copy(&Y, &tmp);
     }
-    bn_mod_for_div(&Y, &Y, n); // Y = Y % n
+    bn_mod(&Y, &Y, n); // Y = Y % n
     //bn_mod(&Y, &Y, n); // Y = Y % n
 
     // Check if inverse exists (A should be 1).
@@ -2296,7 +2379,7 @@ __device__ void bn_mod_inverse_7(BIGNUM *inverse, BIGNUM *a, BIGNUM *n) {
     }
 }
 
-__device__ void bn_mod_inverse_6(BIGNUM *inverse, BIGNUM *a, BIGNUM *n) {
+/*__device__ void bn_mod_inverse_6(BIGNUM *inverse, BIGNUM *a, BIGNUM *n) {
     int sign = 1, pnoinv = 0;
 
     BIGNUM A, B, X, Y, M, D, temp, R;
@@ -2389,9 +2472,9 @@ __device__ void bn_mod_inverse_6(BIGNUM *inverse, BIGNUM *a, BIGNUM *n) {
             bn_print("Modular Inverse:", &R);
         }
     }
-}
+}*/
 
-__device__ void bn_mod_inverse_4(BIGNUM *inverse, BIGNUM *a, BIGNUM *n) {
+/*__device__ void bn_mod_inverse_4(BIGNUM *inverse, BIGNUM *a, BIGNUM *n) {
     int sign = -1, *pnoinv = 0;
     
     // BIGNUM *A, *B, *X, *Y, *M, *D, *R;
@@ -2399,9 +2482,6 @@ __device__ void bn_mod_inverse_4(BIGNUM *inverse, BIGNUM *a, BIGNUM *n) {
     BIGNUM temp; // Using stack allocation for simplicity, consider using dynamic allocation if necessary.
     
     // Initializing BIGNUMs
-    /*bn_init(A); bn_init(B);
-    bn_init(X); bn_init(Y);
-    bn_init(M); bn_init(D);*/
     init_zero(&A, MAX_BIGNUM_WORDS);
     init_zero(&B, MAX_BIGNUM_WORDS);
     init_zero(&X, MAX_BIGNUM_WORDS);
@@ -2472,12 +2552,6 @@ __device__ void bn_mod_inverse_4(BIGNUM *inverse, BIGNUM *a, BIGNUM *n) {
         bn_print("Updated Y:", &Y);
         bn_print("Updated n:", n);
 
-        /*debug_counter++;
-        printf("Debug counter: %d\n", debug_counter);
-        if (debug_counter > 4) {
-            printf("Debug counter exceeded.\n");
-            break; // TODO: Remove this line
-        }*/
     }
 
     // Final adjustments to ensure inverse is positive and correctly modulo n
@@ -2496,19 +2570,12 @@ __device__ void bn_mod_inverse_4(BIGNUM *inverse, BIGNUM *a, BIGNUM *n) {
         bn_copy(&R, &Y); // Y holds the inverse at this point
     }
 
-    // Cleanup if needed
-    /*if (inverse == NULL) {
-        delete &R; // Or equivalent deallocation in CUDA
-    }*/
 
     // Final debug print
     bn_print("Modular Inverse:", &R);
+}*/
 
-    /*printf("## bn_mod_inverse_4 ##\n");
-    return;*/
-}
-
-__device__ void bn_mod_inverse_3(BIGNUM *inverse, BIGNUM *a, BIGNUM *n) {
+__device__ void bn_mod_inverse_3_deprecated(BIGNUM *inverse, BIGNUM *a, BIGNUM *n) {
     BIGNUM *r0, *r1, *s0, *s1, *temp, *temporary_remainder;
     int capacity = MAX_BIGNUM_WORDS;
 
@@ -2650,6 +2717,7 @@ __device__ void bn_mod_inverse_fixed(BIGNUM *inverse, BIGNUM *a, BIGNUM *n) {
     printf(" -- bn_mod_inverse_fixed --\n");
 }
 
+// TODO: Replace this by the bn_mod_inverse_fixed
 __device__ void bn_mod_inverse(BIGNUM *result, BIGNUM *a, BIGNUM *modulus) {
     printf(" ## bn_mod_inverse ##\n");
     // Allocate and initialize working variables
@@ -2657,11 +2725,6 @@ __device__ void bn_mod_inverse(BIGNUM *result, BIGNUM *a, BIGNUM *modulus) {
     // Initialization of these BIGNUMs with proper handling for the CUDA environment is required
     // Zero-initialize all BIGNUMs: u, v, inv, u1, u3, v1, v3, t1, t3, q
     
-    /*bn_zero(&u); bn_zero(&v); bn_zero(&inv); 
-    bn_zero(&u1); bn_zero(&u3); 
-    bn_zero(&v1); bn_zero(&v3); 
-    bn_zero(&t1); bn_zero(&t3); 
-    bn_zero(&q);*/
     init_zero(&u, MAX_BIGNUM_WORDS);
     init_zero(&v, MAX_BIGNUM_WORDS);
     init_zero(&inv, MAX_BIGNUM_WORDS);
@@ -2704,7 +2767,7 @@ __device__ void bn_mod_inverse(BIGNUM *result, BIGNUM *a, BIGNUM *modulus) {
     // especially if the BIGNUM structure requires deallocation of any allocated memory
 }
 
-__device__ void bn_mod_inverse_2(BIGNUM *inverse, BIGNUM *a, BIGNUM *n) {
+/*__device__ void bn_mod_inverse_2(BIGNUM *inverse, BIGNUM *a, BIGNUM *n) {
     BIGNUM u, v, x1, x2, q, r, temp;
     init_zero(&u, MAX_BIGNUM_WORDS);
     init_zero(&v, MAX_BIGNUM_WORDS);
@@ -2728,11 +2791,6 @@ __device__ void bn_mod_inverse_2(BIGNUM *inverse, BIGNUM *a, BIGNUM *n) {
 
     // The loop runs while 'u' is not zero
     while (!bn_is_zero(&u)) {
-
-        /*bn_print("Before Division: u", &u);
-        bn_print("Before Division: v", &v);
-        bn_print("q", &q);
-        bn_print("r", &r);*/
 
         bn_div(&u, &v, &q, &r); // Divides v by u, producing quotient q and remainder r
 
@@ -2764,9 +2822,9 @@ __device__ void bn_mod_inverse_2(BIGNUM *inverse, BIGNUM *a, BIGNUM *n) {
         // Inverse does not exist
         printf("Inverse does not exist.\n");
     }
-}
+}*/
 
-__device__ void bn_mod_inverse_claude(BIGNUM *inverse, BIGNUM *a, BIGNUM *n) {
+/*__device__ void bn_mod_inverse_claude(BIGNUM *inverse, BIGNUM *a, BIGNUM *n) {
 
     BIGNUM gcd, u, v, tmp;
     int sign;
@@ -2834,7 +2892,7 @@ __device__ void bn_mod_inverse_claude(BIGNUM *inverse, BIGNUM *a, BIGNUM *n) {
     } else {
         bn_copy(inverse, &v);
     }
-}
+}*/
 
 // CUDA point_add function, based on gmp implementation
 __device__ void point_add(
