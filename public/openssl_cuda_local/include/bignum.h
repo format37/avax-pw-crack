@@ -88,7 +88,7 @@ __device__ void init_zero(BIGNUM *bn, int capacity) {
 
     // top is used for representing the actual size of the 
     // significant part of the number for calculation purposes.
-    bn->top = 0; // There are no significant digits when all words are zero.
+    bn->top = 1; // There are no significant digits when all words are zero.
 
     bn->neg = 0;
     
@@ -269,6 +269,7 @@ __device__ void bn_copy(BIGNUM *dest, BIGNUM *src) {
     }
     //bn_print("[2] src: ", src);
     //bn_print("[2] dest: ", dest);
+    dest->dmax = src->dmax;
 }
 
 __device__ void absolute_add(BIGNUM *result, const BIGNUM *a, const BIGNUM *b) {
@@ -341,25 +342,24 @@ __device__ void absolute_subtract(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
 }
 
 __device__ void bn_subtract(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
-    printf("bn_subtract\n");
+    printf("bn_subtract:\n");
     // Check tops
     if (find_top(a, MAX_BIGNUM_WORDS) != a->top) {
         printf("### bn_cmp_abs ### Error: Top is not set correctly in the source BIGNUM.\n");
         printf("a->top: %d, actual top: %d\n", a->top, find_top(a, MAX_BIGNUM_WORDS));
-        // Print bn value
-        bn_print("a: ", a);
     }
     if (find_top(b, MAX_BIGNUM_WORDS) != b->top) {
         printf("### bn_cmp_abs ### Error: Top is not set correctly in the source BIGNUM.\n");
         printf("b->top: %d, actual top: %d\n", b->top, find_top(b, MAX_BIGNUM_WORDS));
-        // Print bn value
-        bn_print("b: ", b);
     }
+    bn_print("a: ", a);
+    bn_print("b: ", b);
 
     // If one is negative and the other is positive, it's essentially an addition.
     if (a->neg != b->neg) {
         result->neg = a->neg; // The sign will be the same as the sign of 'a'.
         absolute_add(result, a, b); // Perform the addition of magnitudes here because signs are different.
+        bn_print("result: ", result);
         return;
     }
 
@@ -383,6 +383,7 @@ __device__ void bn_subtract(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
     if (result->top == 0) { 
         // Handle underflow if needed. 
     }
+    bn_print("result: ", result);
 }
 
 /*__device__ void bn_subtract_v0(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
@@ -1240,6 +1241,12 @@ __device__ void point_double(EC_POINT *P, EC_POINT *R, BIGNUM *p) {
 }
 
 __device__ bool bn_is_zero(BIGNUM *a) {
+    // Check a top
+    int top = find_top(a, MAX_BIGNUM_WORDS);
+    if (top != a->top) {
+        printf("bn_is_zero: top is not correct\n");
+        printf("a->top: %d, actual top: %d\n", a->top, top);
+    }
     for (int i = 0; i < a->top; ++i) {
         if (a->d[i] != 0) {
             return false;
@@ -2360,29 +2367,26 @@ __device__ void bn_mod_inverse_7(BIGNUM *inverse, BIGNUM *a, BIGNUM *n) {
         
         // Update Y = Y - D * X.
         bn_mul(&D, &X, &M); // M = D * X, where M will now hold the product
-        printf("0: Y.top: %d\n", Y.top);
+        // printf("0: Y.top: %d\n", Y.top);
         if (sign < 0) {
             bn_add(&Y, &Y, &M); // Y = Y + M
-            printf("1: Y.top: %d\n", Y.top);
+            //printf("1: Y.top: %d\n", Y.top);
         } else {
-            printf("Subtracting Y - M (Y.top: %d, M.top: %d)\n", Y.top, M.top);
+            /*printf("Subtracting Y - M (Y.top: %d, M.top: %d)\n", Y.top, M.top);
             bn_print("Y:", &Y);
-            bn_print("M:", &M);
+            bn_print("M:", &M);*/
             init_zero(&tmp, MAX_BIGNUM_WORDS);
             bn_subtract(&tmp, &Y, &M); // Y = Y - M
             bn_cmp(&Y, &tmp);
-            printf("2: Y.top: %d\n", Y.top);
         }
         
 
         bn_copy(&M, &X);         // M = X
-        printf("Y.top: %d\n", Y.top);
-        printf("X.top: %d\n", X.top);
-        bn_copy(&X, &Y);         // X = Y // INCORRECT TOP INT THE SOURCE
-        // return; // TODO: Remove this line
+        bn_copy(&X, &Y);         // X = Y
         bn_copy(&Y, &M);         // Y = M
-        bn_mod(&Y, &Y, n);       // Y = Y % n
-        //bn_mod(&Y, &Y, n);       // Y = Y % n
+        init_zero(&tmp, MAX_BIGNUM_WORDS);
+        bn_mod(&tmp, &Y, n);       // Y = Y % n
+        bn_copy(&Y, &tmp);
         
         sign = -sign;
         // Debug prints to watch variables at significant points
@@ -2403,8 +2407,9 @@ __device__ void bn_mod_inverse_7(BIGNUM *inverse, BIGNUM *a, BIGNUM *n) {
         bn_subtract(&tmp, n, &Y); // Y = n - Y to make Y positive
         bn_copy(&Y, &tmp);
     }
-    bn_mod(&Y, &Y, n); // Y = Y % n
-    //bn_mod(&Y, &Y, n); // Y = Y % n
+    init_zero(&tmp, MAX_BIGNUM_WORDS);
+    bn_mod(&tmp, &Y, n); // Y = Y % n
+    bn_copy(&Y, &tmp);
 
     // Check if inverse exists (A should be 1).
     if (!bn_is_one(&A)) {
@@ -2422,9 +2427,9 @@ __device__ void bn_mod_inverse_7(BIGNUM *inverse, BIGNUM *a, BIGNUM *n) {
     // Optionally, print the modular inverse.
     if (!pnoinv) {
         if (inverse) {
-            bn_print("Modular Inverse:", inverse);
+            bn_print("i: Modular Inverse:", inverse);
         } else {
-            bn_print("Modular Inverse:", &R);
+            bn_print("r: Modular Inverse:", &R);
         }
     }
 }

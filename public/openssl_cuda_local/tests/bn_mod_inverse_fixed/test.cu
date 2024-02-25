@@ -13,25 +13,26 @@ __global__ void test_mod_inverse_kernel() {
 
     // Test values for 'a'
     BN_ULONG test_values_a[] = {
-        0x3ULL           // Test Case 1
-        /*0x64ULL,          // Test Case 2: 100 in decimal
+        0x3ULL,           // Test Case 1
+        0x64ULL,          // Test Case 2: 100 in decimal
         0x1ULL,           // Test Case 3
         0x4ULL,           // Test Case 4
         0x100003ULL,       // Test Case 5: Simplified large number for demonstration
-        0x123456789ABCDEFULL // Test Case 6: Large prime number*/
+        0x123456789ABCDEFULL // Test Case 6: Large prime number
     };
 
     // 'n' values (ensure these are real prime numbers for valid tests, except where prime is not required)
     BN_ULONG test_values_n[] = {
-        0xBULL           // Test Case 1: 11 in decimal
-        /*0x65ULL,          // Test Case 2: 101 in decimal
+        0xBULL,           // Test Case 1: 11 in decimal
+        0x65ULL,          // Test Case 2: 101 in decimal
         0xDULL,           // Test Case 3: 13 in decimal
         0x8ULL,           // Test Case 4: Non-prime, to show no inverse exists
         0x100019ULL,       // Test Case 5: Simplified large prime number for demonstration
-        0xFEDCBA987654323ULL // Test Case 6: Large prime number*/
+        0xFEDCBA987654323ULL // Test Case 6: Large prime number
     };
 
-    int num_tests = sizeof(test_values_a) / sizeof(test_values_a[0]);
+    // int num_tests = sizeof(test_values_a) / sizeof(test_values_a[0]);
+    int num_tests = 1;
 
     for (int test = 0; test < num_tests; ++test) {
         // Check for errors and print results
@@ -43,8 +44,8 @@ __global__ void test_mod_inverse_kernel() {
         init_zero(&inverse, MAX_BIGNUM_WORDS);
 
         // Print tops
-        printf("a->top: %d\n", a.top);
-        printf("n->top: %d\n", n.top);
+        //printf("a->top: %d\n", a.top);
+        //printf("n->top: %d\n", n.top);
 
         // Initialize 'a' and 'n' with the test values
         a.d[0] = test_values_a[test];
@@ -55,8 +56,8 @@ __global__ void test_mod_inverse_kernel() {
         n.top = find_top(&n, MAX_BIGNUM_WORDS);
 
         // Print tops
-        printf("a->top: %d\n", a.top);
-        printf("n->top: %d\n", n.top);
+        //printf("a->top: %d\n", a.top);
+        //printf("n->top: %d\n", n.top);
 
         bn_print("a: ", &a);
         bn_print("n: ", &n);
