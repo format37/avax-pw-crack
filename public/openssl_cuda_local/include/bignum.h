@@ -215,18 +215,34 @@ __device__ int bn_cmp_one(BIGNUM* a) {
 
 // Helper function to perform a deep copy of BIGNUM
 __device__ void bn_copy(BIGNUM *dest, BIGNUM *src) {
-    // printf("bn_copy");
-    if (dest == nullptr || src == nullptr) return;
+    //printf("bn_copy from src to dest\n");
+    //bn_print("[0] src: ", src);
+    //bn_print("[0] dest: ", dest);
 
-    // Check top
+    // Init dst as zero
+    init_zero(dest, MAX_BIGNUM_WORDS);
+    // Set dst top to 1
+    dest->top = 1;
+    // Set dst neg to 0
+    dest->neg = 0;
+
+    if (dest == nullptr || src == nullptr) {
+        printf("### bn_copy ### Error: Destination or source BIGNUM is null.\n");
+        return;
+    }
+
+    // Check src top
     int top = find_top(src, MAX_BIGNUM_WORDS);
     if (top != src->top) {
-        printf("### bn_copy ### Error: Top is not set correctly in the source BIGNUM.\n");
+        printf("### bn_copy ### Error: SRC Top is not set correctly in the source BIGNUM.\n");
         printf("src->top: %d, actual top: %d\n", src->top, top);
         src->top = top;
         // Print bn value
         bn_print("src: ", src);
     }
+
+    //bn_print("[1] src: ", src);
+    //bn_print("[1] dest: ", dest);
 
     // Copy the neg and top fields
     dest->neg = src->neg;
@@ -242,6 +258,17 @@ __device__ void bn_copy(BIGNUM *dest, BIGNUM *src) {
     for (int i = src->top; i < dest->top; i++) {
         dest->d[i] = 0;
     }
+    // Check dst top
+    top = find_top(dest, MAX_BIGNUM_WORDS);
+    if (top != dest->top) {
+        printf("### bn_copy ### Error: DST Top is not set correctly in the destination BIGNUM.\n");
+        printf("dest->top: %d, actual top: %d\n", dest->top, top);
+        dest->top = top;
+        // Print bn value
+        bn_print("dest: ", dest);
+    }
+    //bn_print("[2] src: ", src);
+    //bn_print("[2] dest: ", dest);
 }
 
 __device__ void absolute_add(BIGNUM *result, const BIGNUM *a, const BIGNUM *b) {
@@ -315,6 +342,19 @@ __device__ void absolute_subtract(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
 
 __device__ void bn_subtract(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
     printf("bn_subtract\n");
+    // Check tops
+    if (find_top(a, MAX_BIGNUM_WORDS) != a->top) {
+        printf("### bn_cmp_abs ### Error: Top is not set correctly in the source BIGNUM.\n");
+        printf("a->top: %d, actual top: %d\n", a->top, find_top(a, MAX_BIGNUM_WORDS));
+        // Print bn value
+        bn_print("a: ", a);
+    }
+    if (find_top(b, MAX_BIGNUM_WORDS) != b->top) {
+        printf("### bn_cmp_abs ### Error: Top is not set correctly in the source BIGNUM.\n");
+        printf("b->top: %d, actual top: %d\n", b->top, find_top(b, MAX_BIGNUM_WORDS));
+        // Print bn value
+        bn_print("b: ", b);
+    }
 
     // If one is negative and the other is positive, it's essentially an addition.
     if (a->neg != b->neg) {
@@ -1840,6 +1880,10 @@ __device__ int bn_divide_rev2(BIGNUM *quotient, BIGNUM *remainder, BIGNUM *divid
     quotient->neg = dividend->neg ^ divisor->neg;
     remainder->neg = dividend->neg;
 
+    // Update tops using find_top
+    quotient->top = find_top(quotient, MAX_BIGNUM_WORDS);
+    remainder->top = find_top(remainder, MAX_BIGNUM_WORDS);
+
     return 1;
 }
 
@@ -2306,6 +2350,7 @@ __device__ void bn_mod_inverse_7(BIGNUM *inverse, BIGNUM *a, BIGNUM *n) {
     Y.top = a->top;
     
     // Main loop of Extended Euclidean Algorithm.
+    int debug_counter = 0;
     while (!bn_is_zero(&B)) {
         bn_divide_rev2(&D, &M, &A, &B); // D = A / B, M = A % B
 
@@ -2314,7 +2359,7 @@ __device__ void bn_mod_inverse_7(BIGNUM *inverse, BIGNUM *a, BIGNUM *n) {
         bn_copy(&B, &M);
         
         // Update Y = Y - D * X.
-        bn_mul(&M, &D, &X); // M = D * X
+        bn_mul(&D, &X, &M); // M = D * X, where M will now hold the product
         printf("0: Y.top: %d\n", Y.top);
         if (sign < 0) {
             bn_add(&Y, &Y, &M); // Y = Y + M
@@ -2323,6 +2368,7 @@ __device__ void bn_mod_inverse_7(BIGNUM *inverse, BIGNUM *a, BIGNUM *n) {
             printf("Subtracting Y - M (Y.top: %d, M.top: %d)\n", Y.top, M.top);
             bn_print("Y:", &Y);
             bn_print("M:", &M);
+            init_zero(&tmp, MAX_BIGNUM_WORDS);
             bn_subtract(&tmp, &Y, &M); // Y = Y - M
             bn_cmp(&Y, &tmp);
             printf("2: Y.top: %d\n", Y.top);
@@ -2333,7 +2379,7 @@ __device__ void bn_mod_inverse_7(BIGNUM *inverse, BIGNUM *a, BIGNUM *n) {
         printf("Y.top: %d\n", Y.top);
         printf("X.top: %d\n", X.top);
         bn_copy(&X, &Y);         // X = Y // INCORRECT TOP INT THE SOURCE
-        return; // TODO: Remove this line
+        // return; // TODO: Remove this line
         bn_copy(&Y, &M);         // Y = M
         bn_mod(&Y, &Y, n);       // Y = Y % n
         //bn_mod(&Y, &Y, n);       // Y = Y % n
@@ -2344,12 +2390,16 @@ __device__ void bn_mod_inverse_7(BIGNUM *inverse, BIGNUM *a, BIGNUM *n) {
         bn_print("Updated B:", &B);
         bn_print("Updated X:", &X);
         bn_print("Updated Y:", &Y);
-        printf("### bn_mod_inverse_7 ###\n");
-        break;
+        /*debug_counter++;
+        if (debug_counter > 3) {
+            printf("bn_mod_inverse_7: Debug counter exceeded.\n");
+            break; // TODO: Remove this line
+        }*/
     }
     
     // Final adjustments.
     if (sign < 0) {
+        init_zero(&tmp, MAX_BIGNUM_WORDS);
         bn_subtract(&tmp, n, &Y); // Y = n - Y to make Y positive
         bn_copy(&Y, &tmp);
     }
