@@ -42,9 +42,21 @@ __global__ void test_mod_inverse_kernel() {
         init_zero(&n, MAX_BIGNUM_WORDS);
         init_zero(&inverse, MAX_BIGNUM_WORDS);
 
+        // Print tops
+        printf("a->top: %d\n", a.top);
+        printf("n->top: %d\n", n.top);
+
         // Initialize 'a' and 'n' with the test values
         a.d[0] = test_values_a[test];
         n.d[0] = test_values_n[test];
+
+        // Find tops
+        a.top = find_top(&a, MAX_BIGNUM_WORDS);
+        n.top = find_top(&n, MAX_BIGNUM_WORDS);
+
+        // Print tops
+        printf("a->top: %d\n", a.top);
+        printf("n->top: %d\n", n.top);
 
         bn_print("a: ", &a);
         bn_print("n: ", &n);

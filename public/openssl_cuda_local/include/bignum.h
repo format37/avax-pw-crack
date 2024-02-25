@@ -48,7 +48,7 @@ __device__ int find_top(BIGNUM *bn, int max_words) {
         }
     }
     // printf(">> find_top returning 0\n");
-    return 0; // If all words are zero, the top is 0
+    return 1; // If all words are zero, the top is 0
 }
 
 __device__ void debug_printf(const char *fmt, ...) {
