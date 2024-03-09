@@ -12,12 +12,13 @@ int main() {
 
     // Expanded Test values for 'dividend' and 'divisor' with accurate multi-word representation
     char* test_values_dividend[] = {
-        "1", // 1
+        "10000000000000005", // 1
         "F", // 2
         "F", // 3
         "17", // 4
         "1234567890ABCDEF", // 5
-        "1234567890ABCDEF1234567890ABCDEF"  // 6
+        "1234567890ABCDEF7234567890ABCDEF",  // 6
+        "B"
     };
 
     char* test_values_divisor[] = {
@@ -26,7 +27,8 @@ int main() {
         "1", // 3
         "5", // 4 
         "1", // 5
-        "2"  // 6
+        "2",  // 6
+        "3"
     };
 
     int num_tests = sizeof(test_values_dividend) / sizeof(test_values_dividend[0]);
@@ -42,7 +44,6 @@ int main() {
         BN_hex2bn(&divisor, test_values_divisor[test]);
 
         BN_div(quotient, remainder, dividend, divisor, ctx);
-
         
         print_bn("Dividend", dividend);
         print_bn("Divisor", divisor);

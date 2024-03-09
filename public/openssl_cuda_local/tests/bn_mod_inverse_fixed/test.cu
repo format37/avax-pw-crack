@@ -55,6 +55,10 @@ __global__ void test_mod_inverse_kernel() {
         a.top = find_top(&a, MAX_BIGNUM_WORDS);
         n.top = find_top(&n, MAX_BIGNUM_WORDS);
 
+        // Set neg
+        a.neg = 0;
+        n.neg = 0;
+
         // Print tops
         //printf("a->top: %d\n", a.top);
         //printf("n->top: %d\n", n.top);
