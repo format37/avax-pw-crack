@@ -8,9 +8,10 @@ from typos import Typos
 from Crypto.Hash import RIPEMD160
 import json
 import os
+import time
 import bip_utils
 print('bip_utils.__path__:', bip_utils.__path__)
-# exit()
+
 
 class Wallet(object):
     def __init__(self, mnemonic: str):
@@ -187,4 +188,8 @@ if __name__ == "__main__":
     wallet = Wallet(mnemonic)
     lowercase = False
     typos = Typos(best_guess, max_edit_distance=2, lowercase=lowercase)
-    print(guess_avaxp_address(typos, wallet, expected_avaxp_addresses))
+    start_time = time.time()
+    result = guess_avaxp_address(typos, wallet, expected_avaxp_addresses)
+    end_time = time.time()
+    print('result:', result)
+    print('Time elapsed:', end_time - start_time)
