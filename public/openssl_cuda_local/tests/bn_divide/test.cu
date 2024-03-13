@@ -21,7 +21,10 @@ __global__ void test_div(BN_ULONG *A, BN_ULONG *B) {
         divisor.d[i] = B[i];
     }
     bn_print("# dividend : ", &dividend);
+    //printf("dividend top: %d\n", dividend.top);
     bn_print("# divisor  : ", &divisor);
+    //printf("divisor top: %d\n", divisor.top);
+
     
     // Test division
     success = bn_div(&quotient, &remainder, &dividend, &divisor);
@@ -33,7 +36,9 @@ __global__ void test_div(BN_ULONG *A, BN_ULONG *B) {
         printf("Failure\n");
     }
     bn_print("# quotient : ", &quotient);
+    printf("quotient top: %d\n", quotient.top);
     bn_print("# remainder: ", &remainder);
+    printf("remainder top: %d\n", remainder.top);
 }
 
 // Main function

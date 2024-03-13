@@ -1969,8 +1969,8 @@ __device__ int bn_div(BIGNUM *quotient, BIGNUM *remainder, BIGNUM *dividend, BIG
     convert_to_binary_array(dividend->d, binary_dividend, MAX_BIGNUM_WORDS);
     convert_to_binary_array(divisor->d, binary_divisor, MAX_BIGNUM_WORDS);
 
-    binary_print_big_endian(">> binary_dividend", binary_dividend, total_bits);
-    binary_print_big_endian(">> binary_divisor", binary_divisor, total_bits);
+    //binary_print_big_endian(">> binary_dividend", binary_dividend, total_bits);
+    //binary_print_big_endian(">> binary_divisor", binary_divisor, total_bits);
 
     // Call the binary division function
     // bn_div_binary(binary_dividend, binary_divisor, binary_quotient, binary_remainder);
@@ -1985,8 +1985,8 @@ __device__ int bn_div(BIGNUM *quotient, BIGNUM *remainder, BIGNUM *dividend, BIG
         );
 
     //bn_print_quotient("<< binary_quotient", quotient);
-    binary_print_big_endian("<< binary_quotient", binary_quotient, total_bits);
-    binary_print_big_endian("<< binary_remainder", binary_remainder, total_bits);
+    //binary_print_big_endian("<< binary_quotient", binary_quotient, total_bits);
+    //binary_print_big_endian("<< binary_remainder", binary_remainder, total_bits);
 
     // Fix the 'top' fields of quotient and remainder
     quotient->top = get_bn_top_from_binary_array(binary_quotient, total_bits);
