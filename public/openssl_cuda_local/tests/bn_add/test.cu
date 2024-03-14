@@ -2,152 +2,107 @@
 #include <cuda_runtime.h>
 #include "bignum.h"
 
-// Define your BIGNUM structure based on your project definitions
-/*#define MAX_BIGNUM_WORDS 20
-#define BN_ULONG unsigned long long int
-#define BN_ULONG_NUM_BITS (sizeof(BN_ULONG) * 8)*/
+__global__ void kernel_test(BN_ULONG *A, BN_ULONG *B, int *sign_a, int *sign_b) {
+    int success = 0;
+    // Initialize values for each test
+    BIGNUM a, b, result;
+    init_zero(&a, MAX_BIGNUM_WORDS);
+    init_zero(&b, MAX_BIGNUM_WORDS);
+    init_zero(&result, MAX_BIGNUM_WORDS);
 
-// Function prototypes for the bn_add function test
-// __device__ void bn_add(BIGNUM *a, BIGNUM *b, BIGNUM *r);
+    a.top = MAX_BIGNUM_WORDS;
+    b.top = MAX_BIGNUM_WORDS;
+    result.top = MAX_BIGNUM_WORDS;
 
-// Test kernel for bn_add
-__global__ void testKernel() {
-    printf("++ testKernel for bn_add ++\n");
-
-    // Set the maximum number of test cases
-    const int num_tests = 7;
-
-    // 10 + -5 = 5 # sub 10 - 5
-    // 10 + -10 = 0 # sub 10 - 10
-    // 10 + -15 = -5 # sub 15 - 10
-    // -10 + -5 = -15 # add 10 + 5
-    // -10 + 5 = -5 # sub 10 - 5
-    // -10 + 15 = 5 # sub 15 - 10
-
-    // Test values for 'a' and 'b'
-    BN_ULONG test_values_a[num_tests][MAX_BIGNUM_WORDS] = {
-        {0x1},
-        {0xFFFFFFFFFFFFFFFF},
-        {0x0, 0x1}, // Representing 1 << 64 (2^64)
-        {0x0, 0xFFFFFFFFFFFFFFFF}, // test 4
-        {0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF}, // test 5: -1 in two's complement (two words)
-        {0x1, 0xFFFFFFFFFFFFFFFF}, // test 6: Negative number with two words
-        {0x1, 0x0} // test 7
-    };
-
-    BN_ULONG test_values_b[num_tests][MAX_BIGNUM_WORDS] = {
-        {0x2},
-        {0x1},
-        {0x0, 0x2}, // Representing 2 << 64 (2^65)
-        {0xFFFFFFFFFFFFFFFF, 0x1}, // test 4
-        {0x1, 0x0}, // test 5: -1 in two's complement (two words)
-        {0xFFFFFFFFFFFFFFFF, 0x0}, // test 6
-        {0xFFFFFFFFFFFFFFFE, 0xFFFFFFFFFFFFFFFF} // test 7: -2 in two's complement (two words)
-    };
-
-    int bn_signs_a[num_tests] = {
-        0, //test 1
-        0, //test 2
-        0, //test 3
-        0, //test 4
-        0, //test 5
-        1, //test 6
-        0 //test 7
-    };
-
-    int bn_signs_b[num_tests] = {
-        0, //test 1
-        0, //test 2
-        0, //test 3
-        0, //test 4
-        1, //test 5
-        0, //test 6
-        1 //test 7
-    };
-    /*
-    // Test values for 'a' and 'b'
-    BN_ULONG test_values_a[num_tests][MAX_BIGNUM_WORDS] = {
-        {0xA}, // 10
-        {0xA}, // 10
-        {0xF}, // 15
-        {0xA}, // -10 (by sign)
-        {0xA}, // -10 (by sign)
-        {0xA}  // -10 (by sign)
-    };
-    // Signs for 'a' and 'b'
-    int bn_signs_a[num_tests] = {
-        0, // +10
-        0, // +10
-        0, // +15
-        1, // -10
-        1, // -10
-        1  // -10
-    };
-
-    BN_ULONG test_values_b[num_tests][MAX_BIGNUM_WORDS] = {
-        {0x5}, // -5 (by sign)
-        {0xA}, // -10 (by sign)
-        {0xA}, // 10
-        {0x5}, // -5 (by sign)
-        {0x5}, // 5
-        {0xF}  // 15
-    };
-
-    int bn_signs_b[num_tests] = {
-        1, // -5
-        1, // -10
-        0, // +10
-        1, // -5
-        0, // +5
-        0  // +15
-    };*/
-
-
-    // Initialize 'a' and 'b' with test values for each test
-    for (int test = 0; test < num_tests; ++test) {
-        printf("\nTest %d:\n", test + 1);
-
-        BIGNUM a, b, result;
-        init_zero(&a, MAX_BIGNUM_WORDS);
-        init_zero(&b, MAX_BIGNUM_WORDS);
-        init_zero(&result, MAX_BIGNUM_WORDS);
-
-        // Assign test values to 'a' and 'b', and initialize top accordingly
-        for (int i = 0; i < MAX_BIGNUM_WORDS; ++i) {
-            a.d[i] = test_values_a[test][i];
-            a.neg = bn_signs_a[test];
-            b.d[i] = test_values_b[test][i];
-            b.neg = bn_signs_b[test];
-        }
-        a.top = find_top(&a, MAX_BIGNUM_WORDS);
-        b.top = find_top(&b, MAX_BIGNUM_WORDS);
-
-        // Test addition
-        bn_add(&result, &a, &b);
-
-        // Print results
-        bn_print("a     : ", &a);
-        bn_print("b     : ", &b);
-        bn_print("result: ", &result);
+    // Assign test values and initialize top accordingly
+    for (int i = 0; i < MAX_BIGNUM_WORDS; ++i) {
+        a.d[i] = A[i];
+        b.d[i] = B[i];
     }
 
-    printf("-- Finished testKernel for bn_add --\n");
+    // Set the sign of the numbers
+    a.neg = sign_a[0];
+    b.neg = sign_b[0];
+
+    bn_print("# a : ", &a);
+    bn_print("# b  : ", &b);
+
+    // Test
+    bn_add(&result, &a, &b);
+
+    // Print results
+    bn_print("# result: ", &result);
+    printf("top: %d\n", result.top);
 }
 
 // Main function
 int main() {
-    printf("Starting bn_add test\n");
-    // Launch the kernel to run the test
-    testKernel<<<1, 1>>>();
-    
-    // Check for any errors after running the kernel
-    cudaError_t err = cudaGetLastError();
-    if (err != cudaSuccess) {
-        printf("Error: %s\n", cudaGetErrorString(err));
-        return -1;
+    BN_ULONG test_values_a[][MAX_BIGNUM_WORDS] = {
+        {0xffffffffffffffff, 0xffffffffffffffff, 0,0}, // 0
+        {0,0,0,0x1}, // 1
+        {0xffffffffffffffff, 0,0,0}, // 2
+        {0xffffffffffffffff, 0xffffffffffffffff, 0,0}, // 3
+        {0x1234567890abcdef, 0,0,0}, // 4
+        {0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff}, // 5
+        {0x1234567890abcdef, 0,0,0}, // 6
+        {0x1234567890abcdef, 0,0,0}, // 7
+        {0x1234567890abcdef, 0,0,0}, // 8
+        {0x1234567890abcdef, 0,0,0}  // 9
+    };
+
+    BN_ULONG test_values_b[][MAX_BIGNUM_WORDS] = {
+        {0x1, 0,0,0}, // 0
+        {0,0,0,0x2}, // 1
+        {0x1, 0,0,0}, // 2
+        {0x1, 0,0,0}, // 3
+        {0,0,0,0}, // 4
+        {0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff}, // 5
+        {0x5678901234567890, 0,0,0}, // 6
+        {0x5678901234567890, 0,0,0}, // 7
+        {0xfedcba0987654321, 0,0,0}, // 8
+        {0xfedcba0987654321, 0,0,0}  // 9
+    };
+
+    // Set sign to 0 for positive numbers, 1 for negative numbers
+    int sign_a[] = {0, 0, 0, 0, 0, 0, 0, 1, 0, 0};
+    int sign_b[] = {0, 0, 0, 0, 0, 0, 0, 1, 0, 1};
+
+    int num_tests = sizeof(test_values_a) / sizeof(test_values_a[0]);
+
+    printf("\n\n### CUDA test:\n");
+
+    BN_ULONG *d_A, *d_B;
+    int *d_sign_a, *d_sign_b;
+    cudaMalloc((void**)&d_A, MAX_BIGNUM_WORDS * sizeof(BN_ULONG));
+    cudaMalloc((void**)&d_B, MAX_BIGNUM_WORDS * sizeof(BN_ULONG));
+    cudaMalloc((void**)&d_sign_a, sizeof(int));
+    cudaMalloc((void**)&d_sign_b, sizeof(int));
+
+    for (int i = 0; i < num_tests; i++) {
+        printf("\nTest %d:\n", i);
+
+        cudaMemcpy(d_A, test_values_a[i], MAX_BIGNUM_WORDS * sizeof(BN_ULONG), cudaMemcpyHostToDevice);
+        cudaMemcpy(d_B, test_values_b[i], MAX_BIGNUM_WORDS * sizeof(BN_ULONG), cudaMemcpyHostToDevice);
+        cudaMemcpy(d_sign_a, &sign_a[i], sizeof(int), cudaMemcpyHostToDevice);
+        cudaMemcpy(d_sign_b, &sign_b[i], sizeof(int), cudaMemcpyHostToDevice);
+
+        // Launch the kernel to run the test
+        kernel_test<<<1, 1>>>(d_A, d_B, d_sign_a, d_sign_b);
+
+        // Check for any errors after running the kernel
+        cudaError_t err = cudaGetLastError();
+        if (err != cudaSuccess) {
+            printf("Error: %s\n", cudaGetErrorString(err));
+            //return -1;
+        }
+
+        // Wait for GPU to finish before accessing on host
+        cudaDeviceSynchronize();
     }
-    
-    // Wait for GPU to finish before accessing on host
-    cudaDeviceSynchronize();
+
+    cudaFree(d_A);
+    cudaFree(d_B);
+    cudaFree(d_sign_a);
+    cudaFree(d_sign_b);
     return 0;
 }
