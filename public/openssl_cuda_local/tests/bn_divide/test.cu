@@ -1,3 +1,4 @@
+//bn_div_test.cu
 #include <stdio.h>
 #include <cuda_runtime.h>
 #include "bignum.h"
@@ -36,9 +37,9 @@ __global__ void test_div(BN_ULONG *A, BN_ULONG *B) {
         printf("Failure\n");
     }
     bn_print("# quotient : ", &quotient);
-    printf("quotient top: %d\n", quotient.top);
+    //printf("quotient top: %d\n", quotient.top);
     bn_print("# remainder: ", &remainder);
-    printf("remainder top: %d\n", remainder.top);
+    //printf("remainder top: %d\n", remainder.top);
 }
 
 // Main function
