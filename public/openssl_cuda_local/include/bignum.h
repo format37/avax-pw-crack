@@ -1721,7 +1721,8 @@ __device__ void convert_back_to_bn_ulong(int binary[], BN_ULONG value[], int wor
     for (int word = 0; word < words; ++word) {
         value[word] = 0;
         for (int i = 0; i < BN_ULONG_NUM_BITS; ++i) {
-            value[word] |= ((BN_ULONG)binary[word * BN_ULONG_NUM_BITS + (BN_ULONG_NUM_BITS - 1 - i)] << i);
+            //value[word] |= ((BN_ULONG)binary[word * BN_ULONG_NUM_BITS + (BN_ULONG_NUM_BITS - 1 - i)] << i);
+            value[words-word-1] |= ((BN_ULONG)binary[word * BN_ULONG_NUM_BITS + (BN_ULONG_NUM_BITS - 1 - i)] << i);
         }
     }
 }
@@ -2005,7 +2006,15 @@ __device__ int bn_div(BIGNUM *quotient, BIGNUM *remainder, BIGNUM *dividend, BIG
     // printf("\n# binary remainder top: %d\n", remainder->top);
 
     // Convert the binary arrays back to BIGNUMs
+    quotient->top = MAX_BIGNUM_WORDS;
     convert_back_to_bn_ulong(binary_quotient, quotient->d, quotient->top);
+    // Reverse words in the quotient
+    /*
+    for (int i = 0; i < quotient->top / 2; i++) {
+        BN_ULONG temp = quotient->d[i];
+        quotient->d[i] = quotient->d[quotient->top - i - 1];
+        quotient->d[quotient->top - i - 1] = temp;
+    }*/
     convert_back_to_bn_ulong(binary_remainder, remainder->d, remainder->top);
 
     //bn_print("\n<< quotient: ", quotient);
