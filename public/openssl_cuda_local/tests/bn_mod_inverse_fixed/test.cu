@@ -28,10 +28,10 @@ __global__ void test(BN_ULONG *A, BN_ULONG *N) {
 // Main function
 int main() {
     BN_ULONG test_values_a[][MAX_BIGNUM_WORDS] = {
-        {0,0,0,0x3}, // 0
+        {0x3,0,0,0}, // 0
     };
     BN_ULONG test_values_n[][MAX_BIGNUM_WORDS] = {
-        {0,0,0,0xB}, // 0
+        {0xB,0,0,0}, // 0
     };
     int num_tests = sizeof(test_values_a) / sizeof(test_values_a[0]);
 

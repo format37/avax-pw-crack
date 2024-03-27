@@ -28,25 +28,25 @@ __global__ void testKernel() {
     };*/
     // Test values for 'a' (dividends)
     BN_ULONG test_values_a[][TEST_BIGNUM_WORDS] = {
-        {0, 0x3ULL},                             // Test Case 1: Small positive number
+        {0x3ULL,0},                             // Test Case 1: Small positive number
         {0x64ULL},                            // Test Case 2: Medium positive number
         {0xFFFFFFFFFFFFFFFFULL},              // Test Case 3: Max unsigned 64-bit integer
         {0x0ULL},                             // Test Case 4: Zero
-        {0x0ULL, 0x1ULL},                     // Test Case 5: Large number spanning two words
+        {0x1ULL,0x0ULL},                     // Test Case 5: Large number spanning two words
         {0x123456789ABCDEFULL},               // Test Case 6: Large positive number
-        {0xFFFFFFFFFFFFFFFFULL, 0x1ULL},      // Test Case 7: Very large number just over one word size
+        {0x1ULL,0xFFFFFFFFFFFFFFFFULL},      // Test Case 7: Very large number just over one word size
         {0x1ULL}                              // Test Case 8: Division by zero, should return 0
     };
 
     // 'n' values (divisors)
     BN_ULONG test_values_n[][TEST_BIGNUM_WORDS] = {
-        {0, 0xBULL},                             // Test Case 1: Small prime number
+        {0xBULL,0},                             // Test Case 1: Small prime number
         {0x65ULL},                            // Test Case 2: Composite number slightly larger than a
         {0x100000000ULL},                     // Test Case 3: Small power of 2 (larger than 64-bit values)
         {0x2ULL},                             // Test Case 4: Smallest even prime (edge case for even divisor)
-        {0x0ULL, 0x1ULL},                     // Test Case 5: Large prime spanning two words
+        {0x1ULL,0x0ULL},                     // Test Case 5: Large prime spanning two words
         {0xFEDCBA987654323ULL},               // Test Case 6: Large prime number
-        {0x100000000ULL, 0x1ULL},             // Test Case 7: Larger power of 2 spanning two words
+        {0x1ULL,0x100000000ULL},             // Test Case 7: Larger power of 2 spanning two words
         {0x0ULL}                              // Test Case 8: Division by zero, should return 0
     };
 

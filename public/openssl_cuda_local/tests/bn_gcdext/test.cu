@@ -22,6 +22,7 @@ __global__ void testKernel() {
     int sign_a[] = {0, 0, 0}; // Signs for 'a'
     int sign_b[] = {0, 0, 0}; // Signs for 'b'*/
     BN_ULONG test_values_a[][TEST_BIGNUM_WORDS] = {
+        {0x3,0},
         {0x123456789ABCDEFULL, 0x0}, // Original example 1
         {0x1FFF3ULL, 0x0}, // Original example 2
         {0xFEDCBA9876543210ULL, 0x0}, // Original example 3
@@ -31,6 +32,7 @@ __global__ void testKernel() {
     };
 
     BN_ULONG test_values_b[][TEST_BIGNUM_WORDS] = {
+        {0xb,0},
         {0xFEDCBA987654321ULL, 0x0}, // Original example 1
         {0x2468ACEULL, 0x0}, // Original example 2
         {0xFEDCBA9876543210ULL, 0x0}, // Original example 3
@@ -41,18 +43,18 @@ __global__ void testKernel() {
 
     // int sign_a[] = {0, 0, 0, 0, 0}; // Signs for 'a', add -1 for negative numbers as needed
     // int sign_b[] = {0, 0, 0, 0, 0}; // Signs for 'b', add -1 for negative numbers as needed
-    int sign_a[] = {0, 0, 0, 0, 0, 0}; // Signs for 'a', add -1 for negative numbers as needed    
-    int sign_b[] = {0, 0, 0, 0, 0, 0}; // Signs for 'b', add -1 for negative numbers as needed
+    int sign_a[] = {0, 0, 0, 0, 0, 0, 0}; // Signs for 'a', add -1 for negative numbers as needed    
+    int sign_b[] = {0, 0, 0, 0, 0, 0, 0}; // Signs for 'b', add -1 for negative numbers as needed
     
     int num_tests = sizeof(test_values_a) / (sizeof(BN_ULONG) * TEST_BIGNUM_WORDS);
 
     for (int test = 0; test < num_tests; ++test) {
-        BIGNUM a, b, g;//, s, t;
+        BIGNUM a, b, g, s, t;
         init_zero(&a, TEST_BIGNUM_WORDS);
         init_zero(&b, TEST_BIGNUM_WORDS);
         init_zero(&g, TEST_BIGNUM_WORDS);
-        /*init_zero(&s, TEST_BIGNUM_WORDS);
-        init_zero(&t, TEST_BIGNUM_WORDS);*/
+        init_zero(&s, TEST_BIGNUM_WORDS);
+        init_zero(&t, TEST_BIGNUM_WORDS);
 
         // Initialize 'a' and 'b' with the test values
         for (int j = 0; j < TEST_BIGNUM_WORDS; ++j) {
@@ -65,19 +67,19 @@ __global__ void testKernel() {
         a.neg = sign_a[test];
         b.neg = sign_b[test];
         
-        printf("Test %d:\n", test + 1);
+        printf("\nTest %d:\n", test + 1);
         bn_print("a: ", &a);
         bn_print("b: ", &b);
 
         // Test gcdext
-        //bn_gcdext(&g, &s, &t, &a, &b);
+        bn_gcdext(&g, &s, &t, &a, &b);
         //bn_gcd(&g, &a, &b);
-        bn_gcd(&g, &a, &b);
+        //bn_gcd(&g, &a, &b);
 
         // Print result
         bn_print("gcd: ", &g);
-        /*bn_print("s: ", &s);
-        bn_print("t: ", &t);*/
+        bn_print("s: ", &s);
+        bn_print("t: ", &t);
     }
     printf("-- Finished testKernel for bn_gcdext --\n");
 }

@@ -1147,6 +1147,7 @@ __device__ void bn_lshift_deprecated(BIGNUM *a, int shift) {
 }
 
 __device__ int bn_mod(BIGNUM *r, BIGNUM *a, BIGNUM *n) {
+    printf("++ bn_mod ++\n");
     // int BN_nnmod(BIGNUM *r, const BIGNUM *m, const BIGNUM *d, BN_CTX *ctx)
     BIGNUM q;
     init_zero(&q, MAX_BIGNUM_WORDS);
@@ -1168,6 +1169,7 @@ __device__ int bn_mod(BIGNUM *r, BIGNUM *a, BIGNUM *n) {
     - `ctx` is the context used for memory management during the operation in original OpenSSL implementation.
     */
     // return bn_divide_rev2(&q, r, a, n); // quotient, remainder, 
+    printf("-- bn_mod --\n");
     return bn_div(&q, r, a, n); // quotient, remainder, 
 }
 
@@ -2039,11 +2041,11 @@ __device__ int bn_div(BIGNUM *quotient, BIGNUM *remainder, BIGNUM *dividend, BIG
         quotient->d[quotient->top - i - 1] = temp;
     }
     // Reverse words in the remainder
-    for (int i = 0; i < remainder->top / 2; i++) {
+    /*for (int i = 0; i < remainder->top / 2; i++) {
         BN_ULONG temp = remainder->d[i];
         remainder->d[i] = remainder->d[remainder->top - i - 1];
         remainder->d[remainder->top - i - 1] = temp;
-    }
+    }*/
 
     bn_print("\n<< quotient: ", quotient);
     printf("# bignum quotient top: %d\n", quotient->top);
@@ -2326,7 +2328,7 @@ __device__ int bn_gcd(BIGNUM *r, BIGNUM *a, BIGNUM *b) {
 */
 
 __device__ void bn_gcdext_deprecated(BIGNUM *g, BIGNUM *s, BIGNUM *t, BIGNUM *a, BIGNUM *b_original) {
-    // printf("++ bn_gcdext ++\n");
+    printf("++ bn_gcdext_deprecated ++\n");
 
     // Temporary BIGNUM for b, to avoid modifying the original b
     BIGNUM b_temp;
@@ -2375,7 +2377,7 @@ __device__ void bn_gcdext_deprecated(BIGNUM *g, BIGNUM *s, BIGNUM *t, BIGNUM *a,
     }
 
     // Now g contains gcd(a, b), and s and t contain the Bezout coefficients
-    // printf(" -- bn_gcdext --\n");
+    printf(" -- bn_gcdext_deprecated --\n");
 }
 
 __device__ void swap_bignum_pointers(BIGNUM** a, BIGNUM** b) {
@@ -2385,6 +2387,10 @@ __device__ void swap_bignum_pointers(BIGNUM** a, BIGNUM** b) {
 }
 
 __device__ void bn_gcdext(BIGNUM *g, BIGNUM *s, BIGNUM *t, BIGNUM *a, BIGNUM *b) {
+    printf("\n++ bn_gcdext ++\n");
+    bn_print(">> a: ", a);
+    bn_print(">> b: ", b);
+    printf("\n");
     BIGNUM old_s, old_t, old_r, r, quotient, temp;
     init_zero(&old_s, MAX_BIGNUM_WORDS);
     init_zero(&old_t, MAX_BIGNUM_WORDS);
@@ -2417,6 +2423,10 @@ __device__ void bn_gcdext(BIGNUM *g, BIGNUM *s, BIGNUM *t, BIGNUM *a, BIGNUM *b)
     bn_copy(g, &old_r);
     bn_copy(s, &old_s);
     bn_copy(t, &old_t);
+    bn_print("\n<< g: ", g);
+    bn_print("<< s: ", s);
+    bn_print("<< t: ", t);
+    printf("-- bn_gcdext --\n");
 }
 
 __device__ void bn_mod_inverse(BIGNUM *result, BIGNUM *a, BIGNUM *n) {

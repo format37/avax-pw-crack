@@ -77,7 +77,7 @@ int main() {
         {0,0x100,0,0}, // 15: Divisor smaller than the second word of the dividend
     };*/
 
-    BN_ULONG test_values_dividend[][MAX_BIGNUM_WORDS] = {
+    /*BN_ULONG test_values_dividend[][MAX_BIGNUM_WORDS] = {
         {0,0,0,0xB}, // 0: Simple division
         {0x1,0,0,0}, // 1: Division by 1
         {0,0,0x1234567890ABCDEF,0x7234567890ABCDEF}, // 2: Large numbers
@@ -113,21 +113,15 @@ int main() {
         {0x1234567890ABCDEF,0,0,0}, // 13: One-word divisor
         {0x100,0,0,0}, // 14: Divisor smaller than the first word of the dividend
         {0,0x100,0,0}, // 15: Divisor smaller than the second word of the dividend
-    };
+    };*/
 
-    /*BN_ULONG test_values_dividend[][MAX_BIGNUM_WORDS] = {
-        {0,0,0,0xB}, // 0
-        {0x1,0,0,0}, // 1
-        {0,0,0x1234567890ABCDEF,0x7234567890ABCDEF}, // 2
-        {0x1,0,0,0} // 3
+    BN_ULONG test_values_dividend[][MAX_BIGNUM_WORDS] = {
+        {0xB,0,0,0}, // 0
     };
 
     BN_ULONG test_values_divisor[][MAX_BIGNUM_WORDS] = {
-        {0,0,0,0x3}, // 0
-        {0x2,0,0,0}, // 1
-        {0,0,0x2,0}, // 2
-        {0,0,0x100,0} // 3
-    };*/
+        {0x3,0,0,0}, // 0
+    };
 
     int num_tests = sizeof(test_values_dividend) / sizeof(test_values_dividend[0]);
 

@@ -50,6 +50,7 @@ int main() {
     int sign_a[] = {0, 0, 0}; // Signs for 'a'
     int sign_b[] = {0, 0, 0}; // Signs for 'b'*/
     BN_ULONG test_values_a[][TEST_BIGNUM_WORDS] = {
+        {0,0x3},
         {0x123456789ABCDEFULL, 0x0}, // Original example 1
         {0x1FFF3ULL, 0x0}, // Original example 2
         {0xFEDCBA9876543210ULL, 0x0}, // Original example 3
@@ -59,6 +60,7 @@ int main() {
     };
 
     BN_ULONG test_values_b[][TEST_BIGNUM_WORDS] = {
+        {0,0xb},
         {0xFEDCBA987654321ULL, 0x0}, // Original example 1
         {0x2468ACEULL, 0x0}, // Original example 2
         {0xFEDCBA9876543210ULL, 0x0}, // Original example 3
@@ -67,8 +69,8 @@ int main() {
         {0xFFFFFFFFFFFFFFFFULL, 0x1} // Mixed case: Significantly different values across words
     };
 
-    int sign_a[] = {0, 0, 0, 0, 0, 0}; // Signs for 'a', add -1 for negative numbers as needed
-    int sign_b[] = {0, 0, 0, 0, 0, 0}; // Signs for 'b', add -1 for negative numbers as needed
+    int sign_a[] = {0, 0, 0, 0, 0, 0, 0}; // Signs for 'a', add -1 for negative numbers as needed
+    int sign_b[] = {0, 0, 0, 0, 0, 0, 0}; // Signs for 'b', add -1 for negative numbers as needed
 
     int num_tests = sizeof(test_values_a) / sizeof(test_values_a[0]);
     
@@ -82,8 +84,8 @@ int main() {
             return 1;
         }
 
-        reverse_endian((unsigned char*)test_values_a[i], TEST_BIGNUM_WORDS * sizeof(BN_ULONG));
-        reverse_endian((unsigned char*)test_values_b[i], TEST_BIGNUM_WORDS * sizeof(BN_ULONG));
+        //reverse_endian((unsigned char*)test_values_a[i], TEST_BIGNUM_WORDS * sizeof(BN_ULONG));
+        //reverse_endian((unsigned char*)test_values_b[i], TEST_BIGNUM_WORDS * sizeof(BN_ULONG));
 
         BN_bin2bn((unsigned char*)test_values_a[i], TEST_BIGNUM_WORDS * sizeof(BN_ULONG), a);
         BN_bin2bn((unsigned char*)test_values_b[i], TEST_BIGNUM_WORDS * sizeof(BN_ULONG), b);
