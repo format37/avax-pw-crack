@@ -48,7 +48,7 @@ __global__ void test(BN_ULONG *A, BN_ULONG *B) {
     init_zero(&product, MAX_BIGNUM_WORDS);
     product.top = MAX_BIGNUM_WORDS;
     bn_mul(&quotient, &divisor, &product);
-    bn_print("# product  : ", &product);
+    bn_print("\n Quotient * Divisor = ", &product);
 
     // Compare product with dividend
     if (bn_cmp(&product, &dividend) == 0) {
@@ -56,16 +56,17 @@ __global__ void test(BN_ULONG *A, BN_ULONG *B) {
     } else {
         printf("Product is not equal to dividend\n");
     }
+    printf("\n");
 }
 
 // Main function
 int main() {
     BN_ULONG test_values_dividend[][MAX_BIGNUM_WORDS] = {
-        {0x80,0,0,0}, // 0
+        {0x80,0,0,0}, // Little endian
     };
 
     BN_ULONG test_values_divisor[][MAX_BIGNUM_WORDS] = {
-        {0x4,0,0,0}, // 0
+        {0x4,0,0,0}, // Little endian
     };
 
     int num_tests = sizeof(test_values_dividend) / sizeof(test_values_dividend[0]);

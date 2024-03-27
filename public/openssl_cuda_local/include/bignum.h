@@ -40,6 +40,27 @@ __device__ void bn_print(const char* msg, BIGNUM* a) {
     printf("\n");
 }
 
+__device__ void bn_print_reversed(const char* msg, BIGNUM* a) {
+    printf("%s", msg);
+    if (a->top == 0) {
+        printf("0\n");  // Handle the case where BIGNUM is zero
+        return;
+    }
+    if (a->neg) {
+        printf("-");  // Handle the case where BIGNUM is negative
+    }
+    for (int i = 0; i < a->top; i++) {
+    //for (int i = 0; i < MAX_BIGNUM_WORDS; i++) {
+        // Print words up to top - 1 with appropriate formatting
+        if (i == 0) {
+            printf("%llx", a->d[i]);
+        } else {
+            printf(" %016llx", a->d[i]);
+        }
+    }
+    printf("\n");
+}
+
 __device__ int find_top(BIGNUM *bn, int max_words) {
     for (int i = max_words - 1; i >= 0; i--) {
         // printf(">> find_top [%d]: %llx", i, bn->d[i]);
@@ -140,7 +161,7 @@ __device__ int bn_cmp(BIGNUM* a, BIGNUM* b) {
   if (a_top > b_top) return sign_factor * 1; // Consider sign for magnitude comparison
   // bn_print("[3] bn_cmp a: ", a);
   if (a_top < b_top) return sign_factor * -1;
-  // bn_print("[4] bn_cmp a: ", a);
+  // bn_div(("[4] bn_cmp a: ", a);
     
   // Both numbers have the same number of significant digits, so compare them starting from the most significant digit
   for (int i = a_top; i >= 0; i--) {
@@ -1721,8 +1742,8 @@ __device__ void convert_back_to_bn_ulong(int binary[], BN_ULONG value[], int wor
     for (int word = 0; word < words; ++word) {
         value[word] = 0;
         for (int i = 0; i < BN_ULONG_NUM_BITS; ++i) {
-            //value[word] |= ((BN_ULONG)binary[word * BN_ULONG_NUM_BITS + (BN_ULONG_NUM_BITS - 1 - i)] << i);
-            value[words-word-1] |= ((BN_ULONG)binary[word * BN_ULONG_NUM_BITS + (BN_ULONG_NUM_BITS - 1 - i)] << i);
+            value[word] |= ((BN_ULONG)binary[word * BN_ULONG_NUM_BITS + (BN_ULONG_NUM_BITS - 1 - i)] << i);
+            // value[words-word-1] |= ((BN_ULONG)binary[word * BN_ULONG_NUM_BITS + (BN_ULONG_NUM_BITS - 1 - i)] << i);
         }
     }
 }
@@ -2001,38 +2022,45 @@ __device__ int bn_div(BIGNUM *quotient, BIGNUM *remainder, BIGNUM *dividend, BIG
     // Fix the 'top' fields of quotient and remainder
     quotient->top = get_bn_top_from_binary_array(binary_quotient, total_bits);
     //quotient->top = get_bn_top_from_binary_array_little_endian(binary_quotient, total_bits);
-    // printf("\n# binary quotient top: %d\n", quotient->top);
+    //printf("\n# Total bits: %d\n", total_bits);
+    //printf("\n# binary quotient top: %d\n", quotient->top);
     remainder->top = get_bn_top_from_binary_array(binary_remainder, total_bits);
-    // printf("\n# binary remainder top: %d\n", remainder->top);
+    //printf("\n# binary remainder top: %d\n", remainder->top);
 
     // Convert the binary arrays back to BIGNUMs
     quotient->top = MAX_BIGNUM_WORDS;
     convert_back_to_bn_ulong(binary_quotient, quotient->d, quotient->top);
+    remainder->top = MAX_BIGNUM_WORDS;
+    convert_back_to_bn_ulong(binary_remainder, remainder->d, remainder->top);
     // Reverse words in the quotient
-    /*
     for (int i = 0; i < quotient->top / 2; i++) {
         BN_ULONG temp = quotient->d[i];
         quotient->d[i] = quotient->d[quotient->top - i - 1];
         quotient->d[quotient->top - i - 1] = temp;
-    }*/
-    convert_back_to_bn_ulong(binary_remainder, remainder->d, remainder->top);
+    }
+    // Reverse words in the remainder
+    for (int i = 0; i < remainder->top / 2; i++) {
+        BN_ULONG temp = remainder->d[i];
+        remainder->d[i] = remainder->d[remainder->top - i - 1];
+        remainder->d[remainder->top - i - 1] = temp;
+    }
 
-    //bn_print("\n<< quotient: ", quotient);
-    //printf("# bignum quotient top: %d\n", quotient->top);
-    //bn_print("<< remainder: ", remainder);
-    //printf("# bignum remainder top: %d\n", remainder->top);
+    bn_print("\n<< quotient: ", quotient);
+    printf("# bignum quotient top: %d\n", quotient->top);
+    bn_print("<< remainder: ", remainder);
+    printf("# bignum remainder top: %d\n", remainder->top);
 
     // Determine sign of quotient and remainder
     quotient->neg = dividend->neg ^ divisor->neg;
     remainder->neg = dividend->neg;
 
     // Update tops using find_top
-    quotient->top = find_top(quotient, MAX_BIGNUM_WORDS);
-    remainder->top = find_top(remainder, MAX_BIGNUM_WORDS);
+    //quotient->top = find_top(quotient, MAX_BIGNUM_WORDS);
+    //remainder->top = find_top(remainder, MAX_BIGNUM_WORDS);
 
     // print output values
-    bn_print("<< bn_div quotient: ", quotient);
-    bn_print("<< bn_div remainder: ", remainder);
+    //bn_print("<< bn_div quotient: ", quotient);
+    //bn_print("<< bn_div remainder: ", remainder);
 
     return 1;
 }
