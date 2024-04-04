@@ -25,11 +25,8 @@ void set_bignum_words(BIGNUM *bn, const BN_ULONG *words, int num_words) {
 }
 
 int main() {
+    printf("++ Starting BN_mod_inverse test ++\n");
     BN_CTX *ctx = BN_CTX_new();
-    if (ctx == NULL) {
-        fprintf(stderr, "Error: BN_CTX_new() failed.\n");
-        return 1;
-    }
 
     /*// Test values for 'a'
     BN_ULONG test_values_a[][TEST_BIGNUM_WORDS] = {
@@ -65,7 +62,7 @@ int main() {
 
     //for (int test = 0; test < num_tests; ++test) {
     for (int i = 0; i < num_tests; ++i) {
-        //printf("Test %d:\n", i);
+        printf("Test %d:\n", i);
         BIGNUM *a = BN_new();
         BIGNUM *n = BN_new();
         BIGNUM *mod_inverse = NULL;
@@ -74,26 +71,23 @@ int main() {
         set_bignum_words(n, test_values_n[i], MAX_BIGNUM_WORDS);
 
         // Set signs
-        if (sign_a[i]) BN_set_negative(a, 1);
-        if (sign_n[i]) BN_set_negative(n, 1);
+        //if (sign_a[i]) BN_set_negative(a, 1);
+        //if (sign_n[i]) BN_set_negative(n, 1);
+
+        print_bn("a", a);
+        print_bn("n", n);
 
         mod_inverse = BN_mod_inverse(NULL, a, n, ctx);
 
         if (mod_inverse == NULL) {
             unsigned long err_code = ERR_get_error();  // Get the error code
             if (ERR_GET_REASON(err_code) == BN_R_NO_INVERSE) {
-                printf("Test %d:\n", i);
-                print_bn("a", a);
-                print_bn("n", n);
                 printf("No modular inverse exists for the given 'a' and 'n'.\n");
             } else {
                 fprintf(stderr, "Error computing modular inverse.\n");
                 ERR_print_errors_fp(stderr);
             }
         } else {
-            printf("Test %d:\n", i);
-            print_bn("a", a);
-            print_bn("n", n);
             print_bn("modular inverse", mod_inverse);
         }
 
