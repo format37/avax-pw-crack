@@ -2392,6 +2392,111 @@ __device__ void swap_bignum_pointers(BIGNUM** a, BIGNUM** b) {
     *b = temp;
 }
 
+// TODO: Debug or remove the function below
+__device__ void bn_mod_exp(BIGNUM *r, BIGNUM *a, BIGNUM *p, BIGNUM *m) {
+    int i, j, bits, ret = 0, wstart, wend, window;
+    int start = 1;
+    BIGNUM *d, *val[TABLE_SIZE];
+    BIGNUM temp;
+    init_zero(&temp, MAX_BIGNUM_WORDS);
+
+    bits = p->top * BN_ULONG_NUM_BITS;
+    if (bits == 0) {
+        /* x**0 mod 1, or x**0 mod -1 is still zero. */
+        if (bn_is_one(m) || bn_is_zero(m)) {
+            init_zero(r, MAX_BIGNUM_WORDS);
+        } else {
+            init_one(r, MAX_BIGNUM_WORDS);
+        }
+        return;
+    }
+
+    for (i = 0; i < TABLE_SIZE; i++) {
+        val[i] = &temp;
+        init_zero(val[i], MAX_BIGNUM_WORDS);
+    }
+
+    if (!bn_mod(&temp, a, m, NULL))
+        goto err;               /* 1 */
+    if (bn_is_zero(&temp)) {
+        init_zero(r, MAX_BIGNUM_WORDS);
+        return;
+    }
+
+    window = BN_window_bits_for_exponent_size(bits);
+    if (window > 1) {
+        if (!bn_mod_mul(&temp, &temp, &temp, m, NULL))
+            goto err;           /* 2 */
+        j = 1 << (window - 1);
+        for (i = 1; i < j; i++) {
+            if (!bn_mod_mul(val[i], val[i - 1], &temp, m, NULL))
+                goto err;
+        }
+    }
+
+    start = 1;                  /* This is used to avoid multiplication etc
+                                 * when there is only the value '1' in the
+                                 * buffer. */
+    wstart = bits - 1;          /* The top bit of the window */
+    wend = 0;                   /* The bottom bit of the window */
+
+    if (!bn_mod(&temp, BN_value_one(), m, NULL))
+        goto err;
+
+    for (;;) {
+        int wvalue;             /* The 'value' of the window */
+
+        if (bn_is_bit_set(p, wstart) == 0) {
+            if (!start)
+                if (!bn_mod_mul(r, r, r, m, NULL))
+                    goto err;
+            if (wstart == 0)
+                break;
+            wstart--;
+            continue;
+        }
+        /*
+         * We now have wstart on a 'set' bit, we now need to work out how bit
+         * a window to do.  To do this we need to scan forward until the last
+         * set bit before the end of the window
+         */
+        wvalue = 1;
+        wend = 0;
+        for (i = 1; i < window; i++) {
+            if (wstart - i < 0)
+                break;
+            if (bn_is_bit_set(p, wstart - i)) {
+                wvalue <<= (i - wend);
+                wvalue |= 1;
+                wend = i;
+            }
+        }
+
+        /* wend is the size of the current window */
+        j = wend + 1;
+        /* add the 'bytes above' */
+        if (!start)
+            for (i = 0; i < j; i++) {
+                if (!bn_mod_mul(r, r, r, m, NULL))
+                    goto err;
+            }
+
+        /* wvalue will be an odd number < 2^window */
+        if (!bn_mod_mul(r, r, val[wvalue >> 1], m, NULL))
+            goto err;
+
+        /* move the 'window' down further */
+        wstart -= wend + 1;
+        start = 0;
+        if (wstart < 0)
+            break;
+    }
+    return;
+
+err:
+    return;
+}
+
 __device__ void bn_gcdext(BIGNUM *g, BIGNUM *s, BIGNUM *t, BIGNUM *a, BIGNUM *b) {
     printf("\n++ bn_gcdext ++\n");
     bn_print(">> a: ", a);
@@ -2446,6 +2551,34 @@ __device__ void bn_gcdext(BIGNUM *g, BIGNUM *s, BIGNUM *t, BIGNUM *a, BIGNUM *b)
     bn_print("<< s: ", s);
     bn_print("<< t: ", t);
     printf("-- bn_gcdext --\n");
+}
+
+__device__ int bn_mod_inverse_v1(BIGNUM *r, BIGNUM *a, BIGNUM *n) {
+    BIGNUM t, nt;
+    init_zero(&t, MAX_BIGNUM_WORDS);
+    init_zero(&nt, MAX_BIGNUM_WORDS);
+
+    // Check for zero input corner cases
+    if (bn_is_zero(n)) {
+        return 0;
+    }
+    if (bn_is_zero(a)) {
+        return 0;
+    }
+
+    // Check if a and n are coprime using bn_gcd
+    bn_gcd(&t, a, n);
+    if (!bn_is_one(&t)) {
+        return 0;
+    }
+
+    // Compute modular inverse using Fermat's Little Theorem
+    // If n is prime, then a^(n-2) mod n is the modular inverse of a
+    bn_set_word(&nt, 2);
+    bn_sub(n, n, &nt);
+    bn_mod_exp(r, a, n, n);
+
+    return 1;
 }
 
 __device__ void bn_mod_inverse(BIGNUM *result, BIGNUM *a, BIGNUM *n) {
