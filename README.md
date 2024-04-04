@@ -56,3 +56,4 @@ sudo apt install nvidia-cuda-toolkit
 #### crypto sources & docs
 [crypto-cuda](https://github.com/peihongch/crypto-cuda/)
 [bip-0039](https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki)
+[libgpucrypto](https://shader.kaist.edu/sslshader/libgpucrypto/)

@@ -19,7 +19,7 @@ __device__ void reverse_order(BN_ULONG test_values_a[][TEST_BIGNUM_WORDS], BN_UL
 }
 
 __global__ void testKernel() {
-    printf("++ testKernel for bn_gcdext ++\n");
+    printf("++ testKernel for bn_gcd ++\n");
     BN_ULONG test_values_a[][TEST_BIGNUM_WORDS] = {
         {0,0,0,0x3},                    // 1
         {0,0,0x123456789ABCDEFULL,0},   // 2
@@ -70,14 +70,12 @@ __global__ void testKernel() {
         bn_print("b: ", &b);
 
         // Test gcdext
-        bn_gcdext(&g, &s, &t, &a, &b);
+        bn_gcd(&g, &a, &b);
 
         // Print result
         bn_print("gcd: ", &g);
-        bn_print("s: ", &s);
-        bn_print("t: ", &t);
     }
-    printf("-- Finished testKernel for bn_gcdext --\n");
+    printf("-- Finished testKernel for bn_gcd --\n");
 }
 
 // Main function

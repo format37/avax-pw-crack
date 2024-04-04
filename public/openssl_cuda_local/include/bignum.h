@@ -2153,6 +2153,12 @@ __device__ void bn_gcd(BIGNUM* r, BIGNUM* in_a, BIGNUM* in_b) {
     bn_copy(&a, in_a);
     bn_copy(&b, in_b);
 
+    // Check if a and b are equal
+    if (bn_cmp(&a, &b) == 0) {
+        bn_copy(r, &a); // Set the result to a (or b, since they are equal)
+        return; // Exit the function early
+    }
+
     // Check if either a or b is zero at the start and set r accordingly
     if (bn_is_zero(&a)) {
         // Since a is zero, GCD(a, b) = b by definition
@@ -2420,9 +2426,22 @@ __device__ void bn_gcdext(BIGNUM *g, BIGNUM *s, BIGNUM *t, BIGNUM *a, BIGNUM *b)
         bn_copy(t, &temp);
     }
 
-    bn_copy(g, &old_r);
+    // Use bn_gcd to calculate the GCD
+    bn_gcd(g, a, b);
+    
+    // Adjust the signs of s and t based on the input values
+    if (bn_is_negative(a)) {
+        // bn_negate(&old_s);
+        old_s.neg = !old_s.neg;
+    }
+    if (bn_is_negative(b)) {
+        // bn_negate(&old_t);
+        old_t.neg = !old_t.neg;
+    }
+
     bn_copy(s, &old_s);
     bn_copy(t, &old_t);
+
     bn_print("\n<< g: ", g);
     bn_print("<< s: ", s);
     bn_print("<< t: ", t);

@@ -4,26 +4,26 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#define TEST_BIGNUM_WORDS 2 // Adjust based on the highest number of words needed
+#define TEST_BIGNUM_WORDS 4
 
-void reverse_endian(uint8_t* array, size_t length) {
-    if (!array || length <= 1) {
-        // No need to reverse if array is NULL or length is 0 or 1.
-        return;
+void print_bn(const char* label, const BIGNUM* bn) {
+    char* bn_str = BN_bn2hex(bn);
+    int i = 0;
+    while (bn_str[i] == '0' && bn_str[i+1] != '\0') {
+        i++;
     }
-    
-    for (size_t i = 0; i < length / 2; ++i) {
-        // Swap the bytes
-        uint8_t temp = array[i];
-        array[i] = array[length - 1 - i];
-        array[length - 1 - i] = temp;
-    }
+    printf("%s: %s\n", label, &bn_str[i]);
+    OPENSSL_free(bn_str);
 }
 
-void bn_print(const char* prefix, const BIGNUM* bn) {
-    char *number_str = BN_bn2hex(bn);
-    printf("%s %s\n", prefix, number_str);
-    OPENSSL_free(number_str);
+void set_bignum_words(BIGNUM *bn, const BN_ULONG *words, int num_words) {
+    BN_zero(bn);
+    for (int i = 0; i < num_words; ++i) {
+        BN_add_word(bn, words[i]);
+        if (i < num_words - 1) {
+            BN_lshift(bn, bn, BN_BITS2);
+        }
+    }
 }
 
 int main() {
@@ -35,38 +35,24 @@ int main() {
         return 1;
     }
 
-    /*BN_ULONG test_values_a[][TEST_BIGNUM_WORDS] = {
-        {0x123456789ABCDEFULL, 0x0}, // 1
-        {0x1FFF3ULL, 0x0}, // 2
-        {0xFEDCBA9876543210ULL, 0x0} // 3
-    };
-
-    BN_ULONG test_values_b[][TEST_BIGNUM_WORDS] = {
-        {0xFEDCBA987654321ULL, 0x0}, // 1
-        {0x2468ACEULL, 0x0}, // 2
-        {0xFEDCBA9876543210ULL, 0x0} // 3
-    };
-
-    int sign_a[] = {0, 0, 0}; // Signs for 'a'
-    int sign_b[] = {0, 0, 0}; // Signs for 'b'*/
     BN_ULONG test_values_a[][TEST_BIGNUM_WORDS] = {
-        {0,0x3},
-        {0x123456789ABCDEFULL, 0x0}, // Original example 1
-        {0x1FFF3ULL, 0x0}, // Original example 2
-        {0xFEDCBA9876543210ULL, 0x0}, // Original example 3
-        {0xFFFFFFFFFFFFFFFFULL, 0x1}, // Two-word case 1: Max value + 1 (overflow into the second word)
-        {0x0, 0x1}, // Two-word case 2: A larger number that occupies the second word
-        {0x123456789ABCDEFULL, 0xFEDCBA9876543210ULL} // Two-word case 3: Fully make use of two words
+        {0,0,0,0x3},                    // 1
+        {0,0,0x123456789ABCDEFULL,0},   // 2
+        {0,0,0x1FFF3ULL,0},             // 3
+        {0,0,0xFEDCBA9876543210ULL,0},  // 4
+        {0,0,0xFFFFFFFFFFFFFFFFULL,0x1},// 5
+        {0,0,0,0x1},                    // 6
+        {0,0,0x123456789ABCDEFULL,0xFEDCBA9876543210ULL} // 7
     };
 
     BN_ULONG test_values_b[][TEST_BIGNUM_WORDS] = {
-        {0,0xb},
-        {0xFEDCBA987654321ULL, 0x0}, // Original example 1
-        {0x2468ACEULL, 0x0}, // Original example 2
-        {0xFEDCBA9876543210ULL, 0x0}, // Original example 3
-        {0x0, 0x0}, // Edge case: One of the numbers is 0
-        {0xFFFFFFFFFFFFFFFFULL, 0xFFFFFFFFFFFFFFFFULL}, // Edge case: Both numbers equal, also a two-word case
-        {0xFFFFFFFFFFFFFFFFULL, 0x1} // Mixed case: Significantly different values across words
+        {0,0,0,0xb},                    // 1
+        {0,0,0xFEDCBA987654321ULL,0},   // 2
+        {0,0,0x2468ACEULL,0},           // 3
+        {0,0,0xFEDCBA9876543210ULL,0},  // 4
+        {0,0,0,0},                      // 5
+        {0,0,0xFFFFFFFFFFFFFFFFULL,0xFFFFFFFFFFFFFFFFULL}, // 6
+        {0,0,0xFFFFFFFFFFFFFFFFULL,0x1}                    // 7
     };
 
     int sign_a[] = {0, 0, 0, 0, 0, 0, 0}; // Signs for 'a', add -1 for negative numbers as needed
@@ -75,6 +61,7 @@ int main() {
     int num_tests = sizeof(test_values_a) / sizeof(test_values_a[0]);
     
     for (int i = 0; i < num_tests; ++i) {
+        printf("\nTest %d:\n", i + 1);
         BIGNUM *a = BN_new();
         BIGNUM *b = BN_new();
         BIGNUM *gcd = BN_new();
@@ -84,24 +71,20 @@ int main() {
             return 1;
         }
 
-        //reverse_endian((unsigned char*)test_values_a[i], TEST_BIGNUM_WORDS * sizeof(BN_ULONG));
-        //reverse_endian((unsigned char*)test_values_b[i], TEST_BIGNUM_WORDS * sizeof(BN_ULONG));
-
-        BN_bin2bn((unsigned char*)test_values_a[i], TEST_BIGNUM_WORDS * sizeof(BN_ULONG), a);
-        BN_bin2bn((unsigned char*)test_values_b[i], TEST_BIGNUM_WORDS * sizeof(BN_ULONG), b);
+        set_bignum_words(a, test_values_a[i], TEST_BIGNUM_WORDS);
+        set_bignum_words(b, test_values_b[i], TEST_BIGNUM_WORDS);
 
         // Set signs
-        if (sign_a[i]) BN_set_negative(a, 1);
-        if (sign_b[i]) BN_set_negative(b, 1);
+        //if (sign_a[i]) BN_set_negative(a, 1);
+        //if (sign_b[i]) BN_set_negative(b, 1);
+        print_bn("a", a);
+        print_bn("b", b);
 
         if (!BN_gcd(gcd, a, b, ctx)) {
             fprintf(stderr, "Error computing GCD.\n");
             ERR_print_errors_fp(stderr);
         } else {
-            printf("\nTest %d:\n", i + 1);
-            bn_print("a", a);
-            bn_print("b", b);
-            bn_print("gcd", gcd);
+            print_bn("gcd", gcd);
         }
 
         BN_free(a);
