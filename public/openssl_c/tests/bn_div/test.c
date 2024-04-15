@@ -66,11 +66,13 @@ int main() {
     };*/
 
     BN_ULONG test_values_dividend[][MAX_BIGNUM_WORDS] = {
-        {0,0,0,0x3}, // 0
+        {0,0,0,0xb}, // 0
+        {0,0,0,0x3}, // 1
     };
 
     BN_ULONG test_values_divisor[][MAX_BIGNUM_WORDS] = {
-        {0,0,0,0x2}, // 0
+        {0,0,0,0x3}, // 0
+        {0,0,0,0xb}, // 1
     };
 
     int num_tests = sizeof(test_values_dividend) / sizeof(test_values_dividend[0]);

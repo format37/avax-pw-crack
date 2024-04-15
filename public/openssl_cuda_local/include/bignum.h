@@ -942,6 +942,7 @@ __device__ void mod_inv(BIGNUM *value, BIGNUM *mod, BIGNUM *inv) {
 }*/
 
 __device__ void bn_sub(BIGNUM *r, BIGNUM *a, BIGNUM *b) {
+    // TODO: Implement check that r, a and b are different pointers
     //printf("++ bn_sub ++\n");
     // get top of a and b
     a->top = find_top(a, MAX_BIGNUM_WORDS);
@@ -994,7 +995,31 @@ __device__ void bn_sub(BIGNUM *r, BIGNUM *a, BIGNUM *b) {
         // Set r to correct value or raise an error
     }
     
-    r->neg = 0; // Assuming we don't want negative numbers, otherwise set sign properly
+    //r->neg = 0; // Assuming we don't want negative numbers, otherwise set sign properly
+    // Define the neg flag based on the signs of a and b and the result of the subtraction
+    if (a->neg && !b->neg) {
+        // 'a' is negative, 'b' is positive
+        r->neg = 1;
+    } else if (!a->neg && b->neg) {
+        // 'a' is positive, 'b' is negative
+        r->neg = 0;
+    } else {
+        // Both numbers have the same sign
+        int cmp = bn_cmp(a, b);
+        if (cmp < 0) {
+            // |a| < |b|
+            r->neg = !a->neg; // Result has the opposite sign of 'a'
+        } else if (cmp > 0) {
+            // |a| > |b|
+            r->neg = a->neg; // Result has the same sign as 'a'
+        } else {
+            // |a| == |b|
+            r->neg = 0; // Result is zero, so it's positive
+        }
+    }
+    bn_print("<< r: ", r);
+    // print r.neg
+    printf("r->neg: %d\n", r->neg);
 }
 
 __device__ void bn_add_words(BN_ULONG *a, unsigned long long carry, int idx, int dmax) {
@@ -1028,10 +1053,11 @@ __device__ void bn_add_bignum_words(BIGNUM *r, BIGNUM *a, int n) {
 }
 
 __device__ void bn_mul(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
+    // TODO: Implement check that product, a and b are different pointers
     printf("++ bn_mul ++\n");
     bn_print(">> a: ", a);
     bn_print(">> b: ", b);
-    bn_print(">> product: ", product);
+    //bn_print(">> product: ", product);
     // Reset the product
     for(int i = 0; i < a->top + b->top; i++)
         product->d[i] = 0;
@@ -1072,8 +1098,8 @@ __device__ void bn_mul(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
     
     // Determine if the result should be negative
     product->neg = (a->neg != b->neg) ? 1 : 0;
-    bn_print("<< a: ", a);
-    bn_print("<< b: ", b);
+    //bn_print("<< a: ", a);
+    //bn_print("<< b: ", b);
     bn_print("<< product: ", product);
     printf("-- bn_mul --\n");
 }
@@ -2141,6 +2167,9 @@ __device__ int is_even(const BIGNUM* num) {
 }
 
 __device__ void bn_gcd(BIGNUM* r, BIGNUM* in_a, BIGNUM* in_b) {
+    printf("++ bn_gcd ++\n");
+    bn_print(">> in_a: ", in_a);
+    bn_print(">> in_b: ", in_b);
     BIGNUM a, b, temp;
     int shifts = 0;
 
@@ -2210,6 +2239,9 @@ __device__ void bn_gcd(BIGNUM* r, BIGNUM* in_a, BIGNUM* in_b) {
 
     // Copy the result to r
     bn_copy(r, &temp_a);
+
+    bn_print("<< bn_gcd r: ", r);
+    printf("-- bn_gcd --\n");
 }
 /*
 __device__ int bn_num_bits(BIGNUM *a) {
@@ -2393,7 +2425,7 @@ __device__ void swap_bignum_pointers(BIGNUM** a, BIGNUM** b) {
 }
 
 // TODO: Debug or remove the function below
-__device__ void bn_mod_exp(BIGNUM *r, BIGNUM *a, BIGNUM *p, BIGNUM *m) {
+/*__device__ void bn_mod_exp(BIGNUM *r, BIGNUM *a, BIGNUM *p, BIGNUM *m) {
     int i, j, bits, ret = 0, wstart, wend, window;
     int start = 1;
     BIGNUM *d, *val[TABLE_SIZE];
@@ -2402,7 +2434,7 @@ __device__ void bn_mod_exp(BIGNUM *r, BIGNUM *a, BIGNUM *p, BIGNUM *m) {
 
     bits = p->top * BN_ULONG_NUM_BITS;
     if (bits == 0) {
-        /* x**0 mod 1, or x**0 mod -1 is still zero. */
+        // x**0 mod 1, or x**0 mod -1 is still zero.
         if (bn_is_one(m) || bn_is_zero(m)) {
             init_zero(r, MAX_BIGNUM_WORDS);
         } else {
@@ -2417,7 +2449,7 @@ __device__ void bn_mod_exp(BIGNUM *r, BIGNUM *a, BIGNUM *p, BIGNUM *m) {
     }
 
     if (!bn_mod(&temp, a, m, NULL))
-        goto err;               /* 1 */
+        goto err;               // 1
     if (bn_is_zero(&temp)) {
         init_zero(r, MAX_BIGNUM_WORDS);
         return;
@@ -2426,7 +2458,7 @@ __device__ void bn_mod_exp(BIGNUM *r, BIGNUM *a, BIGNUM *p, BIGNUM *m) {
     window = BN_window_bits_for_exponent_size(bits);
     if (window > 1) {
         if (!bn_mod_mul(&temp, &temp, &temp, m, NULL))
-            goto err;           /* 2 */
+            goto err;           // 2
         j = 1 << (window - 1);
         for (i = 1; i < j; i++) {
             if (!bn_mod_mul(val[i], val[i - 1], &temp, m, NULL))
@@ -2434,17 +2466,17 @@ __device__ void bn_mod_exp(BIGNUM *r, BIGNUM *a, BIGNUM *p, BIGNUM *m) {
         }
     }
 
-    start = 1;                  /* This is used to avoid multiplication etc
-                                 * when there is only the value '1' in the
-                                 * buffer. */
-    wstart = bits - 1;          /* The top bit of the window */
-    wend = 0;                   /* The bottom bit of the window */
+    start = 1;                  // This is used to avoid multiplication etc
+                                // when there is only the value '1' in the
+                                // buffer.
+    wstart = bits - 1;          // The top bit of the window
+    wend = 0;                   // The bottom bit of the window
 
     if (!bn_mod(&temp, BN_value_one(), m, NULL))
         goto err;
 
     for (;;) {
-        int wvalue;             /* The 'value' of the window */
+        int wvalue;             // The 'value' of the window
 
         if (bn_is_bit_set(p, wstart) == 0) {
             if (!start)
@@ -2455,11 +2487,10 @@ __device__ void bn_mod_exp(BIGNUM *r, BIGNUM *a, BIGNUM *p, BIGNUM *m) {
             wstart--;
             continue;
         }
-        /*
-         * We now have wstart on a 'set' bit, we now need to work out how bit
-         * a window to do.  To do this we need to scan forward until the last
-         * set bit before the end of the window
-         */
+        
+         // We now have wstart on a 'set' bit, we now need to work out how bit
+         // a window to do.  To do this we need to scan forward until the last
+         // set bit before the end of the window
         wvalue = 1;
         wend = 0;
         for (i = 1; i < window; i++) {
@@ -2472,20 +2503,20 @@ __device__ void bn_mod_exp(BIGNUM *r, BIGNUM *a, BIGNUM *p, BIGNUM *m) {
             }
         }
 
-        /* wend is the size of the current window */
+        // wend is the size of the current window
         j = wend + 1;
-        /* add the 'bytes above' */
+        // add the 'bytes above'
         if (!start)
             for (i = 0; i < j; i++) {
                 if (!bn_mod_mul(r, r, r, m, NULL))
                     goto err;
             }
 
-        /* wvalue will be an odd number < 2^window */
+        // wvalue will be an odd number < 2^window
         if (!bn_mod_mul(r, r, val[wvalue >> 1], m, NULL))
             goto err;
 
-        /* move the 'window' down further */
+        // move the 'window' down further
         wstart -= wend + 1;
         start = 0;
         if (wstart < 0)
@@ -2495,7 +2526,7 @@ __device__ void bn_mod_exp(BIGNUM *r, BIGNUM *a, BIGNUM *p, BIGNUM *m) {
 
 err:
     return;
-}
+}*/
 
 __device__ void bn_gcdext(BIGNUM *g, BIGNUM *s, BIGNUM *t, BIGNUM *a, BIGNUM *b) {
     printf("\n++ bn_gcdext ++\n");
@@ -2553,7 +2584,192 @@ __device__ void bn_gcdext(BIGNUM *g, BIGNUM *s, BIGNUM *t, BIGNUM *a, BIGNUM *b)
     printf("-- bn_gcdext --\n");
 }
 
-__device__ int bn_mod_inverse_v1(BIGNUM *r, BIGNUM *a, BIGNUM *n) {
+__device__ void bn_mod_inverse_final(BIGNUM *result, BIGNUM *a, BIGNUM *n) {
+    BIGNUM old_r, r, old_t, t, quotient, temp, gcd;
+    init_zero(&old_r, MAX_BIGNUM_WORDS);
+    init_zero(&r, MAX_BIGNUM_WORDS);
+    init_zero(&old_t, MAX_BIGNUM_WORDS);
+    init_zero(&t, MAX_BIGNUM_WORDS);
+    init_zero(&quotient, MAX_BIGNUM_WORDS);
+    init_zero(&temp, MAX_BIGNUM_WORDS);
+    init_zero(&gcd, MAX_BIGNUM_WORDS);
+
+    // Initialize values
+    bn_copy(&old_r, n);
+    bn_copy(&r, a);
+    bn_set_word(&old_t, 0);
+    bn_set_word(&t, 1);
+
+    // Calculate GCD(a, n)
+    bn_gcd(&gcd, a, n);
+
+    // Check if GCD(a, n) is 1
+    BIGNUM one;
+    init_one(&one, MAX_BIGNUM_WORDS);
+    if (bn_cmp(&gcd, &one) != 0) {
+        // GCD is not 1, inverse doesn't exist
+        init_zero(result, MAX_BIGNUM_WORDS);
+        return;
+    }
+
+    while (!bn_is_zero(&r)) {
+        // quotient = old_r / r
+        bn_div(&quotient, &temp, &old_r, &r);
+
+        // (old_r, r) := (r, old_r - quotient * r)
+        bn_copy(&temp, &r);
+        bn_mul(&r, &quotient, &r);
+        bn_sub(&r, &old_r, &r);
+        bn_copy(&old_r, &temp);
+
+        // (old_t, t) := (t, old_t - quotient * t)
+        bn_copy(&temp, &t);
+        bn_mul(&t, &quotient, &t);
+        bn_sub(&t, &old_t, &t);
+        bn_copy(&old_t, &temp);
+        // printf("q = %d, t = %d, nt = %d, r = %d, nr = %d\n", q, t, nt, r, nr);
+        
+    }
+
+    // Make sure old_t is positive
+    if (old_t.neg) {
+        bn_add(&old_t, &old_t, n);
+    }
+
+    // Set the result
+    bn_copy(result, &old_t);
+    bn_mod(result, result, n);
+}
+
+__device__ void bn_mod_inverse(BIGNUM *result, BIGNUM *a, BIGNUM *n) {
+    BIGNUM t, nt, r, nr, q, tmp, tmp2;
+    init_zero(&t, MAX_BIGNUM_WORDS);
+    init_zero(&tmp2, MAX_BIGNUM_WORDS);
+    init_one(&nt, MAX_BIGNUM_WORDS);
+    bn_copy(&r, n);
+    bn_mod(&nr, a, n);
+    int counter = 0;
+    while (!bn_is_zero(&nr)) {
+        bn_div(&q, &tmp, &r, &nr);
+        bn_copy(&tmp, &nt);
+        
+        nt.top = find_top(&nt, MAX_BIGNUM_WORDS);
+        q.top = find_top(&q, MAX_BIGNUM_WORDS);
+
+        bn_mul(&nt, &q, &tmp2);
+        bn_copy(&nt, &tmp2); // dst, src        
+        bn_print("presub t: ", &t);
+        bn_print("postmul nt: ", &nt);        
+        bn_subtract(&tmp2, &t, &nt); // r = a - b
+        bn_copy(&nt, &tmp2); // dst << src
+        bn_print("postsub nt: ", &nt);  // OK      
+        bn_copy(&t, &tmp); // dst << src
+        bn_copy(&tmp, &nr); // dst << src
+        // bn_mul(&nr, &q, &nr);
+        bn_mul(&nr, &q, &tmp2);
+        bn_copy(&nr, &tmp2); // dst, src
+        bn_print("postmul nr: ", &nr); // OK
+        bn_subtract(&tmp2, &r, &nr);
+        bn_copy(&nr, &tmp2); // dst << src
+
+        bn_copy(&r, &tmp); // dst << src
+        bn_print("\nq: ", &q);
+        bn_print("t: ", &t);
+        bn_print("nt: ", &nt);
+        bn_print("r: ", &r);
+        bn_print("nr: ", &nr);
+        counter++;
+        /*if (counter > 1) {
+            printf("Counter limit reached\n");
+            break;
+        }*/
+    }
+
+    if (!bn_is_one(&r)) {
+        // No modular inverse exists
+        init_zero(result, MAX_BIGNUM_WORDS);
+        return;
+    }
+
+    if (bn_is_negative(&t)) {
+        bn_add(&t, &t, n);
+    }
+
+    bn_copy(result, &t);
+}
+
+__device__ void bn_mod_inverse_tmp(BIGNUM *result, BIGNUM *a, BIGNUM *n) {
+    BIGNUM old_r, r, old_t, t, quotient, temp, gcd;
+    init_zero(&old_r, MAX_BIGNUM_WORDS);
+    init_zero(&r, MAX_BIGNUM_WORDS);
+    init_zero(&old_t, MAX_BIGNUM_WORDS);
+    init_zero(&t, MAX_BIGNUM_WORDS);
+    init_zero(&quotient, MAX_BIGNUM_WORDS);
+    init_zero(&temp, MAX_BIGNUM_WORDS);
+    init_zero(&gcd, MAX_BIGNUM_WORDS);
+
+    // Initialize values
+    bn_copy(&old_r, n);
+    bn_copy(&r, a);
+    bn_set_word(&old_t, 0);
+    bn_set_word(&t, 1);
+
+    // Calculate GCD(a, n)
+    bn_gcd(&gcd, a, n);
+
+    // Check if GCD(a, n) is 1
+    BIGNUM one;
+    init_one(&one, MAX_BIGNUM_WORDS);
+    if (bn_cmp(&gcd, &one) != 0) {
+        // GCD is not 1, inverse doesn't exist
+        init_zero(result, MAX_BIGNUM_WORDS);
+        return;
+    }
+
+    int count = 0;
+    int limit = 5;
+
+    while (!bn_is_zero(&r)) {
+        // quotient = old_r / r
+        bn_div(&quotient, &temp, &old_r, &r);
+
+        // (old_r, r) := (r, old_r - quotient * r)
+        bn_copy(&temp, &r);
+        bn_mul(&r, &quotient, &r);
+        bn_sub(&r, &old_r, &r);
+        bn_copy(&old_r, &temp);
+
+        // (old_t, t) := (t, old_t - quotient * t)
+        bn_copy(&temp, &t);
+        bn_mul(&t, &quotient, &t);
+        bn_sub(&t, &old_t, &t);
+        bn_copy(&old_t, &temp);
+
+        // Print all significant values
+        printf("\nIteration %d:\n", count);
+        bn_print("old_r: ", &old_r);
+        bn_print("r: ", &r);
+        bn_print("old_t: ", &old_t);
+        bn_print("t: ", &t);
+
+        count++;
+        if (count > limit) {
+            printf("Limit reached\n");
+            break;
+        }
+    }
+
+    // Make sure old_t is positive
+    if (old_t.neg) {
+        bn_add(&old_t, &old_t, n);
+    }
+
+    // Set the result
+    bn_copy(result, &old_t);
+    bn_mod(result, result, n);
+}
+
+/*__device__ int bn_mod_inverse_v1(BIGNUM *r, BIGNUM *a, BIGNUM *n) {
     BIGNUM t, nt;
     init_zero(&t, MAX_BIGNUM_WORDS);
     init_zero(&nt, MAX_BIGNUM_WORDS);
@@ -2579,9 +2795,9 @@ __device__ int bn_mod_inverse_v1(BIGNUM *r, BIGNUM *a, BIGNUM *n) {
     bn_mod_exp(r, a, n, n);
 
     return 1;
-}
+}*/
 
-__device__ void bn_mod_inverse(BIGNUM *result, BIGNUM *a, BIGNUM *n) {
+__device__ void bn_mod_inverse_v0(BIGNUM *result, BIGNUM *a, BIGNUM *n) {
     BIGNUM g, x, y;
     init_zero(&g, MAX_BIGNUM_WORDS);
     init_zero(&x, MAX_BIGNUM_WORDS);
