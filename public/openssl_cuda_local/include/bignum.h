@@ -942,6 +942,7 @@ __device__ void mod_inv(BIGNUM *value, BIGNUM *mod, BIGNUM *inv) {
 }*/
 
 __device__ void bn_sub(BIGNUM *r, BIGNUM *a, BIGNUM *b) {
+    printf("ATTENTION: bn_sub is deprecated. Use bn_subtract instead.\n");
     // TODO: Implement check that r, a and b are different pointers
     //printf("++ bn_sub ++\n");
     // get top of a and b
