@@ -59,8 +59,8 @@ __device__ EC_POINT ec_point_scalar_mul(
         if (i<debug_counter) bn_print("2 current.x: ", &current.x);
         // debug_printf("2 y: %s\n", bignum_to_hex(&current.y));
         if (i<debug_counter) bn_print("2 current.y: ", &current.y);
-        printf("BREAKING\n");
-        break; // TODO: remove this
+        //printf("BREAKING\n");
+        // break; // TODO: remove this
     }
 
     // debug_printf("Final x: %s\n", bignum_to_hex(&result.x));
@@ -75,6 +75,8 @@ __device__ EC_POINT ec_point_scalar_mul(
 __global__ void testKernel() {
 
     // BN_CTX *ctx = BN_CTX_new();
+
+    // return;
 
     // Addition
     BIGNUM a;
@@ -215,7 +217,11 @@ __global__ void testKernel() {
 
     // Derive public key 
     // EC_POINT publicKey = ec_point_scalar_mul(&G, &newKey, &curveOrder);
+    
+    
     EC_POINT publicKey = ec_point_scalar_mul(&G, &newKey, &CURVE_P, &CURVE_A);
+    
+    
     // ec_point_scalar_mul / point_add / mod_mul / bn_mod <= Issue
 
     // Print public key
@@ -228,10 +234,9 @@ __global__ void testKernel() {
 
 }
 
+// Main function
 int main() {
-    // print that we starting
-    printf("Starting\n");
-    testKernel<<<1,1>>>();
+    testKernel<<<1, 1>>>();
     cudaError_t err = cudaGetLastError();
     if (err != cudaSuccess) {
         printf("Error: %s\n", cudaGetErrorString(err));

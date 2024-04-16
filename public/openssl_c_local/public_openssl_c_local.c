@@ -57,7 +57,7 @@ int main() {
   print_bn_hex("program C parentKeyInt (Before mod_add)", b);
 
   // Debug ++ TODO: Remove
-	BIGNUM *tempSum = BN_new();
+	/*BIGNUM *tempSum = BN_new();
   BN_add(tempSum, a, b);
   unsigned char my_buffer[64];
 	
@@ -67,7 +67,7 @@ int main() {
   for (int i = 0; i < BN_num_bytes(tempSum); i+=4) {
       uint32_t val = *((uint32_t*)(&my_buffer[i]));
       printf("At index %d: val = %x\n", i / 4, val);
-  }
+  }*/
   // Debug --
 
   BN_add(newKey, a, b);
