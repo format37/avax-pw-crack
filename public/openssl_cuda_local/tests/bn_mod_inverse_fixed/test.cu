@@ -71,7 +71,7 @@ __global__ void testKernel() {
     reverse_order(test_values_a, test_values_n, sizeof(test_values_a) / (sizeof(BN_ULONG) * TEST_BIGNUM_WORDS));
     
     int num_tests = sizeof(test_values_a) / (sizeof(BN_ULONG) * TEST_BIGNUM_WORDS);
-    int limit = 15;
+    int limit = 19;
     bool mod_inverse_exists;
     for (int test = 0; test < num_tests; ++test) {
         BIGNUM value_a, value_n, result;
