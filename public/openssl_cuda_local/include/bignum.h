@@ -2529,14 +2529,17 @@ __device__ void bn_gcdext(BIGNUM *g, BIGNUM *s, BIGNUM *t, BIGNUM *a, BIGNUM *b)
     printf("-- bn_gcdext --\n");
 }
 
-__device__ void bn_mod_inverse(BIGNUM *result, BIGNUM *a, BIGNUM *n) {
+__device__ bool bn_mod_inverse(BIGNUM *result, BIGNUM *a, BIGNUM *n) {
+    if (bn_is_one(n)) {
+        return false;  // No modular inverse exists
+    }
     BIGNUM t, nt, r, nr, q, tmp, tmp2;
     init_zero(&t, MAX_BIGNUM_WORDS);
     init_zero(&tmp2, MAX_BIGNUM_WORDS);
     init_one(&nt, MAX_BIGNUM_WORDS);
     bn_copy(&r, n);
     bn_mod(&nr, a, n);
-    int counter = 0;
+    //int counter = 0;
     while (!bn_is_zero(&nr)) {
         bn_div(&q, &tmp, &r, &nr);
         bn_copy(&tmp, &nt);
@@ -2574,7 +2577,7 @@ __device__ void bn_mod_inverse(BIGNUM *result, BIGNUM *a, BIGNUM *n) {
         bn_print("nt: ", &nt);
         bn_print("r: ", &r);
         bn_print("nr: ", &nr);
-        counter++;
+        // counter++;
         /*if (counter > 1) {
             printf("Counter limit reached\n");
             break;
@@ -2583,17 +2586,19 @@ __device__ void bn_mod_inverse(BIGNUM *result, BIGNUM *a, BIGNUM *n) {
 
     if (!bn_is_one(&r)) {
         // No modular inverse exists
+        // printf("No modular inverse exists\n");
         init_zero(result, MAX_BIGNUM_WORDS);
-        return;
+        return false;
     }
 
     if (bn_is_negative(&t)) {
-        printf("# Negative t\n");
+        printf("bn_mod_inverse negative t\n");
         bn_add(&tmp2, &t, n); // result = t + n
         bn_copy(&t, &tmp2); // dst << src
     }
 
     bn_copy(result, &t); // dst << src
+    return true;
 }
 
 // CUDA point_add function, based on gmp implementation

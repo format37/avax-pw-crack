@@ -71,7 +71,8 @@ __global__ void testKernel() {
     reverse_order(test_values_a, test_values_n, sizeof(test_values_a) / (sizeof(BN_ULONG) * TEST_BIGNUM_WORDS));
     
     int num_tests = sizeof(test_values_a) / (sizeof(BN_ULONG) * TEST_BIGNUM_WORDS);
-    int limit = 2;
+    int limit = 8;
+    bool mod_inverse_exists;
     for (int test = 0; test < num_tests; ++test) {
         BIGNUM value_a, value_n, result;
         init_zero(&value_a, TEST_BIGNUM_WORDS);
@@ -94,9 +95,11 @@ __global__ void testKernel() {
         bn_print("n: ", &value_n);
 
         // Test the bn_mod_inverse function
-        bn_mod_inverse(&result, &value_a, &value_n);
+        mod_inverse_exists = bn_mod_inverse(&result, &value_a, &value_n);
         // Print the result
-        bn_print("Modular inverse: ", &result);
+        printf("[%d] ", test);
+        if (mod_inverse_exists) bn_print("Modular inverse: ", &result);
+        else printf("No modular inverse exists for the given 'a' and 'n'.\n");
         printf("\n");
         limit -= 1;
         if (limit == 0) {

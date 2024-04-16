@@ -101,14 +101,16 @@ int main() {
         if (mod_inverse == NULL) {
             unsigned long err_code = ERR_get_error();  // Get the error code
             if (ERR_GET_REASON(err_code) == BN_R_NO_INVERSE) {
-                printf("No modular inverse exists for the given 'a' and 'n'.\n");
+                printf("[%d] No modular inverse exists for the given 'a' and 'n'.\n", i);
             } else {
                 fprintf(stderr, "Error computing modular inverse.\n");
                 ERR_print_errors_fp(stderr);
             }
         } else {
-            print_bn("modular inverse", mod_inverse);
+            printf("[%d] ", i);
+            print_bn("Modular inverse", mod_inverse);
         }
+        printf("\n");
 
         BN_free(a);
         BN_free(n);

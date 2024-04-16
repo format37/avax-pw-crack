@@ -1,6 +1,9 @@
 #include <stdio.h>
 
 int mod_inverse(int a, int n) {
+    if (n == 1) {
+        return -1;  // No modular inverse exists
+    }
     int t = 0, nt = 1, r = n, nr = a % n;
     while (nr != 0) {
         int q = r / nr;
@@ -40,8 +43,8 @@ int mod_inverse(int a, int n) {
 }
 
 int main() {
-    int a = 0x2A;
-    int n = 0x7E1;
+    int a = 0x3;
+    int n = 0x1;
     int inverse = mod_inverse(a, n);
     if (inverse != -1) {
         //printf("The modular inverse of %d modulo %d is %d\n", a, n, inverse);
@@ -50,6 +53,7 @@ int main() {
         printf("Modular inverse: %s0x%x\n", (inverse < 0) ? "-" : "", (inverse < 0) ? -inverse : inverse);
     } else {
         printf("No modular inverse exists for %d modulo %d\n", a, n);
+        printf("inverse is %d\n", inverse);
     }
     return 0;
 }
