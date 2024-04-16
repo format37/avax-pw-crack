@@ -43,7 +43,7 @@ int main() {
         {0,0,0,0x3},     // 11: a = 3, n = 11 (for negative 'a' and 'n' test case)
         {0,0,0,0x2A},    // 12: a = 42, n = 2017 (for negative 'a' test case)
         {0,0,0,0x4D2},   // 13: a = 1234, n = 5678 (for negative 'n' test case)
-        {0,0x11F71B54,0x92EA6E0},    // 14: a = 1234567890, n = 9876543210
+        {0,0x11F71B54,0x92EA6E0,0},    // 14: a = 1234567890, n = 9876543210
         {0xFFFFFFFF,0xFFFFFFFF,0xFFFFFFFF,0xFFFFFFFF},    // 15: a = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF, n = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
         {0,0,0,0x4},     // 16: a = 4, n = 12
         {0,0,0,0x6},     // 17: a = 6, n = 15
@@ -65,7 +65,7 @@ int main() {
         {0,0,0,0xB},     // 11: a = 3, n = 11 (for negative 'a' and 'n' test case)
         {0,0,0,0x7E1},   // 12: a = 42, n = 2017 (for negative 'a' test case)
         {0,0,0,0x162E},  // 13: a = 1234, n = 5678 (for negative 'n' test case)
-        {0,0x2456AF20,0x962E90},    // 14: a = 1234567890, n = 9876543210
+        {0,0x2456AF20,0x962E90,0},    // 14: a = 1234567890, n = 9876543210
         {0xFFFFFFFF,0xFFFFFFFF,0xFFFFFFFF,0xFFFFFFFF},    // 15: a = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF, n = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
         {0,0,0,0xC},     // 16: a = 4, n = 12
         {0,0,0,0xF},     // 17: a = 6, n = 15

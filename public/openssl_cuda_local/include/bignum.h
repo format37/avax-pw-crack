@@ -2533,6 +2533,16 @@ __device__ bool bn_mod_inverse(BIGNUM *result, BIGNUM *a, BIGNUM *n) {
     if (bn_is_one(n)) {
         return false;  // No modular inverse exists
     }
+    BIGNUM gcd;
+    init_zero(&gcd, MAX_BIGNUM_WORDS);
+    bn_gcd(&gcd, a, n);
+
+    if (!bn_is_one(&gcd)) {
+        // GCD(a, n) is not 1, so no modular inverse exists
+        init_zero(result, MAX_BIGNUM_WORDS);
+        return false;
+    }
+
     BIGNUM t, nt, r, nr, q, tmp, tmp2;
     init_zero(&t, MAX_BIGNUM_WORDS);
     init_zero(&tmp2, MAX_BIGNUM_WORDS);
@@ -2577,8 +2587,8 @@ __device__ bool bn_mod_inverse(BIGNUM *result, BIGNUM *a, BIGNUM *n) {
         bn_print("nt: ", &nt);
         bn_print("r: ", &r);
         bn_print("nr: ", &nr);
-        // counter++;
-        /*if (counter > 1) {
+        /*counter++;
+        if (counter > 10) {
             printf("Counter limit reached\n");
             break;
         }*/
