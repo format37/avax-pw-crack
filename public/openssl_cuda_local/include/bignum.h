@@ -885,62 +885,6 @@ __device__ void mod_inv(BIGNUM *value, BIGNUM *mod, BIGNUM *inv) {
     }
 }
 
-/*__device__ void bn_sub_v2(BIGNUM *a, BIGNUM *b, BIGNUM *r) {
-    printf("++ bn_sub ++\n");
-    // get top of a and b
-    a->top = find_top(a, MAX_BIGNUM_WORDS);
-    b->top = find_top(b, MAX_BIGNUM_WORDS);
-
-    bn_print(">> a: ", a);
-    bn_print(">> b: ", b);
-
-    int max = a->top > b->top ? a->top : b->top;
-    BN_ULONG borrow = 0;
-    printf("max: %d\n", max);
-    
-    for (int i = 0; i < max; ++i) {
-        debug_printf("# 4.%d\n", i);
-        BN_ULONG ai = (i < a->top) ? a->d[i] : 0;
-        BN_ULONG bi = (i < b->top) ? b->d[i] : 0;
-
-        // Check if a subtraction would cause a borrow
-        if (ai >= bi + borrow) {
-            debug_printf("# 5\n");
-            debug_printf("r->top: %d\n", r->top);
-            debug_printf("i: %d\n", i);
-            debug_printf("r->d[i]: %llu\n", r->d[i]);
-            debug_printf("ai: %llu\n", ai);
-            debug_printf("bi: %llu\n", bi);
-            debug_printf("borrow: %llu\n", borrow);            
-            r->d[i] = ai - bi - borrow;
-            debug_printf("# 6\n");
-            borrow = 0;
-        } else {
-            // Borrow from the next highest bit
-            r->d[i] = (1ULL << (sizeof(BN_ULONG) * 8)) + ai - bi - borrow;
-            borrow = 1;
-        }
-    }
-    debug_printf("# 8\n");
-    // Set result top and sign
-    r->top = a->top; // r will have at most as many words as a
-    for (int i = r->top - 1; i >= 0; --i) {
-        if (r->d[i] != 0) {
-            break;
-        }
-        r->top--; // Reduce top for each leading zero
-    }
-
-    // Detect underflow
-    if (borrow != 0) {
-        // Handle result underflow if needed (b > a)
-        debug_printf("Underflow detected\n");
-        // Set r to correct value or raise an error
-    }
-    
-    r->neg = 0; // Assuming we don't want negative numbers, otherwise set sign properly
-}*/
-
 __device__ void bn_sub(BIGNUM *r, BIGNUM *a, BIGNUM *b) {
     printf("ATTENTION: bn_sub is deprecated. Use bn_subtract instead.\n");
     // TODO: Implement check that r, a and b are different pointers
@@ -2585,63 +2529,6 @@ __device__ void bn_gcdext(BIGNUM *g, BIGNUM *s, BIGNUM *t, BIGNUM *a, BIGNUM *b)
     printf("-- bn_gcdext --\n");
 }
 
-__device__ void bn_mod_inverse_final(BIGNUM *result, BIGNUM *a, BIGNUM *n) {
-    BIGNUM old_r, r, old_t, t, quotient, temp, gcd;
-    init_zero(&old_r, MAX_BIGNUM_WORDS);
-    init_zero(&r, MAX_BIGNUM_WORDS);
-    init_zero(&old_t, MAX_BIGNUM_WORDS);
-    init_zero(&t, MAX_BIGNUM_WORDS);
-    init_zero(&quotient, MAX_BIGNUM_WORDS);
-    init_zero(&temp, MAX_BIGNUM_WORDS);
-    init_zero(&gcd, MAX_BIGNUM_WORDS);
-
-    // Initialize values
-    bn_copy(&old_r, n);
-    bn_copy(&r, a);
-    bn_set_word(&old_t, 0);
-    bn_set_word(&t, 1);
-
-    // Calculate GCD(a, n)
-    bn_gcd(&gcd, a, n);
-
-    // Check if GCD(a, n) is 1
-    BIGNUM one;
-    init_one(&one, MAX_BIGNUM_WORDS);
-    if (bn_cmp(&gcd, &one) != 0) {
-        // GCD is not 1, inverse doesn't exist
-        init_zero(result, MAX_BIGNUM_WORDS);
-        return;
-    }
-
-    while (!bn_is_zero(&r)) {
-        // quotient = old_r / r
-        bn_div(&quotient, &temp, &old_r, &r);
-
-        // (old_r, r) := (r, old_r - quotient * r)
-        bn_copy(&temp, &r);
-        bn_mul(&r, &quotient, &r);
-        bn_sub(&r, &old_r, &r);
-        bn_copy(&old_r, &temp);
-
-        // (old_t, t) := (t, old_t - quotient * t)
-        bn_copy(&temp, &t);
-        bn_mul(&t, &quotient, &t);
-        bn_sub(&t, &old_t, &t);
-        bn_copy(&old_t, &temp);
-        // printf("q = %d, t = %d, nt = %d, r = %d, nr = %d\n", q, t, nt, r, nr);
-        
-    }
-
-    // Make sure old_t is positive
-    if (old_t.neg) {
-        bn_add(&old_t, &old_t, n);
-    }
-
-    // Set the result
-    bn_copy(result, &old_t);
-    bn_mod(result, result, n);
-}
-
 __device__ void bn_mod_inverse(BIGNUM *result, BIGNUM *a, BIGNUM *n) {
     BIGNUM t, nt, r, nr, q, tmp, tmp2;
     init_zero(&t, MAX_BIGNUM_WORDS);
@@ -2657,21 +2544,29 @@ __device__ void bn_mod_inverse(BIGNUM *result, BIGNUM *a, BIGNUM *n) {
         nt.top = find_top(&nt, MAX_BIGNUM_WORDS);
         q.top = find_top(&q, MAX_BIGNUM_WORDS);
 
-        bn_mul(&nt, &q, &tmp2);
-        bn_copy(&nt, &tmp2); // dst, src        
-        bn_print("presub t: ", &t);
-        bn_print("postmul nt: ", &nt);        
-        bn_subtract(&tmp2, &t, &nt); // r = a - b
+        bn_print("\n[0] premul q = ", &q);
+        bn_print("[1] premul nt = ", &nt);
+        bn_mul(&nt, &q, &tmp2); // # nt = q * nt
+        bn_copy(&nt, &tmp2); // dst, src
+        bn_print("[2] postmul nt = ", &nt);        
+
+        bn_print("[3] presub t = ", &t);
+        bn_subtract(&tmp2, &t, &nt); // nt = t - nt
         bn_copy(&nt, &tmp2); // dst << src
-        bn_print("postsub nt: ", &nt);  // OK      
+        bn_print("[4] postsub nt = ", &nt);  // OK
+
         bn_copy(&t, &tmp); // dst << src
         bn_copy(&tmp, &nr); // dst << src
-        // bn_mul(&nr, &q, &nr);
+        bn_print("[5] premul nr = ", &nr);
+        bn_print("[6] premul q = ", &q);
         bn_mul(&nr, &q, &tmp2);
         bn_copy(&nr, &tmp2); // dst, src
-        bn_print("postmul nr: ", &nr); // OK
+        bn_print("[7] postmul nr = ", &nr); // OK
+        
+        bn_print("[8] presub r = ", &r);
         bn_subtract(&tmp2, &r, &nr);
         bn_copy(&nr, &tmp2); // dst << src
+        bn_print("[9] postsub nr = ", &nr); // 
 
         bn_copy(&r, &tmp); // dst << src
         bn_print("\nq: ", &q);
@@ -2693,131 +2588,12 @@ __device__ void bn_mod_inverse(BIGNUM *result, BIGNUM *a, BIGNUM *n) {
     }
 
     if (bn_is_negative(&t)) {
-        bn_add(&t, &t, n);
+        printf("# Negative t\n");
+        bn_add(&tmp2, &t, n); // result = t + n
+        bn_copy(&t, &tmp2); // dst << src
     }
 
-    bn_copy(result, &t);
-}
-
-__device__ void bn_mod_inverse_tmp(BIGNUM *result, BIGNUM *a, BIGNUM *n) {
-    BIGNUM old_r, r, old_t, t, quotient, temp, gcd;
-    init_zero(&old_r, MAX_BIGNUM_WORDS);
-    init_zero(&r, MAX_BIGNUM_WORDS);
-    init_zero(&old_t, MAX_BIGNUM_WORDS);
-    init_zero(&t, MAX_BIGNUM_WORDS);
-    init_zero(&quotient, MAX_BIGNUM_WORDS);
-    init_zero(&temp, MAX_BIGNUM_WORDS);
-    init_zero(&gcd, MAX_BIGNUM_WORDS);
-
-    // Initialize values
-    bn_copy(&old_r, n);
-    bn_copy(&r, a);
-    bn_set_word(&old_t, 0);
-    bn_set_word(&t, 1);
-
-    // Calculate GCD(a, n)
-    bn_gcd(&gcd, a, n);
-
-    // Check if GCD(a, n) is 1
-    BIGNUM one;
-    init_one(&one, MAX_BIGNUM_WORDS);
-    if (bn_cmp(&gcd, &one) != 0) {
-        // GCD is not 1, inverse doesn't exist
-        init_zero(result, MAX_BIGNUM_WORDS);
-        return;
-    }
-
-    int count = 0;
-    int limit = 5;
-
-    while (!bn_is_zero(&r)) {
-        // quotient = old_r / r
-        bn_div(&quotient, &temp, &old_r, &r);
-
-        // (old_r, r) := (r, old_r - quotient * r)
-        bn_copy(&temp, &r);
-        bn_mul(&r, &quotient, &r);
-        bn_sub(&r, &old_r, &r);
-        bn_copy(&old_r, &temp);
-
-        // (old_t, t) := (t, old_t - quotient * t)
-        bn_copy(&temp, &t);
-        bn_mul(&t, &quotient, &t);
-        bn_sub(&t, &old_t, &t);
-        bn_copy(&old_t, &temp);
-
-        // Print all significant values
-        printf("\nIteration %d:\n", count);
-        bn_print("old_r: ", &old_r);
-        bn_print("r: ", &r);
-        bn_print("old_t: ", &old_t);
-        bn_print("t: ", &t);
-
-        count++;
-        if (count > limit) {
-            printf("Limit reached\n");
-            break;
-        }
-    }
-
-    // Make sure old_t is positive
-    if (old_t.neg) {
-        bn_add(&old_t, &old_t, n);
-    }
-
-    // Set the result
-    bn_copy(result, &old_t);
-    bn_mod(result, result, n);
-}
-
-/*__device__ int bn_mod_inverse_v1(BIGNUM *r, BIGNUM *a, BIGNUM *n) {
-    BIGNUM t, nt;
-    init_zero(&t, MAX_BIGNUM_WORDS);
-    init_zero(&nt, MAX_BIGNUM_WORDS);
-
-    // Check for zero input corner cases
-    if (bn_is_zero(n)) {
-        return 0;
-    }
-    if (bn_is_zero(a)) {
-        return 0;
-    }
-
-    // Check if a and n are coprime using bn_gcd
-    bn_gcd(&t, a, n);
-    if (!bn_is_one(&t)) {
-        return 0;
-    }
-
-    // Compute modular inverse using Fermat's Little Theorem
-    // If n is prime, then a^(n-2) mod n is the modular inverse of a
-    bn_set_word(&nt, 2);
-    bn_sub(n, n, &nt);
-    bn_mod_exp(r, a, n, n);
-
-    return 1;
-}*/
-
-__device__ void bn_mod_inverse_v0(BIGNUM *result, BIGNUM *a, BIGNUM *n) {
-    BIGNUM g, x, y;
-    init_zero(&g, MAX_BIGNUM_WORDS);
-    init_zero(&x, MAX_BIGNUM_WORDS);
-    init_zero(&y, MAX_BIGNUM_WORDS);
-
-    bn_gcdext(&g, &x, &y, a, n);
-
-    if (!bn_is_one(&g)) {
-        // a and n are not coprime, no modular inverse exists
-        init_zero(result, MAX_BIGNUM_WORDS);
-        return;
-    }
-
-    // Make sure x is positive
-    if (bn_is_negative(&x)) {
-        bn_add(&x, &x, n);
-    }
-
-    bn_mod(&x, n, result);
+    bn_copy(result, &t); // dst << src
 }
 
 // CUDA point_add function, based on gmp implementation

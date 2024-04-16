@@ -29,14 +29,52 @@ int main() {
     BN_CTX *ctx = BN_CTX_new();
     
     BN_ULONG test_values_a[][MAX_BIGNUM_WORDS] = {
-        {0,0,0,0x3}, // 0
-    };
-    BN_ULONG test_values_n[][MAX_BIGNUM_WORDS] = {
-        {0,0,0,0xB}, // 0
+        {0,0,0,0x3},     // 0: a = 3, n = 11
+        {0,0,0,0x2A},    // 1: a = 42, n = 2017
+        {0,0,0,0x4D2},   // 2: a = 1234, n = 5678
+        {0,0,0,0x0},     // 3: a = 0, n = 11
+        {0,0,0,0x1},     // 4: a = 1, n = 11
+        {0,0,0,0xA},     // 5: a = 10, n = 11
+        {0,0,0,0xB},     // 6: a = 11, n = 11
+        {0,0,0,0x3},     // 7: a = 3, n = 1
+        {0,0,0,0x3},     // 8: a = 3, n = 2
+        {0,0,0,0x3},     // 9: a = 3, n = 11 (for negative 'a' test case)
+        {0,0,0,0x3},     // 10: a = 3, n = 11 (for negative 'n' test case)
+        {0,0,0,0x3},     // 11: a = 3, n = 11 (for negative 'a' and 'n' test case)
+        {0,0,0,0x2A},    // 12: a = 42, n = 2017 (for negative 'a' test case)
+        {0,0,0,0x4D2},   // 13: a = 1234, n = 5678 (for negative 'n' test case)
+        {0,0x11F71B54,0x92EA6E0},    // 14: a = 1234567890, n = 9876543210
+        {0xFFFFFFFF,0xFFFFFFFF,0xFFFFFFFF,0xFFFFFFFF},    // 15: a = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF, n = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
+        {0,0,0,0x4},     // 16: a = 4, n = 12
+        {0,0,0,0x6},     // 17: a = 6, n = 15
+        {0,0,0,0x12},    // 18: a = 18, n = 24
     };
 
-    int sign_a[] = {0}; // Signs for 'a', add -1 for negative numbers as needed
-    int sign_n[] = {0}; // Signs for 'n', add -1 for negative numbers as needed
+    BN_ULONG test_values_n[][MAX_BIGNUM_WORDS] = {
+        {0,0,0,0xB},     // 0: a = 3, n = 11
+        {0,0,0,0x7E1},   // 1: a = 42, n = 2017
+        {0,0,0,0x162E},  // 2: a = 1234, n = 5678
+        {0,0,0,0xB},     // 3: a = 0, n = 11
+        {0,0,0,0xB},     // 4: a = 1, n = 11
+        {0,0,0,0xB},     // 5: a = 10, n = 11
+        {0,0,0,0xB},     // 6: a = 11, n = 11
+        {0,0,0,0x1},     // 7: a = 3, n = 1
+        {0,0,0,0x2},     // 8: a = 3, n = 2
+        {0,0,0,0xB},     // 9: a = 3, n = 11 (for negative 'a' test case)
+        {0,0,0,0xB},     // 10: a = 3, n = 11 (for negative 'n' test case)
+        {0,0,0,0xB},     // 11: a = 3, n = 11 (for negative 'a' and 'n' test case)
+        {0,0,0,0x7E1},   // 12: a = 42, n = 2017 (for negative 'a' test case)
+        {0,0,0,0x162E},  // 13: a = 1234, n = 5678 (for negative 'n' test case)
+        {0,0x2456AF20,0x962E90},    // 14: a = 1234567890, n = 9876543210
+        {0xFFFFFFFF,0xFFFFFFFF,0xFFFFFFFF,0xFFFFFFFF},    // 15: a = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF, n = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
+        {0,0,0,0xC},     // 16: a = 4, n = 12
+        {0,0,0,0xF},     // 17: a = 6, n = 15
+        {0,0,0,0x18},    // 18: a = 18, n = 24
+    };
+
+    // 0 for positive, 1 for negative
+    int sign_a[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0};
+    int sign_n[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, 0, 0};
 
     // Number of tests defined by the number of elements in test_values_a/n arrays.
     int num_tests = sizeof(test_values_a) / sizeof(test_values_a[0]);
@@ -75,7 +113,7 @@ int main() {
         BN_free(a);
         BN_free(n);
         BN_free(mod_inverse); // mod_inverse is created by BN_mod_inverse
-        break;
+        //break;
     }
 
     BN_CTX_free(ctx);
