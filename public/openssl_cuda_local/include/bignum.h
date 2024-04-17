@@ -16,8 +16,6 @@ typedef struct bignum_st {
 } BIGNUM;
 
 __device__ void bn_add(BIGNUM *result, BIGNUM *a, BIGNUM *b);
-// __device__ int bn_divide_rev2(BIGNUM *quotient, BIGNUM *remainder, BIGNUM *dividend, BIGNUM *divisor);
-// __device__ int bn_divide_rev3(BIGNUM *quotient, BIGNUM *remainder, BIGNUM *dividend, BIGNUM *divisor);
 __device__ int bn_mod(BIGNUM *r, BIGNUM *m, BIGNUM *d);
 
 __device__ void bn_print(const char* msg, BIGNUM* a) {
@@ -419,38 +417,6 @@ __device__ void bn_subtract(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
     //bn_print("result: ", result);
 }
 
-/*__device__ void bn_subtract_v0(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
-    printf("bn_subtract\n");
-    // Determine the real sign of the result based on the signs of a and b.
-    if (a->neg != b->neg) {
-        // If one is negative and the other is positive, it's essentially an addition.
-        result->neg = a->neg;  // The sign will be the same as the sign of 'a'.
-        // Should perform an addition of magnitudes here because b is negative.
-        absolute_add(result, a, b); // This line should be added to perform the absolute value addition.
-        return;
-    } else {
-        // Else, signs are same, and it's a subtraction.
-        // The result will have the sign of 'a' if |a| >= |b|, otherwise, it will
-        // be the opposite of 'a' sign because |a| < |b|.
-        // result->neg = (bn_cmp(a, b) >= 0) ? a->neg : !a->neg;
-        if (bn_cmp(a, b) >= 0) {
-            result->neg = a->neg;  // If the comparison is true (a is greater or equal to b), take the sign from 'a'
-        } else {
-            result->neg = !a->neg; // If the comparison is false (a is less than b), take the opposite of 'a''s sign
-        }
-    }
-
-    // Perform the absolute subtraction without altering 'a' and 'b'.
-    // The function 'absolute_subtract' needs to be implemented as subtraction of |a| and |b|.
-    absolute_subtract(result, a, b);
-
-    // Find the top of the resulting bignum to remove leading zeros
-    find_top(result, MAX_BIGNUM_WORDS);
-
-    // If 'a' and 'b' were of different signs, we already set result->neg accordingly.
-    // We are dealing with the scenario where |a| - |b| or |b| - |a| is performed.
-}*/
-
 __device__ void bn_add_v0(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
     if (a->neg != b->neg) {
         // Handle the case where a and b have different signs
@@ -573,10 +539,6 @@ __device__ void bn_add(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
     // Lastly, normalize the result to remove any leading zeros that could have appeared.
     find_top(result, MAX_BIGNUM_WORDS);
 }
-
-/*BIGNUM divide_tmp;
-init_zero(&divide_tmp, MAX_BIGNUM_WORDS);
-#define bn_mod(r, m, d) bn_divide(divide_tmp, (r), (m), (d))*/
 
 __device__ void bn_mod_deprecated(BIGNUM* r, BIGNUM* m, BIGNUM* d) {
     //debug_printf("bn_mod 0\n");
@@ -1222,25 +1184,25 @@ __device__ void point_double(EC_POINT *P, EC_POINT *R, BIGNUM *p) {
 }
 
 __device__ bool bn_is_zero(BIGNUM *a) {
-    /*printf("++ bn_is_zero ++\n");
-    bn_print(">> a: ", a);*/
+    printf("++ bn_is_zero ++\n");
+    bn_print(">> a: ", a);
     // Check a top
     int top = find_top(a, MAX_BIGNUM_WORDS);
     if (top != a->top) {
-        //printf("WARNING: bn_is_zero: top is not correct\n");
+        printf("WARNING: bn_is_zero: top is not correct\n");
         //printf("a->top: %d, actual top: %d\n", a->top, top);
         // Set the top to the correct value
         a->top = top;
     }
     for (int i = 0; i < a->top; ++i) {
         if (a->d[i] != 0) {
-            /*printf(">> return: False\n");
-            printf("-- bn_is_zero --\n");*/
+            printf(">> return: False\n");
+            printf("-- bn_is_zero --\n");
             return false;
         }
     }
-    /*printf(">> return: True\n");
-    printf("-- bn_is_zero --\n");*/
+    printf(">> return: True\n");
+    printf("-- bn_is_zero --\n");
     return true;
 }
 
@@ -1949,10 +1911,12 @@ __device__ int bn_div(BIGNUM *quotient, BIGNUM *remainder, BIGNUM *dividend, BIG
     // Error checks similar to OpenSSL
     if (divisor == NULL || bn_is_zero(divisor)) {
         // Handle division by zero or similar error
+        printf("bn_div Error: Division by zero or invalid divisor\n");
         return 0;
     }
     if (dividend == NULL) {
         // Handle invalid dividend
+        printf("bn_div Error: Invalid dividend\n");
         return 0;
     }
 
@@ -2017,15 +1981,14 @@ __device__ int bn_div(BIGNUM *quotient, BIGNUM *remainder, BIGNUM *dividend, BIG
         remainder->d[i] = remainder->d[remainder->top - i - 1];
         remainder->d[remainder->top - i - 1] = temp;
     }*/
-
-    bn_print("\n<< quotient: ", quotient);
-    printf("# bignum quotient top: %d\n", quotient->top);
-    bn_print("<< remainder: ", remainder);
-    printf("# bignum remainder top: %d\n", remainder->top);
-
     // Determine sign of quotient and remainder
     quotient->neg = dividend->neg ^ divisor->neg;
     remainder->neg = dividend->neg;
+
+    bn_print("\n<< quotient: ", quotient);
+    //printf("# bignum quotient top: %d\n", quotient->top);
+    bn_print("<< remainder: ", remainder);
+    //printf("# bignum remainder top: %d\n", remainder->top);
 
     // Update tops using find_top
     //quotient->top = find_top(quotient, MAX_BIGNUM_WORDS);
@@ -2611,8 +2574,106 @@ __device__ bool bn_mod_inverse(BIGNUM *result, BIGNUM *a, BIGNUM *n) {
     return true;
 }
 
+__device__ int point_add(
+    EC_POINT *result, 
+    EC_POINT *p1, 
+    EC_POINT *p2, 
+    BIGNUM *p, 
+    BIGNUM *a
+) {
+    // Handle the point at infinity cases
+    if (point_is_at_infinity(p1)) {
+        copy_point(result, p2);
+        return 0;
+    }
+    if (point_is_at_infinity(p2)) {
+        copy_point(result, p1);
+        return 0;
+    }
+
+    // Initialize temporary BIGNUMs for calculation
+    BIGNUM s, x3, y3, tmp1, tmp2;
+    init_zero(&s, MAX_BIGNUM_WORDS);
+    init_zero(&x3, MAX_BIGNUM_WORDS);
+    init_zero(&y3, MAX_BIGNUM_WORDS);
+    init_zero(&tmp1, MAX_BIGNUM_WORDS);
+    init_zero(&tmp2, MAX_BIGNUM_WORDS);
+    
+    if (bn_cmp(&p1->x, &p2->x) == 0 && bn_cmp(&p1->y, &p2->y) != 0) {
+        // The points are inverses to one another, return point at infinity
+        set_point_at_infinity(result);
+        return 0;
+    }
+
+    if (bn_cmp(&p1->x, &p2->x) == 0 && bn_cmp(&p1->y, &p2->y) == 0) {
+        // Point doubling
+        BIGNUM two;
+        init_zero(&two, MAX_BIGNUM_WORDS);
+        bn_set_word(&two, 2);
+        
+        bn_mul(&tmp1, &p1->x, &p1->x);     // tmp1 = p1.x^2
+        bn_mod(&tmp1, p, &tmp1);           // tmp1 = p1.x^2 mod p
+        bn_add(&tmp1, &tmp1, &tmp1);       // tmp1 = 2 * p1.x^2
+        bn_add(&tmp1, &tmp1, &p1->x);      // tmp1 = 3 * p1.x^2
+        bn_mod(&tmp1, p, &tmp1);           // tmp1 = 3 * p1.x^2 mod p
+        bn_add(&tmp1, &tmp1, a);           // tmp1 = 3 * p1.x^2 + a
+        bn_mod(&tmp1, p, &tmp1);           // tmp1 = (3 * p1.x^2 + a) mod p
+        
+        bn_mul(&tmp2, &p1->y, &two);       // tmp2 = 2 * p1.y
+        bn_mod(&tmp2, p, &tmp2);           // tmp2 = (2 * p1.y) mod p
+        // print tmp2 and p
+        bn_print("### >> bn_mod_inverse tmp2: ", &tmp2);
+        bn_print("### >> bn_mod_inverse p: ", p);
+        bn_mod_inverse(&tmp2, p, &tmp2);   // tmp2 = (2 * p1.y)^-1 mod p
+        
+        bn_mul(&s, &tmp1, &tmp2);          // s = (3 * p1.x^2 + a) * (2 * p1.y)^-1
+        bn_mod(&s, p, &s);                 // s = (3 * p1.x^2 + a) / (2 * p1.y) mod p
+        
+        bn_mul(&x3, &s, &s);               // x3 = s^2
+        bn_mod(&x3, p, &x3);               // x3 = s^2 mod p
+        bn_subtract(&x3, &x3, &p1->x);          
+        bn_subtract(&x3, &x3, &p1->x);          // x3 = s^2 - 2 * p1.x
+        bn_mod(&x3, p, &x3);               // x3 = (s^2 - 2 * p1.x) mod p
+        
+        bn_subtract(&tmp1, &p1->x, &x3);    
+        bn_mul(&y3, &s, &tmp1);            // y3 = s * (p1.x - x3)
+        bn_mod(&y3, p, &y3);               // y3 = s * (p1.x - x3) mod p
+        bn_subtract(&y3, &y3, &p1->y);          // y3 = s * (p1.x - x3) - p1.y
+        bn_mod(&y3, p, &y3);               // y3 = (s * (p1.x - x3) - p1.y) mod p
+    } else {
+        // Regular point addition
+        bn_subtract(&tmp1, &p2->y, &p1->y);
+        bn_mod(&tmp1, p, &tmp1);           // tmp1 = (p2.y - p1.y) mod p
+        bn_subtract(&tmp2, &p2->x, &p1->x);
+        bn_mod(&tmp2, p, &tmp2);           // tmp2 = (p2.x - p1.x) mod p
+        bn_mod_inverse(&tmp2, p, &tmp2);   // tmp2 = (p2.x - p1.x)^-1 mod p
+        bn_mul(&s, &tmp1, &tmp2);          // s = (p2.y - p1.y) * (p2.x - p1.x)^-1
+        bn_mod(&s, p, &s);                 // s = (p2.y - p1.y) / (p2.x - p1.x) mod p
+
+        bn_mul(&x3, &s, &s);               // x3 = s^2
+        bn_mod(&x3, p, &x3);               // x3 = s^2 mod p
+        bn_subtract(&x3, &x3, &p1->x);
+        bn_subtract(&x3, &x3, &p2->x);          // x3 = s^2 - p1.x - p2.x
+        bn_mod(&x3, p, &x3);               // x3 = (s^2 - p1.x - p2.x) mod p
+
+        bn_subtract(&tmp1, &p1->x, &x3);
+        bn_mul(&y3, &s, &tmp1);            // y3 = s * (p1.x - x3)
+        bn_mod(&y3, p, &y3);               // y3 = s * (p1.x - x3) mod p
+        bn_subtract(&y3, &y3, &p1->y);          // y3 = s * (p1.x - x3) - p1.y
+        bn_mod(&y3, p, &y3);               // y3 = (s * (p1.x - x3) - p1.y) mod p
+    }
+
+    // Assign the computed coordinates to the result
+    // copy_bn(&result->x, &x3);
+    // copy_bn(&result->y, &y3);
+    bn_copy(&result->x, &x3);
+    bn_copy(&result->y, &y3);
+
+    return 0;
+}
+
 // CUDA point_add function, based on gmp implementation
-__device__ void point_add(
+__device__ void point_add_v0(
     EC_POINT *result, 
     EC_POINT *p1, 
     EC_POINT *p2, 
@@ -2620,12 +2681,12 @@ __device__ void point_add(
     BIGNUM *a
     ) {    // Handle the point at infinity cases
     //printf("A # Result x.d: %f, y.d: %f\n", result->x.d, result->y.d);
-    bn_print("point_add init result.x: ", &result->x);
-    bn_print("point_add init result.y: ", &result->y);
-    bn_print("p1.x: ", &p1->x);
-    bn_print("p1.y: ", &p1->y);
-    bn_print("p2.x: ", &p2->x);
-    bn_print("p2.y: ", &p2->y);
+    bn_print(">> point_add init result.x: ", &result->x);
+    bn_print(">> point_add init result.y: ", &result->y);
+    bn_print(">> p1.x: ", &p1->x);
+    bn_print(">> p1.y: ", &p1->y);
+    bn_print(">> p2.x: ", &p2->x);
+    bn_print(">> p2.y: ", &p2->y);
     // bn_print("A result: ", &result.x);
     if (point_is_at_infinity(p1)) {
         printf("point_is_at_infinity(p1)\n");
@@ -2718,8 +2779,8 @@ __device__ void point_add(
     if (bn_cmp(&p1->x, &p2->x) != 0) {
         printf("bn_cmp(&p1->x, &p2->x) != 0\n");
         // Full point addition formula
-        bn_sub(&tmp1, &p2->y, &p1->y);
-        bn_sub(&tmp2, &p2->x, &p1->x);
+        bn_subtract(&tmp1, &p2->y, &p1->y);
+        bn_subtract(&tmp2, &p2->x, &p1->x);
         bn_mod(&tmp1, p, &tmp1);
         bn_mod(&tmp2, p, &tmp2);
         bn_mod_inverse(&tmp2, p, &tmp2); // Compute modular inverse //TODO: replace to general mod inverse

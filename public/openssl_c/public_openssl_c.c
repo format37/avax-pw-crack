@@ -26,10 +26,16 @@ int main() {
     EC_POINT_mul(EC_KEY_get0_group(eckey), pub_key, priv_key, NULL, NULL, NULL);
     EC_KEY_set_public_key(eckey, pub_key);
 
+    // Print uncompressed public key
+    char *pub_key_hex = EC_POINT_point2hex(EC_KEY_get0_group(eckey), pub_key, POINT_CONVERSION_UNCOMPRESSED, NULL);
+    printf("\nUncompressed Public Key: %s\n", pub_key_hex);
+    OPENSSL_free(pub_key_hex);
+
     // Compress public key
     compress_pubkey(eckey, compressed_pubkey, &compressed_pubkey_len);
 
     // Print compressed public key
+    printf("\nCompressed Public Key: ");
     for (size_t i = 0; i < compressed_pubkey_len; i++) {
         printf("%02x", compressed_pubkey[i]);
     }

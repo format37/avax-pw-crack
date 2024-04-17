@@ -142,12 +142,19 @@ int main() {
     mpz_set(G.x, Gx);
     mpz_set(G.y, Gy);
 
-    gmp_printf("0 x: %Zx\n", G.x);
-    gmp_printf("0 y: %Zx\n", G.y);
-    r = point_add(r, G);
-    // print the current x and y    
-    gmp_printf("1 x: %Zx\n", r.x);
-    gmp_printf("1 y: %Zx\n", r.y);
+    // Create point p2: C6047F9441ED7D6D3045406E95C07CD85C778E4B8CEF3CA7ABAC09B95C709EE5
+    Point p2;
+    mpz_init(p2.x);
+    mpz_init(p2.y);
+    mpz_set_str(p2.x, "C6047F9441ED7D6D3045406E95C07CD85C778E4B8CEF3CA7ABAC09B95C709EE5", 16);
+    mpz_set_str(p2.y, "1AE168FEA63DC339A3C58419466CEAEEF7F632653266D0E1236431A950CFE52A", 16);
+    
+    gmp_printf("<< p2 x: %Zx\n", p2.x);
+    gmp_printf("<< p2 y: %Zx\n", p2.y);
+    r = point_add(G, p2);
+    // print the current x and y
+    gmp_printf("<< r x: %Zx\n", r.x);
+    gmp_printf("<< r y: %Zx\n", r.y);
 
     return 0;
 }

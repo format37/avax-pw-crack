@@ -143,13 +143,22 @@ Point point_multiply(Point p, mpz_t n) {
     gmp_printf("0 x: %Zx\n", pp.x);
     gmp_printf("0 y: %Zx\n", pp.y);
     mpz_mod_ui(temp, n, 2);
+    // print pre_point_add r and pp
+    gmp_printf("pre pp x: %Zx\n", pp.x);
+    gmp_printf("pre pp y: %Zx\n", pp.y);
     if (mpz_cmp_ui(temp, 1) == 0) {
+      gmp_printf("pre r x: %Zx\n", r.x);
+      gmp_printf("pre r y: %Zx\n", r.y);
       r = point_add(r, pp);
+      gmp_printf("post r x: %Zx\n", r.x);
+      gmp_printf("post r y: %Zx\n", r.y);
       // print the current x and y
       gmp_printf("1 x: %Zx\n", r.x);
       gmp_printf("1 y: %Zx\n", r.y);
     }
-    pp = point_add(pp, pp);
+    pp = point_add(pp, pp);    
+    gmp_printf("post pp x: %Zx\n", pp.x);
+    gmp_printf("post pp y: %Zx\n", pp.y);
     mpz_tdiv_q_ui(n, n, 2);
     // print the current x and y
     gmp_printf("2 x: %Zx\n", pp.x);
