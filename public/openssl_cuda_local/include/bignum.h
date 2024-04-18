@@ -242,9 +242,9 @@ __device__ int bn_cmp_one(BIGNUM* a) {
 
 // Helper function to perform a deep copy of BIGNUM
 __device__ void bn_copy(BIGNUM *dest, BIGNUM *src) {
-    /*printf("++ bn_copy ++\n");
+    printf("++ bn_copy ++\n");
     bn_print(">> src: ", src);
-    bn_print(">> dest: ", dest);*/
+    bn_print(">> dest: ", dest);
 
     // Init dst as zero
     init_zero(dest, MAX_BIGNUM_WORDS);
@@ -298,9 +298,9 @@ __device__ void bn_copy(BIGNUM *dest, BIGNUM *src) {
     //bn_print("[2] dest: ", dest);
     dest->dmax = src->dmax;
     
-    /*bn_print("<< src: ", src);
+    bn_print("<< src: ", src);
     bn_print("<< dest: ", dest);
-    printf("-- bn_copy --\n");*/
+    printf("-- bn_copy --\n");
 }
 
 __device__ void absolute_add(BIGNUM *result, const BIGNUM *a, const BIGNUM *b) {
@@ -1102,7 +1102,7 @@ __device__ int bn_mod(BIGNUM *r, BIGNUM *a, BIGNUM *n) {
     - `ctx` is the context used for memory management during the operation in original OpenSSL implementation.
     */
     // return bn_divide_rev2(&q, r, a, n); // quotient, remainder, 
-    printf("-- bn_mod --\n");
+    printf("-- bn_mod --> bn_div..\n");
     return bn_div(&q, r, a, n); // quotient, remainder, 
 }
 
@@ -1185,8 +1185,11 @@ __device__ void point_double(EC_POINT *P, EC_POINT *R, BIGNUM *p) {
 
 __device__ bool bn_is_zero(BIGNUM *a) {
     printf("++ bn_is_zero ++\n");
+    bn_print(">>[3] bn_div divisor: ", a);
     bn_print(">> a: ", a);
+    printf("a->top: %d\n", a->top);
     // Check a top
+
     int top = find_top(a, MAX_BIGNUM_WORDS);
     if (top != a->top) {
         printf("WARNING: bn_is_zero: top is not correct\n");
@@ -1195,6 +1198,7 @@ __device__ bool bn_is_zero(BIGNUM *a) {
         a->top = top;
     }
     for (int i = 0; i < a->top; ++i) {
+        printf(">> a->d[%d]: %llu\n", i, a->d[i]);
         if (a->d[i] != 0) {
             printf(">> return: False\n");
             printf("-- bn_is_zero --\n");
@@ -1886,7 +1890,7 @@ __device__ void bn_div_binary(
     memcpy(remainder, temp, total_bits * sizeof(int));
 }
 
-__device__ int bn_div(BIGNUM *quotient, BIGNUM *remainder, BIGNUM *dividend, BIGNUM *divisor) {
+__device__ int bn_div(BIGNUM *quotient_in, BIGNUM *remainder_in, BIGNUM *dividend_in, BIGNUM *divisor_in) {
     /*
     - `dv` (quotient) is where the result of the division is stored.
     - `rem` (remainder) is where the remainder of the division is stored.
@@ -1898,27 +1902,72 @@ __device__ int bn_div(BIGNUM *quotient, BIGNUM *remainder, BIGNUM *dividend, BIG
     // dividend
     // -------- = quotient, remainder
     // divisor
+    printf("\n++ bn_div ++\n");
 
+    // Declare local BIGNUM variables
+    BIGNUM quotient;
+    BIGNUM remainder;
+    BIGNUM dividend;
+    BIGNUM divisor;
+    printf("# [0] #\n");
+    // Initialize the BIGNUMs
+    init_zero(&quotient, MAX_BIGNUM_WORDS);
+    init_zero(&remainder, MAX_BIGNUM_WORDS);
+    init_zero(&dividend, MAX_BIGNUM_WORDS);
+    init_zero(&divisor, MAX_BIGNUM_WORDS);
+    printf("# [1] #\n");
+    //bn_print(">> dividend: ", dividend_in);
+    //bn_print(">> divisor: ", divisor_in);
+    // Copy from input BIGNUMs
+    bn_copy(&quotient, quotient_in);
+    bn_copy(&remainder, remainder_in);
+    bn_copy(&dividend, dividend_in);
+    bn_copy(&divisor, divisor_in);
+    printf("# [2] #\n");
     // print input values
-    bn_print(">> bn_div dividend: ", dividend);
-    bn_print(">> bn_div divisor: ", divisor);
+    bn_print(">> bn_div dividend: ", &dividend);
+    bn_print(">>[0] bn_div divisor: ", &divisor);
 
     // init zero to quotient and remainder
-    init_zero(quotient, MAX_BIGNUM_WORDS);
-    init_zero(remainder, MAX_BIGNUM_WORDS);
-    quotient->neg = 0;
-    remainder->neg = 0;
+    init_zero(&quotient, MAX_BIGNUM_WORDS);
+    init_zero(&remainder, MAX_BIGNUM_WORDS);
+    quotient.neg = 0;
+    remainder.neg = 0;
+    
     // Error checks similar to OpenSSL
-    if (divisor == NULL || bn_is_zero(divisor)) {
+    bn_print(">>[1] bn_div divisor: ", &divisor);
+    if (bn_is_zero(&divisor)) {
         // Handle division by zero or similar error
-        printf("bn_div Error: Division by zero or invalid divisor\n");
+        // Free the allocated memory when done
+        /*free(quotient);
+        free(remainder);
+        free(dividend);
+        free(divisor);*/
+        printf("-- bn_div -- Error: Division by zero. Divisor is zero\n");
         return 0;
     }
-    if (dividend == NULL) {
+    if (&divisor == NULL) {
+        // Handle invalid divisor
+        // Free the allocated memory when done
+        /*free(quotient);
+        free(remainder);
+        free(dividend);
+        free(divisor);*/
+        printf("-- bn_div -- Error: Invalid divisor\n");
+        return 0;
+    }
+    if (&dividend == NULL) {
         // Handle invalid dividend
-        printf("bn_div Error: Invalid dividend\n");
+        // Free the allocated memory when done
+        /*free(quotient);
+        free(remainder);
+        free(dividend);
+        free(divisor);*/
+        printf("-- bn_div -- Error: Invalid dividend\n");
         return 0;
     }
+
+    
 
     const int total_bits = MAX_BIGNUM_WORDS * BN_ULONG_NUM_BITS;
     // printf("# total_bits: %d\n", total_bits);
@@ -1934,8 +1983,8 @@ __device__ int bn_div(BIGNUM *quotient, BIGNUM *remainder, BIGNUM *dividend, BIG
     memset(binary_remainder, 0, total_bits * sizeof(int));
     
     // Convert the BIGNUMs to binary arrays, use actual 'top' value for correct size
-    convert_to_binary_array(dividend->d, binary_dividend, MAX_BIGNUM_WORDS);
-    convert_to_binary_array(divisor->d, binary_divisor, MAX_BIGNUM_WORDS);
+    convert_to_binary_array(dividend.d, binary_dividend, MAX_BIGNUM_WORDS);
+    convert_to_binary_array(divisor.d, binary_divisor, MAX_BIGNUM_WORDS);
 
     //binary_print_big_endian(">> binary_dividend", binary_dividend, total_bits);
     //binary_print_big_endian(">> binary_divisor", binary_divisor, total_bits);
@@ -1948,8 +1997,8 @@ __device__ int bn_div(BIGNUM *quotient, BIGNUM *remainder, BIGNUM *dividend, BIG
         binary_divisor, 
         binary_quotient, 
         binary_remainder, 
-        dividend->top, 
-        divisor->top
+        dividend.top, 
+        divisor.top
         );
 
     //bn_print_quotient("<< binary_quotient", quotient);
@@ -1957,23 +2006,23 @@ __device__ int bn_div(BIGNUM *quotient, BIGNUM *remainder, BIGNUM *dividend, BIG
     //binary_print_big_endian("<< binary_remainder", binary_remainder, total_bits);
 
     // Fix the 'top' fields of quotient and remainder
-    quotient->top = get_bn_top_from_binary_array(binary_quotient, total_bits);
+    quotient.top = get_bn_top_from_binary_array(binary_quotient, total_bits);
     //quotient->top = get_bn_top_from_binary_array_little_endian(binary_quotient, total_bits);
     //printf("\n# Total bits: %d\n", total_bits);
     //printf("\n# binary quotient top: %d\n", quotient->top);
-    remainder->top = get_bn_top_from_binary_array(binary_remainder, total_bits);
+    remainder.top = get_bn_top_from_binary_array(binary_remainder, total_bits);
     //printf("\n# binary remainder top: %d\n", remainder->top);
 
     // Convert the binary arrays back to BIGNUMs
-    quotient->top = MAX_BIGNUM_WORDS;
-    convert_back_to_bn_ulong(binary_quotient, quotient->d, quotient->top);
-    remainder->top = MAX_BIGNUM_WORDS;
-    convert_back_to_bn_ulong(binary_remainder, remainder->d, remainder->top);
+    quotient.top = MAX_BIGNUM_WORDS;
+    convert_back_to_bn_ulong(binary_quotient, quotient.d, quotient.top);
+    remainder.top = MAX_BIGNUM_WORDS;
+    convert_back_to_bn_ulong(binary_remainder, remainder.d, remainder.top);
     // Reverse words in the quotient
-    for (int i = 0; i < quotient->top / 2; i++) {
-        BN_ULONG temp = quotient->d[i];
-        quotient->d[i] = quotient->d[quotient->top - i - 1];
-        quotient->d[quotient->top - i - 1] = temp;
+    for (int i = 0; i < quotient.top / 2; i++) {
+        BN_ULONG temp = quotient.d[i];
+        quotient.d[i] = quotient.d[quotient.top - i - 1];
+        quotient.d[quotient.top - i - 1] = temp;
     }
     // Reverse words in the remainder
     /*for (int i = 0; i < remainder->top / 2; i++) {
@@ -1982,12 +2031,12 @@ __device__ int bn_div(BIGNUM *quotient, BIGNUM *remainder, BIGNUM *dividend, BIG
         remainder->d[remainder->top - i - 1] = temp;
     }*/
     // Determine sign of quotient and remainder
-    quotient->neg = dividend->neg ^ divisor->neg;
-    remainder->neg = dividend->neg;
+    quotient.neg = dividend.neg ^ divisor.neg;
+    remainder.neg = dividend.neg;
 
-    bn_print("\n<< quotient: ", quotient);
+    bn_print("\n<< quotient: ", &quotient);
     //printf("# bignum quotient top: %d\n", quotient->top);
-    bn_print("<< remainder: ", remainder);
+    bn_print("<< remainder: ", &remainder);
     //printf("# bignum remainder top: %d\n", remainder->top);
 
     // Update tops using find_top
@@ -1997,7 +2046,16 @@ __device__ int bn_div(BIGNUM *quotient, BIGNUM *remainder, BIGNUM *dividend, BIG
     // print output values
     //bn_print("<< bn_div quotient: ", quotient);
     //bn_print("<< bn_div remainder: ", remainder);
-
+    
+    // Set the output values
+    bn_copy(quotient_in, &quotient);
+    bn_copy(remainder_in, &remainder);
+    // Free the allocated memory when done
+    /*free(quotient);
+    free(remainder);
+    free(dividend);
+    free(divisor);*/
+    printf("-- bn_div --\n");
     return 1;
 }
 
@@ -2493,28 +2551,43 @@ __device__ void bn_gcdext(BIGNUM *g, BIGNUM *s, BIGNUM *t, BIGNUM *a, BIGNUM *b)
 }
 
 __device__ bool bn_mod_inverse(BIGNUM *result, BIGNUM *a, BIGNUM *n) {
+    printf("++ bn_mod_inverse ++\n");
+    bn_print(">> a: ", a);
+    bn_print(">> n: ", n);
+    bn_print(">> result: ", result);
     if (bn_is_one(n)) {
         return false;  // No modular inverse exists
     }
     BIGNUM gcd;
     init_zero(&gcd, MAX_BIGNUM_WORDS);
     bn_gcd(&gcd, a, n);
-
+    printf("<<gcd out>>\n");
     if (!bn_is_one(&gcd)) {
         // GCD(a, n) is not 1, so no modular inverse exists
         init_zero(result, MAX_BIGNUM_WORDS);
         return false;
     }
-
+    printf("## 0 ##\n");
     BIGNUM t, nt, r, nr, q, tmp, tmp2;
     init_zero(&t, MAX_BIGNUM_WORDS);
     init_zero(&tmp2, MAX_BIGNUM_WORDS);
     init_one(&nt, MAX_BIGNUM_WORDS);
+    init_zero(&r, MAX_BIGNUM_WORDS);
+    init_zero(&nr, MAX_BIGNUM_WORDS);
+    init_zero(&q, MAX_BIGNUM_WORDS);
+    init_zero(&tmp, MAX_BIGNUM_WORDS);
     bn_copy(&r, n);
-    bn_mod(&nr, a, n);
-    //int counter = 0;
+    printf("## 1 ##\n");
+    bn_mod(&nr, a, n); // OK
+    printf("## 2 ##\n");
+    printf("<<mod out>>\n");
+    int counter = 0;
     while (!bn_is_zero(&nr)) {
-        bn_div(&q, &tmp, &r, &nr);
+        bn_print("\n[bn_mod_inverse pre_bn_div] r = ", &r);
+        bn_print("[bn_mod_inverse pre_bn_div] nr = ", &nr);
+        bn_print("[bn_mod_inverse pre_bn_div] tmp = ", &tmp);
+        bn_print("[bn_mod_inverse pre_bn_div] q = ", &q);
+        bn_div(&q, &tmp, &r, &nr); // CHECK
         bn_copy(&tmp, &nt);
         
         nt.top = find_top(&nt, MAX_BIGNUM_WORDS);
@@ -2550,11 +2623,11 @@ __device__ bool bn_mod_inverse(BIGNUM *result, BIGNUM *a, BIGNUM *n) {
         bn_print("nt: ", &nt);
         bn_print("r: ", &r);
         bn_print("nr: ", &nr);
-        /*counter++;
+        counter++;
         if (counter > 10) {
             printf("Counter limit reached\n");
             break;
-        }*/
+        }
     }
 
     if (!bn_is_one(&r)) {
@@ -2621,10 +2694,15 @@ __device__ int point_add(
         
         bn_mul(&tmp2, &p1->y, &two);       // tmp2 = 2 * p1.y
         bn_mod(&tmp2, p, &tmp2);           // tmp2 = (2 * p1.y) mod p
-        // print tmp2 and p
+        
+        BIGNUM tmp3;
+        init_zero(&tmp3, MAX_BIGNUM_WORDS);
+        bn_copy(&tmp3, &tmp2);
+        // print tmp2, tmp3, and p
         bn_print("### >> bn_mod_inverse tmp2: ", &tmp2);
+        bn_print("### >> bn_mod_inverse tmp3: ", &tmp3);
         bn_print("### >> bn_mod_inverse p: ", p);
-        bn_mod_inverse(&tmp2, p, &tmp2);   // tmp2 = (2 * p1.y)^-1 mod p
+        bn_mod_inverse(&tmp2, p, &tmp3);   // tmp2 = (2 * p1.y)^-1 mod p
         
         bn_mul(&s, &tmp1, &tmp2);          // s = (3 * p1.x^2 + a) * (2 * p1.y)^-1
         bn_mod(&s, p, &s);                 // s = (3 * p1.x^2 + a) / (2 * p1.y) mod p

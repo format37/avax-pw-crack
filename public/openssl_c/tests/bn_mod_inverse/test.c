@@ -48,6 +48,7 @@ int main() {
         {0,0,0,0x4},     // 16: a = 4, n = 12
         {0,0,0,0x6},     // 17: a = 6, n = 15
         {0,0,0,0x12},    // 18: a = 18, n = 24
+        {0xffffffffffffffff, 0xffffffffffffffe, 0xbaaedce6af48a03b, 0xbfd25e8cd0364141},
     };
 
     BN_ULONG test_values_n[][MAX_BIGNUM_WORDS] = {
@@ -70,11 +71,12 @@ int main() {
         {0,0,0,0xC},     // 16: a = 4, n = 12
         {0,0,0,0xF},     // 17: a = 6, n = 15
         {0,0,0,0x18},    // 18: a = 18, n = 24
+        {0x1b2db4c027cdbaba, 0x70116675aa53aa8a, 0xad1c289591e564d3, 0xcaa5c571ffccab5a},
     };
 
     // 0 for positive, 1 for negative
-    int sign_a[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0};
-    int sign_n[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, 0, 0};
+    int sign_a[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0};
+    int sign_n[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0};
 
     // Number of tests defined by the number of elements in test_values_a/n arrays.
     int num_tests = sizeof(test_values_a) / sizeof(test_values_a[0]);
