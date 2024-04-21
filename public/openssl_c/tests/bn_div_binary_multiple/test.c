@@ -44,6 +44,19 @@ void binary_division(int dividend[], int divisor[], int quotient[], int remainde
         }
         temp[total_bits - 1] = dividend[i];
         
+        printf("Iteration %d:\n", i);
+        printf("temp: ");
+        for (int j = 0; j < total_bits; ++j) {
+            printf("%d", temp[j]);
+        }
+        printf("\n");
+
+        printf("divisor: ");
+        for (int j = 0; j < total_bits; ++j) {
+            printf("%d", divisor[j]);
+        }
+        printf("\n");
+
         // Check if temp is greater than or equal to divisor
         int can_subtract = 1;
         for (int j = 0; j < total_bits; ++j) {
@@ -52,9 +65,10 @@ void binary_division(int dividend[], int divisor[], int quotient[], int remainde
                 break;
             }
         }
-
+        printf("can_subtract: %d\n", can_subtract);
         // Subtract divisor from temp if temp >= divisor
         if(can_subtract) {
+            printf(">> Subtracting is available\n");
             quotient[i] = 1;
             for (int j = total_bits - 1; j >= 0; --j) {
                 temp[j] -= divisor[j];
@@ -117,8 +131,18 @@ int main() {
     //BN_ULONG A[WORDS] = {0x1234567890ABCDEF, 0x1234567890ABCDEF}; // Example values for A    
     //BN_ULONG B[WORDS] = {0x2, 0}; // Example values for B
 
-    BN_ULONG A[WORDS] = {0, 0, 0x1, 0x0000000000000005}; // Example values for A is B
-    BN_ULONG B[WORDS] = {0, 0, 0, 0x2}; // Example values for B is 3
+    BN_ULONG A[WORDS] = {0xffffffffffffffff, 0xffffffffffffffe, 0xbaaedce6af48a03b, 0xbfd25e8cd0364141}; // Example values for A is B
+    BN_ULONG B[WORDS] = {0x1b2db4c027cdbaba, 0x70116675aa53aa8a, 0xad1c289591e564d3, 0xcaa5c571ffccab5a}; // Example values for B is 3
+
+    // print A and B
+    printf("A: ");
+    for (int i = 0; i < WORDS; ++i) {
+        printf("%lX", A[i]);
+    }
+    printf("\nB: ");
+    for (int i = 0; i < WORDS; ++i) {
+        printf("%lX", B[i]);
+    }
 
     int binary_A[WORDS * BN_ULONG_NUM_BITS];
     int binary_B[WORDS * BN_ULONG_NUM_BITS];

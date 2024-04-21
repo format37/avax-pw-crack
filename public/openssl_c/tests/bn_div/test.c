@@ -27,52 +27,12 @@ void set_bignum_words(BIGNUM *bn, const BN_ULONG *words, int num_words) {
 int main() {
     BN_CTX *ctx = BN_CTX_new();
 
-    /*BN_ULONG test_values_dividend[][MAX_BIGNUM_WORDS] = {
-        {0,0,0,0xB}, // 0: Simple division
-        {0x1,0,0,0}, // 1: Division by 1
-        {0,0,0x1234567890ABCDEF,0x7234567890ABCDEF}, // 2: Large numbers
-        {0x1,0,0,0}, // 3: Dividend smaller than divisor
-        {0xFFFFFFFFFFFFFFFF,0xFFFFFFFFFFFFFFFF,0xFFFFFFFFFFFFFFFF,0xFFFFFFFFFFFFFFFF}, // 4: Maximum positive value
-        {0x1,0,0,0x8000000000000000}, // 5: Negative dividend
-        {0,0,0x1,0x8000000000000000}, // 6: Negative divisor
-        {0x1,0,0,0x8000000000000000}, // 7: Both negative
-        {0,0,0x1,0}, // 8: Multiple 16-sign words
-        {0,0,0xFFFFFFFFFFFFFFFF,0}, // 9: Numerical order transition
-        {0,0,0x1234567890ABCDEF,0x7234567890ABCDEF}, // 10: Large dividend, small divisor
-        {0,0,0x1,0x7234567890ABCDEF}, // 11: Small dividend, large divisor
-        {0,0,0,0}, // 12: Zero dividend
-        {0x1234567890ABCDEF,0x7234567890ABCDEF,0x1234567890ABCDEF,0x7234567890ABCDEF}, // 13: Four-word dividend and divisor
-        {0xFFFFFFFFFFFFFFFF,0,0,0}, // 14: Two-word dividend with maximum value in the first word
-        {0,0xFFFFFFFFFFFFFFFF,0,0}, // 15: Two-word dividend with maximum value in the second word
-    };
-
-    BN_ULONG test_values_divisor[][MAX_BIGNUM_WORDS] = {
-        {0,0,0,0x3}, // 0: Simple divisor
-        {0x1,0,0,0}, // 1: Division by 1
-        {0,0,0x2,0}, // 2: Large divisor
-        {0,0,0x100,0}, // 3: Divisor larger than dividend
-        {0x2,0,0,0}, // 4: Small divisor
-        {0x2,0,0,0}, // 5: Positive divisor
-        {0,0,0x1,0}, // 6: Negative divisor
-        {0,0,0x1,0x8000000000000000}, // 7: Both negative
-        {0,0,0x10,0}, // 8: Multiple 16-sign words in divisor
-        {0,0,0x1,0}, // 9: Numerical order transition in divisor
-        {0,0,0,0x1}, // 10: Small divisor
-        {0,0,0x1234567890ABCDEF,0}, // 11: Large divisor
-        {0,0,0,0x1}, // 12: Non-zero divisor for zero dividend
-        {0x1234567890ABCDEF,0,0,0}, // 13: One-word divisor
-        {0x100,0,0,0}, // 14: Divisor smaller than the first word of the dividend
-        {0,0x100,0,0}, // 15: Divisor smaller than the second word of the dividend
-    };*/
-
     BN_ULONG test_values_dividend[][MAX_BIGNUM_WORDS] = {
-        {0,0,0,0xb}, // 0
-        {0,0,0,0x3}, // 1
+        {0xffffffffffffffff, 0xffffffffffffffe, 0xbaaedce6af48a03b, 0xbfd25e8cd0364141},
     };
 
     BN_ULONG test_values_divisor[][MAX_BIGNUM_WORDS] = {
-        {0,0,0,0x3}, // 0
-        {0,0,0,0xb}, // 1
+        {0x1b2db4c027cdbaba, 0x70116675aa53aa8a, 0xad1c289591e564d3, 0xcaa5c571ffccab5a},
     };
 
     int num_tests = sizeof(test_values_dividend) / sizeof(test_values_dividend[0]);
@@ -93,6 +53,19 @@ int main() {
         print_bn("Divisor", divisor);
         print_bn("Quotient", quotient);
         print_bn("Remainder", remainder);
+
+        // dividend
+        // -------- = quotient, remainder
+        // divisor
+        // Multiplication back: quotient * divisor + remainder = dividend
+        BIGNUM *product = BN_new();
+        BN_mul(product, quotient, divisor, ctx);
+        // Print the product
+        print_bn("Product", product);
+        // Add the remainder
+        BN_add(product, product, remainder);
+        // Print the dividend
+        print_bn("Product + Remainder", product);
 
         BN_free(dividend);
         BN_free(divisor);

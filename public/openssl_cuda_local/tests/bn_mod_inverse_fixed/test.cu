@@ -21,7 +21,7 @@ __device__ void reverse_order(BN_ULONG test_values_a[][TEST_BIGNUM_WORDS], BN_UL
 __global__ void testKernel() {
     printf("++ testKernel for bn_mod_inverse ++\n");
     BN_ULONG test_values_a[][MAX_BIGNUM_WORDS] = {
-        {0,0,0,0x3},     // 0: a = 3, n = 11
+        /*{0,0,0,0x3},     // 0: a = 3, n = 11
         {0,0,0,0x2A},    // 1: a = 42, n = 2017
         {0,0,0,0x4D2},   // 2: a = 1234, n = 5678
         {0,0,0,0x0},     // 3: a = 0, n = 11
@@ -39,13 +39,13 @@ __global__ void testKernel() {
         {0xFFFFFFFF,0xFFFFFFFF,0xFFFFFFFF,0xFFFFFFFF},    // 15: a = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF, n = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
         {0,0,0,0x4},     // 16: a = 4, n = 12
         {0,0,0,0x6},     // 17: a = 6, n = 15
-        {0,0,0,0x12},    // 18: a = 18, n = 24
+        {0,0,0,0x12},    // 18: a = 18, n = 24*/
         {0xffffffffffffffff, 0xffffffffffffffe, 0xbaaedce6af48a03b, 0xbfd25e8cd0364141},
 
     };
 
     BN_ULONG test_values_n[][MAX_BIGNUM_WORDS] = {
-        {0,0,0,0xB},     // 0: a = 3, n = 11
+        /*{0,0,0,0xB},     // 0: a = 3, n = 11
         {0,0,0,0x7E1},   // 1: a = 42, n = 2017
         {0,0,0,0x162E},  // 2: a = 1234, n = 5678
         {0,0,0,0xB},     // 3: a = 0, n = 11
@@ -63,13 +63,15 @@ __global__ void testKernel() {
         {0xFFFFFFFF,0xFFFFFFFF,0xFFFFFFFF,0xFFFFFFFF},    // 15: a = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF, n = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
         {0,0,0,0xC},     // 16: a = 4, n = 12
         {0,0,0,0xF},     // 17: a = 6, n = 15
-        {0,0,0,0x18},    // 18: a = 18, n = 24
+        {0,0,0,0x18},    // 18: a = 18, n = 24*/
         {0x1b2db4c027cdbaba, 0x70116675aa53aa8a, 0xad1c289591e564d3, 0xcaa5c571ffccab5a},
     };
 
     // 0 for positive, 1 for negative
-    int sign_a[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0};
-    int sign_n[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0};
+    //int sign_a[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0};
+    //int sign_n[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0};
+    int sign_a[] = {0};
+    int sign_n[] = {0};
     
     reverse_order(test_values_a, test_values_n, sizeof(test_values_a) / (sizeof(BN_ULONG) * TEST_BIGNUM_WORDS));
     

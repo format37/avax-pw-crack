@@ -21,13 +21,11 @@ __device__ void reverse_order(BN_ULONG test_values_a[][TEST_BIGNUM_WORDS], BN_UL
 
 __global__ void testKernel() {
     BN_ULONG test_values_dividend[][MAX_BIGNUM_WORDS] = {
-        {0,0,0,0xb}, // 0
-        {0,0,0,0x3}, // 1
+        {0xffffffffffffffff, 0xffffffffffffffe, 0xbaaedce6af48a03b, 0xbfd25e8cd0364141},
     };
 
     BN_ULONG test_values_divisor[][MAX_BIGNUM_WORDS] = {
-        {0,0,0,0x3}, // 0
-        {0,0,0,0xb}, // 1
+        {0x1b2db4c027cdbaba, 0x70116675aa53aa8a, 0xad1c289591e564d3, 0xcaa5c571ffccab5a},
     };
     reverse_order(test_values_dividend, test_values_divisor, sizeof(test_values_dividend) / (sizeof(BN_ULONG) * TEST_BIGNUM_WORDS));
 
@@ -71,6 +69,22 @@ __global__ void testKernel() {
         bn_print("# quotient : ", &quotient);
         bn_print("# remainder: ", &remainder);
         printf("\n");
+        // dividend
+        // -------- = quotient, remainder
+        // divisor
+        // Multiplication back: quotient * divisor + remainder = dividend
+        BIGNUM temp, product;
+        init_zero(&temp, TEST_BIGNUM_WORDS);
+        init_zero(&product, TEST_BIGNUM_WORDS);
+        bn_mul(&quotient, &divisor, &product);
+        // print product
+        bn_print("product: ", &product);
+        // add remainder
+        bn_add(&temp, &product, &remainder);
+        // print temp
+        bn_print("temp: ", &temp);
+        // print dividend
+        bn_print("initial dividend: ", &dividend);
     }
       
 }
