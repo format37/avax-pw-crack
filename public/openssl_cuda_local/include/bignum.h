@@ -2852,7 +2852,14 @@ __device__ int point_add(
         printf("p1 != p2\n");
         // Regular point addition
         bn_subtract(&tmp1, &p2->y, &p1->y);
-        bn_mod(&tmp1, p, &tmp1);           // tmp1 = (p2.y - p1.y) mod p
+        bn_print("\n[a] << bn_subtract tmp1: ", &tmp1);
+        init_zero(&tmp3, MAX_BIGNUM_WORDS);
+        bn_copy(&tmp3, &tmp1); // dst << src
+        // bn_mod(&tmp1, p, &tmp1);           // tmp1 = (p2.y - p1.y) mod p
+        //init_zero(&tmp1, MAX_BIGNUM_WORDS);
+        // bn_mod(BIGNUM *r, BIGNUM *a, BIGNUM *n)
+        bn_mod(&tmp1, p, &tmp3);           // tmp1 = (p2.y - p1.y) mod p
+        bn_print("\n[c] << bn_mod tmp1: ", &tmp1);
         bn_subtract(&tmp2, &p2->x, &p1->x);
         bn_mod(&tmp2, p, &tmp2);           // tmp2 = (p2.x - p1.x) mod p
         bn_print("\n[0] >> bn_mod_inverse tmp2: ", &tmp2);
@@ -2863,8 +2870,18 @@ __device__ int point_add(
         init_zero(&tmp2, MAX_BIGNUM_WORDS);
         //bn_mod_inverse(&tmp2, p, &tmp3);   // tmp2 = (p2.x - p1.x)^-1 mod p
         bn_mod_inverse(&tmp2, &tmp3, p);
-        bn_print("\n[1] << bn_mod_inverse tmp2: ", &tmp2);
-        bn_mul(&s, &tmp1, &tmp2);          // s = (p2.y - p1.y) * (p2.x - p1.x)^-1
+        bn_print("\n[1] << bn_mod_inverse tmp2: ", &tmp2); // OK
+        // mul(a, b, product)
+        //bn_mul(&s, &tmp1, &tmp2);          // s = (p2.y - p1.y) * (p2.x - p1.x)^-1
+        bn_print("\n[2] >> bn_mul s: ", &s);
+        bn_print("\n[2] >> bn_mul tmp1: ", &tmp1);
+        bn_print("\n[2] >> bn_mul tmp2: ", &tmp2);
+        init_zero(&s, MAX_BIGNUM_WORDS);
+        bn_mul(&tmp1, &tmp2, &s);
+        bn_print("\n[2] << bn_mul s: ", &s);
+        bn_print("\n[2] << bn_mul tmp1: ", &tmp1);
+        bn_print("\n[2] << bn_mul tmp2: ", &tmp2);
+
         bn_mod(&s, p, &s);                 // s = (p2.y - p1.y) / (p2.x - p1.x) mod p
 
         bn_mul(&x3, &s, &s);               // x3 = s^2

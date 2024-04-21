@@ -68,9 +68,11 @@ Point point_add(Point p1, Point p2) {
         printf("p1.x != p2.x\n");
 
         // Full point addition formula
-        mpz_sub(tmp1, p2.y, p1.y); 
+        mpz_sub(tmp1, p2.y, p1.y);
+        gmp_printf("[a] << mpz_sub tmp1: %Zx\n", tmp1);
         mpz_sub(tmp2, p2.x, p1.x);
         mpz_mod(tmp1, tmp1, p);
+        gmp_printf("[c] << mpz_mod tmp1: %Zx\n", tmp1);
         mpz_mod(tmp2, tmp2, p);
         // print tmp2 and p
         gmp_printf("[0] >> mpz_invert tmp2: %Zx\n", tmp2);
@@ -79,7 +81,15 @@ Point point_add(Point p1, Point p2) {
         // print tmp2
         gmp_printf("[1] << mpz_invert tmp2: %Zx\n", tmp2);
         gmp_printf("[1] << mpz_invert p: %Zx\n", p);
+        
+        gmp_printf("[2] >> mpz_mul s: %Zx\n", s);
+        gmp_printf("[2] >> mpz_mul tmp1: %Zx\n", tmp1);
+        gmp_printf("[2] >> mpz_mul tmp2: %Zx\n", tmp2);
         mpz_mul(s, tmp1, tmp2);
+        gmp_printf("[2] << mpz_mul s: %Zx\n", s);
+        gmp_printf("[2] << mpz_mul tmp1: %Zx\n", tmp1);
+        gmp_printf("[2] << mpz_mul tmp2: %Zx\n", tmp2);
+
         mpz_mod(s, s, p);
 
         mpz_pow_ui(x3, s, 2);
