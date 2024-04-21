@@ -2,18 +2,37 @@
 #include <cuda_runtime.h>
 #include "bignum.h"
 
+#define TEST_BIGNUM_WORDS 4
+
+__device__ void reverse_order(BN_ULONG test_values_a[][TEST_BIGNUM_WORDS], BN_ULONG test_values_b[][TEST_BIGNUM_WORDS], size_t num_rows) {
+    for (size_t i = 0; i < num_rows; i++) {
+        for (size_t j = 0; j < TEST_BIGNUM_WORDS / 2; j++) {
+            BN_ULONG temp_a = test_values_a[i][j];
+            test_values_a[i][j] = test_values_a[i][TEST_BIGNUM_WORDS - 1 - j];
+            test_values_a[i][TEST_BIGNUM_WORDS - 1 - j] = temp_a;
+
+            BN_ULONG temp_b = test_values_b[i][j];
+            test_values_b[i][j] = test_values_b[i][TEST_BIGNUM_WORDS - 1 - j];
+            test_values_b[i][TEST_BIGNUM_WORDS - 1 - j] = temp_b;
+        }
+    }
+}
+
 __global__ void testKernel() {
     printf("++ testKernel for point_add ++\n");
 
     BIGNUM curveOrder;
     BN_ULONG curveOrder_d[4];
+    BN_ULONG order_temp[4];
 
     // Initialize curveOrder_d
-    // FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
+    // FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F
     curveOrder_d[0] = 0xFFFFFFFFFFFFFFFF;
-    curveOrder_d[1] = 0xFFFFFFFFFFFFFFFE;
-    curveOrder_d[2] = 0xBAAEDCE6AF48A03B;
-    curveOrder_d[3] = 0xBFD25E8CD0364141;
+    curveOrder_d[1] = 0xFFFFFFFFFFFFFFFF;
+    curveOrder_d[2] = 0xFFFFFFFFFFFFFFFF;
+    curveOrder_d[3] = 0xFFFFFFFEFFFFFC2F;
+    // Reverse order
+    reverse_order(&curveOrder_d, &order_temp, 1);
     curveOrder.d = curveOrder_d;
     curveOrder.neg = 0;
     curveOrder.top = 4;
@@ -32,6 +51,11 @@ __global__ void testKernel() {
     BIGNUM *curve_prime = &CURVE_P;
     BIGNUM *curve_a = &CURVE_A;
 
+    // Initialize generator
+    BN_ULONG CURVE_GX_d[4];
+    BN_ULONG CURVE_GY_d[4];
+
+
     // Generator x coordinate
     // 79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798
     CURVE_GX_d[0] = 0x79BE667EF9DCBBAC;
@@ -41,12 +65,15 @@ __global__ void testKernel() {
 
     // Generator y coordinate
     BIGNUM CURVE_GY;
-    BN_ULONG CURVE_GY_d[4];
+    //BN_ULONG CURVE_GY_d[4];
     // 483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8
     CURVE_GY_d[0] = 0x483ADA7726A3C465;
     CURVE_GY_d[1] = 0x5DA4FBFC0E1108A8;
     CURVE_GY_d[2] = 0xFD17B448A6855419;
     CURVE_GY_d[3] = 0x9C47D08FFB10D4B8;
+
+    // Reverse order
+    reverse_order(&CURVE_GX_d, &CURVE_GY_d, 1);
 
     // Initialize generator
     EC_POINT G;
@@ -75,6 +102,8 @@ __global__ void testKernel() {
     p2_yd[1] = 0xA3C58419466CEAEE;
     p2_yd[2] = 0xF7F632653266D0E1;
     p2_yd[3] = 0x236431A950CFE52A;
+    // Reverse order
+    reverse_order(&p2_xd, &p2_yd, 1);
     EC_POINT p2;
     p2.x.d = p2_xd;
     p2.y.d = p2_yd;

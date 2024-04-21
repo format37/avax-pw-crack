@@ -28,6 +28,11 @@ void init_constants() {
 
 // Point addition
 Point point_add(Point p1, Point p2) {
+    printf("++ point_add ++\n");
+    gmp_printf(">> p1.x: %Zx\n", p1.x);
+    gmp_printf(">> p1.y: %Zx\n", p1.y);
+    gmp_printf(">> p2.x: %Zx\n", p2.x);
+    gmp_printf(">> p2.y: %Zx\n", p2.y);
     /*if (mpz_cmp(p1.a, p2.a) != 0 || mpz_cmp(p1.b, p2.b) != 0) {
         printf("Points are not on the same curve\n");
     }*/ // Not needed for secp256k1
@@ -67,7 +72,13 @@ Point point_add(Point p1, Point p2) {
         mpz_sub(tmp2, p2.x, p1.x);
         mpz_mod(tmp1, tmp1, p);
         mpz_mod(tmp2, tmp2, p);
-        mpz_invert(tmp2, tmp2, p); 
+        // print tmp2 and p
+        gmp_printf("[0] >> mpz_invert tmp2: %Zx\n", tmp2);
+        gmp_printf("[0] >> mpz_invert p: %Zx\n", p);
+        mpz_invert(tmp2, tmp2, p);
+        // print tmp2
+        gmp_printf("[1] << mpz_invert tmp2: %Zx\n", tmp2);
+        gmp_printf("[1] << mpz_invert p: %Zx\n", p);
         mpz_mul(s, tmp1, tmp2);
         mpz_mod(s, s, p);
 
@@ -95,6 +106,8 @@ Point point_add(Point p1, Point p2) {
 
         mpz_mul_ui(tmp2, p1.y, 2);
         mpz_mod(tmp2, tmp2, p);
+        gmp_printf("### 1 >> mpz_invert tmp2: %Zx\n", tmp2);
+        gmp_printf("### 1 >> mpz_invert p: %Zx\n", p);
         mpz_invert(tmp2, tmp2, p);  
 
         mpz_mul(s, tmp1, tmp2);
@@ -149,8 +162,12 @@ int main() {
     mpz_set_str(p2.x, "C6047F9441ED7D6D3045406E95C07CD85C778E4B8CEF3CA7ABAC09B95C709EE5", 16);
     mpz_set_str(p2.y, "1AE168FEA63DC339A3C58419466CEAEEF7F632653266D0E1236431A950CFE52A", 16);
     
-    gmp_printf("<< p2 x: %Zx\n", p2.x);
-    gmp_printf("<< p2 y: %Zx\n", p2.y);
+    // print G
+    gmp_printf(">> G x: %Zx\n", G.x);
+    gmp_printf(">> G y: %Zx\n", G.y);
+
+    gmp_printf(">> p2 x: %Zx\n", p2.x);
+    gmp_printf(">> p2 y: %Zx\n", p2.y);
     r = point_add(G, p2);
     // print the current x and y
     gmp_printf("<< r x: %Zx\n", r.x);

@@ -2646,10 +2646,10 @@ __device__ void bn_gcdext(BIGNUM *g, BIGNUM *s, BIGNUM *t, BIGNUM *a, BIGNUM *b)
 }
 
 __device__ bool bn_mod_inverse(BIGNUM *result, BIGNUM *a, BIGNUM *n) {
-    /*printf("++ bn_mod_inverse ++\n");
+    printf("++ bn_mod_inverse ++\n");
     bn_print(">> a: ", a);
     bn_print(">> n: ", n);
-    bn_print(">> result: ", result);*/
+    bn_print(">> result: ", result);
 
     if (bn_is_one(n)) {
         return false;  // No modular inverse exists
@@ -2764,104 +2764,6 @@ __device__ bool bn_mod_inverse(BIGNUM *result, BIGNUM *a, BIGNUM *n) {
     return true;
 }
 
-__device__ bool bn_mod_inverse_v0(BIGNUM *result, BIGNUM *a, BIGNUM *n) {
-    printf("++ bn_mod_inverse ++\n");
-    bn_print(">> a: ", a);
-    bn_print(">> n: ", n);
-    bn_print(">> result: ", result);
-    if (bn_is_one(n)) {
-        return false;  // No modular inverse exists
-    }
-    BIGNUM gcd;
-    init_zero(&gcd, MAX_BIGNUM_WORDS);
-    bn_gcd(&gcd, a, n);
-    printf("<<gcd out>>\n");
-    if (!bn_is_one(&gcd)) {
-        // GCD(a, n) is not 1, so no modular inverse exists
-        init_zero(result, MAX_BIGNUM_WORDS);
-        return false;
-    }
-    printf("## 0 ##\n");
-    BIGNUM t, nt, r, nr, q, tmp, tmp2;
-    init_zero(&t, MAX_BIGNUM_WORDS);
-    init_zero(&tmp2, MAX_BIGNUM_WORDS);
-    init_one(&nt, MAX_BIGNUM_WORDS);
-    init_zero(&r, MAX_BIGNUM_WORDS);
-    init_zero(&nr, MAX_BIGNUM_WORDS);
-    init_zero(&q, MAX_BIGNUM_WORDS);
-    init_zero(&tmp, MAX_BIGNUM_WORDS);
-    bn_copy(&r, n);
-    printf("## 1 ##\n");
-    bn_mod(&nr, a, n); // OK
-    printf("## 2 ##\n");
-    printf("<<mod out>>\n");
-    int counter = 0;
-    while (!bn_is_zero(&nr)) {
-        bn_print("\n[bn_mod_inverse pre_bn_div] r = ", &r);
-        bn_print("[bn_mod_inverse pre_bn_div] nr = ", &nr);
-        bn_print("[bn_mod_inverse pre_bn_div] tmp = ", &tmp);
-        bn_print("[bn_mod_inverse pre_bn_div] q = ", &q);
-        bn_div(&q, &tmp, &r, &nr); // CHECK
-        bn_copy(&tmp, &nt);
-        
-        nt.top = find_top(&nt, MAX_BIGNUM_WORDS);
-        q.top = find_top(&q, MAX_BIGNUM_WORDS);
-
-        bn_print("\n[0] premul q = ", &q);
-        bn_print("[1] premul nt = ", &nt);
-        bn_mul(&nt, &q, &tmp2); // # nt = q * nt
-        bn_copy(&nt, &tmp2); // dst, src
-        bn_print("[2] postmul nt = ", &nt);        
-
-        bn_print("[3] presub t = ", &t);
-        bn_subtract(&tmp2, &t, &nt); // tmp2 = t - nt
-        bn_print("[3.5] postsub tmp2 = ", &tmp2);
-        bn_copy(&nt, &tmp2); // dst << src
-        bn_print("[4] postsub nt = ", &nt);  // OK
-
-        bn_copy(&t, &tmp); // dst << src
-        bn_copy(&tmp, &nr); // dst << src
-        bn_print("[5] premul nr = ", &nr);
-        bn_print("[6] premul q = ", &q);
-        bn_mul(&nr, &q, &tmp2);
-        bn_copy(&nr, &tmp2); // dst, src
-        bn_print("[7] postmul nr = ", &nr); // OK
-        
-        bn_print("[8] presub r = ", &r);
-        bn_subtract(&tmp2, &r, &nr);
-        bn_copy(&nr, &tmp2); // dst << src
-        bn_print("[9] postsub nr = ", &nr); // 
-
-        bn_copy(&r, &tmp); // dst << src
-        bn_print("\nq: ", &q);
-        bn_print("t: ", &t);
-        bn_print("nt: ", &nt);
-        bn_print("r: ", &r);
-        bn_print("nr: ", &nr);
-        counter++;
-        if (counter > 10) {
-            printf("Counter limit reached\n");
-            break;
-        }
-    }
-
-    if (!bn_is_one(&r)) {
-        // No modular inverse exists
-        // printf("No modular inverse exists\n");
-        init_zero(result, MAX_BIGNUM_WORDS);
-        return false;
-    }
-
-    if (bn_is_negative(&t)) {
-        printf("bn_mod_inverse negative t\n");
-        bn_add(&tmp2, &t, n); // result = t + n
-        bn_copy(&t, &tmp2); // dst << src
-    }
-
-    bn_copy(result, &t); // dst << src
-    return true;
-}
-
 __device__ int point_add(
     EC_POINT *result, 
     EC_POINT *p1, 
@@ -2869,6 +2771,13 @@ __device__ int point_add(
     BIGNUM *p, 
     BIGNUM *a
 ) {
+    printf("++ point_add ++\n");
+    bn_print(">> p1.x: ", &p1->x);
+    bn_print(">> p1.y: ", &p1->y);
+    bn_print(">> p2.x: ", &p2->x);
+    bn_print(">> p2.y: ", &p2->y);
+    bn_print(">> p: ", p);
+    bn_print(">> a: ", a);
     // Handle the point at infinity cases
     if (point_is_at_infinity(p1)) {
         copy_point(result, p2);
@@ -2887,13 +2796,18 @@ __device__ int point_add(
     init_zero(&tmp1, MAX_BIGNUM_WORDS);
     init_zero(&tmp2, MAX_BIGNUM_WORDS);
     
+    // Case 1: p1 = p2 && p1.y != p2.y
     if (bn_cmp(&p1->x, &p2->x) == 0 && bn_cmp(&p1->y, &p2->y) != 0) {
         // The points are inverses to one another, return point at infinity
         set_point_at_infinity(result);
         return 0;
     }
 
+    BIGNUM tmp3;
+    // Case 3: p1 == p2
+    // TODO: Check, do we need to compare y
     if (bn_cmp(&p1->x, &p2->x) == 0 && bn_cmp(&p1->y, &p2->y) == 0) {
+        printf("p1 == p2\n");
         // Point doubling
         BIGNUM two;
         init_zero(&two, MAX_BIGNUM_WORDS);
@@ -2910,15 +2824,15 @@ __device__ int point_add(
         bn_mul(&tmp2, &p1->y, &two);       // tmp2 = 2 * p1.y
         bn_mod(&tmp2, p, &tmp2);           // tmp2 = (2 * p1.y) mod p
         
-        BIGNUM tmp3;
+        
         init_zero(&tmp3, MAX_BIGNUM_WORDS);
         bn_copy(&tmp3, &tmp2);
         // print tmp2, tmp3, and p
-        bn_print("### >> bn_mod_inverse tmp2: ", &tmp2);
-        bn_print("### >> bn_mod_inverse tmp3: ", &tmp3);
-        bn_print("### >> bn_mod_inverse p: ", p);
+        bn_print("\n[0] >> bn_mod_inverse tmp2: ", &tmp2);
+        bn_print("[0] >> bn_mod_inverse tmp3: ", &tmp3);
+        bn_print("[0] >> bn_mod_inverse p: ", p);
         bn_mod_inverse(&tmp2, p, &tmp3);   // tmp2 = (2 * p1.y)^-1 mod p
-        
+        bn_print("\n[1] << bn_mod_inverse tmp2: ", &tmp2);
         bn_mul(&s, &tmp1, &tmp2);          // s = (3 * p1.x^2 + a) * (2 * p1.y)^-1
         bn_mod(&s, p, &s);                 // s = (3 * p1.x^2 + a) / (2 * p1.y) mod p
         
@@ -2934,12 +2848,22 @@ __device__ int point_add(
         bn_subtract(&y3, &y3, &p1->y);          // y3 = s * (p1.x - x3) - p1.y
         bn_mod(&y3, p, &y3);               // y3 = (s * (p1.x - x3) - p1.y) mod p
     } else {
+        // Case 2: p1 != p2
+        printf("p1 != p2\n");
         // Regular point addition
         bn_subtract(&tmp1, &p2->y, &p1->y);
         bn_mod(&tmp1, p, &tmp1);           // tmp1 = (p2.y - p1.y) mod p
         bn_subtract(&tmp2, &p2->x, &p1->x);
         bn_mod(&tmp2, p, &tmp2);           // tmp2 = (p2.x - p1.x) mod p
-        bn_mod_inverse(&tmp2, p, &tmp2);   // tmp2 = (p2.x - p1.x)^-1 mod p
+        bn_print("\n[0] >> bn_mod_inverse tmp2: ", &tmp2);
+        bn_print("[0] >> bn_mod_inverse tmp3: ", &tmp3);
+        bn_print("[0] >> bn_mod_inverse p: ", p);
+        init_zero(&tmp3, MAX_BIGNUM_WORDS);
+        bn_copy(&tmp3, &tmp2);
+        init_zero(&tmp2, MAX_BIGNUM_WORDS);
+        //bn_mod_inverse(&tmp2, p, &tmp3);   // tmp2 = (p2.x - p1.x)^-1 mod p
+        bn_mod_inverse(&tmp2, &tmp3, p);
+        bn_print("\n[1] << bn_mod_inverse tmp2: ", &tmp2);
         bn_mul(&s, &tmp1, &tmp2);          // s = (p2.y - p1.y) * (p2.x - p1.x)^-1
         bn_mod(&s, p, &s);                 // s = (p2.y - p1.y) / (p2.x - p1.x) mod p
 
