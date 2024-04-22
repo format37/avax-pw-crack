@@ -608,7 +608,7 @@ __device__ void bn_mod_deprecated(BIGNUM* r, BIGNUM* m, BIGNUM* d) {
     printf("bn_mod end\n");
 }
 
-__device__ int bn_nnmod(BIGNUM *r, BIGNUM *m, BIGNUM *d)
+__device__ int bn_nnmod_deprecated(BIGNUM *r, BIGNUM *m, BIGNUM *d)
 {
     printf("++ BN_nnmod ++\n");
     bn_print(">> r: ", r);
@@ -660,7 +660,7 @@ __device__ int bn_nnmod(BIGNUM *r, BIGNUM *m, BIGNUM *d)
     return 1; // Success
 }
 
-__device__ int simple_BN_nnmod(BIGNUM *r, const BIGNUM *m, const BIGNUM *d)
+__device__ int simple_BN_nnmod_deprecated(BIGNUM *r, const BIGNUM *m, const BIGNUM *d)
 {
     printf("ATTENTION: simple_BN_nnmod can operates only with single word!\n");
     // Check for division by zero
@@ -2973,7 +2973,8 @@ __device__ int point_add(
         // bn_mod(BIGNUM *r, BIGNUM *a, BIGNUM *n)
         //bn_mod(&tmp1, p, &tmp3);           // tmp1 = (p2.y - p1.y) mod p
         //simple_BN_nnmod(&tmp1, &tmp3, p);           // tmp1 = (p2.y - p1.y) mod p
-        bn_nnmod(&tmp1, p, &tmp3);           // tmp1 = (p2.y - p1.y) mod p
+        //bn_nnmod(&tmp1, p, &tmp3);           // tmp1 = (p2.y - p1.y) mod p
+        bn_mod(&tmp1, p, &tmp3);           // tmp1 = (p2.y - p1.y) mod p
         bn_print("\n[c] << bn_mod tmp1: ", &tmp1);
         bn_subtract(&tmp2, &p2->x, &p1->x);
         bn_mod(&tmp2, p, &tmp2);           // tmp2 = (p2.x - p1.x) mod p

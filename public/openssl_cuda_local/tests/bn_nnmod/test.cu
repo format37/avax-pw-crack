@@ -21,19 +21,21 @@ __device__ void reverse_order(BN_ULONG test_values_a[][TEST_BIGNUM_WORDS], BN_UL
 __global__ void testKernel() {
     printf("++ testKernel for bn_mod ++\n");
     BN_ULONG test_values_a[][MAX_BIGNUM_WORDS] = {
+        {0x2d5971788066012b, 0xb9df77e2c7a41dba, 0x052181e3741e8338, 0x78e39ee6aa40ef8e},
         {0x2d5971788066012b, 0xb9df77e2c7a41dba, 0x052181e3741e8338, 0x78e39ee6aa40ef8e}
         
     };
 
     BN_ULONG test_values_n[][MAX_BIGNUM_WORDS] = {
+        {0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xfffffffefffffc2f},
         {0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xfffffffefffffc2f}
     };
 
     int mod;
 
     // 0 for positive, 1 for negative
-    int sign_a[] = {1};
-    int sign_n[] = {0};
+    int sign_a[] = {1,1};
+    int sign_n[] = {0,1};
     
     reverse_order(test_values_a, test_values_n, sizeof(test_values_a) / (sizeof(BN_ULONG) * TEST_BIGNUM_WORDS));
     
