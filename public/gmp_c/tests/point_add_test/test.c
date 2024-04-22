@@ -71,6 +71,7 @@ Point point_add(Point p1, Point p2) {
         mpz_sub(tmp1, p2.y, p1.y);
         gmp_printf("[a] << mpz_sub tmp1: %Zx\n", tmp1);
         mpz_sub(tmp2, p2.x, p1.x);
+        gmp_printf("[c] >> mpz_mod p: %Zx\n", p);
         mpz_mod(tmp1, tmp1, p);
         gmp_printf("[c] << mpz_mod tmp1: %Zx\n", tmp1);
         mpz_mod(tmp2, tmp2, p);

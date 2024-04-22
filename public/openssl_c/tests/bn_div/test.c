@@ -29,11 +29,17 @@ int main() {
 
     BN_ULONG test_values_dividend[][MAX_BIGNUM_WORDS] = {
         {0xffffffffffffffff, 0xffffffffffffffe, 0xbaaedce6af48a03b, 0xbfd25e8cd0364141},
+        {0x2d5971788066012b, 0xb9df77e2c7a41dba, 0x052181e3741e8338, 0x78e39ee6aa40ef8e},
     };
 
     BN_ULONG test_values_divisor[][MAX_BIGNUM_WORDS] = {
         {0x1b2db4c027cdbaba, 0x70116675aa53aa8a, 0xad1c289591e564d3, 0xcaa5c571ffccab5a},
+        {0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xfffffffefffffc2f},
     };
+
+    // 0 for positive, 1 for negative
+    int sign_dividend[] = {0,1};
+    int sign_divisor[] = {0,0};
 
     int num_tests = sizeof(test_values_dividend) / sizeof(test_values_dividend[0]);
 
@@ -47,10 +53,15 @@ int main() {
         set_bignum_words(dividend, test_values_dividend[test], MAX_BIGNUM_WORDS);
         set_bignum_words(divisor, test_values_divisor[test], MAX_BIGNUM_WORDS);
 
-        BN_div(quotient, remainder, dividend, divisor, ctx);
+        // Set signs
+        if (sign_dividend[test]) BN_set_negative(dividend, 1);
+        if (sign_divisor[test]) BN_set_negative(divisor, 1);
 
         print_bn("Dividend", dividend);
         print_bn("Divisor", divisor);
+
+        BN_div(quotient, remainder, dividend, divisor, ctx);
+
         print_bn("Quotient", quotient);
         print_bn("Remainder", remainder);
 

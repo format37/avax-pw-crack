@@ -31,19 +31,18 @@ int main() {
     BIGNUM *remainder = BN_new();
 
     
-    BN_ULONG test_values_a[][MAX_BIGNUM_WORDS] = {        
-        {0xffffffffffffffff, 0xffffffffffffffe, 0xbaaedce6af48a03b, 0xbfd25e8cd0364141},
-        {0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xfffffffefffffc2f}
+    BN_ULONG test_values_a[][MAX_BIGNUM_WORDS] = {
+        {0x2d5971788066012b, 0xb9df77e2c7a41dba, 0x052181e3741e8338, 0x78e39ee6aa40ef8e}
+        
     };
 
     BN_ULONG test_values_n[][MAX_BIGNUM_WORDS] = {
-        {0x1b2db4c027cdbaba, 0x70116675aa53aa8a, 0xad1c289591e564d3, 0xcaa5c571ffccab5a},
-        {0x2d5971788066012b, 0xb9df77e2c7a41dba, 0x052181e3741e8338, 0x78e39ee6aa40ef8e},
+        {0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xfffffffefffffc2f}
     };
 
     // 0 for positive, 1 for negative
-    int sign_a[] = {0,0};
-    int sign_n[] = {0,1};
+    int sign_a[] = {1};
+    int sign_n[] = {0};
 
     // Number of tests defined by the number of elements in test_values_a/n arrays.
     int num_tests = sizeof(test_values_a) / sizeof(test_values_a[0]);
@@ -53,7 +52,6 @@ int main() {
         printf("Test %d:\n", i);
         BIGNUM *a = BN_new();
         BIGNUM *n = BN_new();
-        BIGNUM *mod_inverse = NULL;
 
         set_bignum_words(a, test_values_a[i], MAX_BIGNUM_WORDS);
         set_bignum_words(n, test_values_n[i], MAX_BIGNUM_WORDS);
@@ -65,7 +63,7 @@ int main() {
         print_bn("a", a);
         print_bn("n", n);
 
-        mod = BN_mod(remainder, a, n, ctx);
+        mod = BN_nnmod(remainder, a, n, ctx);
 
         printf("remainder: %s\n", BN_bn2hex(remainder));
         printf("mod: %d\n", mod);

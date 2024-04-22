@@ -608,8 +608,38 @@ __device__ void bn_mod_deprecated(BIGNUM* r, BIGNUM* m, BIGNUM* d) {
     printf("bn_mod end\n");
 }
 
+__device__ int bn_nnmod(BIGNUM *r, BIGNUM *m, BIGNUM *d)
+{
+    // Check for division by zero
+    if (d->top == 0) {
+        return 0; // Error code
+    }
+
+    // Check if r and d are the same pointer
+    if (r == d) {
+        printf("BN_nnmod: ERR_R_PASSED_INVALID_ARGUMENT\n");
+        return 0;
+    }
+
+    // Perform the modulo operation using BN_mod
+    if (!bn_mod(r, m, d)) {
+        return 0; // Error code
+    }
+
+    // Check the sign of the result
+    if (r->neg) {
+        // If the result is negative, add the absolute value of d to make it non-negative
+        if (!bn_add(r, r, d)) {
+            return 0;
+        }
+    }
+
+    return 1; // Success
+}
+
 __device__ int simple_BN_nnmod(BIGNUM *r, const BIGNUM *m, const BIGNUM *d)
 {
+    printf("ATTENTION: simple_BN_nnmod can operates only with single word!\n");
     // Check for division by zero
     if (d->top == 0) {
         return 0; // Error code
@@ -1080,6 +1110,48 @@ __device__ void bn_lshift_deprecated(BIGNUM *a, int shift) {
             debug_printf("Error: no room for extra word in bn_lshift\n");
         }
     }
+}
+
+__device__ int bn_mod_mpz(BIGNUM *r, BIGNUM *m, BIGNUM *d) {
+    printf("++ bn_mod ++\n");
+    
+    // Check if r and d are the same pointer
+    if (r == d) {
+        printf("bn_mod: ERR_R_PASSED_INVALID_ARGUMENT\n");
+        return 0;
+    }
+
+    // Create a temporary BIGNUM to store the divisor
+    BIGNUM temp_divisor;
+    init_zero(&temp_divisor, MAX_BIGNUM_WORDS);
+
+    // Copy the divisor to the temporary BIGNUM
+    if (r == d) {
+        bn_copy(&temp_divisor, d);
+        d = &temp_divisor;
+    }
+
+    // Perform the division
+    if (!bn_div(NULL, r, m, d)) {
+        return 0;
+    }
+
+    // Adjust the sign of the remainder if necessary
+    if (r->neg) {
+        // If the remainder is negative, add the absolute value of the divisor
+        if (d->neg) {
+            if (!bn_subtract(r, r, d)) {
+                return 0;
+            }
+        } else {
+            if (!bn_add(r, r, d)) {
+                return 0;
+            }
+        }
+    }
+
+    printf("-- bn_mod --\n");
+    return 1;
 }
 
 __device__ int bn_mod(BIGNUM *r, BIGNUM *a, BIGNUM *n) {
@@ -1996,7 +2068,7 @@ __device__ int bn_div(BIGNUM *quotient_in, BIGNUM *remainder_in, BIGNUM *dividen
     // dividend
     // -------- = quotient, remainder
     // divisor
-    //printf("\n++ bn_div ++\n");
+    printf("\n++ bn_div ++\n");
 
     // Declare local BIGNUM variables
     BIGNUM quotient;
@@ -2010,8 +2082,8 @@ __device__ int bn_div(BIGNUM *quotient_in, BIGNUM *remainder_in, BIGNUM *dividen
     init_zero(&dividend, MAX_BIGNUM_WORDS);
     init_zero(&divisor, MAX_BIGNUM_WORDS);
     //printf("# [1] #\n");
-    //bn_print(">> dividend: ", dividend_in);
-    //bn_print(">> divisor: ", divisor_in);
+    bn_print(">> dividend: ", dividend_in);
+    bn_print(">> divisor: ", divisor_in);
     // Copy from input BIGNUMs
     bn_copy(&quotient, quotient_in);
     bn_copy(&remainder, remainder_in);
@@ -2139,8 +2211,8 @@ __device__ int bn_div(BIGNUM *quotient_in, BIGNUM *remainder_in, BIGNUM *dividen
     //remainder->top = find_top(remainder, MAX_BIGNUM_WORDS);
 
     // print output values
-    //bn_print("<< bn_div quotient: ", quotient);
-    //bn_print("<< bn_div remainder: ", remainder);
+    bn_print("<< bn_div quotient: ", &quotient);
+    bn_print("<< bn_div remainder: ", &remainder);
     
     // Set the output values
     bn_copy(quotient_in, &quotient);
@@ -2150,7 +2222,7 @@ __device__ int bn_div(BIGNUM *quotient_in, BIGNUM *remainder_in, BIGNUM *dividen
     free(remainder);
     free(dividend);
     free(divisor);*/
-    //printf("-- bn_div --\n");
+    printf("-- bn_div --\n");
     return 1;
 }
 
@@ -2856,9 +2928,14 @@ __device__ int point_add(
         init_zero(&tmp3, MAX_BIGNUM_WORDS);
         bn_copy(&tmp3, &tmp1); // dst << src
         // bn_mod(&tmp1, p, &tmp1);           // tmp1 = (p2.y - p1.y) mod p
-        //init_zero(&tmp1, MAX_BIGNUM_WORDS);
+        init_zero(&tmp1, MAX_BIGNUM_WORDS);
+        bn_print("\n[c] >> bn_mod p: ", p);
+        bn_print("\n[c] >> bn_mod tmp3: ", &tmp3);
+        bn_print("\n[c] >> bn_mod tmp1: ", &tmp1);
         // bn_mod(BIGNUM *r, BIGNUM *a, BIGNUM *n)
-        bn_mod(&tmp1, p, &tmp3);           // tmp1 = (p2.y - p1.y) mod p
+        //bn_mod(&tmp1, p, &tmp3);           // tmp1 = (p2.y - p1.y) mod p
+        //simple_BN_nnmod(&tmp1, &tmp3, p);           // tmp1 = (p2.y - p1.y) mod p
+        bn_nnmod(&tmp1, p, &tmp3);           // tmp1 = (p2.y - p1.y) mod p
         bn_print("\n[c] << bn_mod tmp1: ", &tmp1);
         bn_subtract(&tmp2, &p2->x, &p1->x);
         bn_mod(&tmp2, p, &tmp2);           // tmp2 = (p2.x - p1.x) mod p
