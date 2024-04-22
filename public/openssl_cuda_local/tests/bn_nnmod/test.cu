@@ -59,7 +59,7 @@ __global__ void testKernel() {
         bn_print("a: ", &value_a);
         bn_print("n: ", &value_n);
 
-        mod = bn_nnmod(&remainder, &value_a, &value_n);
+        mod = bn_mod(&remainder, &value_a, &value_n);
 
         // Print results
         bn_print("remainder: ", &remainder);

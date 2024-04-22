@@ -610,6 +610,10 @@ __device__ void bn_mod_deprecated(BIGNUM* r, BIGNUM* m, BIGNUM* d) {
 
 __device__ int bn_nnmod(BIGNUM *r, BIGNUM *m, BIGNUM *d)
 {
+    printf("++ BN_nnmod ++\n");
+    bn_print(">> r: ", r);
+    bn_print(">> m: ", m);
+    bn_print(">> d: ", d);    
     // Check for division by zero
     if (d->top == 0) {
         return 0; // Error code
@@ -623,17 +627,36 @@ __device__ int bn_nnmod(BIGNUM *r, BIGNUM *m, BIGNUM *d)
 
     // Perform the modulo operation using BN_mod
     if (!bn_mod(r, m, d)) {
+        printf("BN_mod failed\n");
         return 0; // Error code
     }
+    bn_print("[1] r: ", r);
+    bn_print("[1] m: ", m);
+    bn_print("[1] d: ", d);
 
     // Check the sign of the result
-    if (r->neg) {
-        // If the result is negative, add the absolute value of d to make it non-negative
+    if (!r->neg) {
+        printf("r is not negative\n");
+        return 1;
+    }
+
+    BIGNUM tmp;
+    init_zero(&tmp, MAX_BIGNUM_WORDS);
+    if (d->neg) {
+        printf("d is negative\n");
+        if (!bn_subtract(&tmp, r, d)) { // tmp = r - d
+            printf("BN_sub failed\n");
+            return 0;
+        }
+    } else {
+        printf("d is not negative\n");
         if (!bn_add(r, r, d)) {
+            printf("BN_add failed\n");
             return 0;
         }
     }
 
+    printf("returning 1\n");
     return 1; // Success
 }
 
@@ -1156,6 +1179,9 @@ __device__ int bn_mod_mpz(BIGNUM *r, BIGNUM *m, BIGNUM *d) {
 
 __device__ int bn_mod(BIGNUM *r, BIGNUM *a, BIGNUM *n) {
     printf("++ bn_mod ++\n");
+    bn_print(">> r: ", r);
+    bn_print(">> a(m): ", a);
+    bn_print(">> n(d): ", n);
     BIGNUM q;
     init_zero(&q, MAX_BIGNUM_WORDS);
 
@@ -1174,16 +1200,28 @@ __device__ int bn_mod(BIGNUM *r, BIGNUM *a, BIGNUM *n) {
     bn_print("<<1 q after bn_div: ", &q);
     bn_print("<<1 r after bn_div: ", r);
 
+    BIGNUM tmp;
+    init_zero(&tmp, MAX_BIGNUM_WORDS);
+
     if (r->neg) {
+        bool result;
         // If the remainder is negative, add the absolute value of the divisor
         if (n->neg) {
-            if (!bn_subtract(r, r, n)) {
+            printf("d is negative\n");
+            result = bn_subtract(&tmp, r, n); // tmp = r - n
+            if (!result) {
                 return 0;
             }
+            // copy tmp to r
+            bn_copy(r, &tmp);
         } else {
-            if (!bn_add(r, r, n)) {
+            printf("d is not negative\n");
+            result = bn_add(&tmp, r, n); // tmp = r + n            
+            if (!result) {
                 return 0;
             }
+            // copy tmp to r
+            bn_copy(r, &tmp);
         }
     }
 

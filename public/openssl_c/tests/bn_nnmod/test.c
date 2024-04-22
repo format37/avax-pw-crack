@@ -24,6 +24,51 @@ void set_bignum_words(BIGNUM *bn, const BN_ULONG *words, int num_words) {
     }
 }
 
+int BN_nnmod_debug(BIGNUM *r, const BIGNUM *m, const BIGNUM *d, BN_CTX *ctx)
+{
+    /*
+     * like BN_mod, but returns non-negative remainder (i.e., 0 <= r < |d|
+     * always holds)
+     */
+    printf("++ BN_nnmod_debug ++\n");
+    printf(">> r: %s\n", BN_bn2hex(r));
+    printf(">> m: %s\n", BN_bn2hex(m));
+    printf(">> d: %s\n", BN_bn2hex(d));
+    if (r == d) {
+        printf("r == d\n");
+        ERR_raise(ERR_LIB_BN, ERR_R_PASSED_INVALID_ARGUMENT);
+        return 0;
+    }
+
+    if (!(BN_mod(r, m, d, ctx))) {
+        printf("BN_mod failed\n");
+        return 0;
+    }
+    // print r
+    printf("[1] r: %s\n", BN_bn2hex(r));
+    printf("[1] m: %s\n", BN_bn2hex(m));
+    printf("[1] d: %s\n", BN_bn2hex(d));
+
+    /* now   -|d| < r < 0,  so we have to set  r := r + |d| */
+    if (BN_is_negative(r) == 0) {
+        printf("r is not negative\n");
+        return 1;
+    }
+    if (BN_is_negative(d)) {
+        printf("d is negative\n");
+        if (!BN_sub(r, r, d))
+            printf("BN_sub failed\n");
+            return 0;
+    } else {
+        printf("d is not negative\n");
+        if (!BN_add(r, r, d))
+            printf("BN_add failed\n");
+            return 0;
+    }
+    printf("returning 1\n");
+    return 1;
+}
+
 int main() {
     printf("++ Starting BN_mod test ++\n");
     BN_CTX *ctx = BN_CTX_new();
@@ -63,7 +108,7 @@ int main() {
         print_bn("a", a);
         print_bn("n", n);
 
-        mod = BN_nnmod(remainder, a, n, ctx);
+        mod = BN_nnmod_debug(remainder, a, n, ctx);
 
         printf("remainder: %s\n", BN_bn2hex(remainder));
         printf("mod: %d\n", mod);
