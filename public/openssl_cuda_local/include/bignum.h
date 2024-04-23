@@ -331,7 +331,7 @@ __device__ void absolute_add(BIGNUM *result, const BIGNUM *a, const BIGNUM *b) {
 
     // Handle carry out, expand result if necessary
     if (carry > 0) {
-        if (result->top < MAX_BIGNUM_WORDS - 1) {
+        if (result->top < MAX_BIGNUM_SIZE - 1) {
             result->d[result->top] = carry; // Assign carry to the new word
             result->top++;
         } else {
@@ -341,7 +341,7 @@ __device__ void absolute_add(BIGNUM *result, const BIGNUM *a, const BIGNUM *b) {
     }
 
     // Find the real top after addition (no leading zeroes)
-    result->top = find_top(result, MAX_BIGNUM_WORDS);
+    result->top = find_top(result, MAX_BIGNUM_SIZE);
 }
 
 __device__ void absolute_subtract(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
@@ -375,13 +375,13 @@ __device__ void absolute_subtract(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
 __device__ bool bn_subtract(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
     //printf("bn_subtract:\n");
     // Check tops
-    if (find_top(a, MAX_BIGNUM_WORDS) != a->top) {
+    if (find_top(a, MAX_BIGNUM_SIZE) != a->top) {
         printf("### bn_cmp_abs ### Error: Top is not set correctly in the source BIGNUM.\n");
-        printf("a->top: %d, actual top: %d\n", a->top, find_top(a, MAX_BIGNUM_WORDS));
+        printf("a->top: %d, actual top: %d\n", a->top, find_top(a, MAX_BIGNUM_SIZE));
     }
-    if (find_top(b, MAX_BIGNUM_WORDS) != b->top) {
+    if (find_top(b, MAX_BIGNUM_SIZE) != b->top) {
         printf("### bn_cmp_abs ### Error: Top is not set correctly in the source BIGNUM.\n");
-        printf("b->top: %d, actual top: %d\n", b->top, find_top(b, MAX_BIGNUM_WORDS));
+        printf("b->top: %d, actual top: %d\n", b->top, find_top(b, MAX_BIGNUM_SIZE));
     }
     //bn_print("a: ", a);
     //bn_print("b: ", b);
@@ -408,7 +408,7 @@ __device__ bool bn_subtract(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
     }
 
     // Update result.top based on the actual data in result.
-    result->top = find_top(result, MAX_BIGNUM_WORDS);
+    result->top = find_top(result, MAX_BIGNUM_SIZE);
 
     // Perform additional logic if underflow has been detected in absolute_subtract.
     if (result->top == 0) { 
@@ -3030,11 +3030,11 @@ __device__ int point_add(
         // print p1.x
         bn_print("\n[5] >> bn_subtract p1.x: ", &p1->x);
         bn_subtract(&x3, &tmp2, &p1->x); // result = a - b
-        bn_print("\n[5] << bn_subtract x3: ", &x3); // ERR
+        bn_print("\n[5] << bn_subtract x3: ", &x3); // OK
         bn_subtract(&x3, &x3, &p2->x);          // x3 = s^2 - p1.x - p2.x
         bn_print("\n[6] << bn_subtract x3: ", &x3);
         bn_mod(&x3, p, &x3);               // x3 = (s^2 - p1.x - p2.x) mod p
-        bn_print("\n[7] << bn_mod x3: ", &x3);
+        bn_print("\n[7] << bn_mod x3: ", &x3); // ERR
 
         bn_subtract(&tmp1, &p1->x, &x3);
         bn_mul(&y3, &s, &tmp1);            // y3 = s * (p1.x - x3)
