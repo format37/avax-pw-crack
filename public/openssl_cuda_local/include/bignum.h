@@ -2033,8 +2033,7 @@ __device__ void bn_div_binary(
         printf("\n");
     }*/
 
-    const int total_bits = MAX_BIGNUM_WORDS * BN_ULONG_NUM_BITS;
-    //const int total_bits = MAX_BIGNUM_SIZE * BN_ULONG_NUM_BITS;
+    const int total_bits = MAX_BIGNUM_SIZE * BN_ULONG_NUM_BITS;
     int temp[total_bits];
     memset(temp, 0, sizeof(temp));
 
@@ -2115,10 +2114,10 @@ __device__ int bn_div(BIGNUM *quotient_in, BIGNUM *remainder_in, BIGNUM *dividen
     BIGNUM divisor;
     //printf("# [0] #\n");
     // Initialize the BIGNUMs
-    init_zero(&quotient, MAX_BIGNUM_WORDS);
-    init_zero(&remainder, MAX_BIGNUM_WORDS);
-    init_zero(&dividend, MAX_BIGNUM_WORDS);
-    init_zero(&divisor, MAX_BIGNUM_WORDS);
+    init_zero(&quotient, MAX_BIGNUM_SIZE);
+    init_zero(&remainder, MAX_BIGNUM_SIZE);
+    init_zero(&dividend, MAX_BIGNUM_SIZE);
+    init_zero(&divisor, MAX_BIGNUM_SIZE);
     //printf("# [1] #\n");
     bn_print(">> dividend: ", dividend_in);
     bn_print(">> divisor: ", divisor_in);
@@ -2133,8 +2132,8 @@ __device__ int bn_div(BIGNUM *quotient_in, BIGNUM *remainder_in, BIGNUM *dividen
     //bn_print(">>[0] bn_div divisor: ", &divisor);
 
     // init zero to quotient and remainder
-    init_zero(&quotient, MAX_BIGNUM_WORDS);
-    init_zero(&remainder, MAX_BIGNUM_WORDS);
+    init_zero(&quotient, MAX_BIGNUM_SIZE);
+    init_zero(&remainder, MAX_BIGNUM_SIZE);
     quotient.neg = 0;
     remainder.neg = 0;
     
@@ -2173,7 +2172,7 @@ __device__ int bn_div(BIGNUM *quotient_in, BIGNUM *remainder_in, BIGNUM *dividen
 
     
 
-    const int total_bits = MAX_BIGNUM_WORDS * BN_ULONG_NUM_BITS;
+    const int total_bits = MAX_BIGNUM_SIZE * BN_ULONG_NUM_BITS;
     // const int total_bits = MAX_BIGNUM_SIZE * BN_ULONG_NUM_BITS;
     // printf("# total_bits: %d\n", total_bits);
     
@@ -2188,8 +2187,8 @@ __device__ int bn_div(BIGNUM *quotient_in, BIGNUM *remainder_in, BIGNUM *dividen
     memset(binary_remainder, 0, total_bits * sizeof(int));
     
     // Convert the BIGNUMs to binary arrays, use actual 'top' value for correct size
-    convert_to_binary_array(dividend.d, binary_dividend, MAX_BIGNUM_WORDS);
-    convert_to_binary_array(divisor.d, binary_divisor, MAX_BIGNUM_WORDS);
+    convert_to_binary_array(dividend.d, binary_dividend, MAX_BIGNUM_SIZE);
+    convert_to_binary_array(divisor.d, binary_divisor, MAX_BIGNUM_SIZE);
 
     //binary_print_big_endian(">> binary_dividend", binary_dividend, total_bits);
     //binary_print_big_endian(">> binary_divisor", binary_divisor, total_bits);
@@ -2219,9 +2218,9 @@ __device__ int bn_div(BIGNUM *quotient_in, BIGNUM *remainder_in, BIGNUM *dividen
     //printf("\n# binary remainder top: %d\n", remainder->top);
 
     // Convert the binary arrays back to BIGNUMs
-    quotient.top = MAX_BIGNUM_WORDS;
+    quotient.top = MAX_BIGNUM_SIZE;
     convert_back_to_bn_ulong(binary_quotient, quotient.d, quotient.top);
-    remainder.top = MAX_BIGNUM_WORDS;
+    remainder.top = MAX_BIGNUM_SIZE;
     convert_back_to_bn_ulong_reversed(binary_remainder, remainder.d, remainder.top);
     // Reverse words in the quotient
     for (int i = 0; i < quotient.top / 2; i++) {
