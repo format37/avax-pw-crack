@@ -3,7 +3,7 @@
 #include <cuda_runtime.h>
 #include "bignum.h"
 
-#define TEST_BIGNUM_WORDS 4
+#define TEST_BIGNUM_WORDS 8
 
 __device__ void reverse_order(BN_ULONG test_values_a[][TEST_BIGNUM_WORDS], BN_ULONG test_values_b[][TEST_BIGNUM_WORDS], size_t num_rows) {
     for (size_t i = 0; i < num_rows; i++) {
@@ -20,17 +20,26 @@ __device__ void reverse_order(BN_ULONG test_values_a[][TEST_BIGNUM_WORDS], BN_UL
 }
 
 __global__ void testKernel() {
-    BN_ULONG test_values_dividend[][MAX_BIGNUM_WORDS] = {
+    /*BN_ULONG test_values_dividend[][MAX_BIGNUM_WORDS] = {
         {0xffffffffffffffff, 0xffffffffffffffe, 0xbaaedce6af48a03b, 0xbfd25e8cd0364141},
     };
 
     BN_ULONG test_values_divisor[][MAX_BIGNUM_WORDS] = {
         {0x1b2db4c027cdbaba, 0x70116675aa53aa8a, 0xad1c289591e564d3, 0xcaa5c571ffccab5a},
+    };*/
+
+    BN_ULONG test_values_dividend[][TEST_BIGNUM_WORDS] = {
+        {0x8e020bca63c2d3b4, 0xf15d956d1119704c, 0x793bbdfa2cbe57d7, 0x51a13724b434b483, 0xda8f4665b027f674, 0xfab37c1f434754f2, 0x9352e2c1b6dc753e, 0x0675365166805884},
     };
+
+    BN_ULONG test_values_divisor[][TEST_BIGNUM_WORDS] = {
+        {0, 0, 0, 0, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xfffffffefffffc2f},
+    };
+
     reverse_order(test_values_dividend, test_values_divisor, sizeof(test_values_dividend) / (sizeof(BN_ULONG) * TEST_BIGNUM_WORDS));
 
-    //int sign_a[] = {0, 0, 0, 0, 0}; // Signs for 'a', add -1 for negative numbers as needed
-    //int sign_b[] = {0, 0, 0, 0, 0}; // Signs for 'b', add -1 for negative numbers as needed
+    int sign_a[] = {0}; // Signs for 'a', add -1 for negative numbers as needed
+    int sign_b[] = {0}; // Signs for 'b', add -1 for negative numbers as needed
     
     int num_tests = sizeof(test_values_dividend) / (sizeof(BN_ULONG) * TEST_BIGNUM_WORDS);
 
@@ -51,8 +60,8 @@ __global__ void testKernel() {
         dividend.top = find_top(&dividend, TEST_BIGNUM_WORDS);
         divisor.top = find_top(&divisor, TEST_BIGNUM_WORDS);
 
-        //dividend.neg = sign_a[test];
-        //divisor.neg = sign_b[test];
+        dividend.neg = sign_a[test];
+        divisor.neg = sign_b[test];
 
         printf("\n]==>> Test %d:\n", test);
         bn_print("dividend: ", &dividend);

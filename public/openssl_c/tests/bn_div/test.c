@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <openssl/bn.h>
 
-#define MAX_BIGNUM_WORDS 4
+#define MAX_BIGNUM_WORDS 8
 
 void print_bn(const char* label, const BIGNUM* bn) {
     char* bn_str = BN_bn2hex(bn);
@@ -27,7 +27,7 @@ void set_bignum_words(BIGNUM *bn, const BN_ULONG *words, int num_words) {
 int main() {
     BN_CTX *ctx = BN_CTX_new();
 
-    BN_ULONG test_values_dividend[][MAX_BIGNUM_WORDS] = {
+    /*BN_ULONG test_values_dividend[][MAX_BIGNUM_WORDS] = {
         {0xffffffffffffffff, 0xffffffffffffffe, 0xbaaedce6af48a03b, 0xbfd25e8cd0364141},
         {0x2d5971788066012b, 0xb9df77e2c7a41dba, 0x052181e3741e8338, 0x78e39ee6aa40ef8e},
     };
@@ -35,6 +35,14 @@ int main() {
     BN_ULONG test_values_divisor[][MAX_BIGNUM_WORDS] = {
         {0x1b2db4c027cdbaba, 0x70116675aa53aa8a, 0xad1c289591e564d3, 0xcaa5c571ffccab5a},
         {0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xfffffffefffffc2f},
+    };*/
+
+    BN_ULONG test_values_dividend[][MAX_BIGNUM_WORDS] = {
+        {0x8e020bca63c2d3b4, 0xf15d956d1119704c, 0x793bbdfa2cbe57d7, 0x51a13724b434b483, 0xda8f4665b027f674, 0xfab37c1f434754f2, 0x9352e2c1b6dc753e, 0x0675365166805884},
+    };
+
+    BN_ULONG test_values_divisor[][MAX_BIGNUM_WORDS] = {
+        {0, 0, 0, 0, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xfffffffefffffc2f},
     };
 
     // 0 for positive, 1 for negative
