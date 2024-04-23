@@ -2,7 +2,7 @@
 #include <openssl/bn.h>
 #include <openssl/err.h>
 
-#define MAX_BIGNUM_WORDS 4
+#define MAX_BIGNUM_WORDS 8
 
 void print_bn(const char* label, const BIGNUM* bn) {
     char* bn_str = BN_bn2hex(bn);
@@ -31,7 +31,7 @@ int main() {
     BIGNUM *remainder = BN_new();
 
     
-    BN_ULONG test_values_a[][MAX_BIGNUM_WORDS] = {        
+    /*BN_ULONG test_values_a[][MAX_BIGNUM_WORDS] = {        
         {0xffffffffffffffff, 0xffffffffffffffe, 0xbaaedce6af48a03b, 0xbfd25e8cd0364141},
         {0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xfffffffefffffc2f}
     };
@@ -40,10 +40,20 @@ int main() {
         {0x1b2db4c027cdbaba, 0x70116675aa53aa8a, 0xad1c289591e564d3, 0xcaa5c571ffccab5a},
         {0x2d5971788066012b, 0xb9df77e2c7a41dba, 0x052181e3741e8338, 0x78e39ee6aa40ef8e},
     };
-
     // 0 for positive, 1 for negative
     int sign_a[] = {0,0};
-    int sign_n[] = {0,1};
+    int sign_n[] = {0,1};*/
+
+    BN_ULONG test_values_a[][MAX_BIGNUM_WORDS] = {
+        {0xa9d76a4234a8ded, 0x7af964ec3f6f871b, 0xe09d7f67cc580732, 0x3b11b98c6222abbb, 0x0bdfd291448c33e6, 0xa46834fe88684cf0, 0x5106877163ee71eb, 0x5186b6de04720283},
+    };
+
+    BN_ULONG test_values_n[][MAX_BIGNUM_WORDS] = {
+        {0, 0, 0, 0, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xfffffffefffffc2f},
+    };
+    // 0 for positive, 1 for negative
+    int sign_a[] = {0};
+    int sign_n[] = {0};
 
     // Number of tests defined by the number of elements in test_values_a/n arrays.
     int num_tests = sizeof(test_values_a) / sizeof(test_values_a[0]);
@@ -65,7 +75,8 @@ int main() {
         print_bn("a", a);
         print_bn("n", n);
 
-        mod = BN_mod(remainder, a, n, ctx);
+        //mod = BN_mod(remainder, a, n, ctx);
+        mod = BN_nnmod(remainder, a, n, ctx);
 
         printf("remainder: %s\n", BN_bn2hex(remainder));
         printf("mod: %d\n", mod);

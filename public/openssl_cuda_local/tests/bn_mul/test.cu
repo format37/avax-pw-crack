@@ -1,90 +1,81 @@
+//bn_div_test.cu
 #include <stdio.h>
 #include <cuda_runtime.h>
 #include "bignum.h"
 
-__global__ void test_bn_mul_kernel() {
-    printf("++ test_bn_mul_kernel ++\n");
-    // Multi-word and sign test cases
-    BN_ULONG test_values_a[][MAX_BIGNUM_WORDS] = {
-        {0x1ULL},
-        {0xFULL},
-        {0xFFULL},
-        {0xABCULL},
-        {0x1234567890ABCDEFULL},
-        {0x10ULL},
-        {0xFFFFFFFFFFFFFFFFULL},
-        {0xFEDCBA0987654321ULL, 0x1234567890ABCDEFULL}
-    };
-    BN_ULONG test_values_b[][MAX_BIGNUM_WORDS] = {
-        {0x2ULL},
-        {0xFULL},
-        {0x101ULL},
-        {0x10ULL},
-        {0xFEDCBA0987654321ULL},
-        {0x10ULL},
-        {0x1000000000000000ULL},
-        {0xFEDCBA0987654321ULL, 0x1234567890ABCDEFULL}
+#define TEST_BIGNUM_WORDS 4
+
+__device__ void reverse_order(BN_ULONG test_values_a[][TEST_BIGNUM_WORDS], BN_ULONG test_values_b[][TEST_BIGNUM_WORDS], size_t num_rows) {
+    for (size_t i = 0; i < num_rows; i++) {
+        for (size_t j = 0; j < TEST_BIGNUM_WORDS / 2; j++) {
+            BN_ULONG temp_a = test_values_a[i][j];
+            test_values_a[i][j] = test_values_a[i][TEST_BIGNUM_WORDS - 1 - j];
+            test_values_a[i][TEST_BIGNUM_WORDS - 1 - j] = temp_a;
+
+            BN_ULONG temp_b = test_values_b[i][j];
+            test_values_b[i][j] = test_values_b[i][TEST_BIGNUM_WORDS - 1 - j];
+            test_values_b[i][TEST_BIGNUM_WORDS - 1 - j] = temp_b;
+        }
+    }
+}
+
+__global__ void testKernel() {
+
+    BN_ULONG test_values_dividend[][TEST_BIGNUM_WORDS] = {
+        {0xd2a68e877f99fed4, 0x4620881d385be245, 0xfade7e1c8be17cc7, 0x871c611855bf0ca1},
     };
 
-    int sign_a[] = {0, 0, 0, 0, 0, 0, 0, 0}; // Signs for 'a'
-    int sign_b[] = {0, 0, 0, 0, 0, 0, 0, 1}; // Signs for 'b'
+    BN_ULONG test_values_divisor[][TEST_BIGNUM_WORDS] = {
+        {0xac946f7cd9ccebb8, 0xd59803e73c7d12aa, 0x395b2eb7e59a8ba1, 0x19742df442fc6604},
+    };
 
-    int num_tests = sizeof(test_values_a) / sizeof(test_values_a[0]);
+    reverse_order(test_values_dividend, test_values_divisor, sizeof(test_values_dividend) / (sizeof(BN_ULONG) * TEST_BIGNUM_WORDS));
+
+    int sign_a[] = {0,0}; // Signs for 'a', add -1 for negative numbers as needed
+    int sign_b[] = {0,0}; // Signs for 'b', add -1 for negative numbers as needed
+    
+    int num_tests = sizeof(test_values_dividend) / (sizeof(BN_ULONG) * TEST_BIGNUM_WORDS);
+
+    int success = 0;
 
     for (int test = 0; test < num_tests; ++test) {
-        printf("\nTest %d:\n", test + 1);
-        // Initialize BIGNUMs for testing
-        BIGNUM a, b, product;
-        init_zero(&a, MAX_BIGNUM_WORDS);
-        init_zero(&b, MAX_BIGNUM_WORDS);
-        init_zero(&product, MAX_BIGNUM_WORDS);
+        BIGNUM dividend, divisor, quotient, remainder;
+        init_zero(&dividend, TEST_BIGNUM_WORDS);
+        init_zero(&divisor, TEST_BIGNUM_WORDS);
 
-        
-
-        // Initialize 'a' and 'b' with the test values and set the top
-        for (int i = 0; i < MAX_BIGNUM_WORDS; ++i) {
-            a.d[i] = test_values_a[test][i];
-            b.d[i] = test_values_b[test][i];
+        // Initialize 'dividend' and 'divisor' with the test values
+        for (int j = 0; j < TEST_BIGNUM_WORDS; ++j) {
+            dividend.d[j] = test_values_dividend[test][j];
+            divisor.d[j] = test_values_divisor[test][j];
         }
+        dividend.top = find_top(&dividend, TEST_BIGNUM_WORDS);
+        divisor.top = find_top(&divisor, TEST_BIGNUM_WORDS);
 
-        // Determine number of words for 'a' and 'b'
-        a.top = find_top(&a, MAX_BIGNUM_WORDS);
-        b.top = find_top(&b, MAX_BIGNUM_WORDS);
-        
-        // Set signs
-        a.neg = sign_a[test];
-        b.neg = sign_b[test];
+        dividend.neg = sign_a[test];
+        divisor.neg = sign_b[test];
 
-        // Test bn_mul operation
-        bn_mul(&a, &b, &product);
+        printf("\n]==>> Test %d:\n", test);
+        bn_print("a: ", &dividend);
+        bn_print("b: ", &divisor);
 
-        // Update product's top
-        product.top = find_top(&product, MAX_BIGNUM_WORDS);
-
-        // Print the results
-        bn_print("a: ", &a);
-        bn_print("b: ", &b);
-        bn_print("a * b = product: ", &product);
+        // Test division
+        BIGNUM temp, product;
+        init_zero(&product, TEST_BIGNUM_WORDS);
+        bn_mul(&dividend, &divisor, &product);
+        // print product
+        bn_print("product: ", &product);
     }
-
-    printf("-- Finished test_bn_mul_kernel --\n");
+      
 }
 
 // Main function
 int main() {
-    printf("Starting bn_mul test\n");
-    // Launch the kernel to run the test
-    test_bn_mul_kernel<<<1, 1>>>();
-
-    // Wait for GPU to finish before accessing on host
-    cudaDeviceSynchronize();
-
-    // Check for any errors after running the kernel
+    testKernel<<<1, 1>>>();
     cudaError_t err = cudaGetLastError();
     if (err != cudaSuccess) {
-        printf("Error after running kernel: %s\n", cudaGetErrorString(err));
+        printf("Error: %s\n", cudaGetErrorString(err));
         return -1;
     }
-
+    cudaDeviceSynchronize();
     return 0;
 }

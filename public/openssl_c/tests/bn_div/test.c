@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <openssl/bn.h>
 
-#define MAX_BIGNUM_WORDS 8
+#define TEST_BIGNUM_WORDS 8
 
 void print_bn(const char* label, const BIGNUM* bn) {
     char* bn_str = BN_bn2hex(bn);
@@ -27,26 +27,28 @@ void set_bignum_words(BIGNUM *bn, const BN_ULONG *words, int num_words) {
 int main() {
     BN_CTX *ctx = BN_CTX_new();
 
-    /*BN_ULONG test_values_dividend[][MAX_BIGNUM_WORDS] = {
+    /*BN_ULONG test_values_dividend[][TEST_BIGNUM_WORDS] = {
         {0xffffffffffffffff, 0xffffffffffffffe, 0xbaaedce6af48a03b, 0xbfd25e8cd0364141},
         {0x2d5971788066012b, 0xb9df77e2c7a41dba, 0x052181e3741e8338, 0x78e39ee6aa40ef8e},
     };
 
-    BN_ULONG test_values_divisor[][MAX_BIGNUM_WORDS] = {
+    BN_ULONG test_values_divisor[][TEST_BIGNUM_WORDS] = {
         {0x1b2db4c027cdbaba, 0x70116675aa53aa8a, 0xad1c289591e564d3, 0xcaa5c571ffccab5a},
         {0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xfffffffefffffc2f},
     };*/
 
-    BN_ULONG test_values_dividend[][MAX_BIGNUM_WORDS] = {
+    BN_ULONG test_values_dividend[][TEST_BIGNUM_WORDS] = {
         {0x8e020bca63c2d3b4, 0xf15d956d1119704c, 0x793bbdfa2cbe57d7, 0x51a13724b434b483, 0xda8f4665b027f674, 0xfab37c1f434754f2, 0x9352e2c1b6dc753e, 0x0675365166805884},
+        {0xa9d76a4234a8ded, 0x7af964ec3f6f871b, 0xe09d7f67cc580732, 0x3b11b98c6222abbb, 0x0bdfd291448c33e6, 0xa46834fe88684cf0, 0x5106877163ee71eb, 0x5186b6de04720283},
     };
 
-    BN_ULONG test_values_divisor[][MAX_BIGNUM_WORDS] = {
+    BN_ULONG test_values_divisor[][TEST_BIGNUM_WORDS] = {
+        {0, 0, 0, 0, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xfffffffefffffc2f},
         {0, 0, 0, 0, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xfffffffefffffc2f},
     };
 
     // 0 for positive, 1 for negative
-    int sign_dividend[] = {0,1};
+    int sign_dividend[] = {0,0};
     int sign_divisor[] = {0,0};
 
     int num_tests = sizeof(test_values_dividend) / sizeof(test_values_dividend[0]);
@@ -58,8 +60,8 @@ int main() {
         BIGNUM *quotient = BN_new();
         BIGNUM *remainder = BN_new();
 
-        set_bignum_words(dividend, test_values_dividend[test], MAX_BIGNUM_WORDS);
-        set_bignum_words(divisor, test_values_divisor[test], MAX_BIGNUM_WORDS);
+        set_bignum_words(dividend, test_values_dividend[test], TEST_BIGNUM_WORDS);
+        set_bignum_words(divisor, test_values_divisor[test], TEST_BIGNUM_WORDS);
 
         // Set signs
         if (sign_dividend[test]) BN_set_negative(dividend, 1);

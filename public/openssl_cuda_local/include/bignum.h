@@ -1016,11 +1016,65 @@ __device__ void bn_add_bignum_words(BIGNUM *r, BIGNUM *a, int n) {
 }
 
 __device__ void bn_mul(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
-    // TODO: Implement check that product, a and b are different pointers
     printf("++ bn_mul ++\n");
     bn_print(">> a: ", a);
     bn_print(">> b: ", b);
-    //bn_print(">> product: ", product);
+    // Reset the product
+    for(int i = 0; i < a->top + b->top; i++)
+        product->d[i] = 0;
+    
+    // Perform multiplication of each word of a with each word of b
+    for (int i = 0; i < a->top; ++i) {
+        unsigned long long carry = 0;
+        for (int j = 0; j < b->top || carry != 0; ++j) {
+            unsigned long long alow = a->d[i];
+            unsigned long long blow = (j < b->top) ? b->d[j] : 0;
+            unsigned long long lolo = alow * blow;
+            unsigned long long lohi = __umul64hi(alow, blow);
+
+            // Corrected handling: 
+            unsigned long long sumLow = product->d[i + j] + lolo;
+            unsigned long long carryLow = (sumLow < product->d[i + j]) ? 1 : 0; // overflowed?
+
+            unsigned long long sumHigh = sumLow + carry;
+            unsigned long long carryHigh = (sumHigh < sumLow) ? 1 : 0; // overflowed?
+
+            product->d[i + j] = sumHigh;
+
+            // Aggregate carry: contributions from high multiplication and overflows
+            carry = lohi + carryLow + carryHigh;
+        }
+        // Store final carry if it exists
+        if (carry != 0) {
+            product->d[i + b->top] = carry;
+        }
+    }
+
+    // Update the top to reflect the number of significant words in the product
+    product->top = 0;
+    for(int i = a->top + b->top - 1; i >= 0; --i) {
+        if(product->d[i] != 0) {
+            product->top = i + 1;
+            break;
+        }
+    }
+
+    // If the result has no significant words, ensure that top is at least 1
+    if(product->top == 0)
+        product->top = 1;
+    
+    // Determine if the result should be negative
+    product->neg = (a->neg != b->neg) ? 1 : 0;
+    //bn_print("<< a: ", a);
+    //bn_print("<< b: ", b);
+    bn_print("<< product: ", product);
+    printf("-- bn_mul --\n");
+}
+
+__device__ void bn_mul_wrong_carry(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
+    printf("++ bn_mul ++\n");
+    bn_print(">> a: ", a);
+    bn_print(">> b: ", b);
     // Reset the product
     for(int i = 0; i < a->top + b->top; i++)
         product->d[i] = 0;
@@ -1036,7 +1090,7 @@ __device__ void bn_mul(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
 
             unsigned long long sum = product->d[i + j] + lolo + carry;
             carry = lohi + (sum < lolo ? 1 : 0); // update the carry
-
+            
             product->d[i + j] = sum; // store the sum
         }
 
@@ -1204,6 +1258,7 @@ __device__ int bn_mod(BIGNUM *r, BIGNUM *a, BIGNUM *n) {
     init_zero(&tmp, MAX_BIGNUM_SIZE);
 
     if (r->neg) {
+        printf("r is negative\n");
         bool result;
         // If the remainder is negative, add the absolute value of the divisor
         if (n->neg) {
@@ -1340,7 +1395,7 @@ __device__ bool bn_is_zero(BIGNUM *a) {
     printf("a->top: %d\n", a->top);
     // Check a top
 
-    int top = find_top(a, MAX_BIGNUM_WORDS);
+    int top = find_top(a, MAX_BIGNUM_SIZE);
     if (top != a->top) {
         printf("WARNING: bn_is_zero: top is not correct\n");
         //printf("a->top: %d, actual top: %d\n", a->top, top);
@@ -2119,8 +2174,8 @@ __device__ int bn_div(BIGNUM *quotient_in, BIGNUM *remainder_in, BIGNUM *dividen
     init_zero(&dividend, MAX_BIGNUM_SIZE);
     init_zero(&divisor, MAX_BIGNUM_SIZE);
     //printf("# [1] #\n");
-    bn_print(">> dividend: ", dividend_in);
-    bn_print(">> divisor: ", divisor_in);
+    bn_print(">> dividend_in: ", dividend_in);
+    bn_print(">> divisor_in: ", divisor_in);
     // Copy from input BIGNUMs
     bn_copy(&quotient, quotient_in);
     bn_copy(&remainder, remainder_in);
@@ -2128,8 +2183,8 @@ __device__ int bn_div(BIGNUM *quotient_in, BIGNUM *remainder_in, BIGNUM *dividen
     bn_copy(&divisor, divisor_in);
     //printf("# [2] #\n");
     // print input values
-    //bn_print(">> bn_div dividend: ", &dividend);
-    //bn_print(">>[0] bn_div divisor: ", &divisor);
+    bn_print(">> dividend: ", &dividend);
+    bn_print(">> divisor: ", &divisor);
 
     // init zero to quotient and remainder
     init_zero(&quotient, MAX_BIGNUM_SIZE);
@@ -3019,7 +3074,7 @@ __device__ int point_add(
         bn_print("\n[4] >> bn_mul s: ", &s);
         bn_print("\n[4] >> bn_mul tmp2: ", &tmp2);
         bn_mul(&s, &tmp2, &x3); // a * b = product // x3 = s^2
-        bn_print("\n[4] << bn_mul x3: ", &x3);
+        bn_print("\n[4] << bn_mul x3: ", &x3); // ERR
         bn_print("\n[4] << bn_mul s: ", &s);
 
         //bn_mod(&x3, p, &x3);               // x3 = s^2 mod p
@@ -3030,11 +3085,18 @@ __device__ int point_add(
         // print p1.x
         bn_print("\n[5] >> bn_subtract p1.x: ", &p1->x);
         bn_subtract(&x3, &tmp2, &p1->x); // result = a - b
-        bn_print("\n[5] << bn_subtract x3: ", &x3); // OK
+        bn_print("\n[5] << bn_subtract x3: ", &x3); //
         bn_subtract(&x3, &x3, &p2->x);          // x3 = s^2 - p1.x - p2.x
         bn_print("\n[6] << bn_subtract x3: ", &x3);
-        bn_mod(&x3, p, &x3);               // x3 = (s^2 - p1.x - p2.x) mod p
-        bn_print("\n[7] << bn_mod x3: ", &x3); // ERR
+        
+        init_zero(&tmp2, MAX_BIGNUM_SIZE);
+        //bn_mod(&x3, p, &x3); // x3 = (s^2 - p1.x - p2.x) mod p tmp2 = 
+        bn_copy(&tmp2, &x3);
+        bn_print("\n[7] >> bn_mod x3: ", &x3);
+        bn_print("\n[7] >> bn_mod tmp2: ", &tmp2);
+        bn_print("\n[7] >> bn_mod p: ", p);
+        bn_mod(&x3, &tmp2, p); // x3 = tmp2 mod p
+        bn_print("\n[7] << bn_mod x3: ", &x3); //
 
         bn_subtract(&tmp1, &p1->x, &x3);
         bn_mul(&y3, &s, &tmp1);            // y3 = s * (p1.x - x3)
