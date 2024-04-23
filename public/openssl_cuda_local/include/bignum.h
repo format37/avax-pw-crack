@@ -1071,56 +1071,6 @@ __device__ void bn_mul(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
     printf("-- bn_mul --\n");
 }
 
-__device__ void bn_mul_wrong_carry(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
-    printf("++ bn_mul ++\n");
-    bn_print(">> a: ", a);
-    bn_print(">> b: ", b);
-    // Reset the product
-    for(int i = 0; i < a->top + b->top; i++)
-        product->d[i] = 0;
-    
-    // Perform multiplication of each word of a with each word of b
-    for(int i = 0; i < a->top; ++i) {
-        unsigned long long carry = 0;
-        for(int j = 0; j < b->top || carry != 0; ++j) {
-            unsigned long long alow = a->d[i];
-            unsigned long long blow = (j < b->top) ? b->d[j] : 0;
-            unsigned long long lolo = alow * blow;
-            unsigned long long lohi = __umul64hi(alow, blow);
-
-            unsigned long long sum = product->d[i + j] + lolo + carry;
-            carry = lohi + (sum < lolo ? 1 : 0); // update the carry
-            
-            product->d[i + j] = sum; // store the sum
-        }
-
-        // If there is still carry after processing both a and b, store it on the next word.
-        if(carry != 0) {
-            product->d[i + b->top] = carry;
-        }
-    }
-
-    // Update the top to reflect the number of significant words in the product
-    product->top = 0;
-    for(int i = a->top + b->top - 1; i >= 0; --i) {
-        if(product->d[i] != 0) {
-            product->top = i + 1;
-            break;
-        }
-    }
-
-    // If the result has no significant words, ensure that top is at least 1
-    if(product->top == 0)
-        product->top = 1;
-    
-    // Determine if the result should be negative
-    product->neg = (a->neg != b->neg) ? 1 : 0;
-    //bn_print("<< a: ", a);
-    //bn_print("<< b: ", b);
-    bn_print("<< product: ", product);
-    printf("-- bn_mul --\n");
-}
-
 __device__ void bn_add_bit(BIGNUM *a, int bit_index) {
     // Determine the word in the array where this bit resides.
     int word_index = bit_index / (sizeof(BN_ULONG) * 8);
