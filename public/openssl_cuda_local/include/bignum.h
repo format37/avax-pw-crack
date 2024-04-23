@@ -3011,17 +3011,30 @@ __device__ int point_add(
         bn_print("\n[3] >> bn_mod tmp2: ", &tmp2);
         bn_print("\n[3] >> bn_mod p: ", p); // OK
         bn_mod(&s, &tmp2, p);                 // s = (p2.y - p1.y) / (p2.x - p1.x) mod p
-        bn_print("\n[3] << bn_mod s: ", &s); // ERR
+        bn_print("\n[3] << bn_mod s: ", &s); // OK
 
         init_zero(&tmp2, MAX_BIGNUM_WORDS);
         bn_copy(&tmp2, &s);
-        bn_mul(&x3, &s, &tmp2);               // x3 = s^2
         bn_print("\n[4] >> bn_mul x3: ", &x3);
+        bn_print("\n[4] >> bn_mul s: ", &s);
+        bn_print("\n[4] >> bn_mul tmp2: ", &tmp2);
+        bn_mul(&s, &tmp2, &x3); // a * b = product // x3 = s^2
+        bn_print("\n[4] << bn_mul x3: ", &x3);
+        bn_print("\n[4] << bn_mul s: ", &s);
 
-        bn_mod(&x3, p, &x3);               // x3 = s^2 mod p
-        bn_subtract(&x3, &x3, &p1->x);
+        //bn_mod(&x3, p, &x3);               // x3 = s^2 mod p
+        init_zero(&tmp2, MAX_BIGNUM_WORDS);
+        bn_copy(&tmp2, &x3);
+        bn_print("\n[5] >> bn_subtract x3: ", &x3);
+        bn_print("\n[5] >> bn_subtract tmp2: ", &tmp2);
+        // print p1.x
+        bn_print("\n[5] >> bn_subtract p1.x: ", &p1->x);
+        bn_subtract(&x3, &tmp2, &p1->x); // result = a - b
+        bn_print("\n[5] << bn_subtract x3: ", &x3); // ERR
         bn_subtract(&x3, &x3, &p2->x);          // x3 = s^2 - p1.x - p2.x
+        bn_print("\n[6] << bn_subtract x3: ", &x3);
         bn_mod(&x3, p, &x3);               // x3 = (s^2 - p1.x - p2.x) mod p
+        bn_print("\n[7] << bn_mod x3: ", &x3);
 
         bn_subtract(&tmp1, &p1->x, &x3);
         bn_mul(&y3, &s, &tmp1);            // y3 = s * (p1.x - x3)

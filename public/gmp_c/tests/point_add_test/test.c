@@ -102,9 +102,15 @@ Point point_add(Point p1, Point p2) {
         mpz_mod(s, s, p);
         gmp_printf("[3] << mpz_mod s: %Zx\n", s);
 
+        gmp_printf("[4] >> mpz_pow_ui x3: %Zx\n", x3);
+        gmp_printf("[4] >> mpz_pow_ui s: %Zx\n", s);
+        gmp_printf("[4] >> mpz_pow_ui pow: 2\n");
         mpz_pow_ui(x3, s, 2);
         gmp_printf("[4] << mpz_pow_ui x3: %Zx\n", x3);
+        gmp_printf("[4] << mpz_pow_ui s: %Zx\n", s);
         
+        gmp_printf("[5] >> mpz_sub x3: %Zx\n", x3);
+        gmp_printf("[5] >> mpz_sub p1.x: %Zx\n", p1.x);
         mpz_sub(x3, x3, p1.x);
         gmp_printf("[5] << mpz_sub x3: %Zx\n", x3);
 
