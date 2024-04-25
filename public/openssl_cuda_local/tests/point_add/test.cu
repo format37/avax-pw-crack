@@ -116,7 +116,8 @@ __global__ void testKernel() {
     bn_print(">> G.y: ", &G.y);
     bn_print(">> p2.x: ", &p2.x);
     bn_print(">> p2.y: ", &p2.y);
-    point_add(&result, &G, &p2, curve_prime, curve_a);  // Add current to the result
+    //point_add(&result, &G, &p2, curve_prime, curve_a);  // point addition: p1.x != p2.x
+    point_add(&result, &G, &G, curve_prime, curve_a); // point doubling: p1.x == p2.x
     bn_print("<< result.x: ", &result.x);
     bn_print("<< result.y: ", &result.y);
 

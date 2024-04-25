@@ -45,7 +45,8 @@ int main() {
     EC_POINT_set_affine_coordinates(group, p2, x2, y2, ctx);
 
     // Perform point addition
-    EC_POINT_add(group, sum, p1, p2, ctx);
+    // EC_POINT_add(group, sum, p1, p2, ctx);
+    EC_POINT_add(group, sum, p1, p1, ctx);
 
     // Retrieve the result
     BIGNUM *x_sum = BN_new();

@@ -140,17 +140,28 @@ Point point_add(Point p1, Point p2) {
         gmp_printf("p1.y: %Zx\n", p1.y);
         gmp_printf("a: %Zx\n", a);
         gmp_printf("p: %Zx\n", p);
+        
         // Point doubling formula
         mpz_pow_ui(tmp1, p1.x, 2); // tmp1 = p1.x^2  
+        gmp_printf("\n[0] << mpz_pow_ui tmp1: %Zx\n", tmp1);
+        
         mpz_mul_ui(tmp1, tmp1, 3); // tmp1 = 3 * p1.x^2
-        mpz_add(tmp1, tmp1, a);
+        gmp_printf("[1] << mpz_mul_ui tmp1: %Zx\n", tmp1);
+        
+        mpz_add(tmp1, tmp1, a); // a is zero for secp256k1
+        gmp_printf("[2] << mpz_add tmp1: %Zx\n", tmp1);
+
         mpz_mod(tmp1, tmp1, p);
+        gmp_printf("[3] << mpz_mod tmp1: %Zx\n", tmp1);
 
         mpz_mul_ui(tmp2, p1.y, 2);
+        gmp_printf("[4] << mpz_mul_ui tmp2: %Zx\n", tmp2);
+
         mpz_mod(tmp2, tmp2, p);
-        gmp_printf("### 1 >> mpz_invert tmp2: %Zx\n", tmp2);
-        gmp_printf("### 1 >> mpz_invert p: %Zx\n", p);
+        gmp_printf("[5] << mpz_mod tmp2: %Zx\n", tmp2);
+
         mpz_invert(tmp2, tmp2, p);  
+        gmp_printf("[6] << mpz_invert tmp2: %Zx\n", tmp2);
 
         mpz_mul(s, tmp1, tmp2);
         mpz_mod(s, s, p);
@@ -210,7 +221,8 @@ int main() {
 
     gmp_printf(">> p2 x: %Zx\n", p2.x);
     gmp_printf(">> p2 y: %Zx\n", p2.y);
-    r = point_add(G, p2);
+    //r = point_add(G, p2); // point addition: p1.x != p2.x
+    r = point_add(G, G); // point doubling: p1.x == p2.x
     // print the current x and y
     gmp_printf("<< r x: %Zx\n", r.x);
     gmp_printf("<< r y: %Zx\n", r.y);
