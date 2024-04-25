@@ -171,19 +171,22 @@ __device__ int bn_cmp(BIGNUM* a, BIGNUM* b) {
 }
 
 __device__ int bn_cmp_abs(BIGNUM *a, BIGNUM *b) {
-    // Check tops
-    if (find_top(a, MAX_BIGNUM_WORDS) != a->top) {
-        printf("### bn_cmp_abs ### Error: Top is not set correctly in the source BIGNUM.\n");
-        printf("a->top: %d, actual top: %d\n", a->top, find_top(a, MAX_BIGNUM_WORDS));
-        // Print bn value
-        bn_print("a: ", a);
-    }
-    if (find_top(b, MAX_BIGNUM_WORDS) != b->top) {
-        printf("### bn_cmp_abs ### Error: Top is not set correctly in the source BIGNUM.\n");
-        printf("b->top: %d, actual top: %d\n", b->top, find_top(b, MAX_BIGNUM_WORDS));
-        // Print bn value
-        bn_print("b: ", b);
-    }
+    // Check tops // TODO: This may need optimization. Top is often incorrect in point_add
+    // if (find_top(a, MAX_BIGNUM_SIZE) != a->top) {
+    //     printf("### bn_cmp_abs ### Error: Top is not set correctly in the source BIGNUM.\n");
+    //     printf("a->top: %d, actual top: %d\n", a->top, find_top(a, MAX_BIGNUM_WORDS));
+    //     // Print bn value
+    //     bn_print("a: ", a);
+    // }
+    // if (find_top(b, MAX_BIGNUM_SIZE) != b->top) {
+    //     printf("### bn_cmp_abs ### Error: Top is not set correctly in the source BIGNUM.\n");
+    //     printf("b->top: %d, actual top: %d\n", b->top, find_top(b, MAX_BIGNUM_WORDS));
+    //     // Print bn value
+    //     bn_print("b: ", b);
+    // }
+    // Set tops
+    //a->top = find_top(a, MAX_BIGNUM_SIZE); // This stuck in a loop
+    //b->top = find_top(b, MAX_BIGNUM_SIZE);
 
     if (a->top > b->top)
         return 1;
@@ -375,15 +378,18 @@ __device__ void absolute_subtract(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
 
 __device__ bool bn_subtract(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
     //printf("bn_subtract:\n");
-    // Check tops
-    if (find_top(a, MAX_BIGNUM_SIZE) != a->top) {
-        printf("### bn_cmp_abs ### Error: Top is not set correctly in the source BIGNUM.\n");
-        printf("a->top: %d, actual top: %d\n", a->top, find_top(a, MAX_BIGNUM_SIZE));
-    }
-    if (find_top(b, MAX_BIGNUM_SIZE) != b->top) {
-        printf("### bn_cmp_abs ### Error: Top is not set correctly in the source BIGNUM.\n");
-        printf("b->top: %d, actual top: %d\n", b->top, find_top(b, MAX_BIGNUM_SIZE));
-    }
+    // Check tops # TODO: This may need optimization. Top is often incorrect in point_add
+    // if (find_top(a, MAX_BIGNUM_SIZE) != a->top) {
+    //     printf("### bn_cmp_abs ### Error: Top is not set correctly in the source BIGNUM.\n");
+    //     printf("a->top: %d, actual top: %d\n", a->top, find_top(a, MAX_BIGNUM_SIZE));
+    // }
+    // if (find_top(b, MAX_BIGNUM_SIZE) != b->top) {
+    //     printf("### bn_cmp_abs ### Error: Top is not set correctly in the source BIGNUM.\n");
+    //     printf("b->top: %d, actual top: %d\n", b->top, find_top(b, MAX_BIGNUM_SIZE));
+    // }
+    // set tops
+    // a->top = find_top(a, MAX_BIGNUM_SIZE); // This stuck in a loop
+    // b->top = find_top(b, MAX_BIGNUM_SIZE);
     //bn_print("a: ", a);
     //bn_print("b: ", b);
 
@@ -391,7 +397,7 @@ __device__ bool bn_subtract(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
     if (a->neg != b->neg) {
         result->neg = a->neg; // The sign will be the same as the sign of 'a'.
         absolute_add(result, a, b); // Perform the addition of magnitudes here because signs are different.
-        bn_print("result: ", result);
+        // bn_print("result: ", result);
         return true;
     }
 
@@ -1017,9 +1023,9 @@ __device__ void bn_add_bignum_words(BIGNUM *r, BIGNUM *a, int n) {
 }
 
 __device__ void bn_mul(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
-    printf("++ bn_mul ++\n");
-    bn_print(">> a: ", a);
-    bn_print(">> b: ", b);
+    // printf("++ bn_mul ++\n");
+    // bn_print(">> a: ", a);
+    // bn_print(">> b: ", b);
     // Reset the product
     for(int i = 0; i < a->top + b->top; i++)
         product->d[i] = 0;
@@ -1068,8 +1074,8 @@ __device__ void bn_mul(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
     product->neg = (a->neg != b->neg) ? 1 : 0;
     //bn_print("<< a: ", a);
     //bn_print("<< b: ", b);
-    bn_print("<< product: ", product);
-    printf("-- bn_mul --\n");
+    // bn_print("<< product: ", product);
+    // printf("-- bn_mul --\n");
 }
 
 __device__ void bn_add_bit(BIGNUM *a, int bit_index) {
@@ -1141,7 +1147,7 @@ __device__ void bn_lshift_deprecated(BIGNUM *a, int shift) {
 }
 
 __device__ int bn_mod_mpz(BIGNUM *r, BIGNUM *m, BIGNUM *d) {
-    printf("++ bn_mod ++\n");
+    // printf("++ bn_mod ++\n");
     
     // Check if r and d are the same pointer
     if (r == d) {
@@ -1178,15 +1184,15 @@ __device__ int bn_mod_mpz(BIGNUM *r, BIGNUM *m, BIGNUM *d) {
         }
     }
 
-    printf("-- bn_mod --\n");
+    // printf("-- bn_mod --\n");
     return 1;
 }
 
 __device__ int bn_mod(BIGNUM *r, BIGNUM *a, BIGNUM *n) {
-    printf("++ bn_mod ++\n");
-    bn_print(">> r: ", r);
-    bn_print(">> a(m): ", a);
-    bn_print(">> n(d): ", n);
+    // printf("++ bn_mod ++\n");
+    // bn_print(">> r: ", r);
+    // bn_print(">> a(m): ", a);
+    // bn_print(">> n(d): ", n);
     BIGNUM q;
     init_zero(&q, MAX_BIGNUM_SIZE);
 
@@ -1195,15 +1201,15 @@ __device__ int bn_mod(BIGNUM *r, BIGNUM *a, BIGNUM *n) {
         return 0;
     }
 
-    bn_print(">> a before bn_div: ", a);
-    bn_print(">> n before bn_div: ", n);
+    // bn_print(">> a before bn_div: ", a);
+    // bn_print(">> n before bn_div: ", n);
     if (!bn_div(&q, r, a, n)) {
-        bn_print("<<0 q after bn_div: ", &q);
-        bn_print("<<0 r after bn_div: ", r);
+        // bn_print("<<0 q after bn_div: ", &q);
+        // bn_print("<<0 r after bn_div: ", r);
         return 0;
     }
-    bn_print("<<1 q after bn_div: ", &q);
-    bn_print("<<1 r after bn_div: ", r);
+    // bn_print("<<1 q after bn_div: ", &q);
+    // bn_print("<<1 r after bn_div: ", r);
 
     BIGNUM tmp;
     init_zero(&tmp, MAX_BIGNUM_SIZE);
@@ -1231,7 +1237,7 @@ __device__ int bn_mod(BIGNUM *r, BIGNUM *a, BIGNUM *n) {
         }
     }
 
-    printf("-- bn_mod --\n");
+    // printf("-- bn_mod --\n");
     return 1;
 }
 
@@ -1340,29 +1346,29 @@ __device__ void point_double(EC_POINT *P, EC_POINT *R, BIGNUM *p) {
 }
 
 __device__ bool bn_is_zero(BIGNUM *a) {
-    printf("++ bn_is_zero ++\n");
-    bn_print(">>[3] bn_div divisor: ", a);
-    bn_print(">> a: ", a);
-    printf("a->top: %d\n", a->top);
+    // printf("++ bn_is_zero ++\n");
+    // bn_print(">>[3] bn_div divisor: ", a);
+    // bn_print(">> a: ", a);
+    // printf("a->top: %d\n", a->top);
     // Check a top
 
     int top = find_top(a, MAX_BIGNUM_SIZE);
     if (top != a->top) {
-        printf("WARNING: bn_is_zero: top is not correct\n");
+        // printf("WARNING: bn_is_zero: top is not correct\n");
         //printf("a->top: %d, actual top: %d\n", a->top, top);
         // Set the top to the correct value
         a->top = top;
     }
     for (int i = 0; i < a->top; ++i) {
-        printf(">> a->d[%d]: %llu\n", i, a->d[i]);
+        // printf(">> a->d[%d]: %llu\n", i, a->d[i]);
         if (a->d[i] != 0) {
-            printf(">> return: False\n");
-            printf("-- bn_is_zero --\n");
+            // printf(">> return: False\n");
+            // printf("-- bn_is_zero --\n");
             return false;
         }
     }
-    printf(">> return: True\n");
-    printf("-- bn_is_zero --\n");
+    // printf(">> return: True\n");
+    // printf("-- bn_is_zero --\n");
     return true;
 }
 
