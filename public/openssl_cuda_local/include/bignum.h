@@ -2921,7 +2921,7 @@ __device__ int point_add(
     // Case 3: p1 == p2
     // TODO: Check, do we need to compare y
     if (bn_cmp(&p1->x, &p2->x) == 0 && bn_cmp(&p1->y, &p2->y) == 0) {
-        printf("p1 == p2\n");
+        // printf("p1 == p2\n");
         // Point doubling
         BIGNUM two;
         init_zero(&two, MAX_BIGNUM_SIZE);
@@ -2930,7 +2930,7 @@ __device__ int point_add(
         BIGNUM tmp1_squared;
         init_zero(&tmp1_squared, MAX_BIGNUM_SIZE);
         bn_mul(&p1->x, &p1->x, &tmp1_squared);     // tmp1_squared = p1.x^2 // a * b = product
-        bn_print("\n[0] << bn_mul tmp1: ", &tmp1_squared); // OK
+        // bn_print("\n[0] << bn_mul tmp1: ", &tmp1_squared); // OK
 
         init_zero(&tmp1, MAX_BIGNUM_SIZE);
         bn_copy(&tmp1, &tmp1_squared); // dst << src
@@ -2938,86 +2938,95 @@ __device__ int point_add(
         init_zero(&tmp2, MAX_BIGNUM_SIZE);
         bn_set_word(&tmp2, 3);
         bn_mul(&tmp1, &tmp2, &tmp1_squared);     // a * b = product
-        bn_print("\n[1] << bn_mod tmp1_squared: ", &tmp1_squared); // OK
+        // bn_print("\n[1] << bn_mod tmp1_squared: ", &tmp1_squared); // OK
 
-        bn_print("\n[2] << bn_add tmp1_squared: ", &tmp1_squared); // 
+        // bn_print("\n[2] << bn_add tmp1_squared: ", &tmp1_squared); // 
 
         init_zero(&tmp1, MAX_BIGNUM_SIZE);
         bn_copy(&tmp1, &tmp1_squared); // dst << src
         bn_mod(&tmp1_squared, &tmp1, p);           // tmp1 = 3 * p1.x^2 mod p
-        bn_print("\n[3] << bn_add tmp1: ", &tmp1_squared); // OK
+        // bn_print("\n[3] << bn_add tmp1: ", &tmp1_squared); // OK
 
         init_zero(&tmp2, MAX_BIGNUM_SIZE);
         bn_set_word(&two, 2);
         bn_mul(&p1->y, &two, &tmp2);  // tmp2 = 2 * p1.y
-        bn_print("\n[4] << bn_mul tmp2: ", &tmp2); // OK
+        // bn_print("\n[4] << bn_mul tmp2: ", &tmp2); // OK
 
         init_zero(&tmp3, MAX_BIGNUM_SIZE);
         bn_copy(&tmp3, &tmp2); // dst << src
         bn_mod(&tmp2, &tmp3, p);           // tmp2 = tmp2 mod p
-        bn_print("\n[5] << bn_mod tmp2: ", &tmp2); // OK
+        // bn_print("\n[5] << bn_mod tmp2: ", &tmp2); // OK
 
         init_zero(&tmp3, MAX_BIGNUM_SIZE);
         bn_copy(&tmp3, &tmp2); // dst << src
         bn_mod_inverse(&tmp2, &tmp3, p);  // tmp2 = tmp2^-1 mod p
-        bn_print("\n[6] << bn_mod_inverse tmp2: ", &tmp2); // OK
+        // bn_print("\n[6] << bn_mod_inverse tmp2: ", &tmp2); // OK
 
         init_zero(&tmp3, MAX_BIGNUM_SIZE);
-        bn_copy(&tmp3, &tmp1); // dst << src
-        bn_mul(&tmp3, &tmp2, &s);  // s = tmp1 * tmp2
-        bn_print("\n[7] << bn_mul s: ", &s); //
+        bn_copy(&tmp3, &tmp1_squared); // dst << src
+        // bn_print("\n[7] >> bn_mul tmp3: ", &tmp3);
+        // bn_print("[7] >> bn_mul tmp2: ", &tmp2);
+        bn_mul(&tmp3, &tmp2, &s);  // tmp1 * tmp2 = s
+        // bn_print("[7] << bn_mul s: ", &s); //
 
         init_zero(&tmp3, MAX_BIGNUM_SIZE);
         bn_copy(&tmp3, &s); // dst << src
         bn_mod(&s, &tmp3, p);  // s = s mod p
-        bn_print("\n[8] << bn_mod s: ", &s); //
-        bn_print("\n[8] << bn_mod s: ", &s); //
+        // bn_print("\n[8] << bn_mod s: ", &s); //
 
         init_zero(&tmp3, MAX_BIGNUM_SIZE);
         bn_copy(&tmp3, &s); // dst << src
         bn_mul(&tmp3, &tmp3, &x3);  // x3 = s^2
-        bn_print("\n[9] << bn_mul x3: ", &x3); //
+        // bn_print("\n[9] << bn_mul x3: ", &x3); //
 
         bn_subtract(&x3, &x3, &p1->x);  // x3 = x3 - p1.x
-        bn_print("\n[10] << bn_subtract x3: ", &x3); //
+        // bn_print("\n[10] << bn_subtract x3: ", &x3); //
 
         bn_subtract(&x3, &x3, &p1->x);  // x3 = x3 - p1.x
-        bn_print("\n[11] << bn_subtract x3: ", &x3); //
+        // bn_print("\n[11] << bn_subtract x3: ", &x3); //
 
         init_zero(&tmp3, MAX_BIGNUM_SIZE);
         bn_copy(&tmp3, &x3); // dst << src
         bn_mod(&x3, &tmp3, p);  // x3 = x3 mod p
-        bn_print("\n[12] << bn_mod x3: ", &x3); //
+        // bn_print("\n[12] << bn_mod x3: ", &x3); // OK
 
+        init_zero(&tmp1, MAX_BIGNUM_SIZE);
+        // bn_print("[13] >> bn_subtract p1.x: ", &p1->x); //
+        // bn_print("[13] >> bn_subtract x3: ", &x3); //
         bn_subtract(&tmp1, &p1->x, &x3);  // tmp1 = p1.x - x3
-        bn_print("\n[13] << bn_subtract tmp1: ", &tmp1); //
+        // bn_print("\n[13] << bn_subtract tmp1: ", &tmp1); //
 
         init_zero(&tmp3, MAX_BIGNUM_SIZE);
         bn_copy(&tmp3, &s); // dst << src
         bn_mul(&tmp3, &tmp1, &y3);  // y3 = s * tmp1
-        bn_print("\n[14] << bn_mul y3: ", &y3); //
+        // bn_print("\n[14] << bn_mul y3: ", &y3); //
 
-        bn_subtract(&y3, &y3, &p1->y);  // y3 = y3 - p1.y
-        bn_print("\n[15] << bn_subtract y3: ", &y3); //
+        //init_zero(&y3, MAX_BIGNUM_SIZE);
+        init_zero(&tmp3, MAX_BIGNUM_SIZE);
+        bn_copy(&tmp3, &y3); // dst << src
+        // bn_print("[15] >> bn_subtract tmp3: ", &tmp3); //
+        // bn_print("[15] >> bn_subtract p1.y: ", &p1->y); //
+        bn_subtract(&y3, &tmp3, &p1->y);  // y3 = y3 - p1.y
+        // bn_print("\n[15] << bn_subtract y3: ", &y3); //
 
         init_zero(&tmp3, MAX_BIGNUM_SIZE);
         bn_copy(&tmp3, &y3); // dst << src
         bn_mod(&y3, &tmp3, p);  // y3 = y3 mod p
-        bn_print("\n[16] << bn_mod y3: ", &y3); //
+        // bn_print("\n[16] << bn_mod y3: ", &y3); //
     } else {
         // Case 2: p1 != p2
-        printf("p1 != p2\n");
+        // printf("p1 != p2\n");
         // Regular point addition
         bn_subtract(&tmp1, &p2->y, &p1->y);
-        bn_print("\n[a] << bn_subtract tmp1: ", &tmp1);
+        // bn_print("\n[a] << bn_subtract tmp1: ", &tmp1);
         init_zero(&tmp3, MAX_BIGNUM_WORDS);
         bn_copy(&tmp3, &tmp1); // dst << src
         // bn_mod(&tmp1, p, &tmp1);           // tmp1 = (p2.y - p1.y) mod p
         init_zero(&tmp1, MAX_BIGNUM_WORDS);
-        bn_print("\n[c] >> bn_mod tmp3: ", &tmp3);
-        bn_print("\n[c] >> bn_mod p: ", p);        
+        // bn_print("\n[c] >> bn_mod tmp3: ", &tmp3);
+        // bn_print("\n[c] >> bn_mod p: ", p);        
         bn_mod(&tmp1, &tmp3, p);           // tmp1 = (p2.y - p1.y) mod p 
-        bn_print("\n[c] << bn_mod tmp1: ", &tmp1); // OK
+        // bn_print("\n[c] << bn_mod tmp1: ", &tmp1); // OK
         
         init_zero(&tmp2, MAX_BIGNUM_WORDS);
         bn_subtract(&tmp2, &p2->x, &p1->x);
@@ -3025,90 +3034,90 @@ __device__ int point_add(
         init_zero(&tmp3, MAX_BIGNUM_WORDS);
         bn_copy(&tmp3, &tmp2);
         //bn_mod(&tmp2, p, &tmp2);           // tmp2 = (p2.x - p1.x) mod p
-        bn_print("\n[d] >> bn_mod tmp3: ", &tmp3);
-        bn_print("\n[d] >> bn_mod p: ", p);
+        // bn_print("\n[d] >> bn_mod tmp3: ", &tmp3);
+        // bn_print("\n[d] >> bn_mod p: ", p);
         bn_mod(&tmp2, &tmp3, p);           // tmp2 = (p2.x - p1.x) mod p
-        bn_print("\n[d] << bn_mod tmp2: ", &tmp2);
+        // bn_print("\n[d] << bn_mod tmp2: ", &tmp2);
 
-        bn_print("\n[0] >> bn_mod_inverse tmp2: ", &tmp2);
-        bn_print("[0] >> bn_mod_inverse tmp3: ", &tmp3);
-        bn_print("[0] >> bn_mod_inverse p: ", p);
+        // bn_print("\n[0] >> bn_mod_inverse tmp2: ", &tmp2);
+        // bn_print("[0] >> bn_mod_inverse tmp3: ", &tmp3);
+        // bn_print("[0] >> bn_mod_inverse p: ", p);
         init_zero(&tmp3, MAX_BIGNUM_WORDS);
         bn_copy(&tmp3, &tmp2);
         init_zero(&tmp2, MAX_BIGNUM_WORDS);
         //bn_mod_inverse(&tmp2, p, &tmp3);   // tmp2 = (p2.x - p1.x)^-1 mod p
         bn_mod_inverse(&tmp2, &tmp3, p);
-        bn_print("\n[1] << bn_mod_inverse tmp2: ", &tmp2); // OK
+        // bn_print("\n[1] << bn_mod_inverse tmp2: ", &tmp2); // OK
         // mul(a, b, product)
         //bn_mul(&s, &tmp1, &tmp2);          // s = (p2.y - p1.y) * (p2.x - p1.x)^-1
-        bn_print("\n[2] >> bn_mul s: ", &s);
-        bn_print("\n[2] >> bn_mul tmp1: ", &tmp1);
-        bn_print("\n[2] >> bn_mul tmp2: ", &tmp2);
+        // bn_print("\n[2] >> bn_mul s: ", &s);
+        // bn_print("\n[2] >> bn_mul tmp1: ", &tmp1);
+        // bn_print("\n[2] >> bn_mul tmp2: ", &tmp2);
         init_zero(&s, MAX_BIGNUM_WORDS);
         bn_mul(&tmp1, &tmp2, &s);
-        bn_print("\n[2] << bn_mul s: ", &s);
-        bn_print("\n[2] << bn_mul tmp1: ", &tmp1);
-        bn_print("\n[2] << bn_mul tmp2: ", &tmp2); // OK
+        // bn_print("\n[2] << bn_mul s: ", &s);
+        // bn_print("\n[2] << bn_mul tmp1: ", &tmp1);
+        // bn_print("\n[2] << bn_mul tmp2: ", &tmp2); // OK
 
         
         init_zero(&tmp2, MAX_BIGNUM_SIZE);
-        bn_print("\n[3a] >> bn_mod s: ", &s);
+        // bn_print("\n[3a] >> bn_mod s: ", &s);
         bn_copy(&tmp2, &s);
         init_zero(&s, MAX_BIGNUM_SIZE);
-        bn_print("\n[3b] >> bn_mod s: ", &s);
-        bn_print("\n[3] >> bn_mod tmp2: ", &tmp2);
-        bn_print("\n[3] >> bn_mod p: ", p); // OK
+        // bn_print("\n[3b] >> bn_mod s: ", &s);
+        // bn_print("\n[3] >> bn_mod tmp2: ", &tmp2);
+        // bn_print("\n[3] >> bn_mod p: ", p); // OK
         bn_mod(&s, &tmp2, p);                 // s = (p2.y - p1.y) / (p2.x - p1.x) mod p
-        bn_print("\n[3] << bn_mod s: ", &s); // OK
+        // bn_print("\n[3] << bn_mod s: ", &s); // OK
 
         init_zero(&tmp2, MAX_BIGNUM_WORDS);
         bn_copy(&tmp2, &s);
-        bn_print("\n[4] >> bn_mul x3: ", &x3);
-        bn_print("\n[4] >> bn_mul s: ", &s);
-        bn_print("\n[4] >> bn_mul tmp2: ", &tmp2);
+        // bn_print("\n[4] >> bn_mul x3: ", &x3);
+        // bn_print("\n[4] >> bn_mul s: ", &s);
+        // bn_print("\n[4] >> bn_mul tmp2: ", &tmp2);
         bn_mul(&s, &tmp2, &x3); // a * b = product // x3 = s^2
-        bn_print("\n[4] << bn_mul x3: ", &x3); // 
-        bn_print("\n[4] << bn_mul s: ", &s);
+        // bn_print("\n[4] << bn_mul x3: ", &x3); // 
+        // bn_print("\n[4] << bn_mul s: ", &s);
 
         //bn_mod(&x3, p, &x3);               // x3 = s^2 mod p
         init_zero(&tmp2, MAX_BIGNUM_WORDS);
         bn_copy(&tmp2, &x3);
-        bn_print("\n[5] >> bn_subtract x3: ", &x3);
-        bn_print("\n[5] >> bn_subtract tmp2: ", &tmp2);
+        // bn_print("\n[5] >> bn_subtract x3: ", &x3);
+        // bn_print("\n[5] >> bn_subtract tmp2: ", &tmp2);
         // print p1.x
-        bn_print("\n[5] >> bn_subtract p1.x: ", &p1->x);
+        // bn_print("\n[5] >> bn_subtract p1.x: ", &p1->x);
         bn_subtract(&x3, &tmp2, &p1->x); // result = a - b
-        bn_print("\n[5] << bn_subtract x3: ", &x3); //
+        // bn_print("\n[5] << bn_subtract x3: ", &x3); //
         bn_subtract(&x3, &x3, &p2->x);          // x3 = s^2 - p1.x - p2.x
-        bn_print("\n[6] << bn_subtract x3: ", &x3);
+        // bn_print("\n[6] << bn_subtract x3: ", &x3);
         
         init_zero(&tmp2, MAX_BIGNUM_SIZE);
         //bn_mod(&x3, p, &x3); // x3 = (s^2 - p1.x - p2.x) mod p tmp2 = 
         bn_copy(&tmp2, &x3);
-        bn_print("\n[7] >> bn_mod x3: ", &x3);
-        bn_print("\n[7] >> bn_mod tmp2: ", &tmp2);
-        bn_print("\n[7] >> bn_mod p: ", p);
+        // bn_print("\n[7] >> bn_mod x3: ", &x3);
+        // bn_print("\n[7] >> bn_mod tmp2: ", &tmp2);
+        // bn_print("\n[7] >> bn_mod p: ", p);
         bn_mod(&x3, &tmp2, p); // x3 = tmp2 mod p
-        bn_print("\n[7] << bn_mod x3: ", &x3); // OK
+        // bn_print("\n[7] << bn_mod x3: ", &x3); // OK
 
         bn_subtract(&tmp1, &p1->x, &x3);
-        bn_print("\n[8] << bn_subtract tmp1: ", &tmp1); // OK
+        // bn_print("\n[8] << bn_subtract tmp1: ", &tmp1); // OK
 
         //bn_mul(&y3, &s, &tmp1);            // y3 = s * (p1.x - x3)
         bn_mul(&s, &tmp1, &y3); // a * b = product
-        bn_print("\n[9] << bn_mul y3: ", &y3); // OK
+        // bn_print("\n[9] << bn_mul y3: ", &y3); // OK
 
         //bn_mod(&y3, p, &y3);               // y3 = s * (p1.x - x3) mod p
         
         init_zero(&tmp2, MAX_BIGNUM_WORDS);
         bn_copy(&tmp2, &y3);
         bn_subtract(&y3, &tmp2, &p1->y);          // y3 = s * (p1.x - x3) - p1.y
-        bn_print("\n[10] << bn_mod y3: ", &y3); // OK
+        // bn_print("\n[10] << bn_mod y3: ", &y3); // OK
 
         init_zero(&tmp2, MAX_BIGNUM_WORDS);
         bn_copy(&tmp2, &y3);
         bn_mod(&y3, &tmp2, p);               // y3 = tmp2 mod p
-        bn_print("\n[11] << bn_mod y3: ", &y3);
+        // bn_print("\n[11] << bn_mod y3: ", &y3);
     }
 
     // Assign the computed coordinates to the result

@@ -163,20 +163,40 @@ Point point_add(Point p1, Point p2) {
         mpz_invert(tmp2, tmp2, p);  
         gmp_printf("[6] << mpz_invert tmp2: %Zx\n", tmp2);
 
+        gmp_printf("[7] >> mpz_mul tmp1: %Zx\n", tmp1);
+        gmp_printf("[7] >> mpz_mul tmp2: %Zx\n", tmp2);
         mpz_mul(s, tmp1, tmp2);
+        gmp_printf("[7] << mpz_mul s: %Zx\n", s);
+        
         mpz_mod(s, s, p);
-
-        gmp_printf("s: %Zx\n", s);
+        gmp_printf("[8] << mpz_mod s: %Zx\n", s);
 
         mpz_pow_ui(x3, s, 2);
-        mpz_sub(x3, x3, p1.x);
-        mpz_sub(x3, x3, p1.x);
-        mpz_mod(x3, x3, p);
+        gmp_printf("[9] << mpz_pow_ui x3: %Zx\n", x3);
 
+        mpz_sub(x3, x3, p1.x);
+        gmp_printf("[10] << mpz_sub x3: %Zx\n", x3);
+        mpz_sub(x3, x3, p1.x);
+        gmp_printf("[11] << mpz_sub x3: %Zx\n", x3);
+        mpz_mod(x3, x3, p);
+        gmp_printf("[12] << mpz_mod x3: %Zx\n", x3);
+
+        
+        gmp_printf("\n[13] >> mpz_sub p1.x: %Zx\n", p1.x);
+        gmp_printf("[13] >> mpz_sub x3: %Zx\n", x3);
         mpz_sub(tmp1, p1.x, x3);
+        gmp_printf("[13] << mpz_sub tmp1: %Zx\n", tmp1);
+
         mpz_mul(y3, s, tmp1);
+        gmp_printf("\n[14] << mpz_mul y3: %Zx\n", y3);
+        
+        gmp_printf("[15] >> mpz_sub y3: %Zx\n", y3);
+        gmp_printf("[15] >> mpz_sub p1.y: %Zx\n", p1.y);
         mpz_sub(y3, y3, p1.y);
+        gmp_printf("[15] << mpz_sub y3: %Zx\n", y3);
+        
         mpz_mod(y3, y3, p);
+        gmp_printf("[16] << mpz_mod y3: %Zx\n", y3);
     }
 
     mpz_set(result.x, x3);
@@ -221,8 +241,8 @@ int main() {
 
     gmp_printf(">> p2 x: %Zx\n", p2.x);
     gmp_printf(">> p2 y: %Zx\n", p2.y);
-    //r = point_add(G, p2); // point addition: p1.x != p2.x
-    r = point_add(G, G); // point doubling: p1.x == p2.x
+    r = point_add(G, p2); // point addition: p1.x != p2.x
+    //r = point_add(G, G); // point doubling: p1.x == p2.x
     // print the current x and y
     gmp_printf("<< r x: %Zx\n", r.x);
     gmp_printf("<< r y: %Zx\n", r.y);
