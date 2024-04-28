@@ -512,8 +512,34 @@ __device__ int absolute_compare(const BIGNUM* a, const BIGNUM* b) {
     return 0; // |a| and |b| are equal in absolute value
 }
 
-//__device__ void bn_add_v0(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
 __device__ bool bn_add(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
+    // #define BN_ULONG_NUM_BITS 64
+    // #define MAX_BIGNUM_WORDS 4     // For 256-bit numbers
+    // #define MAX_BIGNUM_SIZE 8     // Allow room for temp calculations
+
+    // typedef struct bignum_st {
+    // BN_ULONG *d;
+    // int top;
+    // int dmax;
+    // int neg;
+    // int flags;
+    // } BIGNUM;
+    /*printf("++ bn_add ++\n");
+    bn_print(">> a: ", a);
+    printf(">> a.top: %d\n", a->top);
+    printf(">> a.dmax: %d\n", a->dmax);
+    printf(">> a.neg: %d\n", a->neg);
+    printf(">> a.flags: %d\n", a->flags);
+    bn_print(">> b: ", b);
+    printf(">> b.top: %d\n", b->top);
+    printf(">> b.dmax: %d\n", b->dmax);
+    printf(">> b.neg: %d\n", b->neg);
+    printf(">> b.flags: %d\n", b->flags);
+    bn_print(">> result: ", result);
+    printf(">> result.top: %d\n", result->top);
+    printf(">> result.dmax: %d\n", result->dmax);
+    printf(">> result.neg: %d\n", result->neg);
+    printf(">> result.flags: %d\n", result->flags);*/
     // Clear the result first.
     result->top = 0;
     for (int i = 0; i < MAX_BIGNUM_WORDS; i++) {
@@ -546,6 +572,8 @@ __device__ bool bn_add(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
 
     // Lastly, normalize the result to remove any leading zeros that could have appeared.
     find_top(result, MAX_BIGNUM_WORDS);
+    // bn_print("<< result: ", result);
+    // printf("-- bn_add --\n");
     return true;
 }
 
@@ -620,7 +648,7 @@ __device__ int bn_nnmod_deprecated(BIGNUM *r, BIGNUM *m, BIGNUM *d)
     printf("++ BN_nnmod ++\n");
     bn_print(">> r: ", r);
     bn_print(">> m: ", m);
-    bn_print(">> d: ", d);    
+    bn_print(">> d: ", d);
     // Check for division by zero
     if (d->top == 0) {
         return 0; // Error code
@@ -1192,7 +1220,15 @@ __device__ int bn_mod(BIGNUM *r, BIGNUM *a, BIGNUM *n) {
     // printf("++ bn_mod ++\n");
     // bn_print(">> r: ", r);
     // bn_print(">> a(m): ", a);
+    // printf(">> a.top: %d\n", a->top);
+    // printf(">> a.neg: %d\n", a->neg);
+    // printf(">> a.dmax: %d\n", a->dmax);
+    // printf(">> a.flags: %d\n", a->flags);
     // bn_print(">> n(d): ", n);
+    // printf(">> n.top: %d\n", n->top);
+    // printf(">> n.neg: %d\n", n->neg);
+    // printf(">> n.dmax: %d\n", n->dmax);
+    // printf(">> n.flags: %d\n", n->flags);
     BIGNUM q;
     init_zero(&q, MAX_BIGNUM_SIZE);
 
@@ -1236,7 +1272,7 @@ __device__ int bn_mod(BIGNUM *r, BIGNUM *a, BIGNUM *n) {
             bn_copy(r, &tmp);
         }
     }
-
+    // bn_print("<< r bn_mod: ", r);
     // printf("-- bn_mod --\n");
     return 1;
 }

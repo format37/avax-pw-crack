@@ -43,7 +43,7 @@ int main() {
 
   // Set curve order for secp256k1
 	BN_dec2bn(&curveOrder, "115792089237316195423570985008687907852837564279074904382605163141518161494337");
-  print_bn("Curve Order", curveOrder);
+  //print_bn("Curve Order", curveOrder);
   print_bn_hex("Curve Order", curveOrder); 
 
   // Initialize a and b
@@ -51,10 +51,10 @@ int main() {
   BN_hex2bn(&b, "6C91CEA9CF0CAC55A7596D16B56D2AEFD204BB99DD677993158A7E6564F93CDF");
   
   // Print inputs
-  print_bn("program C a (Before mod_add)", a);
-  print_bn_hex("program C a (Before mod_add)", a);
-  print_bn("program C parentKeyInt (Before mod_add)", b);
-  print_bn_hex("program C parentKeyInt (Before mod_add)", b);
+  // print_bn("program C a (Before mod_add)", a);
+  print_bn_hex(">> BN_add a:", a);
+  // print_bn("program C parentKeyInt (Before mod_add)", b);
+  print_bn_hex(">> BN_add b:", b);
 
   // Debug ++ TODO: Remove
 	/*BIGNUM *tempSum = BN_new();
@@ -71,18 +71,20 @@ int main() {
   // Debug --
 
   BN_add(newKey, a, b);
-  print_bn("Debug C newKey (After add)", newKey);
-  print_bn_hex("Debug C newKey (After add)", newKey);
+  // print_bn("Debug C newKey (After add)", newKey);
+  print_bn_hex("<< BN_add newKey:", newKey);
   
+  print_bn_hex("\n>> BN_nnmod newKey:", newKey);
+  print_bn_hex(">> BN_nnmod curveOrder:", curveOrder);
   BN_nnmod(newKey, newKey, curveOrder, ctx);
-	print_bn("Debug C newKey (After mod)", newKey);
-  print_bn_hex("Debug C newKey (After mod)", newKey);
+	// print_bn("Debug C newKey (After mod)", newKey);
+  print_bn_hex("<< BN_nnmod newKey:", newKey);
 
   uint8_t newKeyBytes[32] = {0};  // Initialize to zero
   int newKeyLen = 0;
   newKeyLen = BN_bn2bin(newKey, newKeyBytes);
   // print newKeyLen
-  printf("newKeyLen: %d\n", newKeyLen);
+  printf("\nnewKeyLen: %d\n", newKeyLen);
   printf("private: ");
 	print_as_hex_char(newKeyBytes, newKeyLen);
 
@@ -107,16 +109,35 @@ int main() {
   BN_bin2bn(newKeyBytes, newKeyLen, priv_key);
   EC_KEY_set_private_key(eckey, priv_key);
 
+  // Print private key
+  printf("private: ");
+  for (size_t i = 0; i < newKeyLen; i++) {
+      printf("%02x", newKeyBytes[i]);
+  }
+
   // Generate public key
   EC_POINT *pub_key = EC_POINT_new(EC_KEY_get0_group(eckey));
   EC_POINT_mul(EC_KEY_get0_group(eckey), pub_key, priv_key, NULL, NULL, NULL);
   EC_KEY_set_public_key(eckey, pub_key);
 
+  // Print uncompressed public key
+  printf("\n");
+  printf("Uncompressed public key: ");
+
+  size_t uncompressed_pubkey_len = 65;
+  unsigned char uncompressed_pubkey[65];
+  uncompressed_pubkey_len = EC_POINT_point2oct(EC_KEY_get0_group(eckey), pub_key, POINT_CONVERSION_UNCOMPRESSED, uncompressed_pubkey, uncompressed_pubkey_len, NULL);
+
+  for (size_t i = 0; i < uncompressed_pubkey_len; i++) {
+      printf("%02x", uncompressed_pubkey[i]);
+  }
+  printf("\n");
+
   // Compress public key
   compress_pubkey(eckey, compressed_pubkey, &compressed_pubkey_len);
 
   // Print compressed public key
-  printf("public: ");
+  printf("Compressed public key: ");
   for (size_t i = 0; i < compressed_pubkey_len; i++) {
       printf("%02x", compressed_pubkey[i]);
   }

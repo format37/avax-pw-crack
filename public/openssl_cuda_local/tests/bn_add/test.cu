@@ -25,7 +25,7 @@ __global__ void kernel_test(BN_ULONG *A, BN_ULONG *B, int *sign_a, int *sign_b) 
     b.neg = sign_b[0];
 
     bn_print("# a : ", &a);
-    bn_print("# b  : ", &b);
+    bn_print("# b : ", &b);
 
     // Test
     bn_add(&result, &a, &b);
@@ -47,7 +47,8 @@ int main() {
         {0x1234567890abcdef, 0,0,0}, // 6
         {0x1234567890abcdef, 0,0,0}, // 7
         {0x1234567890abcdef, 0,0,0}, // 8
-        {0x1234567890abcdef, 0,0,0}  // 9
+        {0x1234567890abcdef, 0,0,0},  // 9
+        {0x405000A0CA2248E1, 0xB788A1C84F4C756C, 0xAB7087E3F0C50175, 0xC17747B1566D9FE8}, //10
     };
 
     BN_ULONG test_values_b[][MAX_BIGNUM_WORDS] = {
@@ -60,12 +61,13 @@ int main() {
         {0x5678901234567890, 0,0,0}, // 6
         {0x5678901234567890, 0,0,0}, // 7
         {0xfedcba0987654321, 0,0,0}, // 8
-        {0xfedcba0987654321, 0,0,0}  // 9
+        {0xfedcba0987654321, 0,0,0},  // 9
+        {0x158A7E6564F93CDF, 0xD204BB99DD677993, 0xA7596D16B56D2AEF, 0x6C91CEA9CF0CAC55},  // 10
     };
 
     // Set sign to 0 for positive numbers, 1 for negative numbers
-    int sign_a[] = {0, 0, 0, 0, 0, 0, 0, 1, 0, 0};
-    int sign_b[] = {0, 0, 0, 0, 0, 0, 0, 1, 0, 1};
+    int sign_a[] = {0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0};
+    int sign_b[] = {0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0};
 
     int num_tests = sizeof(test_values_a) / sizeof(test_values_a[0]);
 

@@ -46,14 +46,16 @@ int main() {
 
     BN_ULONG test_values_a[][MAX_BIGNUM_WORDS] = {
         {0xa9d76a4234a8ded, 0x7af964ec3f6f871b, 0xe09d7f67cc580732, 0x3b11b98c6222abbb, 0x0bdfd291448c33e6, 0xa46834fe88684cf0, 0x5106877163ee71eb, 0x5186b6de04720283},
+        {0, 0, 0, 0x1, 0x2E09165B257A4C3E, 0x52C9F4FAA6322C65, 0x898D5D622CB3EEFF, 0x55DA7F062F1B85C0},
     };
 
     BN_ULONG test_values_n[][MAX_BIGNUM_WORDS] = {
         {0, 0, 0, 0, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xfffffffefffffc2f},
+        {0, 0, 0, 0, 0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFE, 0xBAAEDCE6AF48A03B, 0xBFD25E8CD0364141},
     };
     // 0 for positive, 1 for negative
-    int sign_a[] = {0};
-    int sign_n[] = {0};
+    int sign_a[] = {0,0};
+    int sign_n[] = {0,0};
 
     // Number of tests defined by the number of elements in test_values_a/n arrays.
     int num_tests = sizeof(test_values_a) / sizeof(test_values_a[0]);
