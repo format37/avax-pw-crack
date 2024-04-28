@@ -200,13 +200,14 @@ __global__ void testKernel() {
     // Initialize constants
     // CURVE_P is curveOrder_d
     // CURVE_P.d = curveOrder_d;
-    CURVE_P.top = 4;
-    CURVE_P.neg = 0;
+    // CURVE_P.top = 4;
+    // CURVE_P.neg = 0;
     
-    for (int i = 0; i < 4; i++) CURVE_A_d[i] = 0;
-    CURVE_A.d = CURVE_A_d;
-    CURVE_A.top = 4;
-    CURVE_A.neg = 0;
+    // for (int i = 0; i < 4; i++) CURVE_A_d[i] = 0;
+    // CURVE_A.d = CURVE_A_d;
+    // CURVE_A.top = 4;
+    // CURVE_A.neg = 0;
+    init_zero(&CURVE_A, MAX_BIGNUM_SIZE);
     
     // For secp256k1, CURVE_B should be initialized to 7 rather than 0
     for (int i = 0; i < 4; i++) CURVE_B_d[i] = 0;
@@ -242,6 +243,8 @@ __global__ void testKernel() {
     // Derive public key 
     // EC_POINT publicKey = ec_point_scalar_mul(&G, &newKey, &curveOrder);    
     
+    bn_copy(&CURVE_P, &curveOrder);
+
     EC_POINT publicKey = ec_point_scalar_mul(&G, &newKey, &CURVE_P, &CURVE_A);
     
     
