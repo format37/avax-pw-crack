@@ -3323,22 +3323,28 @@ __device__ void bignum_to_bit_array(const BIGNUM *n, unsigned int *bits) {
 }
 
 __device__ void init_point_at_infinity(EC_POINT *P) {
+    // printf("++ init_point_at_infinity ++\n");
     // For the x and y coordinates of P, we'll set the 'top' to 0,
     // which is our chosen convention for representing the point at infinity.
 
+    init_zero(&P->x, MAX_BIGNUM_WORDS);
+    init_zero(&P->y, MAX_BIGNUM_WORDS);
+
     P->x.top = 0; // No valid 'words' in the BIGNUM representing x
     P->y.top = 0; // No valid 'words' in the BIGNUM representing y
-
+    
     // If 'd' arrays have been allocated, set them to zero as well.
     // memset could potentially be used for this if available and if 'd' is allocated.
     
     for (int i = 0; i < P->x.dmax; ++i) {
         P->x.d[i] = 0;
     }
+    
     for (int i = 0; i < P->y.dmax; ++i) {
         P->y.d[i] = 0;
     }
-    
+    // printf("### mark\n");
     // Alternatively, if you use flags or other conventions for points at infinity,
     // set them accordingly here.
+    // printf("-- init_point_at_infinity --\n");
 }

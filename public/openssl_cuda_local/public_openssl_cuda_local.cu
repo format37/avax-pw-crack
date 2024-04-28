@@ -26,12 +26,19 @@ __device__ EC_POINT ec_point_scalar_mul(
     bn_print(">> scalar: ", scalar);
     bn_print(">> curve_prime: ", curve_prime);
     bn_print(">> curve_a: ", curve_a);    
-
-    EC_POINT current = *point;                       // This initializes the current point with the input point
-    EC_POINT result;                                 // Initialize the result variable, which accumulates the result
-
+    
+    EC_POINT current = *point; // This initializes the current point with the input point
+    EC_POINT result; // Initialize the result variable, which accumulates the result
+    EC_POINT tmp_result;
+    EC_POINT tmp_a;
+    EC_POINT tmp_b;                                     
+    
     init_point_at_infinity(&result);                 // Initialize it to the point at infinity
-
+    init_point_at_infinity(&tmp_result);                 // Initialize it to the point at infinity
+    init_point_at_infinity(&tmp_a);                 // Initialize it to the point at infinity
+    init_point_at_infinity(&tmp_b);                 // Initialize it to the point at infinity
+    // printf("0: Interrupting for debug\n");
+    // return result; // TODO: remove this
     // Convert scalar BIGNUM to an array of integers that's easy to iterate bit-wise
     unsigned int bits[256];                          // Assuming a 256-bit scalar
     bignum_to_bit_array(scalar, bits);               // You will need to implement bignum_to_bit_array()
@@ -39,42 +46,47 @@ __device__ EC_POINT ec_point_scalar_mul(
     // debug_printf("coef hex: %s\n", bignum_to_hex(scalar)); // Convert BIGNUM to hex string for printing
     bn_print("coef: ", scalar);  
     
-    int debug_counter = 1;
+    int debug_counter = 1;    
     
     for (int i = 0; i < 256; i++) {                 // Assuming 256-bit scalars
-        if (i<debug_counter) {
-            // debug_printf("0 x: %s\n", bignum_to_hex(&current.x));
-            bn_print("0 current.x: ", &current.x);
-            // debug_printf("0 y: %s\n", bignum_to_hex(&current.y));
-            bn_print("0 current.y: ", &current.y);
-        }
+        // if (i<debug_counter) {
+        //     // debug_printf("0 x: %s\n", bignum_to_hex(&current.x));
+        //     bn_print("0 current.x: ", &current.x);
+        //     // debug_printf("0 y: %s\n", bignum_to_hex(&current.y));
+        //     bn_print("0 current.y: ", &current.y);
+        // }
         
 
         if (bits[i]) {// If the i-th bit is set
-            printf("0: Interrupting for debug\n");
-            return result; // TODO: remove this
+            // printf("0: Interrupting for debug\n");
+            // return result; // TODO: remove this
             // if (i<debug_counter) printf("# 0\n");
             // point_add(&result, &current, &result);  // Add current to the result
             // point_add(&result, &current, &result, &field_order);  // Add current to the result
             //point_add(&result, &current, &result, curve_order);  // Add current to the result
             
-
+            bn_print("\n>> [0] point_add current.x: ", &current.x);
+            bn_print(">> point_add current.y: ", &current.y);
+            bn_print(">> point_add result.x: ", &result.x);
+            bn_print(">> point_add result.y: ", &result.y);
+            bn_print(">> curve_prime: ", curve_prime);
+            bn_print(">> curve_a: ", curve_a);
             point_add(&result, &current, &result, curve_prime, curve_a);  // Add current to the result
+            bn_print("<< point_add result.x: ", &result.x);
+            bn_print("<< point_add result.y: ", &result.y);
             
-            
-
-             // if (i<debug_counter) printf("# b\n");
+            // if (i<debug_counter) printf("# b\n");
             // debug_printf("1 x: %s\n", bignum_to_hex(&result.x));
-             if (i<debug_counter) bn_print("1 result.x: ", &result.x);
+            //  if (i<debug_counter) bn_print("1 result.x: ", &result.x);
             // debug_printf("1 y: %s\n", bignum_to_hex(&result.y));
-             if (i<debug_counter) bn_print("1 result.y: ", &result.y);
+            //  if (i<debug_counter) bn_print("1 result.y: ", &result.y);
 
         }
-        else {
-            printf("1: Interrupting for debug\n");
-            return result; // TODO: remove this
-        }
-        if (i<debug_counter) debug_printf("# c\n");
+        // else {
+        //     printf("1: Interrupting for debug\n");
+        //     return result; // TODO: remove this
+        // }
+        // if (i<debug_counter) debug_printf("# c\n");
 
         //point_double(&current, &current);           // Double current
         // point_double(&current, &current, &field_order);  // Double current and store the result in current
@@ -82,14 +94,43 @@ __device__ EC_POINT ec_point_scalar_mul(
 
         // We don't need to double the point. We can just add it to itself.
         //point_add(&current, &current, &current, curve_order);
-        point_add(&current, &current, &current, curve_prime, curve_a);  // Double current by adding to itself
+        bn_print("\n>> [1] point_add current.x: ", &current.x);
+        bn_print(">> point_add current.y: ", &current.y);
+        // bn_print(">> point_add result.x: ", &result.x);
+        // bn_print(">> point_add result.y: ", &result.y);
+        bn_print(">> point_add curve_prime: ", curve_prime);
+        bn_print(">> point_add curve_a: ", curve_a);
+        // printf("0: Interrupting for debug\n");
+        // return result; // TODO: remove this
+        // __device__ int point_add(
+        //     EC_POINT *result, 
+        //     EC_POINT *p1, 
+        //     EC_POINT *p2, 
+        //     BIGNUM *p, 
+        //     BIGNUM *a
+        // ) {
+        // init tmp_result
+        init_point_at_infinity(&tmp_result);        
+        // Copy current to tmp_a
+        bn_copy(&tmp_a.x, &current.x);
+        bn_copy(&tmp_a.y, &current.y);
+        // Copy current to tmp_b
+        bn_copy(&tmp_b.x, &current.x);
+        bn_copy(&tmp_b.y, &current.y);
+        point_add(&tmp_result, &tmp_a, &tmp_b, curve_prime, curve_a);  // Double current by adding to itself
+        
+        // Copy tmp_result to current
+        bn_copy(&current.x, &tmp_result.x);
+        bn_copy(&current.y, &tmp_result.y);
+        bn_print("<< point_add current.x: ", &current.x);
+        bn_print("<< point_add current.y: ", &current.y);
 
         // debug_printf("2 x: %s\n", bignum_to_hex(&current.x));
-        if (i<debug_counter) bn_print("2 current.x: ", &current.x);
+        // if (i<debug_counter) bn_print("2 current.x: ", &current.x);
         // debug_printf("2 y: %s\n", bignum_to_hex(&current.y));
-        if (i<debug_counter) bn_print("2 current.y: ", &current.y);
-        //printf("BREAKING\n");
-        // break; // TODO: remove this
+        // if (i<debug_counter) bn_print("2 current.y: ", &current.y);
+        printf("### Breaking at i: %d\n", i);
+        break; // TODO: remove this        
     }
 
     // debug_printf("Final x: %s\n", bignum_to_hex(&result.x));
@@ -124,23 +165,23 @@ __global__ void testKernel() {
 
     // Initialize a
     // C17747B1566D9FE8AB7087E3F0C50175B788A1C84F4C756C405000A0CA2248E1
-    a_d[0] = 0xC17747B1566D9FE8;
-    a_d[1] = 0xAB7087E3F0C50175;
-    a_d[2] = 0xB788A1C84F4C756C;
-    a_d[3] = 0x405000A0CA2248E1; 
-    a.d = a_d; 
-    a.top = 4;
-    a.neg = 0;
+    // a_d[0] = 0xC17747B1566D9FE8;
+    // a_d[1] = 0xAB7087E3F0C50175;
+    // a_d[2] = 0xB788A1C84F4C756C;
+    // a_d[3] = 0x405000A0CA2248E1; 
+    // a.d = a_d; 
+    // a.top = 4;
+    // a.neg = 0;
 
     // Initialize b
     // 6C91CEA9CF0CAC55A7596D16B56D2AEFD204BB99DD677993158A7E6564F93CDF
-    b_d[0] = 0x6C91CEA9CF0CAC55;
-    b_d[1] = 0xA7596D16B56D2AEF;
-    b_d[2] = 0xD204BB99DD677993;
-    b_d[3] = 0x158A7E6564F93CDF;
-    b.d = b_d;
-    b.top = 4;
-    b.neg = 0;
+    // b_d[0] = 0x6C91CEA9CF0CAC55;
+    // b_d[1] = 0xA7596D16B56D2AEF;
+    // b_d[2] = 0xD204BB99DD677993;
+    // b_d[3] = 0x158A7E6564F93CDF;
+    // b.d = b_d;
+    // b.top = 4;
+    // b.neg = 0;
 
     BN_ULONG curveOrder_values[MAX_BIGNUM_WORDS] = {
         0xffffffffffffffff,
@@ -216,22 +257,42 @@ __global__ void testKernel() {
     CURVE_B.top = 4;
     CURVE_B.neg = 0;
 
+    BN_ULONG CURVE_GX_values[MAX_BIGNUM_WORDS] = {
+        0x79BE667EF9DCBBAC,
+        0x55A06295CE870B07,
+        0x029BFCDB2DCE28D9,
+        0x59F2815B16F81798
+        };
+    for (int j = 0; j < MAX_BIGNUM_WORDS; ++j) {
+            CURVE_GX_d[j] = CURVE_GX_values[j];
+        }
     // Generator x coordinate
-    CURVE_GX_d[0] = 0x79BE667EF9DCBBAC;
-    CURVE_GX_d[1] = 0x55A06295CE870B07;
-    CURVE_GX_d[2] = 0x029BFCDB2DCE28D9;
-    CURVE_GX_d[3] = 0x59F2815B16F81798; 
+    // CURVE_GX_d[0] = 0x79BE667EF9DCBBAC;
+    // CURVE_GX_d[1] = 0x55A06295CE870B07;
+    // CURVE_GX_d[2] = 0x029BFCDB2DCE28D9;
+    // CURVE_GX_d[3] = 0x59F2815B16F81798; 
 
     // Generator y coordinate
     BIGNUM CURVE_GY;
-    BN_ULONG CURVE_GY_d[4];
-    CURVE_GY_d[0] = 0x483ADA7726A3C465;
-    CURVE_GY_d[1] = 0x5DA4FBFC0E1108A8;
-    CURVE_GY_d[2] = 0xFD17B448A6855419;
-    CURVE_GY_d[3] = 0x9C47D08FFB10D4B8;
+    BN_ULONG CURVE_GY_values[MAX_BIGNUM_WORDS] = {
+        0x483ADA7726A3C465,
+        0x5DA4FBFC0E1108A8,
+        0xFD17B448A6855419,
+        0x9C47D08FFB10D4B8
+        };
+    for (int j = 0; j < MAX_BIGNUM_WORDS; ++j) {
+            CURVE_GY_d[j] = CURVE_GY_values[j];
+        }
+    // BN_ULONG CURVE_GY_d[4];
+    // CURVE_GY_d[0] = 0x483ADA7726A3C465;
+    // CURVE_GY_d[1] = 0x5DA4FBFC0E1108A8;
+    // CURVE_GY_d[2] = 0xFD17B448A6855419;
+    // CURVE_GY_d[3] = 0x9C47D08FFB10D4B8;
 
     // Initialize generator
     EC_POINT G;
+    init_zero(&G.x, MAX_BIGNUM_WORDS);
+    init_zero(&G.y, MAX_BIGNUM_WORDS);
     G.x.d = CURVE_GX_d; 
     G.y.d = CURVE_GY_d;
     // Set tops, negs
@@ -239,6 +300,9 @@ __global__ void testKernel() {
     G.y.top = 4;
     G.x.neg = 0;
     G.y.neg = 0;
+    // reverse
+    reverse_order(&G.x);
+    reverse_order(&G.y);
 
     // Derive public key 
     // EC_POINT publicKey = ec_point_scalar_mul(&G, &newKey, &curveOrder);    
