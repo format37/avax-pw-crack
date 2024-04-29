@@ -22,19 +22,22 @@ __global__ void testKernel() {
     printf("++ testKernel for bn_mod ++\n");
     BN_ULONG test_values_a[][TEST_BIGNUM_WORDS] = {
         {0xa9d76a4234a8ded, 0x7af964ec3f6f871b, 0xe09d7f67cc580732, 0x3b11b98c6222abbb, 0x0bdfd291448c33e6, 0xa46834fe88684cf0, 0x5106877163ee71eb, 0x5186b6de04720283},
-        {0, 0, 0, 0x1, 0x2E09165B257A4C3E, 0x52C9F4FAA6322C65, 0x898D5D622CB3EEFF, 0x55DA7F062F1B85C0},
+        {0, 0, 0, 0x1, 0x2E09165B257A4C3E, 0x52C9F4FAA6322C65, 0x898D5D622CB3EEFF, 0x55DA7F062F1B85C0},        
+        {0xadb09f810124f172, 0xe261c5a52d2f1c68, 0xc60e0440fa46ea11, 0x3035c57d02d11014, 0xafbd0aae6a979c02, 0x1eaaa1a2f8460fbc, 0xd46a3eb2186d101a, 0xfcc69fa38a05fec0},
+
     };
 
     BN_ULONG test_values_n[][TEST_BIGNUM_WORDS] = {
         {0, 0, 0, 0, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xfffffffefffffc2f},
         {0, 0, 0, 0, 0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFE, 0xBAAEDCE6AF48A03B, 0xBFD25E8CD0364141},
+        {0, 0, 0, 0, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xfffffffefffffc2f},
     };
 
     int mod;
 
     // 0 for positive, 1 for negative
-    int sign_a[] = {0,0};
-    int sign_n[] = {0,0};
+    int sign_a[] = {0,0,0};
+    int sign_n[] = {0,0,0};
     
     reverse_order(test_values_a, test_values_n, sizeof(test_values_a) / (sizeof(BN_ULONG) * TEST_BIGNUM_WORDS));
     

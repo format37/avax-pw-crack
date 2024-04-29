@@ -116,7 +116,8 @@ __device__ void init_zero(BIGNUM *bn, int capacity) {
     
     // dmax is used to manage the memory allocation and ensure you 
     // do not access out-of-bounds memory.
-    bn->dmax = capacity; // Make sure to track the capacity in dmax.
+    //bn->dmax = capacity; // Make sure to track the capacity in dmax.
+    bn->dmax = MAX_BIGNUM_SIZE;
 }
 
 __device__ void init_one(BIGNUM *bn, int capacity) {
@@ -128,10 +129,25 @@ __device__ void init_one(BIGNUM *bn, int capacity) {
     // bn->top = (capacity > 0) ? 1 : 0; // There is one significant digit if capacity allows
     bn->top = 1;
     bn->neg = 0;             // The number is non-negative
-    bn->dmax = capacity;     // Track the capacity in dmax
+    //bn->dmax = capacity;     // Track the capacity in dmax
+    bn->dmax = MAX_BIGNUM_SIZE;
 }
 
 __device__ int bn_cmp(BIGNUM* a, BIGNUM* b) {
+    // printf("++ bn_cmp ++\n");
+    // bn_print(">> a: ", a);
+    // printf(">> a.top: %d\n", a->top);
+    // printf(">> a.dmax: %d\n", a->dmax);
+    // printf(">> a.neg: %d\n", a->neg);
+    // bn_print(">> b: ", b);
+    // printf(">> b.top: %d\n", b->top);
+    // printf(">> b.dmax: %d\n", b->dmax);
+    // printf(">> b.neg: %d\n", b->neg);
+
+    // print a.d[4]
+    // printf("a.d[4]: %llx\n", a->d[3]);
+    // print b.d[4]
+    // printf("b.d[4]: %llx\n", b->d[3]);
     // bn_print("[0] bn_cmp a: ", a);
     // bn_cmp logic:
     //  1 when a is larger
@@ -142,31 +158,39 @@ __device__ int bn_cmp(BIGNUM* a, BIGNUM* b) {
   // int a_top = a->top - 1;
   // while (a_top >= 0 && a->d[a_top] == 0) a_top--;
   int a_top = find_top(a, MAX_BIGNUM_WORDS);
+  //   printf("2>> a.top: %d\n", a->top);
 
   // Skip leading zeroes and find the actual top for b
   // int b_top = b->top - 1;
   // while (b_top >= 0 && b->d[b_top] == 0) b_top--;
   int b_top = find_top(b, MAX_BIGNUM_WORDS);
+  // printf("2>> b.top: %d\n", b->top);
 
   // Compare signs
-  if (a->neg && !b->neg) return -1; // a is negative, b is positive: a < b
-  if (!a->neg && b->neg) return 1;  // a is positive, b is negative: a > b
+  if (a->neg && !b->neg) {return -1;} // a is negative, b is positive: a < b
+  if (!a->neg && b->neg) {return 1;}  // a is positive, b is negative: a > b
   // bn_print("[1] bn_cmp a: ", a);
 
   // If both numbers are negative, we need to reverse the comparison of their magnitudes
   int sign_factor = (a->neg && b->neg) ? -1 : 1;
   // bn_print("[2] bn_cmp a: ", a);
   // Now, use the actual tops for comparison
-  if (a_top > b_top) return sign_factor * 1; // Consider sign for magnitude comparison
+  if (a_top > b_top) {return sign_factor * 1;} // Consider sign for magnitude comparison
   // bn_print("[3] bn_cmp a: ", a);
-  if (a_top < b_top) return sign_factor * -1;
+  if (a_top < b_top) {return sign_factor * -1;}
   // bn_div(("[4] bn_cmp a: ", a);
     
   // Both numbers have the same number of significant digits, so compare them starting from the most significant digit
-  for (int i = a_top; i >= 0; i--) {
-    if (a->d[i] > b->d[i]) return sign_factor * 1; // a is larger (or smaller if both are negative)
-    if (a->d[i] < b->d[i]) return sign_factor * -1; // b is larger (or smaller if both are negative)
+  for (int i = a_top-1; i >= 0; i--) {
+    if (a->d[i] > b->d[i]) {return sign_factor * 1;} // a is larger (or smaller if both are negative)
+    
+    if (a->d[i] < b->d[i]) { // b is larger (or smaller if both are negative)
+        // printf("[5].%d a->d[i]: %llx is  less than b->d[i]: %llx\n", i, a->d[i], b->d[i]);
+        return sign_factor * -1;
+        } 
   }
+    //   printf("Numbers are equal\n");
+    //   printf("-- bn_cmp --\n");
   return 0; // Numbers are equal
 }
 
@@ -1217,18 +1241,24 @@ __device__ int bn_mod_mpz(BIGNUM *r, BIGNUM *m, BIGNUM *d) {
 }
 
 __device__ int bn_mod(BIGNUM *r, BIGNUM *a, BIGNUM *n) {
-    // printf("++ bn_mod ++\n");
-    // bn_print(">> r: ", r);
-    // bn_print(">> a(m): ", a);
-    // printf(">> a.top: %d\n", a->top);
-    // printf(">> a.neg: %d\n", a->neg);
-    // printf(">> a.dmax: %d\n", a->dmax);
-    // printf(">> a.flags: %d\n", a->flags);
-    // bn_print(">> n(d): ", n);
-    // printf(">> n.top: %d\n", n->top);
-    // printf(">> n.neg: %d\n", n->neg);
-    // printf(">> n.dmax: %d\n", n->dmax);
-    // printf(">> n.flags: %d\n", n->flags);
+    printf("++ bn_mod ++\n");
+    bn_print(">> r: ", r);
+    bn_print(">> a(m): ", a);
+    printf(">> a.top: %d\n", a->top);
+    printf(">> a.neg: %d\n", a->neg);
+    printf(">> a.dmax: %d\n", a->dmax);
+    printf(">> a.flags: %d\n", a->flags);
+    bn_print(">> n(d): ", n);
+    printf(">> n.top: %d\n", n->top);
+    printf(">> n.neg: %d\n", n->neg);
+    printf(">> n.dmax: %d\n", n->dmax);
+    printf(">> n.flags: %d\n", n->flags);
+    // print 8 words of n
+    printf(">> n[8]: ");
+    for (int i = 0; i < 8; i++) {
+        printf(" %016llx", n->d[i]);
+    }
+    printf("\n");
     BIGNUM q;
     init_zero(&q, MAX_BIGNUM_SIZE);
 
@@ -1272,8 +1302,8 @@ __device__ int bn_mod(BIGNUM *r, BIGNUM *a, BIGNUM *n) {
             bn_copy(r, &tmp);
         }
     }
-    // bn_print("<< r bn_mod: ", r);
-    // printf("-- bn_mod --\n");
+    bn_print("<< r bn_mod: ", r);
+    printf("-- bn_mod --\n");
     return 1;
 }
 
@@ -2803,10 +2833,10 @@ __device__ void bn_gcdext(BIGNUM *g, BIGNUM *s, BIGNUM *t, BIGNUM *a, BIGNUM *b)
 }
 
 __device__ bool bn_mod_inverse(BIGNUM *result, BIGNUM *a, BIGNUM *n) {
-    printf("++ bn_mod_inverse ++\n");
-    bn_print(">> a: ", a);
-    bn_print(">> n: ", n);
-    bn_print(">> result: ", result);
+    // printf("++ bn_mod_inverse ++\n");
+    // bn_print(">> a: ", a);
+    // bn_print(">> n: ", n);
+    // bn_print(">> result: ", result);
 
     if (bn_is_one(n)) {
         return false;  // No modular inverse exists
@@ -2928,20 +2958,29 @@ __device__ int point_add(
     BIGNUM *p, 
     BIGNUM *a
 ) {
-    printf("++ point_add ++\n");
-    bn_print(">> p1.x: ", &p1->x);
-    bn_print(">> p1.y: ", &p1->y);
-    bn_print(">> p2.x: ", &p2->x);
-    bn_print(">> p2.y: ", &p2->y);
-    bn_print(">> p: ", p);
-    bn_print(">> a: ", a);
+    bool debug = 0;
+    if (debug) {
+        printf("++ point_add ++\n");
+        bn_print(">> p1.x: ", &p1->x);
+        bn_print(">> p1.y: ", &p1->y);
+        bn_print(">> p2.x: ", &p2->x);
+        bn_print(">> p2.y: ", &p2->y);
+        bn_print(">> p: ", p);
+        // printf(">> p.top: %d\n", p->top);
+        printf(">> p.neg: %d\n", p->neg);
+        bn_print(">> a: ", a);
+        bn_print(">> a.top: ", a);
+        // printf(">> a.neg: %d\n", a->neg);
+    }
     // Handle the point at infinity cases
     if (point_is_at_infinity(p1)) {
         copy_point(result, p2);
+        if (debug) printf("Return 0. point_is_at_infinity(p1)");
         return 0;
     }
     if (point_is_at_infinity(p2)) {
         copy_point(result, p1);
+        if (debug) printf("Return 0. point_is_at_infinity(p2)");
         return 0;
     }
 
@@ -2956,6 +2995,7 @@ __device__ int point_add(
     // Case 1: p1 = p2 && p1.y != p2.y
     if (bn_cmp(&p1->x, &p2->x) == 0 && bn_cmp(&p1->y, &p2->y) != 0) {
         // The points are inverses to one another, return point at infinity
+        if (debug) printf("# Return 0. The points are inverses to one another, return point at infinity\n");
         set_point_at_infinity(result);
         return 0;
     }
@@ -2963,7 +3003,7 @@ __device__ int point_add(
     // Case 3: p1 == p2
     // TODO: Check, do we need to compare y
     if (bn_cmp(&p1->x, &p2->x) == 0 && bn_cmp(&p1->y, &p2->y) == 0) {
-        // printf("p1 == p2\n");
+        if (debug) printf("p1 == p2\n");
         // Point doubling
         BIGNUM two;
         init_zero(&two, MAX_BIGNUM_SIZE);
@@ -2972,7 +3012,7 @@ __device__ int point_add(
         BIGNUM tmp1_squared;
         init_zero(&tmp1_squared, MAX_BIGNUM_SIZE);
         bn_mul(&p1->x, &p1->x, &tmp1_squared);     // tmp1_squared = p1.x^2 // a * b = product
-        // bn_print("\n[0] << bn_mul tmp1: ", &tmp1_squared); // OK
+        if (debug) bn_print("\n[0] << bn_mul tmp1: ", &tmp1_squared); // OK
 
         init_zero(&tmp1, MAX_BIGNUM_SIZE);
         bn_copy(&tmp1, &tmp1_squared); // dst << src
@@ -2980,41 +3020,46 @@ __device__ int point_add(
         init_zero(&tmp2, MAX_BIGNUM_SIZE);
         bn_set_word(&tmp2, 3);
         bn_mul(&tmp1, &tmp2, &tmp1_squared);     // a * b = product
-        // bn_print("\n[1] << bn_mod tmp1_squared: ", &tmp1_squared); // OK
+        if (debug) bn_print("\n[1] << bn_mul tmp1_squared: ", &tmp1_squared); // OK
 
-        // bn_print("\n[2] << bn_add tmp1_squared: ", &tmp1_squared); // 
+        if (debug) bn_print("\n[2] << bn_add tmp1_squared: ", &tmp1_squared); // 
 
         init_zero(&tmp1, MAX_BIGNUM_SIZE);
         bn_copy(&tmp1, &tmp1_squared); // dst << src
-        bn_mod(&tmp1_squared, &tmp1, p);           // tmp1 = 3 * p1.x^2 mod p
-        // bn_print("\n[3] << bn_add tmp1: ", &tmp1_squared); // OK
-
+        init_zero(&tmp1_squared, MAX_BIGNUM_SIZE);
+        if (debug) bn_print("\n[3] >> bn_mod tmp1_squared: ", &tmp1_squared);
+        if (debug) bn_print("[3] >> bn_mod tmp1: ", &tmp1);
+        if (debug) bn_print("[3] >> bn_mod p: ", p);
+        bn_mod(&tmp1_squared, &tmp1, p);           // tmp1_squared = tmp1 mod p
+        if (debug) bn_print("[3] << bn_mod tmp1_squared: ", &tmp1_squared); // OK
+        if (debug) bn_print("[3] << bn_mod tmp1: ", &tmp1);
+        
         init_zero(&tmp2, MAX_BIGNUM_SIZE);
         bn_set_word(&two, 2);
         bn_mul(&p1->y, &two, &tmp2);  // tmp2 = 2 * p1.y
-        // bn_print("\n[4] << bn_mul tmp2: ", &tmp2); // OK
+        if (debug) bn_print("\n[4] << bn_mul tmp2: ", &tmp2); // OK
 
         init_zero(&tmp3, MAX_BIGNUM_SIZE);
         bn_copy(&tmp3, &tmp2); // dst << src
-        bn_mod(&tmp2, &tmp3, p);           // tmp2 = tmp2 mod p
-        // bn_print("\n[5] << bn_mod tmp2: ", &tmp2); // OK
-
+        bn_mod(&tmp2, &tmp3, p);           // tmp2 = tmp3 mod p
+        if (debug) bn_print("\n[5] << bn_mod tmp2: ", &tmp2); // OK
+        
         init_zero(&tmp3, MAX_BIGNUM_SIZE);
         bn_copy(&tmp3, &tmp2); // dst << src
         bn_mod_inverse(&tmp2, &tmp3, p);  // tmp2 = tmp2^-1 mod p
-        // bn_print("\n[6] << bn_mod_inverse tmp2: ", &tmp2); // OK
-
+        if (debug) bn_print("\n[6] << bn_mod_inverse tmp2: ", &tmp2); // OK
+        // return 0;//TODO: remove
         init_zero(&tmp3, MAX_BIGNUM_SIZE);
         bn_copy(&tmp3, &tmp1_squared); // dst << src
-        // bn_print("\n[7] >> bn_mul tmp3: ", &tmp3);
-        // bn_print("[7] >> bn_mul tmp2: ", &tmp2);
+        if (debug) bn_print("\n[7] >> bn_mul tmp3: ", &tmp3);
+        if (debug) bn_print("[7] >> bn_mul tmp2: ", &tmp2);
         bn_mul(&tmp3, &tmp2, &s);  // tmp1 * tmp2 = s
-        // bn_print("[7] << bn_mul s: ", &s); //
+        if (debug) bn_print("[7] << bn_mul s: ", &s); //
 
         init_zero(&tmp3, MAX_BIGNUM_SIZE);
         bn_copy(&tmp3, &s); // dst << src
         bn_mod(&s, &tmp3, p);  // s = s mod p
-        // bn_print("\n[8] << bn_mod s: ", &s); //
+        if (debug) bn_print("\n[8] << bn_mod s: ", &s); //
 
         init_zero(&tmp3, MAX_BIGNUM_SIZE);
         bn_copy(&tmp3, &s); // dst << src
@@ -3057,7 +3102,7 @@ __device__ int point_add(
         // bn_print("\n[16] << bn_mod y3: ", &y3); //
     } else {
         // Case 2: p1 != p2
-        // printf("p1 != p2\n");
+        if (debug) printf("p1 != p2\n");
         // Regular point addition
         bn_subtract(&tmp1, &p2->y, &p1->y);
         // bn_print("\n[a] << bn_subtract tmp1: ", &tmp1);

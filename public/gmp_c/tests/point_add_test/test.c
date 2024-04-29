@@ -20,6 +20,7 @@ void init_point_at_infinity() {
 // Initialize your constants in a function
 void init_constants() {
     mpz_init_set_str(p, "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F", 16);
+    //mpz_init_set_str(p, "fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141", 16);    
     mpz_init_set_ui(a, 0);
     mpz_init_set_ui(b, 7);
     mpz_init_set_str(Gx, "79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798", 16);
@@ -151,11 +152,13 @@ Point point_add(Point p1, Point p2) {
         mpz_add(tmp1, tmp1, a); // a is zero for secp256k1
         gmp_printf("[2] << mpz_add tmp1: %Zx\n", tmp1);
 
+        gmp_printf("\n[3] >> mpz_mod tmp1: %Zx\n", tmp1);
+        gmp_printf("[3] >> mpz_mod p: %Zx\n", p);
         mpz_mod(tmp1, tmp1, p);
         gmp_printf("[3] << mpz_mod tmp1: %Zx\n", tmp1);
 
         mpz_mul_ui(tmp2, p1.y, 2);
-        gmp_printf("[4] << mpz_mul_ui tmp2: %Zx\n", tmp2);
+        gmp_printf("\n[4] << mpz_mul_ui tmp2: %Zx\n", tmp2);
 
         mpz_mod(tmp2, tmp2, p);
         gmp_printf("[5] << mpz_mod tmp2: %Zx\n", tmp2);
@@ -232,8 +235,10 @@ int main() {
     Point p2;
     mpz_init(p2.x);
     mpz_init(p2.y);
-    mpz_set_str(p2.x, "C6047F9441ED7D6D3045406E95C07CD85C778E4B8CEF3CA7ABAC09B95C709EE5", 16);
-    mpz_set_str(p2.y, "1AE168FEA63DC339A3C58419466CEAEEF7F632653266D0E1236431A950CFE52A", 16);
+    // mpz_set_str(p2.x, "C6047F9441ED7D6D3045406E95C07CD85C778E4B8CEF3CA7ABAC09B95C709EE5", 16);
+    // mpz_set_str(p2.y, "1AE168FEA63DC339A3C58419466CEAEEF7F632653266D0E1236431A950CFE52A", 16);
+    mpz_set_str(p2.x, "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798", 16);
+    mpz_set_str(p2.y, "483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8", 16);
     
     // print G
     gmp_printf(">> G x: %Zx\n", G.x);

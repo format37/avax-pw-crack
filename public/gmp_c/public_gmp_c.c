@@ -31,6 +31,11 @@ Point point_add(Point p1, Point p2) {
     /*if (mpz_cmp(p1.a, p2.a) != 0 || mpz_cmp(p1.b, p2.b) != 0) {
         printf("Points are not on the same curve\n");
     }*/ // Not needed for secp256k1
+    printf("++ point_add ++\n");
+    gmp_printf(">> p1.x: %Zx\n", p1.x);
+    gmp_printf(">> p1.y: %Zx\n", p1.y);
+    gmp_printf(">> p2.x: %Zx\n", p2.x);
+    gmp_printf(">> p2.y: %Zx\n", p2.y);
 
     Point result;
     mpz_init(result.x);
@@ -83,10 +88,10 @@ Point point_add(Point p1, Point p2) {
     } else {
         // Case 3: p1.x == p2.x
         gmp_printf("p1.x == p2.x\n");
-        gmp_printf("p1.x: %Zx\n", p1.x);
-        gmp_printf("p1.y: %Zx\n", p1.y);
-        gmp_printf("a: %Zx\n", a);
-        gmp_printf("p: %Zx\n", p);
+        // gmp_printf("p1.x: %Zx\n", p1.x);
+        // gmp_printf("p1.y: %Zx\n", p1.y);
+        // gmp_printf("a: %Zx\n", a);
+        // gmp_printf("p: %Zx\n", p);
         // Point doubling formula
         mpz_pow_ui(tmp1, p1.x, 2); // tmp1 = p1.x^2  
         mpz_mul_ui(tmp1, tmp1, 3); // tmp1 = 3 * p1.x^2
@@ -100,7 +105,7 @@ Point point_add(Point p1, Point p2) {
         mpz_mul(s, tmp1, tmp2);
         mpz_mod(s, s, p);
 
-        gmp_printf("s: %Zx\n", s);
+        // gmp_printf("s: %Zx\n", s);
 
         mpz_pow_ui(x3, s, 2);
         mpz_sub(x3, x3, p1.x);
@@ -125,7 +130,7 @@ Point point_add(Point p1, Point p2) {
 // Scalar point multiplication 
 Point point_multiply(Point p, mpz_t n) {
   printf("++ point_multiply ++\n");
-  int debug_counter = 0;
+  // int debug_counter = 0;
   Point r;
   mpz_init(r.x);
   mpz_init(r.y);
@@ -136,39 +141,49 @@ Point point_multiply(Point p, mpz_t n) {
   mpz_t temp;
   mpz_init(temp);
 
+  // print p
+  gmp_printf(">> point.x: %Zx\n", p.x);
+  gmp_printf(">> point.y: %Zx\n", p.y);
   // print n
-  gmp_printf("coef: %Zx\n", n);
+  gmp_printf(">> n scalar: %Zx\n", n);
   
+  unsigned int current_step = 0;
+
   while (mpz_cmp_ui(n, 0) > 0) {
+    printf("\nStep %d\n", current_step);
     // print the current x and y
-    gmp_printf("0 x: %Zx\n", pp.x);
-    gmp_printf("0 y: %Zx\n", pp.y);
+    // gmp_printf("0 x: %Zx\n", pp.x);
+    // gmp_printf("0 y: %Zx\n", pp.y);
     mpz_mod_ui(temp, n, 2);
     // print pre_point_add r and pp
     gmp_printf(">> pp.x: %Zx\n", pp.x);
     gmp_printf(">> pp.y: %Zx\n", pp.y);
     if (mpz_cmp_ui(temp, 1) == 0) {
+      gmp_printf("\n# mpz_cmp_ui(temp, 1) is 0\n");
       gmp_printf(">> point_add r.x: %Zx\n", r.x);
       gmp_printf(">> point_add r.y: %Zx\n", r.y);
       r = point_add(r, pp);
       gmp_printf("<< point_add r.x: %Zx\n", r.x);
-      gmp_printf("<< point_add r.y: %Zx\n", r.y);
+      gmp_printf("<< point_add r.y: %Zx\n\n", r.y);
     }
+    gmp_printf(">> point_add pp.x: %Zx\n", pp.x);
+    gmp_printf(">> point_add pp.y: %Zx\n", pp.y);
     pp = point_add(pp, pp);    
     gmp_printf("<< point_add pp.x: %Zx\n", pp.x);
     gmp_printf("<< point_add pp.y: %Zx\n", pp.y);
     mpz_tdiv_q_ui(n, n, 2);
     // print the current x and y
-    gmp_printf("2 x: %Zx\n", pp.x);
-    gmp_printf("2 y: %Zx\n", pp.y);
-    debug_counter++;
+    // gmp_printf("2 x: %Zx\n", pp.x);
+    // gmp_printf("2 y: %Zx\n", pp.y);
+    // debug_counter++;
     /*if (debug_counter > 1) {
       gmp_printf("3 x: %Zx\n", r.x);
       gmp_printf("3 y: %Zx\n", r.y);
       exit(0);
     }*/
-    gmp_printf("3 x: %Zx\n", r.x);
-    gmp_printf("3 y: %Zx\n", r.y);
+    // gmp_printf("3 x: %Zx\n", r.x);
+    // gmp_printf("3 y: %Zx\n", r.y);
+    current_step++;
   }
 
   mpz_clear(temp);

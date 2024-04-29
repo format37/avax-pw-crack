@@ -49,6 +49,7 @@ __device__ EC_POINT ec_point_scalar_mul(
     int debug_counter = 1;    
     
     for (int i = 0; i < 256; i++) {                 // Assuming 256-bit scalars
+        printf("\nStep: %d\n", i);
         // if (i<debug_counter) {
         //     // debug_printf("0 x: %s\n", bignum_to_hex(&current.x));
         //     bn_print("0 current.x: ", &current.x);
@@ -58,6 +59,7 @@ __device__ EC_POINT ec_point_scalar_mul(
         
 
         if (bits[i]) {// If the i-th bit is set
+            printf("\n# bits[%d] is true\n", bits[i]);
             // printf("0: Interrupting for debug\n");
             // return result; // TODO: remove this
             // if (i<debug_counter) printf("# 0\n");
@@ -80,7 +82,8 @@ __device__ EC_POINT ec_point_scalar_mul(
             //  if (i<debug_counter) bn_print("1 result.x: ", &result.x);
             // debug_printf("1 y: %s\n", bignum_to_hex(&result.y));
             //  if (i<debug_counter) bn_print("1 result.y: ", &result.y);
-
+            printf("\n");
+            
         }
         // else {
         //     printf("1: Interrupting for debug\n");
@@ -94,12 +97,12 @@ __device__ EC_POINT ec_point_scalar_mul(
 
         // We don't need to double the point. We can just add it to itself.
         //point_add(&current, &current, &current, curve_order);
-        bn_print("\n>> [1] point_add current.x: ", &current.x);
-        bn_print(">> point_add current.y: ", &current.y);
+        // bn_print("\n>> [1] point_add current.x: ", &current.x);
+        // bn_print(">> point_add current.y: ", &current.y);
         // bn_print(">> point_add result.x: ", &result.x);
         // bn_print(">> point_add result.y: ", &result.y);
-        bn_print(">> point_add curve_prime: ", curve_prime);
-        bn_print(">> point_add curve_a: ", curve_a);
+        // bn_print(">> point_add curve_prime: ", curve_prime);
+        // bn_print(">> point_add curve_a: ", curve_a);
         // printf("0: Interrupting for debug\n");
         // return result; // TODO: remove this
         // __device__ int point_add(
@@ -110,15 +113,35 @@ __device__ EC_POINT ec_point_scalar_mul(
         //     BIGNUM *a
         // ) {
         // init tmp_result
-        init_point_at_infinity(&tmp_result);        
+        init_point_at_infinity(&tmp_result);
+        // init tmp_a
+        init_point_at_infinity(&tmp_a);
+        // init tmp_b
+        init_point_at_infinity(&tmp_b);
         // Copy current to tmp_a
         bn_copy(&tmp_a.x, &current.x);
         bn_copy(&tmp_a.y, &current.y);
         // Copy current to tmp_b
         bn_copy(&tmp_b.x, &current.x);
         bn_copy(&tmp_b.y, &current.y);
+
+        bn_print("\n[1]\n>> point_add tmp_a.x: ", &tmp_a.x);
+        bn_print(">> point_add tmp_a.y: ", &tmp_a.y);
+        bn_print(">> point_add tmp_b.x: ", &tmp_b.x);
+        bn_print(">> point_add tmp_b.y: ", &tmp_b.y);
+        bn_print(">> point_add tmp_result.x: ", &tmp_result.x);
+        bn_print(">> point_add tmp_result.y: ", &tmp_result.y);
+        // print curve_prime and curve_a
+        bn_print(">> point_add curve_prime: ", curve_prime);
+        bn_print(">> point_add curve_a: ", curve_a);
+
+        
+
         point_add(&tmp_result, &tmp_a, &tmp_b, curve_prime, curve_a);  // Double current by adding to itself
         
+        // printf("### Breaking at i: %d\n", i);
+        // break; // TODO: remove this
+
         // Copy tmp_result to current
         bn_copy(&current.x, &tmp_result.x);
         bn_copy(&current.y, &tmp_result.y);
@@ -129,8 +152,10 @@ __device__ EC_POINT ec_point_scalar_mul(
         // if (i<debug_counter) bn_print("2 current.x: ", &current.x);
         // debug_printf("2 y: %s\n", bignum_to_hex(&current.y));
         // if (i<debug_counter) bn_print("2 current.y: ", &current.y);
-        printf("### Breaking at i: %d\n", i);
-        break; // TODO: remove this        
+        if (i>1) {
+            printf("### Breaking at i: %d\n", i);
+            break; // TODO: remove this        
+        }
     }
 
     // debug_printf("Final x: %s\n", bignum_to_hex(&result.x));
@@ -165,23 +190,31 @@ __global__ void testKernel() {
 
     // Initialize a
     // C17747B1566D9FE8AB7087E3F0C50175B788A1C84F4C756C405000A0CA2248E1
-    // a_d[0] = 0xC17747B1566D9FE8;
-    // a_d[1] = 0xAB7087E3F0C50175;
-    // a_d[2] = 0xB788A1C84F4C756C;
-    // a_d[3] = 0x405000A0CA2248E1; 
-    // a.d = a_d; 
-    // a.top = 4;
-    // a.neg = 0;
+    BN_ULONG a_values[MAX_BIGNUM_WORDS] = {
+        0xC17747B1566D9FE8,
+        0xAB7087E3F0C50175,
+        0xB788A1C84F4C756C,
+        0x405000A0CA2248E1
+        };
+    for (int j = 0; j < TEST_BIGNUM_WORDS; ++j) {
+            a.d[j] = a_values[j];
+        }
+    a.neg = 0;
+    a.top = 4;
 
     // Initialize b
     // 6C91CEA9CF0CAC55A7596D16B56D2AEFD204BB99DD677993158A7E6564F93CDF
-    // b_d[0] = 0x6C91CEA9CF0CAC55;
-    // b_d[1] = 0xA7596D16B56D2AEF;
-    // b_d[2] = 0xD204BB99DD677993;
-    // b_d[3] = 0x158A7E6564F93CDF;
-    // b.d = b_d;
-    // b.top = 4;
-    // b.neg = 0;
+    BN_ULONG b_values[MAX_BIGNUM_WORDS] = {
+        0x6C91CEA9CF0CAC55,
+        0xA7596D16B56D2AEF,
+        0xD204BB99DD677993,
+        0x158A7E6564F93CDF
+        };
+    for (int j = 0; j < TEST_BIGNUM_WORDS; ++j) {
+            b.d[j] = b_values[j];
+        }
+    b.neg = 0;
+    b.top = 4;
 
     BN_ULONG curveOrder_values[MAX_BIGNUM_WORDS] = {
         0xffffffffffffffff,
@@ -196,13 +229,10 @@ __global__ void testKernel() {
 
     // Initialize curveOrder_d
     // FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
-    // curveOrder_d[0] = 0xFFFFFFFFFFFFFFFF;
-    // curveOrder_d[1] = 0xFFFFFFFFFFFFFFFE;
-    // curveOrder_d[2] = 0xBAAEDCE6AF48A03B;
-    // curveOrder_d[3] = 0xBFD25E8CD0364141;
-    // curveOrder.d = curveOrder_d;
-    // curveOrder.neg = 0;
-    // curveOrder.top = 4;
+
+    // Print inputs
+    // bn_print(">> reverse_order a: ", &a);
+    // bn_print(">> reverse_order b: ", &b);
 
     reverse_order(&a);
     reverse_order(&b);
@@ -235,19 +265,10 @@ __global__ void testKernel() {
     // bn_print("<< bn_mod newKey: ", &newKey);
     // printf("(expected): 2E09165B257A4C3E52C9F4FAA6322C66CEDE807B7D6B4EC3960820795EE5447F\n");
     bn_print("\Private key: ", &newKey);
-
+    //return; // TODO: Remove this
     // Derive the public key
     printf("\nDeriving the public key..\n");
     // Initialize constants
-    // CURVE_P is curveOrder_d
-    // CURVE_P.d = curveOrder_d;
-    // CURVE_P.top = 4;
-    // CURVE_P.neg = 0;
-    
-    // for (int i = 0; i < 4; i++) CURVE_A_d[i] = 0;
-    // CURVE_A.d = CURVE_A_d;
-    // CURVE_A.top = 4;
-    // CURVE_A.neg = 0;
     init_zero(&CURVE_A, MAX_BIGNUM_SIZE);
     
     // For secp256k1, CURVE_B should be initialized to 7 rather than 0
@@ -266,11 +287,6 @@ __global__ void testKernel() {
     for (int j = 0; j < MAX_BIGNUM_WORDS; ++j) {
             CURVE_GX_d[j] = CURVE_GX_values[j];
         }
-    // Generator x coordinate
-    // CURVE_GX_d[0] = 0x79BE667EF9DCBBAC;
-    // CURVE_GX_d[1] = 0x55A06295CE870B07;
-    // CURVE_GX_d[2] = 0x029BFCDB2DCE28D9;
-    // CURVE_GX_d[3] = 0x59F2815B16F81798; 
 
     // Generator y coordinate
     BIGNUM CURVE_GY;
@@ -283,11 +299,6 @@ __global__ void testKernel() {
     for (int j = 0; j < MAX_BIGNUM_WORDS; ++j) {
             CURVE_GY_d[j] = CURVE_GY_values[j];
         }
-    // BN_ULONG CURVE_GY_d[4];
-    // CURVE_GY_d[0] = 0x483ADA7726A3C465;
-    // CURVE_GY_d[1] = 0x5DA4FBFC0E1108A8;
-    // CURVE_GY_d[2] = 0xFD17B448A6855419;
-    // CURVE_GY_d[3] = 0x9C47D08FFB10D4B8;
 
     // Initialize generator
     EC_POINT G;
@@ -304,23 +315,35 @@ __global__ void testKernel() {
     reverse_order(&G.x);
     reverse_order(&G.y);
 
+    init_zero(&CURVE_P, MAX_BIGNUM_SIZE);
+    //bn_copy(&CURVE_P, &curveOrder); // CURVE_P is curveOrder_d
+    // Init curve prime
+    // fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f
+    // BN_ULONG CURVE_P_d[4];
+    BN_ULONG CURVE_P_values[MAX_BIGNUM_SIZE] = {
+        0xFFFFFFFFFFFFFFFF,
+        0xFFFFFFFFFFFFFFFF,
+        0xFFFFFFFFFFFFFFFF,
+        0xFFFFFFFEFFFFFC2F,
+        0,0,0,0        
+        };
+    // for (int j = 0; j < MAX_BIGNUM_WORDS; ++j) {
+    //         CURVE_P_d[j] = CURVE_P_values[j];
+    //     }
+    CURVE_P.d = CURVE_P_values;
+    CURVE_P.top = 4;
+    CURVE_P.neg = 0;
+    // reverse
+    reverse_order(&CURVE_P);
+    
     // Derive public key 
     // EC_POINT publicKey = ec_point_scalar_mul(&G, &newKey, &curveOrder);    
-    
-    bn_copy(&CURVE_P, &curveOrder);
-
     EC_POINT publicKey = ec_point_scalar_mul(&G, &newKey, &CURVE_P, &CURVE_A);
-    
-    
-    // ec_point_scalar_mul / point_add / mod_mul / bn_mod <= Issue
 
     // Print public key
     printf("Public key:\n");
     bn_print("Public key x: ", &publicKey.x);
     bn_print("Public key y: ", &publicKey.y);
-
-
-    // BN_CTX_free(ctx);
 
 }
 
