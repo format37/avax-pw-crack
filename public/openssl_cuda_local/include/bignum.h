@@ -3041,7 +3041,7 @@ __device__ int point_add(
     BIGNUM *p, 
     BIGNUM *a
 ) {
-    bool debug = 1;
+    bool debug = 0;
     if (debug) {
         printf("++ point_add ++\n");
         bn_print(">> p1.x: ", &p1->x);
@@ -3062,7 +3062,7 @@ __device__ int point_add(
     if (point_is_at_infinity(p1)) {
         copy_point(result, p2);
         // if (debug) 
-        printf("p1 point at infinity\n");
+        if (debug) printf("p1 point at infinity\n");
         return 0;
     }
 
@@ -3072,7 +3072,7 @@ __device__ int point_add(
     if (point_is_at_infinity(p2)) {
         copy_point(result, p1);
         // if (debug) 
-        printf("p2 point at infinity\n");
+        if (debug) printf("p2 point at infinity\n");
         return 0;
     }
 
@@ -3092,7 +3092,7 @@ __device__ int point_add(
     if (bn_cmp(&p1->x, &p2->x) == 0 && bn_cmp(&p1->y, &p2->y) != 0) {
         // The points are inverses to one another, return point at infinity
         // if (debug) 
-        printf("The points are inverses to one another\n");
+        if (debug) printf("The points are inverses to one another\n");
         set_point_at_infinity(result);
         return 0;
     }
