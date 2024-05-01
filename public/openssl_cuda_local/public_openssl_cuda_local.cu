@@ -373,5 +373,6 @@ int main() {
         return -1;
     }
     cudaDeviceSynchronize();
+    cudaDeviceReset(); // For cuda-memcheck leak-check option
     return 0;
 }

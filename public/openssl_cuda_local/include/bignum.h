@@ -4,9 +4,9 @@
 #define debug_print false
 #define BN_MASK2 0xffffffff;
 #define BN_ULONG_NUM_BITS 64
-#define MAX_BIGNUM_WORDS 4     // For 256-bit numbers
+//#define MAX_BIGNUM_WORDS 4     // For 256-bit numbers
+#define MAX_BIGNUM_WORDS 9     // For 576-bit numbers
 #define MAX_BIGNUM_SIZE 9     // Allow room for temp calculations
-//#define MAX_BIGNUM_SIZE 8     // Allow room for temp calculations
 
 typedef struct bignum_st {
   BN_ULONG *d;
@@ -29,9 +29,10 @@ __device__ void bn_print(const char* msg, BIGNUM* a) {
     if (a->neg) {
         printf("-");  // Handle the case where BIGNUM is negative
     }
-    for (int i = MAX_BIGNUM_SIZE - 1; i >= 0; i--) {
+    int size_of_d = sizeof(a->d);
+    for (int i = size_of_d - 1; i >= 0; i--) {
         // Print words up to top - 1 with appropriate formatting
-        if (i == MAX_BIGNUM_SIZE - 1) {
+        if (i == size_of_d - 1) {
             printf("%llx", a->d[i]);
         } else {
             printf(" %016llx", a->d[i]); // TODO: Enable this line
@@ -83,10 +84,14 @@ __device__ void bn_print_reversed(const char* msg, BIGNUM* a) {
     printf("\n");
 }
 
-__device__ int find_top(BIGNUM *bn, int max_words) {
-    for (int i = max_words - 1; i >= 0; i--) {
-        // printf(">> find_top [%d]: %llx", i, bn->d[i]);
-        // bn_print("", bn);
+__device__ int find_top_1(BIGNUM *bn, int max_words) {
+    // print sizeof(bn->d)
+    // printf("[find_top] sizeof(bn->d): %d\n", sizeof(bn->d));
+    int size_of_d = sizeof(bn->d);
+    // bn_print("find_top", bn);
+    for (int i = size_of_d - 1; i >= 0; i--) {
+        // printf(">> find_top [%d]: ", i);
+        // printf("%llx", bn->d[i]);
         if (bn->d[i] != 0) {
             // printf("<< find_top returning %d\n", i + 1);
             return i + 1;  // The top index is the index of the last non-zero word plus one
@@ -94,6 +99,22 @@ __device__ int find_top(BIGNUM *bn, int max_words) {
     }
     // printf(">> find_top returning 0\n");
     return 1; // If all words are zero, the top is 0
+}
+
+__device__ int find_top(BIGNUM *bn, int max_words) {
+    // bn_print("++ find_top bn ++ ", bn);
+    int size_of_d = sizeof(bn->d);
+    for (int i = max_words - 1; i >= 0; i--) {
+        // printf(">> find_top. size_of_d: %d i: %d bn->d[i]: %llx max_words: %d\n", size_of_d, i, bn->d[i], max_words);
+        if (bn->d[i] != 0) {
+            return i + 1;  // The top index is the index of the last non-zero word plus one
+        }
+    }
+    return 1; // If all words are zero, the top is 0
+}
+
+__device__ void free_bignum(BIGNUM *bn) {
+    delete[] bn->d;
 }
 
 __device__ void debug_printf(const char *fmt, ...) {
@@ -125,8 +146,9 @@ __device__ void reverse(BN_ULONG* d, int n) {
   }
 }
 
-__device__ void init_zero(BIGNUM *bn, int capacity) {
+__device__ void init_zero_1(BIGNUM *bn, int capacity) {
     bn->d = new BN_ULONG[capacity]; // Dynamically allocate the required number of words.
+    // int size_of_d = sizeof(bn->d);
     for (int i = 0; i < capacity; i++) {
         bn->d[i] = 0;
     }
@@ -139,8 +161,31 @@ __device__ void init_zero(BIGNUM *bn, int capacity) {
     
     // dmax is used to manage the memory allocation and ensure you 
     // do not access out-of-bounds memory.
-    //bn->dmax = capacity; // Make sure to track the capacity in dmax.
-    bn->dmax = MAX_BIGNUM_SIZE;
+    // bn->dmax = capacity; // Make sure to track the capacity in dmax.
+    bn->dmax = capacity;
+}
+
+
+__device__ void init_zero(BIGNUM *bn, int capacity) {
+    // int size_of_d = sizeof(bn->d);
+    // printf("++ init_zero ++ Allocating %d words. sizeof(bn->d): %d\n", capacity, size_of_d);
+    bn->d = new BN_ULONG[capacity]; // Dynamically allocate the required number of words.
+    for (int i = 0; i < capacity; i++) {
+        // printf(">> init_zero. set up bn->d[%d]", i);
+        // printf(" from %llx to 0\n", bn->d[i]);
+        bn->d[i] = 0;
+    }
+
+    // top is used for representing the actual size of the 
+    // significant part of the number for calculation purposes.
+    bn->top = 1; // There are no significant digits when all words are zero.
+
+    bn->neg = 0;
+    
+    // dmax is used to manage the memory allocation and ensure you 
+    // do not access out-of-bounds memory.
+    bn->dmax = capacity; // Make sure to track the capacity in dmax.
+    //bn->dmax = MAX_BIGNUM_SIZE;
 }
 
 __device__ void init_one(BIGNUM *bn, int capacity) {

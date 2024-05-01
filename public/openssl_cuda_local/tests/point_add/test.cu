@@ -89,10 +89,15 @@ __global__ void testKernel() {
     // CURVE_GX_d[1] = 0x55A06295CE870B07;
     // CURVE_GX_d[2] = 0x029BFCDB2DCE28D9;
     // CURVE_GX_d[3] = 0x59F2815B16F81798;
-    CURVE_GX_d[0] = 0xC6047F9441ED7D6D;
-    CURVE_GX_d[1] = 0x3045406E95C07CD8;
-    CURVE_GX_d[2] = 0x5C778E4B8CEF3CA7;
-    CURVE_GX_d[3] = 0xABAC09B95C709EE5;
+    // CURVE_GX_d[0] = 0xC6047F9441ED7D6D;
+    // CURVE_GX_d[1] = 0x3045406E95C07CD8;
+    // CURVE_GX_d[2] = 0x5C778E4B8CEF3CA7;
+    // CURVE_GX_d[3] = 0xABAC09B95C709EE5;
+    // G.x: 8282263212c609d9ea2a6e3e172de238d8c39cabd5ac1ca10646e23fd5f51508
+    CURVE_GX_d[0] = 0x8282263212c609d9;
+    CURVE_GX_d[1] = 0xea2a6e3e172de238;
+    CURVE_GX_d[2] = 0xd8c39cabd5ac1ca1;
+    CURVE_GX_d[3] = 0x0646e23fd5f51508;
     for (int i = 4; i < MAX_BIGNUM_SIZE; i++) CURVE_GX_d[i] = 0;
 
     // Generator y coordinate
@@ -103,10 +108,15 @@ __global__ void testKernel() {
     // CURVE_GY_d[1] = 0x5DA4FBFC0E1108A8;
     // CURVE_GY_d[2] = 0xFD17B448A6855419;
     // CURVE_GY_d[3] = 0x9C47D08FFB10D4B8;
-    CURVE_GY_d[0] = 0x1AE168FEA63DC339;
-    CURVE_GY_d[1] = 0xA3C58419466CEAEE;
-    CURVE_GY_d[2] = 0xF7F632653266D0E1;
-    CURVE_GY_d[3] = 0x236431A950CFE52A;
+    // CURVE_GY_d[0] = 0x1AE168FEA63DC339;
+    // CURVE_GY_d[1] = 0xA3C58419466CEAEE;
+    // CURVE_GY_d[2] = 0xF7F632653266D0E1;
+    // CURVE_GY_d[3] = 0x236431A950CFE52A;
+    // G.y: 11f8a8098557dfe45e8256e830b60ace62d613ac2f7b17bed31b6eaff6e26caf
+    CURVE_GY_d[0] = 0x11f8a8098557dfe4;
+    CURVE_GY_d[1] = 0x5e8256e830b60ace;
+    CURVE_GY_d[2] = 0x62d613ac2f7b17be;
+    CURVE_GY_d[3] = 0xd31b6eaff6e26caf;
     for (int i = 4; i < MAX_BIGNUM_SIZE; i++) CURVE_GY_d[i] = 0;
 
     // Reverse order
@@ -132,25 +142,35 @@ __global__ void testKernel() {
     // Define p2
     BN_ULONG p2_xd[MAX_BIGNUM_SIZE];
     BN_ULONG p2_yd[MAX_BIGNUM_SIZE];
-    // // x: C6047F9441ED7D6D3045406E95C07CD85C778E4B8CEF3CA7ABAC09B95C709EE5
-    p2_xd[0] = 0xC6047F9441ED7D6D;
-    p2_xd[1] = 0x3045406E95C07CD8;
-    p2_xd[2] = 0x5C778E4B8CEF3CA7;
-    p2_xd[3] = 0xABAC09B95C709EE5;
+    // x: C6047F9441ED7D6D3045406E95C07CD85C778E4B8CEF3CA7ABAC09B95C709EE5
+    // p2_xd[0] = 0xC6047F9441ED7D6D;
+    // p2_xd[1] = 0x3045406E95C07CD8;
+    // p2_xd[2] = 0x5C778E4B8CEF3CA7;
+    // p2_xd[3] = 0xABAC09B95C709EE5;
     // p2_xd[0] = 0x79BE667EF9DCBBAC;
     // p2_xd[1] = 0x55A06295CE870B07;
     // p2_xd[2] = 0x029BFCDB2DCE28D9;
     // p2_xd[3] = 0x59F2815B16F81798;
+    // p2.x: 8282263212c609d9ea2a6e3e172de238d8c39cabd5ac1ca10646e23fd5f51508
+    p2_xd[0] = 0x8282263212c609d9;
+    p2_xd[1] = 0xea2a6e3e172de238;
+    p2_xd[2] = 0xd8c39cabd5ac1ca1;
+    p2_xd[3] = 0x0646e23fd5f51508;
     for (int i = 4; i < MAX_BIGNUM_SIZE; i++) p2_xd[i] = 0;
-    // // y: 1AE168FEA63DC339A3C58419466CEAEEF7F632653266D0E1236431A950CFE52A
-    p2_yd[0] = 0x1AE168FEA63DC339;
-    p2_yd[1] = 0xA3C58419466CEAEE;
-    p2_yd[2] = 0xF7F632653266D0E1;
-    p2_yd[3] = 0x236431A950CFE52A;
+    // y: 1AE168FEA63DC339A3C58419466CEAEEF7F632653266D0E1236431A950CFE52A
+    // p2_yd[0] = 0x1AE168FEA63DC339;
+    // p2_yd[1] = 0xA3C58419466CEAEE;
+    // p2_yd[2] = 0xF7F632653266D0E1;
+    // p2_yd[3] = 0x236431A950CFE52A;
     // p2_yd[0] = 0x483ADA7726A3C465;
     // p2_yd[1] = 0x5DA4FBFC0E1108A8;
     // p2_yd[2] = 0xFD17B448A6855419;
     // p2_yd[3] = 0x9C47D08FFB10D4B8;
+    // p2.y: 11f8a8098557dfe45e8256e830b60ace62d613ac2f7b17bed31b6eaff6e26caf
+    p2_yd[0] = 0x11f8a8098557dfe4;
+    p2_yd[1] = 0x5e8256e830b60ace;
+    p2_yd[2] = 0x62d613ac2f7b17be;
+    p2_yd[3] = 0xd31b6eaff6e26caf;
     for (int i = 4; i < MAX_BIGNUM_SIZE; i++) p2_yd[i] = 0;
     // Reverse order
     // reverse_order(&p2_xd, &p2_yd, 1);
