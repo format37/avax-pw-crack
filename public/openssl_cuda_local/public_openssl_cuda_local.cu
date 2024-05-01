@@ -49,7 +49,7 @@ __device__ EC_POINT ec_point_scalar_mul(
     int debug_counter = 1;    
     
     for (int i = 0; i < 256; i++) {                 // Assuming 256-bit scalars
-        printf("\nStep: %d\n", i);
+        printf("\n### Step: %d\n", i);
         // if (i<debug_counter) {
         //     // debug_printf("0 x: %s\n", bignum_to_hex(&current.x));
         //     bn_print("0 current.x: ", &current.x);
@@ -59,21 +59,27 @@ __device__ EC_POINT ec_point_scalar_mul(
         
 
         if (bits[i]) {// If the i-th bit is set
-            printf("\n# bits[%d] is true\n", bits[i]);
+            printf("\n[0]\n");
             // printf("0: Interrupting for debug\n");
             // return result; // TODO: remove this
             // if (i<debug_counter) printf("# 0\n");
             // point_add(&result, &current, &result);  // Add current to the result
             // point_add(&result, &current, &result, &field_order);  // Add current to the result
             //point_add(&result, &current, &result, curve_order);  // Add current to the result
+
+            // init tmp_result
+            init_point_at_infinity(&tmp_result); 
             
-            bn_print("\n>> [0] point_add current.x: ", &current.x);
-            bn_print(">> point_add current.y: ", &current.y);
             bn_print(">> point_add result.x: ", &result.x);
             bn_print(">> point_add result.y: ", &result.y);
+            bn_print(">> point_add current.x: ", &current.x);
+            bn_print(">> point_add current.y: ", &current.y);
             bn_print(">> curve_prime: ", curve_prime);
             bn_print(">> curve_a: ", curve_a);
-            point_add(&result, &current, &result, curve_prime, curve_a);  // Add current to the result
+            point_add(&tmp_result, &result, &current, curve_prime, curve_a);  // Add current to the result
+            init_point_at_infinity(&result); // Reset result
+            bn_copy(&result.x, &tmp_result.x);
+            bn_copy(&result.y, &tmp_result.y);
             bn_print("<< point_add result.x: ", &result.x);
             bn_print("<< point_add result.y: ", &result.y);
             
@@ -125,7 +131,8 @@ __device__ EC_POINT ec_point_scalar_mul(
         bn_copy(&tmp_b.x, &current.x);
         bn_copy(&tmp_b.y, &current.y);
 
-        bn_print("\n[1]\n>> point_add tmp_a.x: ", &tmp_a.x);
+        printf("\n[1]\n");
+        bn_print(">> point_add tmp_a.x: ", &tmp_a.x);
         bn_print(">> point_add tmp_a.y: ", &tmp_a.y);
         bn_print(">> point_add tmp_b.x: ", &tmp_b.x);
         bn_print(">> point_add tmp_b.y: ", &tmp_b.y);
@@ -138,24 +145,34 @@ __device__ EC_POINT ec_point_scalar_mul(
         
 
         point_add(&tmp_result, &tmp_a, &tmp_b, curve_prime, curve_a);  // Double current by adding to itself
-        
+        // ATTENTION: tmp_result is not related to result
+
         // printf("### Breaking at i: %d\n", i);
         // break; // TODO: remove this
+
+        bn_print("\n<< point_add tmp_result.x (pp.x): ", &tmp_result.x);
+        bn_print("<< point_add tmp_result.y (pp.y): ", &tmp_result.y);
+        bn_print("<< point_add tmp_a.x (p1.x): ", &tmp_a.x);
+        bn_print("<< point_add tmp_a.y (p1.y): ", &tmp_a.y);
+        bn_print("<< point_add tmp_b.x (p2.x): ", &tmp_b.x);
+        bn_print("<< point_add tmp_b.y (p2.y):", &tmp_b.y);
+        bn_print("<< point_add curve_prime: ", curve_prime);
+        bn_print("<< point_add curve_a: ", curve_a);
 
         // Copy tmp_result to current
         bn_copy(&current.x, &tmp_result.x);
         bn_copy(&current.y, &tmp_result.y);
-        bn_print("<< point_add current.x: ", &current.x);
+        bn_print("\n<< point_add current.x: ", &current.x);
         bn_print("<< point_add current.y: ", &current.y);
 
         // debug_printf("2 x: %s\n", bignum_to_hex(&current.x));
         // if (i<debug_counter) bn_print("2 current.x: ", &current.x);
         // debug_printf("2 y: %s\n", bignum_to_hex(&current.y));
         // if (i<debug_counter) bn_print("2 current.y: ", &current.y);
-        if (i>1) {
-            printf("### Breaking at i: %d\n", i);
-            break; // TODO: remove this        
-        }
+        // if (i>1) {
+        //     printf("### Breaking at i: %d\n", i);
+        //     break; // TODO: remove this        
+        // }
     }
 
     // debug_printf("Final x: %s\n", bignum_to_hex(&result.x));

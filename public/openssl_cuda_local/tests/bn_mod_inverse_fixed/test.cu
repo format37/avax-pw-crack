@@ -40,8 +40,10 @@ __global__ void testKernel() {
         {0,0,0,0x4},     // 16: a = 4, n = 12
         {0,0,0,0x6},     // 17: a = 6, n = 15
         {0,0,0,0x12},    // 18: a = 18, n = 24*/
-        {0xffffffffffffffff, 0xffffffffffffffe, 0xbaaedce6af48a03b, 0xbfd25e8cd0364141},
-        {0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xfffffffefffffc2f},
+        // {0xffffffffffffffff, 0xffffffffffffffe, 0xbaaedce6af48a03b, 0xbfd25e8cd0364141},
+        // {0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xfffffffefffffc2f},
+        {0x35c2d1fd4c7b8673, 0x478b08328cd9d5dd, 0xefec64ca64cda1c2, 0x46c86352a19fca54},
+        //{0x46c86352a19fca54, 0xefec64ca64cda1c2, 0x478b08328cd9d5dd, 0x35c2d1fd4c7b8673},
     };
 
     BN_ULONG test_values_n[][MAX_BIGNUM_WORDS] = {
@@ -64,15 +66,17 @@ __global__ void testKernel() {
         {0,0,0,0xC},     // 16: a = 4, n = 12
         {0,0,0,0xF},     // 17: a = 6, n = 15
         {0,0,0,0x18},    // 18: a = 18, n = 24*/
-        {0x1b2db4c027cdbaba, 0x70116675aa53aa8a, 0xad1c289591e564d3, 0xcaa5c571ffccab5a},
-        {0x4c4619154810c1c0, 0xdaa4ddd8c73971d1, 0x59db91705f2113ce, 0x51b9885e4578874d},
+        // {0x1b2db4c027cdbaba, 0x70116675aa53aa8a, 0xad1c289591e564d3, 0xcaa5c571ffccab5a},
+        // {0x4c4619154810c1c0, 0xdaa4ddd8c73971d1, 0x59db91705f2113ce, 0x51b9885e4578874d},
+        {0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xfffffffefffffc2f},
+        //{0xfffffffefffffc2f, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff},
     };
 
     // 0 for positive, 1 for negative
     //int sign_a[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0};
     //int sign_n[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0};
-    int sign_a[] = {0,0};
-    int sign_n[] = {0,0};
+    int sign_a[] = {0};
+    int sign_n[] = {0};
     
     reverse_order(test_values_a, test_values_n, sizeof(test_values_a) / (sizeof(BN_ULONG) * TEST_BIGNUM_WORDS));
     
@@ -81,17 +85,17 @@ __global__ void testKernel() {
     bool mod_inverse_exists;
     for (int test = 0; test < num_tests; ++test) {
         BIGNUM value_a, value_n, result;
-        init_zero(&value_a, TEST_BIGNUM_WORDS);
-        init_zero(&value_n, TEST_BIGNUM_WORDS);
-        init_zero(&result, TEST_BIGNUM_WORDS);
+        init_zero(&value_a, MAX_BIGNUM_SIZE);
+        init_zero(&value_n, MAX_BIGNUM_SIZE);
+        init_zero(&result, MAX_BIGNUM_SIZE);
 
         // Initialize 'value_a' and 'value_n' with the test values
         for (int j = 0; j < TEST_BIGNUM_WORDS; ++j) {
             value_a.d[j] = test_values_a[test][j];
             value_n.d[j] = test_values_n[test][j];
         }
-        value_a.top = find_top(&value_a, TEST_BIGNUM_WORDS);
-        value_n.top = find_top(&value_n, TEST_BIGNUM_WORDS);
+        value_a.top = find_top(&value_a, MAX_BIGNUM_SIZE);
+        value_n.top = find_top(&value_n, MAX_BIGNUM_SIZE);
 
         //value_a.neg = sign_a[test];
         //value_n.neg = sign_b[test];

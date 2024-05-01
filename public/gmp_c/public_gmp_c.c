@@ -150,7 +150,7 @@ Point point_multiply(Point p, mpz_t n) {
   unsigned int current_step = 0;
 
   while (mpz_cmp_ui(n, 0) > 0) {
-    printf("\nStep %d\n", current_step);
+    printf("\n### Step: %d\n", current_step);
     // print the current x and y
     // gmp_printf("0 x: %Zx\n", pp.x);
     // gmp_printf("0 y: %Zx\n", pp.y);
@@ -159,13 +159,16 @@ Point point_multiply(Point p, mpz_t n) {
     gmp_printf(">> pp.x: %Zx\n", pp.x);
     gmp_printf(">> pp.y: %Zx\n", pp.y);
     if (mpz_cmp_ui(temp, 1) == 0) {
-      gmp_printf("\n# mpz_cmp_ui(temp, 1) is 0\n");
+      gmp_printf("\n[0]\n");
       gmp_printf(">> point_add r.x: %Zx\n", r.x);
       gmp_printf(">> point_add r.y: %Zx\n", r.y);
+      gmp_printf(">> point_add pp.x: %Zx\n", pp.x);
+      gmp_printf(">> point_add pp.y: %Zx\n", pp.y);
       r = point_add(r, pp);
       gmp_printf("<< point_add r.x: %Zx\n", r.x);
       gmp_printf("<< point_add r.y: %Zx\n\n", r.y);
     }
+    gmp_printf("\n[1]\n");
     gmp_printf(">> point_add pp.x: %Zx\n", pp.x);
     gmp_printf(">> point_add pp.y: %Zx\n", pp.y);
     pp = point_add(pp, pp);    

@@ -23,8 +23,10 @@ void init_constants() {
     //mpz_init_set_str(p, "fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141", 16);    
     mpz_init_set_ui(a, 0);
     mpz_init_set_ui(b, 7);
-    mpz_init_set_str(Gx, "79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798", 16);
-    mpz_init_set_str(Gy, "483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8", 16);
+    // mpz_init_set_str(Gx, "79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798", 16);
+    // mpz_init_set_str(Gy, "483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8", 16);
+    mpz_init_set_str(Gx, "c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5", 16);
+    mpz_init_set_str(Gy, "1ae168fea63dc339a3c58419466ceaeef7f632653266d0e1236431a950cfe52a", 16);
 }
 
 // Point addition
@@ -143,6 +145,7 @@ Point point_add(Point p1, Point p2) {
         gmp_printf("p: %Zx\n", p);
         
         // Point doubling formula
+        gmp_printf("\n[0] >> mpz_pow_ui p1.x: %Zx\n", p1.x);
         mpz_pow_ui(tmp1, p1.x, 2); // tmp1 = p1.x^2  
         gmp_printf("\n[0] << mpz_pow_ui tmp1: %Zx\n", tmp1);
         
@@ -163,10 +166,12 @@ Point point_add(Point p1, Point p2) {
         mpz_mod(tmp2, tmp2, p);
         gmp_printf("[5] << mpz_mod tmp2: %Zx\n", tmp2);
 
+        gmp_printf("\n[6] >> mpz_invert tmp2: %Zx\n", tmp2);
+        gmp_printf("[6] >> mpz_invert p: %Zx\n", p);
         mpz_invert(tmp2, tmp2, p);  
         gmp_printf("[6] << mpz_invert tmp2: %Zx\n", tmp2);
 
-        gmp_printf("[7] >> mpz_mul tmp1: %Zx\n", tmp1);
+        gmp_printf("\n[7] >> mpz_mul tmp1: %Zx\n", tmp1);
         gmp_printf("[7] >> mpz_mul tmp2: %Zx\n", tmp2);
         mpz_mul(s, tmp1, tmp2);
         gmp_printf("[7] << mpz_mul s: %Zx\n", s);
@@ -235,10 +240,10 @@ int main() {
     Point p2;
     mpz_init(p2.x);
     mpz_init(p2.y);
-    // mpz_set_str(p2.x, "C6047F9441ED7D6D3045406E95C07CD85C778E4B8CEF3CA7ABAC09B95C709EE5", 16);
-    // mpz_set_str(p2.y, "1AE168FEA63DC339A3C58419466CEAEEF7F632653266D0E1236431A950CFE52A", 16);
-    mpz_set_str(p2.x, "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798", 16);
-    mpz_set_str(p2.y, "483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8", 16);
+    mpz_set_str(p2.x, "C6047F9441ED7D6D3045406E95C07CD85C778E4B8CEF3CA7ABAC09B95C709EE5", 16);
+    mpz_set_str(p2.y, "1AE168FEA63DC339A3C58419466CEAEEF7F632653266D0E1236431A950CFE52A", 16);
+    // mpz_set_str(p2.x, "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798", 16);
+    // mpz_set_str(p2.y, "483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8", 16);
     
     // print G
     gmp_printf(">> G x: %Zx\n", G.x);

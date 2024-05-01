@@ -139,12 +139,15 @@ int main() {
     BN_ULONG test_values_a[][MAX_BIGNUM_WORDS] = {
         {0xbfd25e8cd0364141, 0xbaaedce6af48a03b, 0xffffffffffffffe, 0xffffffffffffffff},
         {0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xfffffffefffffc2f},
-
+        {0x35c2d1fd4c7b8673, 0x478b08328cd9d5dd, 0xefec64ca64cda1c2, 0x46c86352a19fca54},
+        {0x46c86352a19fca54, 0xefec64ca64cda1c2, 0x478b08328cd9d5dd, 0x35c2d1fd4c7b8673},
     };
 
     BN_ULONG test_values_n[][MAX_BIGNUM_WORDS] = {
         {0xcaa5c571ffccab5a, 0xad1c289591e564d3, 0x70116675aa53aa8a, 0x1b2db4c027cdbaba},
         {0x4c4619154810c1c0, 0xdaa4ddd8c73971d1, 0x59db91705f2113ce, 0x51b9885e4578874d},
+        {0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xfffffffefffffc2f},
+        {0xfffffffefffffc2f, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff},
     };
 
     reverse_order(test_values_a, test_values_n, sizeof(test_values_a) / (sizeof(BN_ULONG) * MAX_BIGNUM_WORDS));
