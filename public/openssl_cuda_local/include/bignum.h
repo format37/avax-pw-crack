@@ -1,4 +1,9 @@
 // bignum.h
+// Set the OPENSSL_API_COMPAT preprocessor macro to a compatible value.
+// Adjust the value of OPENSSL_API_COMPAT based on the OpenSSL version 
+// you are using and the compatibility level required by your code. 
+// #define OPENSSL_API_COMPAT 10101000L 
+
 #include "bn.h"
 #include <assert.h>
 #define debug_print false
@@ -8,8 +13,9 @@
 #define MAX_BIGNUM_WORDS 9     // For 576-bit numbers
 #define MAX_BIGNUM_SIZE 9     // Allow room for temp calculations
 
+
 typedef struct bignum_st {
-  BN_ULONG *d;
+  BN_ULONG d[MAX_BIGNUM_SIZE];
   int top;
   int dmax;
   int neg;
@@ -29,14 +35,14 @@ __device__ void bn_print(const char* msg, BIGNUM* a) {
     if (a->neg) {
         printf("-");  // Handle the case where BIGNUM is negative
     }
-    int size_of_d = sizeof(a->d);
-    for (int i = size_of_d - 1; i >= 0; i--) {
+    // int size_of_d = sizeof(a->d);
+    for (int i = MAX_BIGNUM_SIZE - 1; i >= 0; i--) {
         // Print words up to top - 1 with appropriate formatting
-        if (i == size_of_d - 1) {
+        if (i == MAX_BIGNUM_SIZE - 1) {
             printf("%llx", a->d[i]);
         } else {
-            printf(" %016llx", a->d[i]); // TODO: Enable this line
-            //printf("%016llx", a->d[i]);
+            //printf(" %016llx", a->d[i]);
+            printf("%016llx", a->d[i]);
         }
     }
     printf("\n");
@@ -84,27 +90,11 @@ __device__ void bn_print_reversed(const char* msg, BIGNUM* a) {
     printf("\n");
 }
 
-__device__ int find_top_1(BIGNUM *bn, int max_words) {
-    // print sizeof(bn->d)
-    // printf("[find_top] sizeof(bn->d): %d\n", sizeof(bn->d));
-    int size_of_d = sizeof(bn->d);
-    // bn_print("find_top", bn);
-    for (int i = size_of_d - 1; i >= 0; i--) {
-        // printf(">> find_top [%d]: ", i);
-        // printf("%llx", bn->d[i]);
-        if (bn->d[i] != 0) {
-            // printf("<< find_top returning %d\n", i + 1);
-            return i + 1;  // The top index is the index of the last non-zero word plus one
-        }
-    }
-    // printf(">> find_top returning 0\n");
-    return 1; // If all words are zero, the top is 0
-}
-
 __device__ int find_top(BIGNUM *bn, int max_words) {
     // bn_print("++ find_top bn ++ ", bn);
-    int size_of_d = sizeof(bn->d);
-    for (int i = max_words - 1; i >= 0; i--) {
+    // int size_of_d = sizeof(bn->d);
+    // int safe_size = min(size_of_d, max_words);
+    for (int i = MAX_BIGNUM_SIZE - 1; i >= 0; i--) {
         // printf(">> find_top. size_of_d: %d i: %d bn->d[i]: %llx max_words: %d\n", size_of_d, i, bn->d[i], max_words);
         if (bn->d[i] != 0) {
             return i + 1;  // The top index is the index of the last non-zero word plus one
@@ -146,31 +136,14 @@ __device__ void reverse(BN_ULONG* d, int n) {
   }
 }
 
-__device__ void init_zero_1(BIGNUM *bn, int capacity) {
-    bn->d = new BN_ULONG[capacity]; // Dynamically allocate the required number of words.
-    // int size_of_d = sizeof(bn->d);
-    for (int i = 0; i < capacity; i++) {
-        bn->d[i] = 0;
-    }
-
-    // top is used for representing the actual size of the 
-    // significant part of the number for calculation purposes.
-    bn->top = 1; // There are no significant digits when all words are zero.
-
-    bn->neg = 0;
-    
-    // dmax is used to manage the memory allocation and ensure you 
-    // do not access out-of-bounds memory.
-    // bn->dmax = capacity; // Make sure to track the capacity in dmax.
-    bn->dmax = capacity;
-}
-
-
 __device__ void init_zero(BIGNUM *bn, int capacity) {
     // int size_of_d = sizeof(bn->d);
     // printf("++ init_zero ++ Allocating %d words. sizeof(bn->d): %d\n", capacity, size_of_d);
-    bn->d = new BN_ULONG[capacity]; // Dynamically allocate the required number of words.
-    for (int i = 0; i < capacity; i++) {
+    //bn->d = new BN_ULONG[capacity]; // Dynamically allocate the required number of words.
+    // BN_ULONG bn_d[MAX_BIGNUM_SIZE] = {0};
+    // bn->d = bn_d;
+    
+    for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
         // printf(">> init_zero. set up bn->d[%d]", i);
         // printf(" from %llx to 0\n", bn->d[i]);
         bn->d[i] = 0;
@@ -184,8 +157,9 @@ __device__ void init_zero(BIGNUM *bn, int capacity) {
     
     // dmax is used to manage the memory allocation and ensure you 
     // do not access out-of-bounds memory.
-    bn->dmax = capacity; // Make sure to track the capacity in dmax.
-    //bn->dmax = MAX_BIGNUM_SIZE;
+    // bn->dmax = capacity; // Make sure to track the capacity in dmax.
+    bn->dmax = MAX_BIGNUM_SIZE - 1;
+    // delete[] bn_d;
 }
 
 __device__ void init_one(BIGNUM *bn, int capacity) {
@@ -344,6 +318,8 @@ __device__ void bn_copy(BIGNUM *dest, BIGNUM *src) {
 
     // Init dst as zero
     init_zero(dest, MAX_BIGNUM_SIZE);
+    // int size = sizeof(src->d);
+    // init_zero(dest, size);
 
     if (dest == nullptr || src == nullptr) {
         return;
@@ -762,7 +738,7 @@ __device__ void bn_mod_deprecated(BIGNUM* r, BIGNUM* m, BIGNUM* d) {
             long long res = (long long)r->d[i] - (long long)((i < d->top) ? d->d[i] : 0) - borrow;
             borrow = (res < 0) ? 1 : 0;
             if (res < 0) {
-                res += (1LL << 32); // Assuming each BN_ULONG is 32 bits
+                res += (1LL << BN_ULONG_NUM_BITS); // Assuming each BN_ULONG is 32 bits
             }
             r->d[i] = (BN_ULONG)res;
         }
@@ -856,7 +832,7 @@ __device__ void big_num_add_mod(BN_ULONG *result, BN_ULONG *a, BN_ULONG *b, BN_U
     for (int i = num_words - 1; i >= 0; i--) {
         unsigned long long sum = (unsigned long long) a[i] + (unsigned long long) b[i] + carry; // Use 64-bit to prevent overflow
         result[i] = (BN_ULONG) (sum % 0x100000000);  // Keep lower 32 bits
-        carry = (BN_ULONG) (sum >> 32); // Upper 32 bits become carry
+        carry = (BN_ULONG) (sum >> BN_ULONG_NUM_BITS); // Upper 32 bits become carry
     }
 
     // Modular reduction: simply subtract n from result if result >= n
@@ -897,19 +873,19 @@ __device__ void robust_BN_nnmod(BIGNUM *r, const BIGNUM *m, const BIGNUM *d) {
             for (int j = 0; j < d->top; ++j) {
                 unsigned long long sub = (unsigned long long) r->d[i+j] - (unsigned long long) d->d[j] * quotient - borrow;
                 r->d[i+j] = (BN_ULONG) (sub % 0x100000000);
-                borrow = (BN_ULONG) (sub >> 32);
+                borrow = (BN_ULONG) (sub >> BN_ULONG_NUM_BITS);
             }
 
             // Add back the remainder at position i
             unsigned long long sum = (unsigned long long) r->d[i] + (unsigned long long) remainder;
             r->d[i] = (BN_ULONG) (sum % 0x100000000);
-            BN_ULONG carry = (BN_ULONG) (sum >> 32);
+            BN_ULONG carry = (BN_ULONG) (sum >> BN_ULONG_NUM_BITS);
 
             // Propagate any carry
             for (int j = i+1; j < r->top && carry; ++j) {
                 sum = (unsigned long long) r->d[j] + carry;
                 r->d[j] = (BN_ULONG) (sum % 0x100000000);
-                carry = (BN_ULONG) (sum >> 32);
+                carry = (BN_ULONG) (sum >> BN_ULONG_NUM_BITS);
             }
 
             // If there's still a carry, increase the size of r
@@ -1020,21 +996,25 @@ __device__ int extended_gcd(BIGNUM *a, BIGNUM *mod, BIGNUM *x, BIGNUM *y) {
 
     // Initialize a BIGNUM for zero.
     BIGNUM zero;
-    BN_ULONG zero_d[1] = {0}; // Assuming BN_ULONG is the type used to represent a single "word" of the BIGNUM.
+    // BN_ULONG zero_d[MAX_BIGNUM_SIZE] = {0}; // Assuming BN_ULONG is the type used to represent a single "word" of the BIGNUM.
 
-    zero.d = zero_d;
-    // zero.top = (zero_d[0] != 0); // If we've set zero_d[0] to 0, zero's top should be zero, implying an actual value of 0.
-    zero.top = 0;
-    zero.dmax = 1; // The maximum number of "words" in the BIGNUM. Since zero is just 0, this is 1.
+    // zero.d = zero_d;
+    // // zero.top = (zero_d[0] != 0); // If we've set zero_d[0] to 0, zero's top should be zero, implying an actual value of 0.
+    // zero.top = 0;
+    // zero.dmax = 1; // The maximum number of "words" in the BIGNUM. Since zero is just 0, this is 1.
+    init_zero(&zero, MAX_BIGNUM_WORDS);
 
-    BIGNUM *temp_remainder = new BIGNUM(); // If dynamic memory is allowed - or statically allocate enough space if not
+    //BIGNUM *temp_remainder = new BIGNUM(); // If dynamic memory is allowed - or statically allocate enough space if not
+    BIGNUM temp_remainder;
 
     while (bn_cmp(&remainder, &zero) != 0) {
         // bn_div(&last_remainder, &remainder, &quotient);
-        bn_div(&last_remainder, &remainder, &quotient, temp_remainder); // Now using 4 arguments
+        bn_div(&last_remainder, &remainder, &quotient, &temp_remainder); // Now using 4 arguments
         BIGNUM swap_temp = last_remainder; // Temporary storage for the swap
-        last_remainder = *temp_remainder;
-        *temp_remainder = swap_temp;
+        // last_remainder = *temp_remainder;
+        // *temp_remainder = swap_temp;
+        bn_copy(&last_remainder, &temp_remainder);
+        bn_copy(&temp_remainder, &swap_temp);
 
         bn_mul(&quotient, x, &temp); // temp = quotient*x
         bn_sub(&prev_x, &temp, &prev_x); // new prev_x = prev_x - temp
@@ -1047,7 +1027,7 @@ __device__ int extended_gcd(BIGNUM *a, BIGNUM *mod, BIGNUM *x, BIGNUM *y) {
     }
 
     // Clean up
-    delete temp_remainder; // Only if dynamic memory is allowed - if you statically allocated, this is unnecessary
+    delete &temp_remainder; // Only if dynamic memory is allowed - if you statically allocated, this is unnecessary
     
     set_bn(x, &prev_x);
     set_bn(y, &last_y);
@@ -1456,9 +1436,11 @@ __device__ int bn_mod_v0(BIGNUM *r, BIGNUM *a, BIGNUM *n) {
 __device__ void mod_mul(BIGNUM *a, BIGNUM *b, BIGNUM *mod, BIGNUM *result) {
     debug_printf("mod_mul 0\n");
     // Product array to store the intermediate multiplication result
-    BN_ULONG product_d[MAX_BIGNUM_SIZE] ={0}; // All elements initialized to 0
+    // BN_ULONG product_d[MAX_BIGNUM_SIZE] ={0}; // All elements initialized to 0
     // Ensure that 'product' uses this pre-allocated array
-    BIGNUM product = { product_d, 0, MAX_BIGNUM_SIZE };
+    // BIGNUM product = { product_d, 0, MAX_BIGNUM_SIZE };
+    BIGNUM product;
+    init_zero(&product, MAX_BIGNUM_SIZE);
     debug_printf("mod_mul 1\n");
     // Now, you can call the bn_mul function and pass 'product' to it
     bn_mul(a, b, &product);
@@ -1471,9 +1453,9 @@ __device__ void mod_mul(BIGNUM *a, BIGNUM *b, BIGNUM *mod, BIGNUM *result) {
     debug_printf("mod_mul 3\n");
 
     // Wipe the product memory if necessary
-    for (int i = 0; i < MAX_BIGNUM_SIZE; ++i) {
-        product_d[i] = 0;
-    }
+    // for (int i = 0; i < MAX_BIGNUM_SIZE; ++i) {
+    //     product_d[i] = 0;
+    // }
 }
 
 __device__ void point_double(EC_POINT *P, EC_POINT *R, BIGNUM *p) {
@@ -1603,14 +1585,16 @@ __device__ void copy_point(EC_POINT *dest, EC_POINT *src) {
     // along with other metadata (like size, top, neg, etc.)
 
     // init the dest point
-    dest->x.d = new BN_ULONG[MAX_BIGNUM_WORDS];
-    dest->y.d = new BN_ULONG[MAX_BIGNUM_WORDS];
-    dest->x.top = 0;
-    dest->y.top = 0;
-    dest->x.neg = 0;
-    dest->y.neg = 0;
-    dest->x.dmax = MAX_BIGNUM_WORDS;
-    dest->y.dmax = MAX_BIGNUM_WORDS;
+    // dest->x.d = new BN_ULONG[MAX_BIGNUM_WORDS];
+    // dest->y.d = new BN_ULONG[MAX_BIGNUM_WORDS];
+    // dest->x.top = 0;
+    // dest->y.top = 0;
+    // dest->x.neg = 0;
+    // dest->y.neg = 0;
+    // dest->x.dmax = MAX_BIGNUM_WORDS;
+    // dest->y.dmax = MAX_BIGNUM_WORDS;
+    init_zero(&dest->x, MAX_BIGNUM_WORDS);
+    init_zero(&dest->y, MAX_BIGNUM_WORDS);
 
     // Copy the BIGNUM x
     bn_copy(&dest->x, &src->x);
@@ -2303,6 +2287,7 @@ __device__ int bn_div(BIGNUM *quotient_in, BIGNUM *remainder_in, BIGNUM *dividen
     // -------- = quotient, remainder
     // divisor
     //printf("\n++ bn_div ++\n");
+    bool debug = 0;
 
     // Declare local BIGNUM variables
     BIGNUM quotient;
@@ -2315,9 +2300,11 @@ __device__ int bn_div(BIGNUM *quotient_in, BIGNUM *remainder_in, BIGNUM *dividen
     init_zero(&remainder, MAX_BIGNUM_SIZE);
     init_zero(&dividend, MAX_BIGNUM_SIZE);
     init_zero(&divisor, MAX_BIGNUM_SIZE);
-    //printf("# [1] #\n");
-    /*bn_print(">> dividend_in: ", dividend_in);
-    bn_print(">> divisor_in: ", divisor_in);*/
+    if (debug) {
+        printf("# [1] #\n");
+        bn_print(">> dividend_in: ", dividend_in);
+        bn_print(">> divisor_in: ", divisor_in);
+    };
     // Copy from input BIGNUMs
     bn_copy(&quotient, quotient_in);
     bn_copy(&remainder, remainder_in);
@@ -2382,6 +2369,11 @@ __device__ int bn_div(BIGNUM *quotient_in, BIGNUM *remainder_in, BIGNUM *dividen
     // Initialize binary arrays
     memset(binary_quotient, 0, total_bits * sizeof(int));
     memset(binary_remainder, 0, total_bits * sizeof(int));
+
+    if (debug) {
+        bn_print(">> convert_to_binary_array dividend: ", &dividend);
+        bn_print(">> convert_to_binary_array divisor: ", &divisor);
+    };
     
     // Convert the BIGNUMs to binary arrays, use actual 'top' value for correct size
     convert_to_binary_array(dividend.d, binary_dividend, MAX_BIGNUM_SIZE);
@@ -2402,17 +2394,19 @@ __device__ int bn_div(BIGNUM *quotient_in, BIGNUM *remainder_in, BIGNUM *dividen
         divisor.top
         );
 
-    //bn_print_quotient("<< binary_quotient", &quotient);
-    //binary_print_big_endian("<< binary_quotient", binary_quotient, total_bits);
-    //binary_print_big_endian("<< binary_remainder", binary_remainder, total_bits);
+    if (debug) {
+        bn_print_quotient("<< binary_quotient", &quotient);
+        binary_print_big_endian("<< binary_quotient", binary_quotient, total_bits);
+        binary_print_big_endian("<< binary_remainder", binary_remainder, total_bits);
+    };
 
     // Fix the 'top' fields of quotient and remainder
     quotient.top = get_bn_top_from_binary_array(binary_quotient, total_bits);
     //quotient->top = get_bn_top_from_binary_array_little_endian(binary_quotient, total_bits);
     //printf("\n# Total bits: %d\n", total_bits);
-    //printf("\n# binary quotient top: %d\n", quotient->top);
+    // printf("\n# binary quotient top: %d\n", quotient.top);
     remainder.top = get_bn_top_from_binary_array(binary_remainder, total_bits);
-    //printf("\n# binary remainder top: %d\n", remainder->top);
+    // printf("\n# binary remainder top: %d\n", remainder.top);
 
     // Convert the binary arrays back to BIGNUMs
     quotient.top = MAX_BIGNUM_SIZE;
@@ -2435,10 +2429,12 @@ __device__ int bn_div(BIGNUM *quotient_in, BIGNUM *remainder_in, BIGNUM *dividen
     quotient.neg = dividend.neg ^ divisor.neg;
     remainder.neg = dividend.neg;
 
-    //bn_print("\n<< quotient: ", &quotient); // CHECK
-    //printf("# bignum quotient top: %d\n", quotient->top);
-    //bn_print("<< remainder: ", &remainder);
-    //printf("# bignum remainder top: %d\n", remainder->top);
+    if (debug) {
+        bn_print("\n<< quotient: ", &quotient); // CHECK
+        //printf("# bignum quotient top: %d\n", quotient->top);
+        bn_print("<< remainder: ", &remainder);
+        //printf("# bignum remainder top: %d\n", remainder->top);
+    };
 
     // Update tops using find_top
     //quotient->top = find_top(quotient, MAX_BIGNUM_WORDS);
@@ -2501,9 +2497,19 @@ __device__ void bn_set_signed_word(BIGNUM *r, int64_t value) {
 __device__ void bn_swap(BIGNUM *a, BIGNUM *b) {
     // Swap the dynamic parts
     // mp_ptr temp_d = a->d;
-    BN_ULONG *temp_d = a->d;
-    a->d = b->d;
-    b->d = temp_d;
+    // BN_ULONG *temp_d = a->d;
+    BN_ULONG temp_d[MAX_BIGNUM_SIZE];
+    for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
+        temp_d[i] = a->d[i];
+    }
+    //a->d = b->d;
+    for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
+        a->d[i] = b->d[i];
+    }
+    //b->d = temp_d;
+    for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
+        b->d[i] = temp_d[i];
+    }
     
     // Swap the scalar components such as top, sign etc.
     int temp_top = a->top;
@@ -2967,73 +2973,73 @@ __device__ bool bn_mod_inverse(BIGNUM *result, BIGNUM *a, BIGNUM *n) {
         return false;  // No modular inverse exists
     }
 
-    BIGNUM *r = new BIGNUM();
-    BIGNUM *nr = new BIGNUM();
-    BIGNUM *t = new BIGNUM();
-    BIGNUM *nt = new BIGNUM();
-    BIGNUM *q = new BIGNUM();
-    BIGNUM *tmp = new BIGNUM();
-    BIGNUM *tmp2 = new BIGNUM();
-    BIGNUM *tmp3 = new BIGNUM();
+    BIGNUM r;
+    BIGNUM nr;
+    BIGNUM t;
+    BIGNUM nt;
+    BIGNUM q;
+    BIGNUM tmp;
+    BIGNUM tmp2;
+    BIGNUM tmp3;
 
-    init_zero(r, MAX_BIGNUM_SIZE);
-    init_zero(nr, MAX_BIGNUM_SIZE);
-    init_zero(t, MAX_BIGNUM_SIZE);
-    init_one(nt, MAX_BIGNUM_SIZE);
-    init_zero(q, MAX_BIGNUM_SIZE);
-    init_zero(tmp, MAX_BIGNUM_SIZE);
-    init_zero(tmp2, MAX_BIGNUM_SIZE);
-    init_zero(tmp3, MAX_BIGNUM_SIZE);
+    init_zero(&r, MAX_BIGNUM_SIZE);
+    init_zero(&nr, MAX_BIGNUM_SIZE);
+    init_zero(&t, MAX_BIGNUM_SIZE);
+    init_one(&nt, MAX_BIGNUM_SIZE);
+    init_zero(&q, MAX_BIGNUM_SIZE);
+    init_zero(&tmp, MAX_BIGNUM_SIZE);
+    init_zero(&tmp2, MAX_BIGNUM_SIZE);
+    init_zero(&tmp3, MAX_BIGNUM_SIZE);
 
-    bn_copy(r, n);
+    bn_copy(&r, n);
     /*bn_print("\n[bn_mod_inverse pre_bn_mod] a = ", a);
     bn_print("[bn_mod_inverse pre_bn_mod] n = ", n);
     bn_print("[bn_mod_inverse pre_bn_mod] nr = ", nr);*/
-    bn_mod(nr, a, n); // Compute non-negative remainder of 'a' modulo 'n'
+    bn_mod(&nr, a, n); // Compute non-negative remainder of 'a' modulo 'n'
     //bn_print("[bn_mod_inverse post_bn_mod] nr = ", nr);
     unsigned int counter = 0;
-    while (!bn_is_zero(nr)) {
+    while (!bn_is_zero(&nr)) {
         if (debug) {
             printf("\n### Iteration %d\n", counter);
-            bn_print(">> bn_div r = ", r);
-            bn_print(">> bn_div nr = ", nr); // CHECK
-            bn_print(">> bn_div tmp = ", tmp);
-            bn_print(">> bn_div q = ", q);
+            bn_print(">> bn_div r = ", &r);
+            bn_print(">> bn_div nr = ", &nr); // CHECK
+            bn_print(">> bn_div tmp = ", &tmp);
+            bn_print(">> bn_div q = ", &q);
         }
 
-        bn_div(q, tmp, r, nr); // Compute quotient and remainder
-        bn_copy(tmp, nt);
+        bn_div(&q, &tmp, &r, &nr); // Compute quotient and remainder
+        bn_copy(&tmp, &nt);
 
-        nt->top = find_top(nt, MAX_BIGNUM_SIZE);
-        q->top = find_top(q, MAX_BIGNUM_SIZE);
+        nt.top = find_top(&nt, MAX_BIGNUM_SIZE);
+        q.top = find_top(&q, MAX_BIGNUM_SIZE);
 
         //bn_print("\n[0] premul q = ", q);
         //bn_print("[1] premul nt = ", nt);
-        bn_mul(q, nt, tmp2); // tmp2 = q * nt
+        bn_mul(&q, &nt, &tmp2); // tmp2 = q * nt
         //bn_print("[2] postmul nt = ", tmp2);        
 
         //bn_print("[3] presub t = ", t);
-        init_zero(tmp3, MAX_BIGNUM_SIZE);
-        bn_subtract(tmp3, t, tmp2); // tmp3 = t - tmp2
+        init_zero(&tmp3, MAX_BIGNUM_SIZE);
+        bn_subtract(&tmp3, &t, &tmp2); // tmp3 = t - tmp2
         //bn_print("[3.5] postsub tmp2 = ", tmp3);
-        bn_copy(nt, tmp3); // dst << src
+        bn_copy(&nt, &tmp3); // dst << src
         //bn_print("[4] postsub nt = ", nt);
 
-        bn_copy(t, tmp);
-        bn_copy(tmp, nr);
+        bn_copy(&t, &tmp);
+        bn_copy(&tmp, &nr);
         //bn_print("[5] premul nr = ", nr);
         //bn_print("[6] premul q = ", q);
-        bn_mul(q, nr, tmp2);
+        bn_mul(&q, &nr, &tmp2);
         //bn_print("[7] postmul nr = ", tmp2); 
         
         //bn_print("[8] presub r = ", r);
         // set zero to tmp3
-        init_zero(tmp3, MAX_BIGNUM_SIZE);
-        bn_subtract(tmp3, r, tmp2); // tmp3 = r - tmp2
-        bn_copy(nr, tmp3);
+        init_zero(&tmp3, MAX_BIGNUM_SIZE);
+        bn_subtract(&tmp3, &r, &tmp2); // tmp3 = r - tmp2
+        bn_copy(&nr, &tmp3);
         //bn_print("[9] postsub nr = ", nr);
 
-        bn_copy(r, tmp);
+        bn_copy(&r, &tmp);
         /*bn_print("\nq: ", q);
         bn_print("t: ", t);
         bn_print("nt: ", nt);
@@ -3047,34 +3053,34 @@ __device__ bool bn_mod_inverse(BIGNUM *result, BIGNUM *a, BIGNUM *n) {
         }*/
     }
 
-    if (!bn_is_one(r)) {
+    if (!bn_is_one(&r)) {
         if (debug) printf("No modular inverse exists\n");
         init_zero(result, MAX_BIGNUM_SIZE);
-        delete r;
-        delete nr;
-        delete t;
-        delete nt;
-        delete q;
-        delete tmp;
-        delete tmp2;
+        delete &r;
+        delete &nr;
+        delete &t;
+        delete &nt;
+        delete &q;
+        delete &tmp;
+        delete &tmp2;
         return false; // No modular inverse exists
     }
 
-    if (bn_is_negative(t)) {
+    if (bn_is_negative(&t)) {
         if (debug) printf("bn_mod_inverse negative t\n");
-        bn_add(tmp2, t, n); // tmp2 = t + n
-        bn_copy(t, tmp2);
+        bn_add(&tmp2, &t, n); // tmp2 = t + n
+        bn_copy(&t, &tmp2);
     }
 
-    bn_copy(result, t);
+    bn_copy(result, &t);
 
-    delete r;
-    delete nr;
-    delete t;
-    delete nt;
-    delete q;
-    delete tmp;
-    delete tmp2;
+    delete &r;
+    delete &nr;
+    delete &t;
+    delete &nt;
+    delete &q;
+    delete &tmp;
+    delete &tmp2;
 
     return true;
 }
@@ -3086,7 +3092,7 @@ __device__ int point_add(
     BIGNUM *p, 
     BIGNUM *a
 ) {
-    bool debug = 0;
+    bool debug = 1;
     if (debug) {
         printf("++ point_add ++\n");
         bn_print(">> p1.x: ", &p1->x);
@@ -3124,12 +3130,15 @@ __device__ int point_add(
     
 
     // Initialize temporary BIGNUMs for calculation
-    BIGNUM s, x3, y3, tmp1, tmp2, tmp3;
+    BIGNUM s, x3, y3, tmp1, tmp2, tmp3, two, tmp1_squared;
     init_zero(&s, MAX_BIGNUM_SIZE);
     init_zero(&x3, MAX_BIGNUM_SIZE);
     init_zero(&y3, MAX_BIGNUM_SIZE);
     init_zero(&tmp1, MAX_BIGNUM_SIZE);
     init_zero(&tmp2, MAX_BIGNUM_SIZE);
+    init_zero(&tmp3, MAX_BIGNUM_SIZE);
+    init_zero(&two, MAX_BIGNUM_SIZE);
+    init_zero(&tmp1_squared, MAX_BIGNUM_SIZE);
 
     
     
@@ -3146,15 +3155,16 @@ __device__ int point_add(
 
     // Case 3: p1 == p2
     // TODO: Check, do we need to compare y
-    if (bn_cmp(&p1->x, &p2->x) == 0 && bn_cmp(&p1->y, &p2->y) == 0) {
+    //if (bn_cmp(&p1->x, &p2->x) == 0 && bn_cmp(&p1->y, &p2->y) == 0) {
+    if (bn_cmp(&p1->x, &p2->x) == 0) {
         //if (debug) 
-        printf("p1 == p2\n");
+        printf("p1.x == p2.x\n");
         // Point doubling
-        BIGNUM two;
+        // BIGNUM two;
         init_zero(&two, MAX_BIGNUM_SIZE);
         bn_set_word(&two, 2);
 
-        BIGNUM tmp1_squared;
+        // BIGNUM tmp1_squared;
         init_zero(&tmp1_squared, MAX_BIGNUM_SIZE);
         init_zero(&tmp1, MAX_BIGNUM_SIZE);
         bn_copy(&tmp1, &p1->x); // dst << src
@@ -3262,7 +3272,7 @@ __device__ int point_add(
     } else {
         // Case 2: p1 != p2
         //if (debug) 
-        printf("p1 != p2\n");
+        printf("p1.x != p2.x\n");
         // Regular point addition
         bn_subtract(&tmp1, &p2->y, &p1->y);
         // bn_print("\n[a] << bn_subtract tmp1: ", &tmp1);
@@ -3373,14 +3383,47 @@ __device__ int point_add(
     bn_copy(&result->x, &x3);
     bn_copy(&result->y, &y3);
 
+    // Free the dynamically allocated memory
+    free_bignum(&s);
+    free_bignum(&x3);
+    free_bignum(&y3);
+    free_bignum(&tmp1);
+    free_bignum(&tmp2);
+    free_bignum(&tmp3);
+    free_bignum(&two);
+    free_bignum(&tmp1_squared);
+
     return 0;
+}
+
+__device__ void bignum_to_bit_array_2(BIGNUM *n, unsigned int *bits) {
+    int index = 0;
+    n->top = find_top(n, MAX_BIGNUM_SIZE);
+    for (int i = n->top - 1; i >= 0; --i) {
+        BN_ULONG word = n->d[i];
+        for (int j = BN_ULONG_NUM_BITS - 1; j >= 0; --j) {
+            bits[index++] = (word >> j) & 1;
+        }
+    }
+}
+
+__device__ void bignum_to_bit_array_1(BIGNUM *n, unsigned int *bits) {
+    int index = 0;
+    n->top = find_top(n, MAX_BIGNUM_SIZE);
+    for (int i = 0; i < n->top; ++i) {
+        BN_ULONG word = n->d[i];
+        for (int j = 0; j < BN_ULONG_NUM_BITS; ++j) {  // Assuming BN_ULONG is 32 bits
+            bits[index++] = (word >> j) & 1;
+        }
+    }
 }
 
 __device__ void bignum_to_bit_array(const BIGNUM *n, unsigned int *bits) {
     int index = 0;
     for (int i = 0; i < n->top; ++i) {
         BN_ULONG word = n->d[i];
-        for (int j = 0; j < 32; ++j) {  // Assuming BN_ULONG is 32 bits
+        //for (int j = 0; j < 32; ++j) {  // Assuming BN_ULONG is 32 bits
+        for (int j = 0; j < BN_ULONG_NUM_BITS; ++j) {  // Assuming BN_ULONG is 32 bits
             bits[index++] = (word >> j) & 1;
         }
     }

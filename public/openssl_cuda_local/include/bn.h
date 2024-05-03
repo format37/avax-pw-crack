@@ -368,21 +368,21 @@ int BN_ucmp(const BIGNUM *a, const BIGNUM *b);
 int BN_set_bit(BIGNUM *a, int n);
 int BN_clear_bit(BIGNUM *a, int n);
 // __device__ char *BN_bn2hex(const BIGNUM *a);
-__host__ __device__ char* BN_bn2hex(const BIGNUM *a) {
+// __host__ __device__ char* BN_bn2hex(const BIGNUM *a) {
   // host+device stub
-}
+// }
 //__device__ char *BN_bn2dec(const BIGNUM *a);
-__host__ __device__ char* BN_bn2dec(const BIGNUM *a) {
+// __host__ __device__ char* BN_bn2dec(const BIGNUM *a) {
   // host+device stub
-}
+// }
 // __device__ int BN_hex2bn(BIGNUM **a, const char *str);
-__host__ __device__ int BN_hex2bn(BIGNUM **a, const char *str) {
+// __host__ __device__ int BN_hex2bn(BIGNUM **a, const char *str) {
   // host+device stub
-}
+// }
 // __device__ int BN_dec2bn(BIGNUM **a, const char *str);
-__host__ __device__ int BN_dec2bn(BIGNUM **a, const char *str) {
+// __host__ __device__ int BN_dec2bn(BIGNUM **a, const char *str) {
   // host+device stub
-}
+// }
 int BN_asc2bn(BIGNUM **a, const char *str);
 int BN_gcd(BIGNUM *r, const BIGNUM *a, const BIGNUM *b, BN_CTX *ctx);
 int BN_kronecker(const BIGNUM *a, const BIGNUM *b, BN_CTX *ctx); /* returns

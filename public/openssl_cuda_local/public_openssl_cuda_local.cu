@@ -266,12 +266,14 @@ __global__ void testKernel() {
 
     // Modular Reduction
     BIGNUM m;
-    BN_ULONG m_d[4];
-    for (int i = 0; i < 4; i++) m_d[i] = 0;
-    m_d[0] = 0x64; // 100
-    m.d = m_d;
-    m.top = 1;
-    m.neg = 0;
+    init_zero(&m, MAX_BIGNUM_SIZE);
+    // BN_ULONG m_d[4];
+    // for (int i = 0; i < 4; i++) m_d[i] = 0;
+    // m_d[0] = 0x64; // 100
+    // m.d = m_d;
+    m.d[0] = 0x64; // 100
+    // m.top = 1;
+    // m.neg = 0;
     
     BIGNUM tmp;
     init_zero(&tmp, MAX_BIGNUM_SIZE);
@@ -289,11 +291,13 @@ __global__ void testKernel() {
     init_zero(&CURVE_A, MAX_BIGNUM_SIZE);
     
     // For secp256k1, CURVE_B should be initialized to 7 rather than 0
-    for (int i = 0; i < 4; i++) CURVE_B_d[i] = 0;
-    CURVE_B_d[0] = 0x7;
-    CURVE_B.d = CURVE_B_d;
-    CURVE_B.top = 4;
-    CURVE_B.neg = 0;
+    // for (int i = 0; i < 4; i++) CURVE_B_d[i] = 0;
+    init_zero(&CURVE_B, MAX_BIGNUM_SIZE);
+    CURVE_B.d[0] = 0x7;
+    // CURVE_B_d[0] = 0x7;
+    // CURVE_B.d = CURVE_B_d;
+    // CURVE_B.top = 4;
+    // CURVE_B.neg = 0;
 
     BN_ULONG CURVE_GX_values[MAX_BIGNUM_WORDS] = {
         0x79BE667EF9DCBBAC,
@@ -321,16 +325,24 @@ __global__ void testKernel() {
     EC_POINT G;
     init_zero(&G.x, MAX_BIGNUM_WORDS);
     init_zero(&G.y, MAX_BIGNUM_WORDS);
-    G.x.d = CURVE_GX_d; 
-    G.y.d = CURVE_GY_d;
+    // G.x.d = CURVE_GX_d; 
+    // G.y.d = CURVE_GY_d;
+    for (int j = 0; j < MAX_BIGNUM_WORDS; ++j) {
+            G.x.d[j] = CURVE_GX_values[j];
+            G.y.d[j] = CURVE_GY_values[j];
+        }
     // Set tops, negs
-    G.x.top = 4;
-    G.y.top = 4;
-    G.x.neg = 0;
-    G.y.neg = 0;
+    // G.x.top = 4;
+    // G.y.top = 4;
+
+    // G.x.neg = 0;
+    // G.y.neg = 0;
     // reverse
     reverse_order(&G.x);
     reverse_order(&G.y);
+    // find top
+    G.x.top = find_top(&G.x, MAX_BIGNUM_WORDS);
+    G.y.top = find_top(&G.y, MAX_BIGNUM_WORDS);
 
     init_zero(&CURVE_P, MAX_BIGNUM_SIZE);
     //bn_copy(&CURVE_P, &curveOrder); // CURVE_P is curveOrder_d
@@ -347,11 +359,16 @@ __global__ void testKernel() {
     // for (int j = 0; j < MAX_BIGNUM_WORDS; ++j) {
     //         CURVE_P_d[j] = CURVE_P_values[j];
     //     }
-    CURVE_P.d = CURVE_P_values;
-    CURVE_P.top = 4;
-    CURVE_P.neg = 0;
+    // CURVE_P.d = CURVE_P_values;
+    for (int j = 0; j < MAX_BIGNUM_WORDS; ++j) {
+            CURVE_P.d[j] = CURVE_P_values[j];
+        }
+    // CURVE_P.top = 4;
+    // CURVE_P.neg = 0;
     // reverse
     reverse_order(&CURVE_P);
+    // find top
+    CURVE_P.top = find_top(&CURVE_P, MAX_BIGNUM_WORDS);
     
     // Derive public key 
     // EC_POINT publicKey = ec_point_scalar_mul(&G, &newKey, &curveOrder);    

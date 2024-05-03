@@ -1,0 +1,35 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "profile: Public key derivation",
+            "type": "cuda-gdb",
+            "request": "launch",
+            "program": "${workspaceFolder}/program",
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "preLaunchTask": "profile public_key_derivation"
+        },
+        {
+            "name": "build: Public key derivation",
+            "type": "cuda-gdb",
+            "request": "launch",
+            "program": "${workspaceFolder}/program",
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "preLaunchTask": "nvcc public_key_derivation"
+        },
+        {
+            "name": "build: bn_div",
+            "type": "cuda-gdb",
+            "request": "launch",
+            "program": "${workspaceFolder}/program",
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "preLaunchTask": "nvcc bn_div"
+        }
+    ]
+}

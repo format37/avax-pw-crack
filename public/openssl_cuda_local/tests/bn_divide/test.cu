@@ -3,7 +3,7 @@
 #include <cuda_runtime.h>
 #include "bignum.h"
 
-#define TEST_BIGNUM_WORDS 8
+#define TEST_BIGNUM_WORDS 9
 
 __device__ void reverse_order(BN_ULONG test_values_a[][TEST_BIGNUM_WORDS], BN_ULONG test_values_b[][TEST_BIGNUM_WORDS], size_t num_rows) {
     for (size_t i = 0; i < num_rows; i++) {
@@ -29,13 +29,13 @@ __global__ void testKernel() {
     };*/
 
     BN_ULONG test_values_dividend[][TEST_BIGNUM_WORDS] = {
-        {0x8e020bca63c2d3b4, 0xf15d956d1119704c, 0x793bbdfa2cbe57d7, 0x51a13724b434b483, 0xda8f4665b027f674, 0xfab37c1f434754f2, 0x9352e2c1b6dc753e, 0x0675365166805884},
-        {0xa9d76a4234a8ded, 0x7af964ec3f6f871b, 0xe09d7f67cc580732, 0x3b11b98c6222abbb, 0x0bdfd291448c33e6, 0xa46834fe88684cf0, 0x5106877163ee71eb, 0x5186b6de04720283},
+        {0,0x8e020bca63c2d3b4, 0xf15d956d1119704c, 0x793bbdfa2cbe57d7, 0x51a13724b434b483, 0xda8f4665b027f674, 0xfab37c1f434754f2, 0x9352e2c1b6dc753e, 0x0675365166805884},
+        {0,0xa9d76a4234a8ded, 0x7af964ec3f6f871b, 0xe09d7f67cc580732, 0x3b11b98c6222abbb, 0x0bdfd291448c33e6, 0xa46834fe88684cf0, 0x5106877163ee71eb, 0x5186b6de04720283},
     };
 
     BN_ULONG test_values_divisor[][TEST_BIGNUM_WORDS] = {
-        {0, 0, 0, 0, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xfffffffefffffc2f},
-        {0, 0, 0, 0, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xfffffffefffffc2f},
+        {0, 0, 0, 0, 0, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xfffffffefffffc2f},
+        {0, 0, 0, 0, 0, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xfffffffefffffc2f},
     };
 
     reverse_order(test_values_dividend, test_values_divisor, sizeof(test_values_dividend) / (sizeof(BN_ULONG) * TEST_BIGNUM_WORDS));
