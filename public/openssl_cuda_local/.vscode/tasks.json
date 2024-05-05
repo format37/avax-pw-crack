@@ -2,25 +2,6 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "profile public_key_derivation",
-            "type": "shell",
-            "command": "ncu",
-            "args": [
-                "--target-processes", "all",
-                "--profile-from-start", "off",
-                "--force-overwrite",
-                "-o", "profile",
-                "${workspaceFolder}/program"
-            ],
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": [],
-            "dependsOn": [
-                "nvcc build active file"
-            ]
-        },
-        {
             "label": "nvcc public_key_derivation",
             "type": "shell",
             "command": "/bin/bash",
@@ -73,6 +54,52 @@
                 "showReuseMessage": true,
                 "clear": false
             }
+        },
+        {
+            "label": "nvcc bn_mod_inverse",
+            "type": "shell",
+            "command": "/bin/bash",
+            "args": [
+                "-c",
+                "source /mnt/hdd0/alex/anaconda3/bin/activate && conda activate crack && nvcc -diag-suppress 1444 -G -g ${workspaceFolder}/tests/bn_mod_inverse_fixed/test.cu -arch=sm_86 -I/home/alex/projects/avax-pw-crack/public/openssl_cuda_local/include/ -o program"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": [
+                "$nvcc"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "dedicated",
+                "showReuseMessage": true,
+                "clear": false
+            }
+        },
+        {
+            "label": "profile bn_mod_inverse",
+            "type": "shell",
+            "command": "ncu",
+            "args": [
+                "--target-processes", "all",
+                "--profile-from-start", "off",
+                "--force-overwrite",
+                "-o", "profile",
+                "${workspaceFolder}/program"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": [],
+            "dependsOn": [
+                "nvcc bn_mod_inverse"
+            ]
         }
     ]
 }
