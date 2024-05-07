@@ -839,10 +839,15 @@ int main(int argc, char **argv)
 	// child to avaxp address
 	//char *avaxp_address = childToAvaxpAddress(publicKeyBytes);
 	//printf("Avaxp Address: %s\n", avaxp_address);
-	char *publicKeyHex = byteArrayToHexString(publicKeyBytes, publicKeyLen);
+	//char *publicKeyHex = byteArrayToHexString(publicKeyBytes, publicKeyLen);
+
+    // set public key hex to 02ffe1073d08f0163434453127e81181be1d49e78e88f9d5662af55416fcec9d80
+    const char *publicKeyHex = "02ffe1073d08f0163434453127e81181be1d49e78e88f9d5662af55416fcec9d80";
+
+    printf("Public Key Hex: %s\n", publicKeyHex);
 	char *avaxp_address = childToAvaxpAddress(publicKeyHex);
 	printf("Avaxp Address: %s\n", avaxp_address);
-	free(publicKeyHex);  // Don't forget to free the allocated memory
+	//free(publicKeyHex);  // Don't forget to free the allocated memory
 
 	//uint8_t data[] = {0x01, 0x02, 0x03, 0x04, 0x05};
     //compute_sha256(data, sizeof(data));

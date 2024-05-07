@@ -1,3 +1,3 @@
 clear
-[ -f "test_pbkdf2" ] && rm test_pbkdf2
+[ -f "child_to_avaxp" ] && rm child_to_avaxp
 make

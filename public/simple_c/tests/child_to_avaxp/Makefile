@@ -1,5 +1,5 @@
 CFLAGS := -O2 -Wall -Wextra -Wvla -Wsign-conversion -pedantic -std=c99
-APPNAME := test_pbkdf2
+APPNAME := child_to_avaxp
 
 ifeq ($(OS),Windows_NT)
 	RM := del /Q
@@ -12,10 +12,10 @@ APP_OSSL := $(APPNAME)_ossl$(EXT)
 
 all: $(APP)
 
-$(APP): test_pbkdf2.c pbkdf2_sha512.h
+$(APP): child_to_avaxp.c pbkdf2_sha512.h
 	$(CC) $(CFLAGS) -o $@ $< -lcrypto
 
-$(APP_OSSL): test_pbkdf2.c pbkdf2_sha512.h
+$(APP_OSSL): child_to_avaxp.c pbkdf2_sha512.h
 	$(CC) $(CFLAGS) -DHAS_OSSL -o $@ $< -lcrypto
 
 clean:
