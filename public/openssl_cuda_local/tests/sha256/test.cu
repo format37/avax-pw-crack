@@ -1,4 +1,5 @@
 #include "bignum.h" // Big number arithmetic
+#include "sha256.h" // SHA-256 hashing
 
 __global__ void test() {
     // Convert the mnemonic and passphrase to byte arrays (or use them as-is if you can)
