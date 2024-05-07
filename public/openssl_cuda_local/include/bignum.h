@@ -6,8 +6,9 @@
 #define BN_ULONG_NUM_BITS 64
 #define MAX_BIGNUM_WORDS 9     // For 576-bit numbers
 #define MAX_BIGNUM_SIZE 9     // Allow room for temp calculations
-#define DEVICE_CLOCK_RATE 1708500
 
+// Debug variables
+#define DEVICE_CLOCK_RATE 1708500
 __device__ unsigned int debug_loop_counter_bn_div = 0;  // Global loop counter variable
 __device__ double elapsed_time_bn_div = 0;
 __device__ double elapsed_time_bn_div_binary = 0;
