@@ -1,6 +1,5 @@
 #include <cstdint> // SHA256
 
-// SHA256 ++
 #define CH(x,y,z)  (z ^ (x & (y ^ z)))
 #define MAJ(x,y,z) ((x & y) | (z & (x | y)))
 #define S0(x)      (ROR(x, 2) ^ ROR(x,13) ^ ROR(x,22))
@@ -12,6 +11,7 @@
 #define SHA256_DIGESTINT 8ul  //size of digest in uint32_t
 #define PBKDF2_SHA256_DEF static
 #define ROR(n,k) ror(n,k)
+#define MY_SHA256_DIGEST_LENGTH 32
 
 typedef struct sha256_ctx_t
 {
@@ -168,7 +168,8 @@ __device__ void print_as_hex(const uint8_t *s,  const uint32_t slen)
 {
 	for (uint32_t i = 0; i < slen; i++)
 	{
-		printf("%02X%s", s[ i ], (i % 4 == 3) && (i != slen - 1) ? "-" : "");
+		// printf("%02X%s", s[ i ], (i % 4 == 3) && (i != slen - 1) ? "-" : "");
+		printf("%02X%s", s[ i ], (i % 4 == 3) && (i != slen - 1) ? "" : "");
 	}
 	printf("\n");
 }
@@ -183,4 +184,30 @@ __device__ void compute_sha256(const uint8_t *msg, uint32_t mlen)
     printf("SHA-256: ");
     print_as_hex(md, sizeof md);
 }
-// SHA256 --
+
+__device__ void hexStringToByteArray(const char *hexString, unsigned char *byteArray, int *byteArrayLength) {
+    *byteArrayLength = my_strlen(hexString) / 2;
+    printf("Expected length: %d\n", *byteArrayLength);  // Debug print
+    
+    for (int i = 0; i < *byteArrayLength; ++i) {
+        unsigned char byte = 0;
+        for (int j = 0; j < 2; ++j) {
+            char c = hexString[2 * i + j];
+            if (c >= '0' && c <= '9') {
+                byte = (byte << 4) | (c - '0');
+            } else if (c >= 'a' && c <= 'f') {
+                byte = (byte << 4) | (c - 'a' + 10);
+            } else if (c >= 'A' && c <= 'F') {
+                byte = (byte << 4) | (c - 'A' + 10);
+            }
+        }
+        byteArray[i] = byte;
+    }
+}
+
+__device__ void print_as_hex_uint(const uint8_t *data,  const uint32_t len) {
+    for (size_t i = 0; i < len; i++) {
+        printf("%02x", data[i]);
+    }
+    printf("\n");
+}
