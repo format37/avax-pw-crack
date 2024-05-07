@@ -2,12 +2,17 @@
 #include "bn.h"
 #include <assert.h>
 #define debug_print false
-#define BN_MASK2 0xffffffff;
+#define BN_MASK2 0xffffffff
 #define BN_ULONG_NUM_BITS 64
 #define MAX_BIGNUM_WORDS 9     // For 576-bit numbers
 #define MAX_BIGNUM_SIZE 9     // Allow room for temp calculations
+#define DEVICE_CLOCK_RATE 1708500
 
 __device__ unsigned int debug_loop_counter_bn_div = 0;  // Global loop counter variable
+__device__ double elapsed_time_bn_div = 0;
+__device__ double elapsed_time_bn_div_binary = 0;
+__device__ double elapsed_time_bn_mod_inverse = 0;
+__device__ double elapsed_time_bn_copy = 0;
 
 typedef struct bignum_st {
   BN_ULONG d[MAX_BIGNUM_SIZE];
@@ -286,6 +291,10 @@ __device__ int bn_cmp_one(BIGNUM* a) {
 
 // Helper function to perform a deep copy of BIGNUM
 __device__ void bn_copy(BIGNUM *dest, BIGNUM *src) {
+    // Declare variable to store clock() value
+    clock_t start, end;
+    // Start the clock
+    start = clock64();    
     /*printf("++ bn_copy ++\n");
     bn_print(">> src: ", src);
     bn_print(">> dest: ", dest);*/
@@ -325,6 +334,11 @@ __device__ void bn_copy(BIGNUM *dest, BIGNUM *src) {
     // bn_print("<< src: ", src);
     // bn_print("<< dest: ", dest);
     // printf("-- bn_copy --\n");
+    // End the clock
+    end = clock64();
+    // Calculate the elapsed time
+    // elapsed_time_bn_copy += (double)(end - start) / ((double)DEVICE_CLOCK_RATE*10000);
+    elapsed_time_bn_copy += (double)(end - start);
 }
 
 __device__ void bn_copy_0(BIGNUM *dest, BIGNUM *src) {
@@ -2091,6 +2105,10 @@ __device__ void bn_div_binary(
     int dividend_words,
     int divisor_words
 ) {
+    // Declare variable to store clock() value
+    clock_t start, end;
+    // Start the clock
+    start = clock64();
     /*printf("\n++ bn_div_binary :)++\n");
     printf("dividend bits: [%d]\n", dividend_words);
     for (int i = 0; i < dividend_words; i ++) {
@@ -2165,6 +2183,12 @@ __device__ void bn_div_binary(
 
     // Remainder is in temp after division
     memcpy(remainder, temp, total_bits * sizeof(int));
+
+    // End the clock
+    end = clock64();
+    // Calculate the elapsed time
+    // elapsed_time_bn_div_binary += (double)(end - start) / ((double)DEVICE_CLOCK_RATE*10000);
+    elapsed_time_bn_div_binary += (double)(end - start);
 }
 
 __device__ int bn_div(BIGNUM *quotient_in, BIGNUM *remainder_in, BIGNUM *dividend_in, BIGNUM *divisor_in) {
@@ -2180,6 +2204,12 @@ __device__ int bn_div(BIGNUM *quotient_in, BIGNUM *remainder_in, BIGNUM *dividen
     // -------- = quotient, remainder
     // divisor
     //printf("\n++ bn_div ++\n");
+    // Declare variable to store clock() value
+    clock_t start, end;
+    // Start the clock
+    start = clock64();
+    // printf("Start time: %lld\n", start);
+    
     debug_loop_counter_bn_div++;
 
     bool debug = 0;
@@ -2348,6 +2378,11 @@ __device__ int bn_div(BIGNUM *quotient_in, BIGNUM *remainder_in, BIGNUM *dividen
     free(dividend);
     free(divisor);*/
     //printf("-- bn_div --\n");
+    // Stop the clock
+    end = clock64();
+    // elapsed_time_bn_div += (double)(end - start) / ((double)DEVICE_CLOCK_RATE*10000);
+    elapsed_time_bn_div += (double)(end - start);
+
     return 1;
 }
 
@@ -2628,6 +2663,9 @@ __device__ void bn_gcdext(BIGNUM *g, BIGNUM *s, BIGNUM *t, BIGNUM *a, BIGNUM *b)
 }
 
 __device__ bool bn_mod_inverse(BIGNUM *result, BIGNUM *a, BIGNUM *n) {
+    clock_t start, end;
+    // Start the clock
+    start = clock64();
     bool debug = 0;
     // if (debug) {
     //     printf("++ bn_mod_inverse ++\n");
@@ -2751,7 +2789,10 @@ __device__ bool bn_mod_inverse(BIGNUM *result, BIGNUM *a, BIGNUM *n) {
     delete &q;
     delete &tmp;
     delete &tmp2;
-
+    // Stop the clock
+    end = clock64();
+    //elapsed_time_bn_mod_inverse += (double)(end - start) / ((double)DEVICE_CLOCK_RATE*10000);
+    elapsed_time_bn_mod_inverse += (double)(end - start);
     return true;
 }
 

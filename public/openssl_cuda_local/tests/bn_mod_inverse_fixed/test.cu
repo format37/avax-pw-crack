@@ -73,7 +73,12 @@ __global__ void testKernel() {
         //     break;
         // }
     }
-    printf("Counters:\n");
+    printf("\nTimers:\n");
+    printf("elapsed_time_bn_copy: %.6f\n", elapsed_time_bn_copy);
+    printf("elapsed_time_bn_div: %.6f\n", elapsed_time_bn_div);
+    printf("elapsed_time_bn_div_binary: %.6f\n", elapsed_time_bn_div_binary);
+    printf("elapsed_time_bn_mod_inverse: %.6f\n", elapsed_time_bn_mod_inverse);
+    printf("\nCounters:\n");
     printf("bn_div: %d\n", debug_loop_counter_bn_div);
 }
 
