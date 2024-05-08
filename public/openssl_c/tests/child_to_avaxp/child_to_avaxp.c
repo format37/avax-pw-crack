@@ -176,9 +176,10 @@ char* childToAvaxpAddress(const char *publicKeyHex) {
 	uint8_t sha256Hash[MY_SHA256_DIGEST_LENGTH];
     compute_sha256(publicKeyBytes, (uint32_t) len, sha256Hash);
 
-    printf("SHA256: ");
+    printf("SHA256 uint: ");
     print_as_hex_uint(sha256Hash, MY_SHA256_DIGEST_LENGTH);
-
+    printf("SHA256 char: ");
+    print_as_hex_char(sha256Hash, MY_SHA256_DIGEST_LENGTH);
 
     unsigned char ripemd160Hash[RIPEMD160_DIGEST_LENGTH];
     computeRIPEMD160(sha256Hash, MY_SHA256_DIGEST_LENGTH, ripemd160Hash);

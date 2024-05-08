@@ -77,7 +77,7 @@ void ripemd160_hash(const unsigned char *data, size_t len, unsigned char *digest
 }
 
 int main() {
-    const char *message = "Hello, world!";
+    const char *message = "e4c7762afce13f2f44b69d6af33b8f12145e14291bff7e6be29f05c6015dbe5a";
     size_t message_len = strlen(message);
 
     unsigned char digest[RIPEMD160_DIGEST_SIZE];
