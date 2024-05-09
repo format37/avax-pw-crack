@@ -16,7 +16,6 @@ void computeRIPEMD160(unsigned char *data, size_t len, unsigned char *hash) {
 int main(int argc, char **argv)
 {
 
-    // const char *publicKeyHex = 
     // define sha256Hash as a phrase
     const char *sha256Hash_char = "e4c7762afce13f2f44b69d6af33b8f12145e14291bff7e6be29f05c6015dbe5a";
     // Init sha256Hash as a uint

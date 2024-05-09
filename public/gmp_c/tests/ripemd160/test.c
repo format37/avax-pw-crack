@@ -2,7 +2,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdint.h>
 
+#define MY_SHA256_DIGEST_LENGTH 32
 #define RIPEMD160_DIGEST_SIZE 20
 
 typedef struct {
@@ -11,6 +13,13 @@ typedef struct {
     size_t buffer_size;
     mpz_t length;
 } RIPEMD160_CTX;
+
+void print_as_hex_char(unsigned char *data, int len) {
+    for (int i = 0; i < len; i++) {
+        printf("%02x", data[i]);
+    }
+    printf("\n");
+}
 
 void ripemd160_init(RIPEMD160_CTX *ctx) {
     mpz_init_set_str(ctx->state[0], "67452301", 16);
@@ -77,16 +86,30 @@ void ripemd160_hash(const unsigned char *data, size_t len, unsigned char *digest
 }
 
 int main() {
-    const char *message = "e4c7762afce13f2f44b69d6af33b8f12145e14291bff7e6be29f05c6015dbe5a";
-    size_t message_len = strlen(message);
+    // const char *message = "Hello, world!";
+    // 
+    // define sha256Hash as a phrase
+    const char *sha256Hash_char = "e4c7762afce13f2f44b69d6af33b8f12145e14291bff7e6be29f05c6015dbe5a";
+    // Init sha256Hash as a uint
+    const uint8_t sha256Hash[MY_SHA256_DIGEST_LENGTH];
+    // Fill sha256Hash with sha256Hash_char
+    for (int i = 0; i < MY_SHA256_DIGEST_LENGTH; i++) {
+        sscanf(sha256Hash_char + 2 * i, "%02x", &sha256Hash[i]);
+    }
+
+    printf("SHA256: ");
+    print_as_hex_char(sha256Hash, MY_SHA256_DIGEST_LENGTH);
+
+    size_t message_len = strlen(sha256Hash);
+    printf("Message length: %zu\n", message_len);
 
     unsigned char digest[RIPEMD160_DIGEST_SIZE];
 
     // Hash the message
-    ripemd160_hash((const unsigned char *)message, message_len, digest);
+    ripemd160_hash((const unsigned char *)sha256Hash, MY_SHA256_DIGEST_LENGTH, digest);
 
     // Print the digest
-    printf("RIPEMD-160 hash of \"%s\":\n", message);
+    printf("RIPEMD-160: ");
     for (int i = 0; i < RIPEMD160_DIGEST_SIZE; i++) {
         printf("%02x", digest[i]);
     }
