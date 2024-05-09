@@ -58,6 +58,19 @@ __device__ size_t bn_strlen(const char *str) {
     return len;
 }
 
+__device__ void bn_strcpy(char *dest, const char *src) {
+    size_t i = 0;
+    while (src[i] != '\0') {
+        // printf("size of src: %d\n", sizeof(src));
+        // printf("size of dest: %d\n", sizeof(dest));
+        // printf("src[%d]: %c\n", i, src[i]);
+        // printf("dest[%d]: %c\n", i, dest[i]);
+        dest[i] = src[i];
+        ++i;
+    }
+    dest[i] = '\0';
+}
+
 __device__ void hexStringToByteArray(const char *hexString, unsigned char *byteArray, int *byteArrayLength) {
     *byteArrayLength = bn_strlen(hexString) / 2;
     printf("Expected length: %d\n", *byteArrayLength);  // Debug print
