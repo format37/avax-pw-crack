@@ -49,6 +49,42 @@ __device__ void bn_print(const char* msg, BIGNUM* a) {
     printf("\n");
 }
 
+__device__ size_t bn_strlen(const char *str) {
+    size_t len = 0;
+    while (*str != '\0') {
+        ++len;
+        ++str;
+    }
+    return len;
+}
+
+__device__ void hexStringToByteArray(const char *hexString, unsigned char *byteArray, int *byteArrayLength) {
+    *byteArrayLength = bn_strlen(hexString) / 2;
+    printf("Expected length: %d\n", *byteArrayLength);  // Debug print
+    
+    for (int i = 0; i < *byteArrayLength; ++i) {
+        unsigned char byte = 0;
+        for (int j = 0; j < 2; ++j) {
+            char c = hexString[2 * i + j];
+            if (c >= '0' && c <= '9') {
+                byte = (byte << 4) | (c - '0');
+            } else if (c >= 'a' && c <= 'f') {
+                byte = (byte << 4) | (c - 'a' + 10);
+            } else if (c >= 'A' && c <= 'F') {
+                byte = (byte << 4) | (c - 'A' + 10);
+            }
+        }
+        byteArray[i] = byte;
+    }
+}
+
+__device__ void print_as_hex_char(unsigned char *data, int len) {
+    for (int i = 0; i < len; i++) {
+        printf("%02x", data[i]);
+    }
+    printf("\n");
+}
+
 __device__ void bn_print_short(const char* msg, BIGNUM* a) {
     printf("%s", msg);
     if (a->top == 0) {

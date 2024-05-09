@@ -46,15 +46,6 @@ PBKDF2_SHA256_DEF __device__ void sha256_init(SHA256_CTX *s)
 	s->h[7] = 0x5be0cd19;
 }
 
-__device__ size_t my_strlen(const char *str) {
-    size_t len = 0;
-    while (*str != '\0') {
-        ++len;
-        ++str;
-    }
-    return len;
-}
-
 static __device__ uint32_t ror(uint32_t n, uint32_t k)
 {
 	return (n >> k) | (n << (32 - k));
@@ -183,26 +174,6 @@ __device__ void compute_sha256(const uint8_t *msg, uint32_t mlen)
     sha256_final(&sha, md);
     printf("SHA-256: ");
     print_as_hex(md, sizeof md);
-}
-
-__device__ void hexStringToByteArray(const char *hexString, unsigned char *byteArray, int *byteArrayLength) {
-    *byteArrayLength = my_strlen(hexString) / 2;
-    printf("Expected length: %d\n", *byteArrayLength);  // Debug print
-    
-    for (int i = 0; i < *byteArrayLength; ++i) {
-        unsigned char byte = 0;
-        for (int j = 0; j < 2; ++j) {
-            char c = hexString[2 * i + j];
-            if (c >= '0' && c <= '9') {
-                byte = (byte << 4) | (c - '0');
-            } else if (c >= 'a' && c <= 'f') {
-                byte = (byte << 4) | (c - 'a' + 10);
-            } else if (c >= 'A' && c <= 'F') {
-                byte = (byte << 4) | (c - 'A' + 10);
-            }
-        }
-        byteArray[i] = byte;
-    }
 }
 
 __device__ void print_as_hex_uint(const uint8_t *data,  const uint32_t len) {
