@@ -22,6 +22,16 @@
             "preLaunchTask": "nvcc bn_div"
         },
         {
+            "name": "build: bech32",
+            "type": "cuda-gdb",
+            "request": "launch",
+            "program": "${workspaceFolder}/program",
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "preLaunchTask": "nvcc bech32"
+        },
+        {
             "name": "build: bn_mod_inverse",
             "type": "cuda-gdb",
             "request": "launch",

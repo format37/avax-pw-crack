@@ -1,6 +1,10 @@
+//#include "bignum.h" // Big number arithmetic
+
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include <stdint.h>
+#include "bignum.h"
 
 #define RIPEMD160_DIGEST_LENGTH 20
 #define CHECKSUM_LENGTH 6
@@ -9,8 +13,7 @@
 #define MAX_HRP_LEN 20
 #define MAX_VALUES_LEN (MAX_HRP_LEN * 2 + 1 + RIPEMD160_DIGEST_LENGTH + CHECKSUM_LENGTH)
 
-// ++ Bech32 Encode ++
-void ConvertBytesTo5BitGroups(uint8_t *data, size_t len, uint8_t *result, size_t *result_len) {
+__device__ void ConvertBytesTo5BitGroups(uint8_t *data, size_t len, uint8_t *result, size_t *result_len) {
     uint32_t buffer = 0;
     uint8_t bufferLength = 0;
     *result_len = 0;
@@ -33,8 +36,8 @@ void ConvertBytesTo5BitGroups(uint8_t *data, size_t len, uint8_t *result, size_t
     }
 }
 
-void ExpandHrp(const char *hrp, uint8_t *ret) {
-    size_t hrp_len = strlen(hrp);
+__device__ void ExpandHrp(const char *hrp, uint8_t *ret) {
+    size_t hrp_len = bn_strlen(hrp);
     for (size_t i = 0; i < hrp_len; ++i) {
         uint8_t c = hrp[i];
         ret[i] = c >> 5;
@@ -43,7 +46,7 @@ void ExpandHrp(const char *hrp, uint8_t *ret) {
     ret[hrp_len] = 0;
 }
 
-uint32_t PolyMod(uint8_t *values, size_t len) {
+__device__ uint32_t PolyMod(uint8_t *values, size_t len) {
     uint32_t chk = 1;
     uint32_t generator[] = {0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3};
     for (size_t i = 0; i < len; ++i) {
@@ -56,8 +59,8 @@ uint32_t PolyMod(uint8_t *values, size_t len) {
     return chk;
 }
 
-void CreateChecksum(const char *hrp, uint8_t *data, size_t data_len, uint8_t *checksum) {
-    size_t hrp_len = strlen(hrp);
+__device__ void CreateChecksum(const char *hrp, uint8_t *data, size_t data_len, uint8_t *checksum) {
+    size_t hrp_len = bn_strlen(hrp);
     size_t total_len = hrp_len * 2 + 1 + data_len + CHECKSUM_LENGTH;
     uint8_t values[MAX_VALUES_LEN];
     memset(values, 0, sizeof(values));
@@ -70,7 +73,7 @@ void CreateChecksum(const char *hrp, uint8_t *data, size_t data_len, uint8_t *ch
     }
 }
 
-void Encode(const char *hrp, uint8_t *data, size_t data_len, char *result) {
+__device__ void Encode(const char *hrp, uint8_t *data, size_t data_len, char *result) {
     uint8_t converted_data[MAX_RESULT_LEN];
     size_t converted_data_len;
     ConvertBytesTo5BitGroups(data, data_len, converted_data, &converted_data_len);
@@ -78,10 +81,10 @@ void Encode(const char *hrp, uint8_t *data, size_t data_len, char *result) {
     uint8_t checksum[CHECKSUM_LENGTH];
     CreateChecksum(hrp, converted_data, converted_data_len, checksum);
 
-    size_t hrp_len = strlen(hrp);
+    size_t hrp_len = bn_strlen(hrp);
     size_t result_len = hrp_len + 1 + converted_data_len + CHECKSUM_LENGTH;
 
-    strcpy(result, hrp);
+    bn_strcpy(result, hrp);
     result[hrp_len] = '1';
 
     for (size_t i = 0; i < converted_data_len; ++i) {
@@ -94,21 +97,29 @@ void Encode(const char *hrp, uint8_t *data, size_t data_len, char *result) {
 
     result[result_len] = '\0';
 }
-// -- Bech32 Encode --
 
-int main(int argc, char **argv)
-{
+__global__ void test() {
     // Define the RIPEMD160 hash as f5f073e58eb1aacefe410fe30fb40215aa199967
     unsigned char ripemd160Hash[20] = {0xf5, 0xf0, 0x73, 0xe5, 0x8e, 0xb1, 0xaa, 0xce, 0xfe, 0x41, 0x0f, 0xe3, 0x0f, 0xb4, 0x02, 0x15, 0xaa, 0x19, 0x99, 0x67};
     // Print the RIPEMD160 hash
-    printf("RIPEMD160 Hash: ");
+    printf("\nRIPEMD160 Hash: ");
     for(int i = 0; i < 20; ++i) {
         printf("%02x", ripemd160Hash[i]);
     }
-
+    printf("\n");
     char b32Encoded[MAX_RESULT_LEN];
     Encode("avax", ripemd160Hash, RIPEMD160_DIGEST_LENGTH, b32Encoded);
-    printf("\nBech32 Address: %s\n", b32Encoded);
+    printf("Encoded: %s\n", b32Encoded);
+}
 
+// Main function
+int main() {
+    test<<<1, 1>>>();
+    cudaError_t err = cudaGetLastError();
+    if (err != cudaSuccess) {
+        printf("Error: %s\n", cudaGetErrorString(err));
+        return -1;
+    }
+    cudaDeviceSynchronize();
     return 0;
 }
