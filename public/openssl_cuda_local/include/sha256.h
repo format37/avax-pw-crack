@@ -159,21 +159,21 @@ __device__ void print_as_hex(const uint8_t *s,  const uint32_t slen)
 {
 	for (uint32_t i = 0; i < slen; i++)
 	{
-		// printf("%02X%s", s[ i ], (i % 4 == 3) && (i != slen - 1) ? "-" : "");
-		printf("%02X%s", s[ i ], (i % 4 == 3) && (i != slen - 1) ? "" : "");
+		printf("%02X", s[i]);
 	}
 	printf("\n");
 }
 
-__device__ void compute_sha256(const uint8_t *msg, uint32_t mlen)
+__device__ void compute_sha256(const uint8_t *msg, uint32_t mlen, uint8_t *outputHash)
 {
     uint8_t md[SHA256_DIGESTLEN] = {0};  // Initialize to zero
     SHA256_CTX sha;
     sha256_init(&sha);
     sha256_update(&sha, msg, mlen);
     sha256_final(&sha, md);
-    printf("SHA-256: ");
-    print_as_hex(md, sizeof md);
+    // printf("* SHA-256: ");
+    // print_as_hex(md, sizeof md);
+	memcpy(outputHash, md, MY_SHA256_DIGEST_LENGTH);
 }
 
 __device__ void print_as_hex_uint(const uint8_t *data,  const uint32_t len) {

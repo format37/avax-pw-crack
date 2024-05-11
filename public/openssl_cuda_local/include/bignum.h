@@ -73,7 +73,7 @@ __device__ void bn_strcpy(char *dest, const char *src) {
 
 __device__ void hexStringToByteArray(const char *hexString, unsigned char *byteArray, int *byteArrayLength) {
     *byteArrayLength = bn_strlen(hexString) / 2;
-    printf("Expected length: %d\n", *byteArrayLength);  // Debug print
+    // printf("Expected length: %d\n", *byteArrayLength);  // Debug print
     
     for (int i = 0; i < *byteArrayLength; ++i) {
         unsigned char byte = 0;

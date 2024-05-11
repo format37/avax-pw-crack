@@ -1,3 +1,4 @@
+#include "bignum.h"
 #include "bech32.h"
 
 __global__ void test() {

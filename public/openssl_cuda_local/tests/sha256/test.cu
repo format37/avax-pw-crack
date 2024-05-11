@@ -18,8 +18,8 @@ __global__ void test() {
     //print_as_hex_uint(publicKeyBytes, len);
     print_as_hex_uint(publicKeyBytes, (uint32_t) len);
     printf("Public Key Length: %d bytes\n", len);
-	uint8_t sha256Hash[MY_SHA256_DIGEST_LENGTH];
-    compute_sha256(publicKeyBytes, (uint32_t) len);
+    uint8_t sha256Hash[MY_SHA256_DIGEST_LENGTH];
+    compute_sha256(publicKeyBytes, (uint32_t) len, sha256Hash);
 }
 
 // Main function
