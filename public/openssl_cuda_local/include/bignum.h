@@ -2243,6 +2243,149 @@ __device__ void bn_div_binary(
     elapsed_time_bn_div_binary += (double)(end - start);
 }
 
+__device__ int bn_div_o(BIGNUM *quotient_in, BIGNUM *remainder_in, BIGNUM *dividend_in, BIGNUM *divisor_in) {
+    /*
+    - `dv` (quotient) is where the result of the division is stored.
+    - `rem` (remainder) is where the remainder of the division is stored.
+    - `m` is the dividend.
+    - `d` is the divisor.
+    - `ctx` is the context used for memory management during the operation in original OpenSSL implementation.
+    */
+
+    // dividend
+    // -------- = quotient, remainder
+    // divisor
+    //printf("\n++ bn_div ++\n");
+    // Declare variable to store clock() value
+    clock_t start, end;
+    // Start the clock
+    start = clock64();
+    // printf("Start time: %lld\n", start);
+    
+    debug_loop_counter_bn_div++;
+
+    bool debug = 0;
+
+    // Declare local BIGNUM variables
+    BIGNUM quotient;
+    BIGNUM remainder;
+    BIGNUM dividend;
+    BIGNUM divisor;
+    //printf("# [0] #\n");
+    // Initialize the BIGNUMs
+    init_zero(&quotient, MAX_BIGNUM_SIZE);
+    init_zero(&remainder, MAX_BIGNUM_SIZE);
+    init_zero(&dividend, MAX_BIGNUM_SIZE);
+    init_zero(&divisor, MAX_BIGNUM_SIZE);
+    // if (debug) {
+    //     printf("# [1] #\n");
+    //     bn_print(">> dividend_in: ", dividend_in);
+    //     bn_print(">> divisor_in: ", divisor_in);
+    // };
+    // Copy from input BIGNUMs
+    bn_copy(&quotient, quotient_in);
+    bn_copy(&remainder, remainder_in);
+    bn_copy(&dividend, dividend_in);
+    bn_copy(&divisor, divisor_in);
+    //printf("# [2] #\n");
+    // print input values
+    /*bn_print(">> dividend: ", &dividend);
+    bn_print(">> divisor: ", &divisor);*/
+
+    // init zero to quotient and remainder
+    init_zero(&quotient, MAX_BIGNUM_SIZE);
+    init_zero(&remainder, MAX_BIGNUM_SIZE);
+    quotient.neg = 0;
+    remainder.neg = 0;
+    
+    // Error checks similar to OpenSSL
+    //bn_print(">>[1] bn_div divisor: ", &divisor);
+    if (bn_is_zero(&divisor)) {
+        // Handle division by zero or similar error
+        // Free the allocated memory when done
+        /*free(quotient);
+        free(remainder);
+        free(dividend);
+        free(divisor);*/
+        //printf("-- bn_div -- Error: Division by zero. Divisor is zero\n");
+        return 0;
+    }
+    if (&divisor == NULL) {
+        // Handle invalid divisor
+        // Free the allocated memory when done
+        /*free(quotient);
+        free(remainder);
+        free(dividend);
+        free(divisor);*/
+        //printf("-- bn_div -- Error: Invalid divisor\n");
+        return 0;
+    }
+    if (&dividend == NULL) {
+        // Handle invalid dividend
+        // Free the allocated memory when done
+        /*free(quotient);
+        free(remainder);
+        free(dividend);
+        free(divisor);*/
+        //printf("-- bn_div -- Error: Invalid dividend\n");
+        return 0;
+    }
+
+    // Initialize variables
+    BIGNUM temp_dividend, temp_divisor, temp_quotient, temp_remainder;
+    init_zero(&temp_dividend, MAX_BIGNUM_SIZE);
+    init_zero(&temp_divisor, MAX_BIGNUM_SIZE);
+    init_zero(&temp_quotient, MAX_BIGNUM_SIZE);
+    init_zero(&temp_remainder, MAX_BIGNUM_SIZE);
+
+    bn_copy(&temp_dividend, &dividend);
+    bn_copy(&temp_divisor, &divisor);
+
+    // Normalize the divisor and dividend
+    int shift = BN_ULONG_NUM_BITS - bn_get_top_bit(&temp_divisor);
+    bn_lshift_res(&temp_divisor, &temp_divisor, shift);
+    bn_lshift_res(&temp_dividend, &temp_dividend, shift);
+
+    // Initialize the remainder
+    bn_copy(&temp_remainder, &temp_dividend);
+
+    // Main division loop
+    for (int i = temp_dividend.top - temp_divisor.top; i >= 0; --i) {
+        // Estimate quotient
+        BN_ULONG qhat = bn_div_2_words(temp_remainder.d[i + temp_divisor.top], temp_remainder.d[i + temp_divisor.top - 1], temp_divisor.d[temp_divisor.top - 1]);
+
+        // Multiply and subtract
+        BN_ULONG carry = bn_mul_sub_words(&temp_remainder, &temp_divisor, i, qhat);
+
+        // Correct the estimate if necessary
+        while (carry != 0) {
+            --qhat;
+            carry = bn_add_words(&temp_remainder.d[i], temp_divisor.d, temp_divisor.top, i);
+        }
+
+        // Store the quotient
+        temp_quotient.d[i] = qhat;
+    }
+
+    // Normalize the quotient and remainder
+    bn_rshift_one(&temp_remainder);
+    bn_copy(quotient_in, &temp_quotient);
+    bn_copy(remainder_in, &temp_remainder);
+
+    // Free the allocated memory when done
+    /*free(quotient);
+    free(remainder);
+    free(dividend);
+    free(divisor);*/
+    //printf("-- bn_div --\n");
+    // Stop the clock
+    end = clock64();
+    // elapsed_time_bn_div += (double)(end - start) / ((double)DEVICE_CLOCK_RATE*10000);
+    elapsed_time_bn_div += (double)(end - start);
+
+    return 1;
+}
+
 __device__ int bn_div(BIGNUM *quotient_in, BIGNUM *remainder_in, BIGNUM *dividend_in, BIGNUM *divisor_in) {
     /*
     - `dv` (quotient) is where the result of the division is stored.
