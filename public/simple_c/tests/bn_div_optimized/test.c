@@ -124,8 +124,31 @@ int bn_div(const BN_ULONG *dividend, const BN_ULONG *divisor, BN_ULONG *quotient
     BN_ULONG sub_remainder = shifted_dividend_word - multiplied_quotient;
     printf("sub_remainder = %llu\n", sub_remainder);
 
-    quotient[0] = 0x3;
-    remainder[0] = 0x4;
+    // Step 4: Check if the subtracted remainder is greater than or equal to the divisor
+    if (sub_remainder >= divisor_word) {
+        printf("sub_remainder is greater than or equal to divisor. performing an additional shift\n");
+
+        // Shift the dividend one more word to the right
+        for (int i = dividend_top - 1; i > 0; i--) {
+            shifted_dividend[i] = shifted_dividend[i - 1];
+        }
+        shifted_dividend[0] = 0;
+
+        // Update the quotient
+        quotient[0] = (multiplication_times << 4) | (sub_remainder / divisor_word);
+
+        // Update the remainder
+        sub_remainder = sub_remainder % divisor_word;
+    } else {
+        // Update the quotient
+        quotient[0] = multiplication_times;
+    }
+
+    // Update the remainder
+    remainder[0] = sub_remainder;
+
+    // quotient[0] = 0x3;
+    // remainder[0] = 0x4;
 
     printf("-- bn_div --\n");
     return 1;
@@ -144,6 +167,11 @@ int main()
 
     BN_ULONG quotient[WORDS];
     BN_ULONG remainder[WORDS];
+    // init zero
+    for (int i = 0; i < WORDS; i++) {
+        quotient[i] = 0;
+        remainder[i] = 0;
+    }
     if (!bn_div(dividend, divisor, quotient, remainder)) {
         printf("Error: bn_div failed\n");
         return 1;
