@@ -109,13 +109,14 @@ int bn_div(const BN_ULONG *dividend, const BN_ULONG *divisor, BN_ULONG *quotient
     BN_ULONG shifted_dividend_word = shifted_dividend[dividend_top - 1];
     BN_ULONG multiplied_quotient = divisor_word;
 
-    unsigned char multiplication_times = 0;
+    unsigned char multiplication_times = 1;
     while (multiplied_quotient < shifted_dividend_word) {
         multiplied_quotient += divisor_word;
         multiplication_times++;
     }
     if (multiplied_quotient > shifted_dividend_word) {
         multiplied_quotient -= divisor_word;
+        multiplication_times--;
     }
     printf("multiplication_times = %d\n", multiplication_times);
     printf("multiplied_quotient = %llu\n", multiplied_quotient);
