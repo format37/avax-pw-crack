@@ -343,7 +343,7 @@ int bn_div_2(const BN_ULONG *dividend, const BN_ULONG *divisor, BN_ULONG *quotie
         bn_print("quotient = ", quotient);
 
         printf("\n# 6. Assign the subtraction_result to the remainder\n");
-        remainder[dividend_words - 1] = subtraction_result;
+        remainder[dividend_words - 1] = subtraction_result; // TODO: Do we replace the remainder or add to it?
         printf("remainder[dividend_words-1] = %016llX\n", subtraction_result);
         printf("symbols_to_process = %d\n", symbols_to_process);
 
