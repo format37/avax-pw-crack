@@ -55,7 +55,7 @@ int get_msb_bit(BN_ULONG *n) {
     return msb_bit - 1;
 }
 
-int top_word_significant_symbols(const BN_ULONG *a, const unsigned char top)
+unsigned char top_word_significant_symbols(const BN_ULONG *a, const unsigned char top)
 {
     char count = 0;
     for (int i = 0; i < BN_ULONG_NUM_SYMBOLS; i++) {
@@ -71,8 +71,59 @@ int bn_div(const BN_ULONG *dividend, const BN_ULONG *divisor, BN_ULONG *quotient
     printf("++ bn_div ++\n");
     printf("dividend top: %d\n", find_top(dividend, WORDS));
     printf("divisor top: %d\n", find_top(divisor, WORDS));
-    printf("dividend count_significant_symbols: %d\n", top_word_significant_symbols(dividend, find_top(dividend, WORDS)));
-    printf("divisor count_significant_symbols: %d\n", top_word_significant_symbols(divisor, find_top(divisor, WORDS)));
+    unsigned char dividend_top = find_top(dividend, WORDS);
+    unsigned char divisor_top = find_top(divisor, WORDS);
+    unsigned char dividend_word_top = top_word_significant_symbols(dividend, dividend_top);
+    unsigned char divisor_word_top = top_word_significant_symbols(divisor, divisor_top);
+    printf("dividend count_significant_symbols: %d\n", dividend_word_top);
+    printf("divisor count_significant_symbols: %d\n", divisor_word_top);
+    // Suppose that dividend and divisor have the same top equals to 1
+    // Suppose that dividend is greater than divisor
+
+    BN_ULONG divisor_word = divisor[divisor_top - 1]; // Suppose that divisor have only first word
+
+    // Step 1: Shift the dividend dividend_word_top - divisor_word_top times to the right
+    BN_ULONG shifted_dividend[WORDS];
+    for (int i = 0; i < WORDS; i++) {
+        shifted_dividend[i] = dividend[i];
+    }
+    // BN_ULONG shifted_divisor[WORDS];
+    // for (int i = 0; i < WORDS; i++) {
+    //     shifted_divisor[i] = divisor[i];
+    // }
+    shifted_dividend[dividend_top - 1] = dividend[dividend_top - 1] >> 4 * (dividend_word_top - divisor_word_top);
+    bn_print("shifted_dividend = ", shifted_dividend);
+    // bn_print("shifted_divisor = ", shifted_divisor);
+    if (shifted_dividend[dividend_top - 1] < divisor[divisor_top - 1]) {
+        printf("dividend >> 4 is less than divisor. performing an additional shift\n"); // TODO: check the word edge case
+        shifted_dividend[dividend_top - 1] = dividend[dividend_top - 1] >> 4 * (dividend_word_top - divisor_word_top - 1);
+    }
+    bn_print("shifted_dividend = ", shifted_dividend);
+    
+    // Step 2: Multiplication of the shifted dividend by the divisor
+    // unsigned long long shifted_quotient;
+    BN_ULONG shifted_remainder;
+    // shifted_quotient = shifted_dividend[dividend_top - 1] / shifted_divisor[divisor_top - 1];
+    // shifted_remainder = shifted_dividend[dividend_top - 1] % shifted_divisor[divisor_top - 1];
+    // Classic division and modulo is not available for big numbers. Therefore we use the addiction and comparison
+    BN_ULONG shifted_dividend_word = shifted_dividend[dividend_top - 1];
+    BN_ULONG multiplied_quotient = divisor_word;
+
+    unsigned char multiplication_times = 0;
+    while (multiplied_quotient < shifted_dividend_word) {
+        multiplied_quotient += divisor_word;
+        multiplication_times++;
+    }
+    if (multiplied_quotient > shifted_dividend_word) {
+        multiplied_quotient -= divisor_word;
+    }
+    printf("multiplication_times = %d\n", multiplication_times);
+    printf("multiplied_quotient = %llu\n", multiplied_quotient);
+
+    // Step 3: Subtraction of the multiplied divisor from the shifted dividend
+    BN_ULONG sub_remainder = shifted_dividend_word - multiplied_quotient;
+    printf("sub_remainder = %llu\n", sub_remainder);
+
     quotient[0] = 0x3;
     remainder[0] = 0x4;
 
