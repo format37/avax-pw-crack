@@ -395,21 +395,20 @@ int bn_div_3(const BN_ULONG *dividend, const BN_ULONG *divisor, BN_ULONG *quotie
     unsigned char start_symbol = dividend_significant_symbols - divisor_significant_symbols;
     unsigned char end_symbol = dividend_significant_symbols;
 
-    printf("dividend from 0 to 5 %016llX\n", get_value_from_to(dividend[dividend_words - 1], 0, 4));
+    printf("\n# 0. getting shift from %d to %d of the dividend\n", start_symbol, end_symbol);
+    shifted_dividend[dividend_words - 1] = get_value_from_to(dividend[dividend_words - 1], start_symbol, end_symbol);
+    
+    BN_ULONG subtraction_result = 0;
 
-    while (end_symbol > 1) {
+    while (start_symbol >= 0) {
         printf("\n###\n");
         printf("start_symbol = %d\n", start_symbol);
         printf("end_symbol = %d\n", end_symbol);
-        // unsigned char additional_shift = 0;
-        printf("\n# 1. Shift the dividend %d times to the right\n", dividend_significant_symbols - divisor_significant_symbols);
-        shifted_dividend[dividend_words - 1] = get_value_from_to(dividend[dividend_words - 1], start_symbol, end_symbol);
-        bn_print("shifted_dividend = ", shifted_dividend); // OK
         
-        printf("\n# 1b. add additional shift if the shifted dividend is less than divisor\n");
+        bn_print("shifted_dividend = ", shifted_dividend); // OK
 
         if (shifted_dividend[dividend_words - 1] < divisor[divisor_words - 1]) {
-            printf("dividend >> 4 is less than divisor. performing an additional shift\n");
+            printf("\n# 1. shifted_dividend is less than %016llX. performing an additional shift\n", divisor[divisor_words - 1]);
             if (start_symbol == 0) {
                 printf("a. Error: start_symbol is 0\n"); // TODO: implement the case when start_symbol is 0
                 return 0;
@@ -417,13 +416,17 @@ int bn_div_3(const BN_ULONG *dividend, const BN_ULONG *divisor, BN_ULONG *quotie
             start_symbol -= 1;
             printf("start_symbol = %d\n", start_symbol);
             printf("end_symbol = %d\n", end_symbol);
-            shifted_dividend[dividend_words - 1] = get_value_from_to(dividend[dividend_words - 1], start_symbol, end_symbol);
-            // printf("shifted_dividend[dividend_words - 1] = %016llX\n", shifted_dividend[dividend_words - 1]);
-            // additional_shift += 1;
+            // shifted_dividend[dividend_words - 1] = get_value_from_to(dividend[dividend_words - 1], start_symbol, end_symbol);
+            // Instead of shift, we need to shift left on 1 and set start_symbol from dividend
+            BN_ULONG next_symbol = dividend[dividend_words - 1] >> (4 * start_symbol) & 0xF;
+            printf("next_symbol = %X\n", next_symbol);
+            shifted_dividend[dividend_words - 1] <<= 4;
+            shifted_dividend[dividend_words - 1] |= next_symbol;
+            bn_print("shifted_dividend = ", shifted_dividend);
         }
-        bn_print("shifted_dividend = ", shifted_dividend);
+        
 
-        printf("\n# 2. %016llX * %016llX\n", shifted_dividend[dividend_words - 1], divisor_top_word);
+        printf("\n# 2. divisor_multiplicator * %016llX < %016llX\n", divisor_top_word, shifted_dividend[dividend_words - 1]);
         BN_ULONG dividend_top_word = shifted_dividend[dividend_words - 1];
         BN_ULONG multiplied_divisor = divisor_top_word;
         unsigned char divisor_multiplicator = 1;
@@ -436,10 +439,15 @@ int bn_div_3(const BN_ULONG *dividend, const BN_ULONG *divisor, BN_ULONG *quotie
             divisor_multiplicator--;
         }
         printf("divisor_multiplicator = %016llX\n", divisor_multiplicator);
-        printf("multiplied_divisor = %016llX\n", multiplied_divisor);
+
+        printf("\n# 2b assign the divisor_multiplicator to the quotient\n");
+        quotient[dividend_words - 1] |= divisor_multiplicator << (4 * start_symbol);
+        printf("quotient[dividend_words - 1] = %016llX\n", quotient[dividend_words - 1]);
+
+        printf("\nmultiplied_divisor = %016llX\n", multiplied_divisor);
 
         printf("\n# 3. %016llX - %016llX\n", dividend_top_word, multiplied_divisor);
-        BN_ULONG subtraction_result = dividend_top_word - multiplied_divisor;
+        subtraction_result = dividend_top_word - multiplied_divisor;
         printf("subtraction_result = %016llX\n", subtraction_result);
 
         printf("\n# 4. Assign the next symbol of the dividend to the remainder\n");
@@ -452,21 +460,34 @@ int bn_div_3(const BN_ULONG *dividend, const BN_ULONG *divisor, BN_ULONG *quotie
 
         // unsigned char shift_value = symbols_to_process - 1;
         if (start_symbol == 0) {
-            printf("b. Error: start_symbol is 0\n"); // TODO: implement the case when start_symbol is 0
-            return 0;
+            // printf("b. Error: start_symbol is 0\n"); // TODO: implement the case when start_symbol is 0
+            // return 0;
+            // unsigned char shift_value = start_symbol - 1;
+            break;
         }
-        // unsigned char shift_value = start_symbol - 1;
+        
         start_symbol -= 1;
+        printf("start_symbol = %d\n", start_symbol);
         // BN_ULONG next_symbol = dividend_top_word >> (4 * shift_value) & 0xF;
         BN_ULONG next_symbol = dividend_top_word >> (4 * start_symbol) & 0xF;
         printf("next_symbol = %X\n", next_symbol);
-
+        
         subtraction_result <<= 4;
         subtraction_result |= next_symbol;
         printf("subtraction_result with next symbol = %016llX\n", subtraction_result);
+        shifted_dividend[dividend_words - 1] = subtraction_result;  
+              
 
-        break;
+        // if (start_symbol == 0) {
+        //     printf("c. Error: start_symbol is 0\n"); // TODO: implement the case when start_symbol is 0
+        //     return 0;
+        // }
+        // start_symbol -= 1;
+        // printf("start_symbol = %d\n", start_symbol);
     }
+
+    printf("\n# final: assign the subtraction_result to the remainder\n");
+    remainder[dividend_words - 1] = subtraction_result;
 
     printf("\n-- bn_div --\n");
     return 1;
@@ -474,8 +495,8 @@ int bn_div_3(const BN_ULONG *dividend, const BN_ULONG *divisor, BN_ULONG *quotie
 
 int main()
 {
-    BN_ULONG dividend[WORDS] = {0, 0xb0c89}; //724105
-    // BN_ULONG dividend[WORDS] = {0, 0xb0c893};
+    // BN_ULONG dividend[WORDS] = {0, 0xb0c89}; //724105
+    BN_ULONG dividend[WORDS] = {0, 0xb0c893};
     BN_ULONG divisor[WORDS] = {0, 0xd97}; //3479
 
     reverse_order(dividend);
