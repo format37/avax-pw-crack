@@ -287,6 +287,7 @@ int bn_div_2(const BN_ULONG *dividend, const BN_ULONG *divisor, BN_ULONG *quotie
     }
 
     while (symbols_to_process > 1) {
+        printf("\n\n### symbols_to_process = %d\n", symbols_to_process);
         unsigned char additional_shift = 0;
         printf("\n# 1. Shift the dividend %d times to the right\n", dividend_significant_symbols - divisor_significant_symbols);
         symbols_to_process = dividend_significant_symbols - divisor_significant_symbols;
