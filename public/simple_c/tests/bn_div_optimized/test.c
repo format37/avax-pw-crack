@@ -400,7 +400,7 @@ int bn_div_3(const BN_ULONG *dividend, const BN_ULONG *divisor, BN_ULONG *quotie
     
     BN_ULONG subtraction_result = 0;
 
-    while (start_symbol >= 0) {
+    while (start_symbol > 0) {
         printf("\n###\n");
         printf("start_symbol = %d\n", start_symbol);
         printf("end_symbol = %d\n", end_symbol);
@@ -495,7 +495,7 @@ int bn_div_3(const BN_ULONG *dividend, const BN_ULONG *divisor, BN_ULONG *quotie
 
 int main()
 {
-    // BN_ULONG dividend[WORDS] = {0, 0xb0c89}; //724105
+    //BN_ULONG dividend[WORDS] = {0, 0xb0c89}; //724105
     BN_ULONG dividend[WORDS] = {0, 0xb0c893};
     BN_ULONG divisor[WORDS] = {0, 0xd97}; //3479
 
