@@ -82,15 +82,13 @@ int bn_div_3(const BN_ULONG *dividend, const BN_ULONG *divisor, BN_ULONG *quotie
     
     BN_ULONG subtraction_result = 0;
 
-    // while (start_symbol > 0) {
     while(1) {
         printf("\n###\n");
         printf("start_symbol = %d\n", start_symbol);
         printf("end_symbol = %d\n", end_symbol);
         
-        bn_print("shifted_dividend = ", shifted_dividend); // OK
+        bn_print("shifted_dividend = ", shifted_dividend);
 
-        // if (shifted_dividend[dividend_words - 1] < divisor[divisor_words - 1]) {
         if (shifted_dividend[dividend_words - 1] < divisor[divisor_words - 1] ||
             (dividend_words > 1 && shifted_dividend[dividend_words - 2] < divisor[divisor_words - 2])) {
 
@@ -108,7 +106,6 @@ int bn_div_3(const BN_ULONG *dividend, const BN_ULONG *divisor, BN_ULONG *quotie
             shifted_dividend[dividend_words - 1] |= next_symbol;
             bn_print("shifted_dividend = ", shifted_dividend);
         }
-        
 
         printf("\n# 2. divisor_multiplicator * %016llX < %016llX\n", divisor_top_word, shifted_dividend[dividend_words - 1]);
         BN_ULONG dividend_top_word = shifted_dividend[dividend_words - 1];
@@ -180,6 +177,7 @@ int main()
     BN_ULONG dividend_end = dividend_start + 1000;
     BN_ULONG divisor_start = 0xd97;
     BN_ULONG divisor_end = divisor_start + 10;
+    
     for (BN_ULONG dividend_val = dividend_start; dividend_val <= dividend_end; dividend_val++) {
         BN_ULONG dividend[WORDS] = {0, dividend_val};
         reverse_order(dividend);
