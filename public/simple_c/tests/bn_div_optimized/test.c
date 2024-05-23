@@ -41,14 +41,22 @@ unsigned char top_word_significant_symbols(const BN_ULONG *a, const unsigned cha
     return count;
 }
 
-
-
-BN_ULONG get_value_from_to(const BN_ULONG a, const char from_in, const char to)
+BN_ULONG get_value_from_to(const BN_ULONG a, const int from_in, const int to_in)
 {
     // get_value_from_to(0xb0c89, 0, 4);  // 0x0C89
-    char from = from_in;
+    int from = from_in;
     if (from < 0) from = 0;
-    return (a >> (4 * from)) & ((1 << (4 * (to - from))) - 1);
+    int to = to_in;
+    if (to > BN_ULONG_NUM_SYMBOLS) to = BN_ULONG_NUM_SYMBOLS;
+    printf("get_value_from_to(%016llX, %d, %d)\n", a, from, to);
+    BN_ULONG result;
+    if (to == BN_ULONG_NUM_SYMBOLS) {
+        result = a >> (4 * from);
+    } else {
+        result = (a >> (4 * from)) & ((1 << (4 * (to - from))) - 1);
+    }
+    printf("get_value_from_to result = %016llX\n", result);
+    return result;
 }
 
 int bn_div(const BN_ULONG *dividend, const BN_ULONG *divisor, BN_ULONG *quotient, BN_ULONG *remainder)
@@ -75,8 +83,8 @@ int bn_div(const BN_ULONG *dividend, const BN_ULONG *divisor, BN_ULONG *quotient
         shifted_dividend[i] = dividend[i];
     }
 
-    char start_symbol = dividend_significant_symbols - divisor_significant_symbols;
-    char end_symbol = dividend_significant_symbols;
+    int start_symbol = dividend_significant_symbols - divisor_significant_symbols;
+    int end_symbol = dividend_significant_symbols;
 
     printf("\n# 0. getting shift from %d to %d of the dividend\n", start_symbol, end_symbol);
     shifted_dividend[dividend_words - 1] = get_value_from_to(dividend[dividend_words - 1], start_symbol, end_symbol);
@@ -187,8 +195,8 @@ int main()
     // BN_ULONG dividend_start = 0xb0c893;
     BN_ULONG dividend_start = 0xda005671ffb0c893;
     BN_ULONG dividend_end = dividend_start + 100;
-    BN_ULONG divisor_start = 0xd97;
-    // BN_ULONG divisor_start = 0xe3f00d97; // ERR
+    // BN_ULONG divisor_start = 0xd97;
+    BN_ULONG divisor_start = 0xe3f00d97; // ERR
     BN_ULONG divisor_end = divisor_start + 100;
     
     for (BN_ULONG dividend_val = dividend_start; dividend_val <= dividend_end; dividend_val++) {
