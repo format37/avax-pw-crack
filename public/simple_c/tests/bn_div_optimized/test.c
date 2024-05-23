@@ -185,11 +185,11 @@ int main()
 {
     BN_ULONG tests_passed = 0;
     // BN_ULONG dividend_start = 0xb0c893;
-    // BN_ULONG dividend_start = 0xda0456712fb0c893;
-    BN_ULONG dividend_start = 0x56712fb0c893;
-    BN_ULONG dividend_end = dividend_start + 1000;
+    BN_ULONG dividend_start = 0xda005671ffb0c893;
+    BN_ULONG dividend_end = dividend_start + 100;
     BN_ULONG divisor_start = 0xd97;
-    BN_ULONG divisor_end = divisor_start + 10;
+    // BN_ULONG divisor_start = 0xe3f00d97; // ERR
+    BN_ULONG divisor_end = divisor_start + 100;
     
     for (BN_ULONG dividend_val = dividend_start; dividend_val <= dividend_end; dividend_val++) {
         BN_ULONG dividend[WORDS] = {0, dividend_val};
