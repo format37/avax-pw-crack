@@ -140,8 +140,6 @@ __device__ void bn_print_reversed(const char* msg, BIGNUM* a) {
     printf("\n");
 }
 
-
-
 __device__ int find_top(BIGNUM *bn, int max_words) {
     // bn_print("++ find_top bn ++ ", bn);
     // int size_of_d = sizeof(bn->d);
