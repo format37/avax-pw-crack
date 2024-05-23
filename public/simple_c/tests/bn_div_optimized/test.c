@@ -2,7 +2,7 @@
 
 #define BN_ULONG unsigned long long
 #define BN_ULONG_NUM_BITS 64
-#define BN_ULONG_NUM_SYMBOLS BN_ULONG_NUM_BITS/8
+#define BN_ULONG_NUM_SYMBOLS BN_ULONG_NUM_BITS/4
 #define WORDS 2
 
 void reverse_order(BN_ULONG *test_values_a) {
@@ -51,7 +51,7 @@ unsigned int get_value_from_to(const BN_ULONG a, const char from_in, const char 
     return (a >> (4 * from)) & ((1 << (4 * (to - from))) - 1);
 }
 
-int bn_div_3(const BN_ULONG *dividend, const BN_ULONG *divisor, BN_ULONG *quotient, BN_ULONG *remainder)
+int bn_div(const BN_ULONG *dividend, const BN_ULONG *divisor, BN_ULONG *quotient, BN_ULONG *remainder)
 {
     // dividend
     // --------
@@ -173,7 +173,9 @@ int bn_div_3(const BN_ULONG *dividend, const BN_ULONG *divisor, BN_ULONG *quotie
 int main()
 {
     BN_ULONG tests_passed = 0;
-    BN_ULONG dividend_start = 0xb0c893;
+    // BN_ULONG dividend_start = 0xb0c893;
+    // BN_ULONG dividend_start = 0xda0456712fb0c893;
+    BN_ULONG dividend_start = 0x6712fb0c893;
     BN_ULONG dividend_end = dividend_start + 1000;
     BN_ULONG divisor_start = 0xd97;
     BN_ULONG divisor_end = divisor_start + 10;
@@ -195,7 +197,7 @@ int main()
                 quotient[i] = 0;
                 remainder[i] = 0;
             }
-            if (!bn_div_3(dividend, divisor, quotient, remainder)) {
+            if (!bn_div(dividend, divisor, quotient, remainder)) {
                 printf("Error: bn_div failed\n");
                 return 1;
             }
