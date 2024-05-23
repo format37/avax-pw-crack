@@ -2,6 +2,8 @@
 
 #define BN_ULONG unsigned long long
 #define BN_ULONG_NUM_BITS 64
+// Number of hexadecimal symbols in a BN_ULONG value
+// Each hexadecimal symbol represents 4 bits
 #define BN_ULONG_NUM_SYMBOLS BN_ULONG_NUM_BITS/4
 #define WORDS 2
 
@@ -196,7 +198,7 @@ int main()
     BN_ULONG dividend_start = 0xda005671ffb0c893;
     BN_ULONG dividend_end = dividend_start + 100;
     // BN_ULONG divisor_start = 0xd97;
-    BN_ULONG divisor_start = 0xe3f00d97; // ERR
+    BN_ULONG divisor_start = 0xab2f000e3f00d97;
     BN_ULONG divisor_end = divisor_start + 100;
     
     for (BN_ULONG dividend_val = dividend_start; dividend_val <= dividend_end; dividend_val++) {
