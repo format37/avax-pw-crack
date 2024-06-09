@@ -318,75 +318,77 @@ int bn_div(BIGNUM_CUDA *bn_dividend, BIGNUM_CUDA *bn_divisor, BIGNUM_CUDA *bn_qu
     return 1;
 }
 
-// void openssl_div(BIGNUM_CUDA *bn_dividend, BIGNUM_CUDA *bn_divisor, BIGNUM_CUDA *bn_expected_quotient, BIGNUM_CUDA *bn_expected_remainder) {
-//     BIGNUM *bn_openssl_dividend = BN_new();
-//     BIGNUM *bn_openssl_divisor = BN_new();
-//     BIGNUM *bn_openssl_quotient = BN_new();
-//     BIGNUM *bn_openssl_remainder = BN_new();
-//     BN_CTX *ctx = BN_CTX_new();
+void openssl_div(BIGNUM_CUDA *bn_dividend, BIGNUM_CUDA *bn_divisor, BIGNUM_CUDA *bn_expected_quotient, BIGNUM_CUDA *bn_expected_remainder) {
+    BIGNUM *bn_openssl_dividend = BN_new();
+    BIGNUM *bn_openssl_divisor = BN_new();
+    BIGNUM *bn_openssl_quotient = BN_new();
+    BIGNUM *bn_openssl_remainder = BN_new();
+    BN_CTX *ctx = BN_CTX_new();
 
-//     // Convert bn_dividend to a hexadecimal string
-//     char bn_dividend_str[MAX_BIGNUM_SIZE * BN_ULONG_NUM_SYMBOLS + 1];
-//     bn_dividend_str[0] = '\0';
-//     for (int i = bn_dividend.top - 1; i >= 0; i--) {
-//         char word_str[BN_ULONG_NUM_SYMBOLS + 1];
-//         snprintf(word_str, sizeof(word_str), "%016llX", bn_dividend.d[i]);
-//         strcat(bn_dividend_str, word_str);
-//     }
+    // Convert bn_dividend to a hexadecimal string
+    char bn_dividend_str[MAX_BIGNUM_SIZE * BN_ULONG_NUM_SYMBOLS + 1];
+    bn_dividend_str[0] = '\0';
+    for (int i = bn_dividend->top - 1; i >= 0; i--) {
+        char word_str[BN_ULONG_NUM_SYMBOLS + 1];
+        snprintf(word_str, sizeof(word_str), "%016llX", bn_dividend->d[i]);
+        strcat(bn_dividend_str, word_str);
+    }
 
-//     // Convert bn_divisor to a hexadecimal string
-//     char bn_divisor_str[MAX_BIGNUM_SIZE * BN_ULONG_NUM_SYMBOLS + 1];
-//     bn_divisor_str[0] = '\0';
-//     for (int i = bn_divisor.top - 1; i >= 0; i--) {
-//         char word_str[BN_ULONG_NUM_SYMBOLS + 1];
-//         snprintf(word_str, sizeof(word_str), "%016llX", bn_divisor.d[i]);
-//         strcat(bn_divisor_str, word_str);
-//     }
+    // Convert bn_divisor to a hexadecimal string
+    char bn_divisor_str[MAX_BIGNUM_SIZE * BN_ULONG_NUM_SYMBOLS + 1];
+    bn_divisor_str[0] = '\0';
+    for (int i = bn_divisor->top - 1; i >= 0; i--) {
+        char word_str[BN_ULONG_NUM_SYMBOLS + 1];
+        snprintf(word_str, sizeof(word_str), "%016llX", bn_divisor->d[i]);
+        strcat(bn_divisor_str, word_str);
+    }
 
-//     // Convert the hexadecimal strings to OpenSSL's BIGNUM format
-//     BN_hex2bn(&bn_openssl_dividend, bn_dividend_str);
-//     BN_hex2bn(&bn_openssl_divisor, bn_divisor_str);
+    // Convert the hexadecimal strings to OpenSSL's BIGNUM format
+    BN_hex2bn(&bn_openssl_dividend, bn_dividend_str);
+    BN_hex2bn(&bn_openssl_divisor, bn_divisor_str);
 
-//     // printf("openssl test values:\n");
-//     // print_bn_openssl("dividend", bn_openssl_dividend);
-//     // print_bn_openssl("divisor", bn_openssl_divisor);
-//     BN_div(bn_openssl_quotient, bn_openssl_remainder, bn_openssl_dividend, bn_openssl_divisor, ctx);
-//     // printf("Expected openssl original values:\n");
-//     // print_bn_openssl("quotient", bn_openssl_quotient);
-//     // print_bn_openssl("remainder", bn_openssl_remainder);
+    BN_div(bn_openssl_quotient, bn_openssl_remainder, bn_openssl_dividend, bn_openssl_divisor, ctx);
 
-//     // Convert the results back to your custom BIGNUM_CUDA format
-//     char *bn_quotient_str = BN_bn2hex(bn_openssl_quotient);
-//     char *bn_remainder_str = BN_bn2hex(bn_openssl_remainder);
+    // Convert the results back to your custom BIGNUM_CUDA format
+    char *bn_quotient_str = BN_bn2hex(bn_openssl_quotient);
+    char *bn_remainder_str = BN_bn2hex(bn_openssl_remainder);
 
-//     // Clear the existing values in bn_expected_quotient and bn_expected_remainder
-//     memset(&bn_expected_quotient, 0, sizeof(BIGNUM_CUDA));
-//     memset(&bn_expected_remainder, 0, sizeof(BIGNUM_CUDA));
+    // Clear the existing values in bn_expected_quotient and bn_expected_remainder
+    memset(bn_expected_quotient, 0, sizeof(BIGNUM_CUDA));
+    memset(bn_expected_remainder, 0, sizeof(BIGNUM_CUDA));
 
-//     // Convert the hexadecimal strings to BIGNUM_CUDA format
-//     int i = 0;
-//     int j = strlen(bn_quotient_str) - 1;
-//     while (j >= 0) {
-//         char hex[17] = {0};
-//         strncpy(hex, &bn_quotient_str[j >= 15 ? j - 15 : 0], j >= 15 ? 16 : j + 1);
-//         bn_expected_quotient.d[i++] = strtoull(hex, NULL, 16);
-//         j -= 16;
-//     }
-//     bn_expected_quotient.top = i;
+    // Convert the hexadecimal strings to BIGNUM_CUDA format
+    int i = 0;
+    int j = strlen(bn_quotient_str);
+    while (j > 0) {
+        char hex[BN_ULONG_NUM_SYMBOLS + 1] = {0};
+        int len = (j >= BN_ULONG_NUM_SYMBOLS) ? BN_ULONG_NUM_SYMBOLS : j;
+        strncpy(hex, &bn_quotient_str[j - len], len);
+        bn_expected_quotient->d[i++] = strtoull(hex, NULL, 16);
+        j -= BN_ULONG_NUM_SYMBOLS;
+    }
+    bn_expected_quotient->top = i;
 
-//     i = 0;
-//     j = strlen(bn_remainder_str) - 1;
-//     while (j >= 0) {
-//         char hex[17] = {0};
-//         strncpy(hex, &bn_remainder_str[j >= 15 ? j - 15 : 0], j >= 15 ? 16 : j + 1);
-//         bn_expected_remainder.d[i++] = strtoull(hex, NULL, 16);
-//         j -= 16;
-//     }
-//     bn_expected_remainder.top = i;
+    i = 0;
+    j = strlen(bn_remainder_str);
+    while (j > 0) {
+        char hex[BN_ULONG_NUM_SYMBOLS + 1] = {0};
+        int len = (j >= BN_ULONG_NUM_SYMBOLS) ? BN_ULONG_NUM_SYMBOLS : j;
+        strncpy(hex, &bn_remainder_str[j - len], len);
+        bn_expected_remainder->d[i++] = strtoull(hex, NULL, 16);
+        j -= BN_ULONG_NUM_SYMBOLS;
+    }
+    bn_expected_remainder->top = i;
 
-//     OPENSSL_free(bn_quotient_str);
-//     OPENSSL_free(bn_remainder_str);
-// }
+    OPENSSL_free(bn_quotient_str);
+    OPENSSL_free(bn_remainder_str);
+
+    BN_free(bn_openssl_dividend);
+    BN_free(bn_openssl_divisor);
+    BN_free(bn_openssl_quotient);
+    BN_free(bn_openssl_remainder);
+    BN_CTX_free(ctx);
+}
 
 int main()
 {
@@ -419,6 +421,7 @@ int main()
             bn_print_bn("bn_dividend = ", &bn_dividend);
             bn_print_bn("bn_divisor = ", &bn_divisor);
 
+            // CUDA division
             if (!bn_div(&bn_dividend, &bn_divisor, &bn_quotient, &bn_remainder)) {
                 printf("Error: bn_div failed\n");
                 return 1;
@@ -432,76 +435,8 @@ int main()
             init_zero(&bn_expected_quotient, MAX_BIGNUM_SIZE);
             init_zero(&bn_expected_remainder, MAX_BIGNUM_SIZE);
             
-            // test ++ 
-            BIGNUM *bn_openssl_dividend = BN_new();
-            BIGNUM *bn_openssl_divisor = BN_new();
-            BIGNUM *bn_openssl_quotient = BN_new();
-            BIGNUM *bn_openssl_remainder = BN_new();
-            BN_CTX *ctx = BN_CTX_new();
-
-            // Convert bn_dividend to a hexadecimal string
-            char bn_dividend_str[MAX_BIGNUM_SIZE * BN_ULONG_NUM_SYMBOLS + 1];
-            bn_dividend_str[0] = '\0';
-            for (int i = bn_dividend.top - 1; i >= 0; i--) {
-                char word_str[BN_ULONG_NUM_SYMBOLS + 1];
-                snprintf(word_str, sizeof(word_str), "%016llX", bn_dividend.d[i]);
-                strcat(bn_dividend_str, word_str);
-            }
-
-            // Convert bn_divisor to a hexadecimal string
-            char bn_divisor_str[MAX_BIGNUM_SIZE * BN_ULONG_NUM_SYMBOLS + 1];
-            bn_divisor_str[0] = '\0';
-            for (int i = bn_divisor.top - 1; i >= 0; i--) {
-                char word_str[BN_ULONG_NUM_SYMBOLS + 1];
-                snprintf(word_str, sizeof(word_str), "%016llX", bn_divisor.d[i]);
-                strcat(bn_divisor_str, word_str);
-            }
-
-            // Convert the hexadecimal strings to OpenSSL's BIGNUM format
-            BN_hex2bn(&bn_openssl_dividend, bn_dividend_str);
-            BN_hex2bn(&bn_openssl_divisor, bn_divisor_str);
-
-            // printf("openssl test values:\n");
-            // print_bn_openssl("dividend", bn_openssl_dividend);
-            // print_bn_openssl("divisor", bn_openssl_divisor);
-            BN_div(bn_openssl_quotient, bn_openssl_remainder, bn_openssl_dividend, bn_openssl_divisor, ctx);
-            // printf("Expected openssl original values:\n");
-            // print_bn_openssl("quotient", bn_openssl_quotient);
-            // print_bn_openssl("remainder", bn_openssl_remainder);
-
-            // Convert the results back to your custom BIGNUM_CUDA format
-            char *bn_quotient_str = BN_bn2hex(bn_openssl_quotient);
-            char *bn_remainder_str = BN_bn2hex(bn_openssl_remainder);
-
-            // Clear the existing values in bn_expected_quotient and bn_expected_remainder
-            memset(&bn_expected_quotient, 0, sizeof(BIGNUM_CUDA));
-            memset(&bn_expected_remainder, 0, sizeof(BIGNUM_CUDA));
-
-            // Convert the hexadecimal strings to BIGNUM_CUDA format
-            int i = 0;
-            int j = strlen(bn_quotient_str) - 1;
-            while (j >= 0) {
-                char hex[17] = {0};
-                strncpy(hex, &bn_quotient_str[j >= 15 ? j - 15 : 0], j >= 15 ? 16 : j + 1);
-                bn_expected_quotient.d[i++] = strtoull(hex, NULL, 16);
-                j -= 16;
-            }
-            bn_expected_quotient.top = i;
-
-            i = 0;
-            j = strlen(bn_remainder_str) - 1;
-            while (j >= 0) {
-                char hex[17] = {0};
-                strncpy(hex, &bn_remainder_str[j >= 15 ? j - 15 : 0], j >= 15 ? 16 : j + 1);
-                bn_expected_remainder.d[i++] = strtoull(hex, NULL, 16);
-                j -= 16;
-            }
-            bn_expected_remainder.top = i;
-
-            OPENSSL_free(bn_quotient_str);
-            OPENSSL_free(bn_remainder_str);
-            // openssl_div(&bn_dividend, &bn_divisor, &bn_expected_quotient, &bn_expected_remainder);
-            // test --
+            // OpenSSL test
+            openssl_div(&bn_dividend, &bn_divisor, &bn_expected_quotient, &bn_expected_remainder);
 
             if (bn_cmp(&bn_quotient, &bn_expected_quotient) != 0 || bn_cmp(&bn_remainder, &bn_expected_remainder) != 0) {
                 printf("Error: Division test failed\n");
