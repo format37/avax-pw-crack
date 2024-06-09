@@ -5,7 +5,7 @@ rm -f program
 # -arch=sm_61 # NVIDIA GeForce GTX 1080 Ti
 # -G \
 # gcc program.c -I/home/alex/projects/avax-pw-crack/public/simple_c/tests/bech32/include -o program -std=c99 -lcrypto >> build.log
-gcc test.c -o program -std=c99 >> build.log
+gcc test.c -o program -std=c99 -lcrypto >> build.log
 # nvcc \
 #     -diag-suppress 1444 \
 #     --generate-line-info \

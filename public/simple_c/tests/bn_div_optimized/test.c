@@ -1,4 +1,9 @@
 #include <stdio.h>
+// Following libraries is for test purposes only
+#include <openssl/bn.h>
+// #include <string.h>
+// #include <stdlib.h>
+
 
 #define BN_ULONG unsigned long long
 #define BN_ULONG_NUM_BITS 64
@@ -14,7 +19,7 @@ typedef struct bignum_st {
   int dmax;
   int neg;
   int flags;
-} BIGNUM;
+} BIGNUM_CUDA;
 
 void reverse_order(BN_ULONG *test_values_a) {
     for (size_t j = 0; j < WORDS / 2; j++) {
@@ -24,7 +29,7 @@ void reverse_order(BN_ULONG *test_values_a) {
     }
 }
 
-void init_zero(BIGNUM *bn, int capacity) {
+void init_zero(BIGNUM_CUDA *bn, int capacity) {
     for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
         bn->d[i] = 0;
     }
@@ -42,6 +47,16 @@ void bn_print(const char *prefix, const BN_ULONG *a)
     printf("\n");
 }
 
+void print_bn_openssl(const char* label, const BIGNUM* bn) {
+    char* bn_str = BN_bn2hex(bn);
+    int i = 0;
+    while (bn_str[i] == '0' && bn_str[i+1] != '\0') {
+        i++;
+    }
+    printf("%s: %s\n", label, &bn_str[i]);
+    OPENSSL_free(bn_str);
+}
+
 // void bn_print_bn(const char* msg, BIGNUM* a) {
 //     printf("%s", msg);
 //     if (a->neg) {
@@ -52,7 +67,7 @@ void bn_print(const char *prefix, const BN_ULONG *a)
 //     }
 //     printf("\n");
 // }
-void bn_print_bn(const char* msg, BIGNUM* a) {
+void bn_print_bn(const char* msg, BIGNUM_CUDA* a) {
     printf("%s", msg);
     if (a->neg) {
         printf("-");  // Handle the case where BIGNUM is negative
@@ -70,7 +85,10 @@ void bn_print_bn(const char* msg, BIGNUM* a) {
     printf("\n");
 }
 
-int bn_cmp(BIGNUM* a, BIGNUM* b) {
+int bn_cmp(BIGNUM_CUDA* a, BIGNUM_CUDA* b) {
+    // -1: a < b
+    // 0: a == b
+    // 1: a > b
     if (a->neg != b->neg) {
         return a->neg ? -1 : 1;
     }
@@ -88,14 +106,7 @@ int bn_cmp(BIGNUM* a, BIGNUM* b) {
     return 0;
 }
 
-// unsigned char find_top(const BN_ULONG *a, int top)
-// {
-//     while (top > 0 && a[top - 1] == 0) {
-//         --top;
-//     }
-//     return top;
-// }
-int find_top(const BIGNUM *bn, int max_words) {
+int find_top(const BIGNUM_CUDA *bn, int max_words) {
     for (int i = MAX_BIGNUM_SIZE - 1; i >= 0; i--) {
         if (bn->d[i] != 0) {
             return i + 1;
@@ -104,7 +115,7 @@ int find_top(const BIGNUM *bn, int max_words) {
     return 1;
 }
 
-unsigned char top_word_significant_symbols(BIGNUM *a, const unsigned char top)
+unsigned char top_word_significant_symbols(BIGNUM_CUDA *a, const unsigned char top)
 {
     printf("++ top_word_significant_symbols ++\n");
     bn_print_bn(">> a: ", a);
@@ -123,38 +134,7 @@ unsigned char top_word_significant_symbols(BIGNUM *a, const unsigned char top)
     return count;
 }
 
-// unsigned char top_significant_symbol(BIGNUM *a)
-// {
-//     printf("++ top_significant_symbol ++\n");
-//     bn_print_bn(">> a: ", a);
-//     // return 0;
-//     if (MAX_BIGNUM_SIZE > 256/16) {
-//         printf("Error: MAX_BIGNUM_SIZE is bigger than top_word_significant_symbols can handle. Need to increase datatype\n");
-//     }
-//     unsigned char count = 0;
-//     for (int word = MAX_BIGNUM_SIZE - 1; word >= 0; word--) {
-//         for (int i = 0; i < BN_ULONG_NUM_SYMBOLS; i++) {
-//             //BN_ULONG symbol = a->d[word] >> (4 * i) & 0xF;
-//             BN_ULONG temp = a->d[word];
-//             printf("\n[%d][%d] temp = %016llX\n", word, i, temp);
-//             temp = temp >> (4 * i);
-//             printf("[%d][%d] temp = %016llX\n", word, i, temp);
-//             BN_ULONG symbol = temp & 0xF;
-//             printf("[%d][%d] symbol = %X\n", word, i, symbol);
-//             if (symbol == 0) break;
-//             count++;
-//         }
-//     }
-//     // for (int i = 0; i < BN_ULONG_NUM_SYMBOLS; i++) {
-//     //     BN_ULONG word = a->d[top - 1];
-//     //     if ((word >> 4 * i) == 0) break;
-//     //     count++;
-//     // }
-//     printf("-- top_significant_symbol --\n");
-//     return count;
-// }
-
-unsigned char top_significant_symbol(BIGNUM *a)
+unsigned char top_significant_symbol(BIGNUM_CUDA *a)
 {
     // printf("++ top_significant_symbol ++\n");
     // bn_print_bn(">> a: ", a);
@@ -213,7 +193,7 @@ BN_ULONG get_value_from_to(BN_ULONG a, const int from_in, const int to_in)
     return result;
 }
 
-int bn_div(BIGNUM *bn_dividend, BIGNUM *bn_divisor, BIGNUM *bn_quotient, BIGNUM *bn_remainder)
+int bn_div(BIGNUM_CUDA *bn_dividend, BIGNUM_CUDA *bn_divisor, BIGNUM_CUDA *bn_quotient, BIGNUM_CUDA *bn_remainder)
 {
     // printf("BN_ULONG_NUM_SYMBOLS = %d\n", BN_ULONG_NUM_SYMBOLS);
     // dividend
@@ -338,45 +318,102 @@ int bn_div(BIGNUM *bn_dividend, BIGNUM *bn_divisor, BIGNUM *bn_quotient, BIGNUM 
     return 1;
 }
 
+// void openssl_div(BIGNUM_CUDA *bn_dividend, BIGNUM_CUDA *bn_divisor, BIGNUM_CUDA *bn_expected_quotient, BIGNUM_CUDA *bn_expected_remainder) {
+//     BIGNUM *bn_openssl_dividend = BN_new();
+//     BIGNUM *bn_openssl_divisor = BN_new();
+//     BIGNUM *bn_openssl_quotient = BN_new();
+//     BIGNUM *bn_openssl_remainder = BN_new();
+//     BN_CTX *ctx = BN_CTX_new();
+
+//     // Convert bn_dividend to a hexadecimal string
+//     char bn_dividend_str[MAX_BIGNUM_SIZE * BN_ULONG_NUM_SYMBOLS + 1];
+//     bn_dividend_str[0] = '\0';
+//     for (int i = bn_dividend.top - 1; i >= 0; i--) {
+//         char word_str[BN_ULONG_NUM_SYMBOLS + 1];
+//         snprintf(word_str, sizeof(word_str), "%016llX", bn_dividend.d[i]);
+//         strcat(bn_dividend_str, word_str);
+//     }
+
+//     // Convert bn_divisor to a hexadecimal string
+//     char bn_divisor_str[MAX_BIGNUM_SIZE * BN_ULONG_NUM_SYMBOLS + 1];
+//     bn_divisor_str[0] = '\0';
+//     for (int i = bn_divisor.top - 1; i >= 0; i--) {
+//         char word_str[BN_ULONG_NUM_SYMBOLS + 1];
+//         snprintf(word_str, sizeof(word_str), "%016llX", bn_divisor.d[i]);
+//         strcat(bn_divisor_str, word_str);
+//     }
+
+//     // Convert the hexadecimal strings to OpenSSL's BIGNUM format
+//     BN_hex2bn(&bn_openssl_dividend, bn_dividend_str);
+//     BN_hex2bn(&bn_openssl_divisor, bn_divisor_str);
+
+//     // printf("openssl test values:\n");
+//     // print_bn_openssl("dividend", bn_openssl_dividend);
+//     // print_bn_openssl("divisor", bn_openssl_divisor);
+//     BN_div(bn_openssl_quotient, bn_openssl_remainder, bn_openssl_dividend, bn_openssl_divisor, ctx);
+//     // printf("Expected openssl original values:\n");
+//     // print_bn_openssl("quotient", bn_openssl_quotient);
+//     // print_bn_openssl("remainder", bn_openssl_remainder);
+
+//     // Convert the results back to your custom BIGNUM_CUDA format
+//     char *bn_quotient_str = BN_bn2hex(bn_openssl_quotient);
+//     char *bn_remainder_str = BN_bn2hex(bn_openssl_remainder);
+
+//     // Clear the existing values in bn_expected_quotient and bn_expected_remainder
+//     memset(&bn_expected_quotient, 0, sizeof(BIGNUM_CUDA));
+//     memset(&bn_expected_remainder, 0, sizeof(BIGNUM_CUDA));
+
+//     // Convert the hexadecimal strings to BIGNUM_CUDA format
+//     int i = 0;
+//     int j = strlen(bn_quotient_str) - 1;
+//     while (j >= 0) {
+//         char hex[17] = {0};
+//         strncpy(hex, &bn_quotient_str[j >= 15 ? j - 15 : 0], j >= 15 ? 16 : j + 1);
+//         bn_expected_quotient.d[i++] = strtoull(hex, NULL, 16);
+//         j -= 16;
+//     }
+//     bn_expected_quotient.top = i;
+
+//     i = 0;
+//     j = strlen(bn_remainder_str) - 1;
+//     while (j >= 0) {
+//         char hex[17] = {0};
+//         strncpy(hex, &bn_remainder_str[j >= 15 ? j - 15 : 0], j >= 15 ? 16 : j + 1);
+//         bn_expected_remainder.d[i++] = strtoull(hex, NULL, 16);
+//         j -= 16;
+//     }
+//     bn_expected_remainder.top = i;
+
+//     OPENSSL_free(bn_quotient_str);
+//     OPENSSL_free(bn_remainder_str);
+// }
+
 int main()
 {
     BN_ULONG tests_passed = 0;
-    // BN_ULONG dividend_start = 0xb0c893;
-    BN_ULONG dividend_start = 0xda005671ffb0c893;
-    // BN_ULONG dividend_start = 0xfedcba9876543210;
-    BN_ULONG dividend_end = dividend_start + 10;
-    // BN_ULONG divisor_start = 0xd97;
-    BN_ULONG divisor_start = 0xab2f000e3f00d97;
-    BN_ULONG divisor_end = divisor_start + 10;
-    
-    for (BN_ULONG dividend_val = dividend_start; dividend_val <= dividend_end; dividend_val++) {
-        BN_ULONG dividend[WORDS] = {0x0, dividend_val};
-        reverse_order(dividend);
+    BIGNUM_CUDA bn_dividend, bn_divisor, bn_dividend_end, bn_divisor_end;
+    init_zero(&bn_dividend, MAX_BIGNUM_SIZE);
+    init_zero(&bn_divisor, MAX_BIGNUM_SIZE);
+    init_zero(&bn_dividend_end, MAX_BIGNUM_SIZE);
+    init_zero(&bn_divisor_end, MAX_BIGNUM_SIZE);
+    // dividend
+    bn_dividend.d[0] = 0xda005671ffb0c893;
+    bn_dividend.d[1] = 0x0;
+    bn_dividend_end.d[0] = 0xda005671ffb0c893;
+    bn_dividend_end.d[1] = 0x0;
+    // divisor
+    bn_divisor.d[0] = 0xab2f000e3f00d97;
+    bn_divisor.d[1] = 0x0;
+    bn_divisor_end.d[0] = 0xab2f000e3f00d97;
+    bn_divisor_end.d[1] = 0x0;
 
-        for (BN_ULONG divisor_val = divisor_start; divisor_val <= divisor_end; divisor_val++) {
-            BN_ULONG divisor[WORDS] = {0x0, divisor_val};
-            reverse_order(divisor);
+    BIGNUM_CUDA bn_quotient, bn_remainder;   
 
-            // printf("Testing division: %016llX / %016llX\n", dividend_val, divisor_val);
+    while (bn_cmp(&bn_dividend, &bn_dividend_end) <= 0) {
+        while (bn_cmp(&bn_divisor, &bn_divisor_end) <= 0) {
 
-            BN_ULONG quotient[WORDS];
-            BN_ULONG remainder[WORDS];
-            // init zero
-            for (int i = 0; i < WORDS; i++) {
-                quotient[i] = 0;
-                remainder[i] = 0;
-            }
-
-            BIGNUM bn_dividend, bn_divisor, bn_quotient, bn_remainder;
-            init_zero(&bn_dividend, MAX_BIGNUM_SIZE);
-            init_zero(&bn_divisor, MAX_BIGNUM_SIZE);
             init_zero(&bn_quotient, MAX_BIGNUM_SIZE);
             init_zero(&bn_remainder, MAX_BIGNUM_SIZE);
-
-            for (int i = 0; i < WORDS; i++) {
-                bn_dividend.d[i] = dividend[i];
-                bn_divisor.d[i] = divisor[i];
-            }
 
             printf("Testing division:\n");
             bn_print_bn("bn_dividend = ", &bn_dividend);
@@ -386,26 +423,113 @@ int main()
                 printf("Error: bn_div failed\n");
                 return 1;
             }
-            printf("\nResult of division: %016llX / %016llX is\n", dividend_val, divisor_val);
-            bn_print("quotient = ", quotient);
-            bn_print("remainder = ", remainder);
-            printf("\n");
+            // printf("CUDA test values:\n");
+            // bn_print_bn("bn_dividend = ", &bn_dividend);
+            // bn_print_bn("bn_divisor = ", &bn_divisor);
 
-            BN_ULONG expected_quotient = dividend_val / divisor_val;
-            BN_ULONG expected_remainder = dividend_val % divisor_val;
+            BIGNUM_CUDA bn_expected_quotient;
+            BIGNUM_CUDA bn_expected_remainder;
+            init_zero(&bn_expected_quotient, MAX_BIGNUM_SIZE);
+            init_zero(&bn_expected_remainder, MAX_BIGNUM_SIZE);
+            
+            // test ++ 
+            BIGNUM *bn_openssl_dividend = BN_new();
+            BIGNUM *bn_openssl_divisor = BN_new();
+            BIGNUM *bn_openssl_quotient = BN_new();
+            BIGNUM *bn_openssl_remainder = BN_new();
+            BN_CTX *ctx = BN_CTX_new();
 
-            BN_ULONG actual_quotient = bn_quotient.d[0];
-            BN_ULONG actual_remainder = bn_remainder.d[0];
+            // Convert bn_dividend to a hexadecimal string
+            char bn_dividend_str[MAX_BIGNUM_SIZE * BN_ULONG_NUM_SYMBOLS + 1];
+            bn_dividend_str[0] = '\0';
+            for (int i = bn_dividend.top - 1; i >= 0; i--) {
+                char word_str[BN_ULONG_NUM_SYMBOLS + 1];
+                snprintf(word_str, sizeof(word_str), "%016llX", bn_dividend.d[i]);
+                strcat(bn_dividend_str, word_str);
+            }
 
-            if (actual_quotient != expected_quotient || actual_remainder != expected_remainder) {
-                printf("Error: Division %016llX / %016llX test failed\n", dividend_val, divisor_val);
-                printf("Expected quotient: %016llX, Actual quotient: %016llX\n", expected_quotient, actual_quotient);
-                printf("Expected remainder: %016llX, Actual remainder: %016llX\n", expected_remainder, actual_remainder);
+            // Convert bn_divisor to a hexadecimal string
+            char bn_divisor_str[MAX_BIGNUM_SIZE * BN_ULONG_NUM_SYMBOLS + 1];
+            bn_divisor_str[0] = '\0';
+            for (int i = bn_divisor.top - 1; i >= 0; i--) {
+                char word_str[BN_ULONG_NUM_SYMBOLS + 1];
+                snprintf(word_str, sizeof(word_str), "%016llX", bn_divisor.d[i]);
+                strcat(bn_divisor_str, word_str);
+            }
+
+            // Convert the hexadecimal strings to OpenSSL's BIGNUM format
+            BN_hex2bn(&bn_openssl_dividend, bn_dividend_str);
+            BN_hex2bn(&bn_openssl_divisor, bn_divisor_str);
+
+            // printf("openssl test values:\n");
+            // print_bn_openssl("dividend", bn_openssl_dividend);
+            // print_bn_openssl("divisor", bn_openssl_divisor);
+            BN_div(bn_openssl_quotient, bn_openssl_remainder, bn_openssl_dividend, bn_openssl_divisor, ctx);
+            // printf("Expected openssl original values:\n");
+            // print_bn_openssl("quotient", bn_openssl_quotient);
+            // print_bn_openssl("remainder", bn_openssl_remainder);
+
+            // Convert the results back to your custom BIGNUM_CUDA format
+            char *bn_quotient_str = BN_bn2hex(bn_openssl_quotient);
+            char *bn_remainder_str = BN_bn2hex(bn_openssl_remainder);
+
+            // Clear the existing values in bn_expected_quotient and bn_expected_remainder
+            memset(&bn_expected_quotient, 0, sizeof(BIGNUM_CUDA));
+            memset(&bn_expected_remainder, 0, sizeof(BIGNUM_CUDA));
+
+            // Convert the hexadecimal strings to BIGNUM_CUDA format
+            int i = 0;
+            int j = strlen(bn_quotient_str) - 1;
+            while (j >= 0) {
+                char hex[17] = {0};
+                strncpy(hex, &bn_quotient_str[j >= 15 ? j - 15 : 0], j >= 15 ? 16 : j + 1);
+                bn_expected_quotient.d[i++] = strtoull(hex, NULL, 16);
+                j -= 16;
+            }
+            bn_expected_quotient.top = i;
+
+            i = 0;
+            j = strlen(bn_remainder_str) - 1;
+            while (j >= 0) {
+                char hex[17] = {0};
+                strncpy(hex, &bn_remainder_str[j >= 15 ? j - 15 : 0], j >= 15 ? 16 : j + 1);
+                bn_expected_remainder.d[i++] = strtoull(hex, NULL, 16);
+                j -= 16;
+            }
+            bn_expected_remainder.top = i;
+
+            OPENSSL_free(bn_quotient_str);
+            OPENSSL_free(bn_remainder_str);
+            // openssl_div(&bn_dividend, &bn_divisor, &bn_expected_quotient, &bn_expected_remainder);
+            // test --
+
+            if (bn_cmp(&bn_quotient, &bn_expected_quotient) != 0 || bn_cmp(&bn_remainder, &bn_expected_remainder) != 0) {
+                printf("Error: Division test failed\n");
+                printf("Expected quotient: ");
+                bn_print_bn("", &bn_expected_quotient);
+                printf("Actual quotient: ");
+                bn_print_bn("", &bn_quotient);
+                printf("Expected remainder: ");
+                bn_print_bn("", &bn_expected_remainder);
+                printf("Actual remainder: ");
+                bn_print_bn("", &bn_remainder);
                 printf("Tests passed: %llu\n", tests_passed);
                 return 1;
             }
+            else {
+                printf("OK\n");
+                // Print dividend and remainder as bn
+                bn_print_bn("quotient: ", &bn_quotient);
+                bn_print_bn("remainder: ", &bn_remainder);
+                printf("\n");
+            }
+
+            // Add 1 to divisor
+            bn_divisor.d[0]++; // TODO: Implement bignum addition
             tests_passed++;
         }
+        // Add 1 to dividend
+        bn_dividend.d[0]++; // TODO: Implement bignum addition            
     }
 
     printf("All %llu tests passed\n", tests_passed);
