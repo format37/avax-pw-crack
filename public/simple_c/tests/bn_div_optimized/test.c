@@ -8,11 +8,11 @@
 #include <string.h>
 #include <stdlib.h>
 
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
-#define MIN(a, b) ((a) < (b) ? (a) : (b))
+// #define MAX(a, b) ((a) > (b) ? (a) : (b))
+// #define MIN(a, b) ((a) < (b) ? (a) : (b))
 
 
-#define BN_ULONG unsigned long long
+// #define BN_ULONG unsigned long long
 #define BN_ULONG_NUM_BITS 64
 // Number of hexadecimal symbols in a BN_ULONG value
 // Each hexadecimal symbol represents 4 bits
@@ -207,9 +207,11 @@ int bn_div(BIGNUM_CUDA *bn_dividend, BIGNUM_CUDA *bn_divisor, BIGNUM_CUDA *bn_qu
     // --------
     // divisor
     printf("++ bn_div ++\n");
-    unsigned char dividend_words = find_top(&bn_dividend, WORDS);
-    unsigned char divisor_words = find_top(&bn_divisor, WORDS);
+    
+    unsigned char dividend_words = find_top(bn_dividend, WORDS);
+    unsigned char divisor_words = find_top(bn_divisor, WORDS);
     printf("dividend_words: %d\n", dividend_words);
+    
     // unsigned char dividend_significant_symbols = top_word_significant_symbols(bn_dividend, dividend_words);
     unsigned char dividend_significant_symbols = top_significant_symbol(bn_dividend);
     // printf("dividend_significant_symbols = %d\n", dividend_significant_symbols);
@@ -392,9 +394,9 @@ int main()
     init_zero(&bn_dividend_end, MAX_BIGNUM_SIZE);
     init_zero(&bn_divisor_end, MAX_BIGNUM_SIZE);
     // dividend
-    bn_dividend.d[0] = 0x0;
+    bn_dividend.d[0] = 0xe;
     bn_dividend.d[1] = 0xda005671ffb0c893;
-    bn_dividend_end.d[0] = 0x0;
+    bn_dividend_end.d[0] = 0xe;
     bn_dividend_end.d[1] = 0xda005671ffb0c893;
     // divisor
     bn_divisor.d[0] = 0x0;
@@ -465,6 +467,6 @@ int main()
         bn_dividend.d[0]++; // TODO: Implement bignum addition            
     }
 
-    printf("All %llu tests passed\n", tests_passed);
+    printf("%llu tests passed\n", tests_passed);
     return 0;
 }
