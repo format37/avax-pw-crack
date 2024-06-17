@@ -17,10 +17,10 @@ __device__ double elapsed_time_bn_copy = 0;
 
 typedef struct bignum_st {
   BN_ULONG d[MAX_BIGNUM_SIZE];
-  int top;
-  int dmax;
-  int neg;
-  int flags;
+  int top; // Replace to unsigned char
+  int dmax; // Replace to unsigned char
+  int neg; // Replace to bool
+  int flags; // Check do we use it
 } BIGNUM;
 
 __device__ bool bn_add(BIGNUM *result, BIGNUM *a, BIGNUM *b);
