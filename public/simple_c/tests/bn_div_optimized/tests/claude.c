@@ -2,12 +2,15 @@
 #include <stdlib.h>
 #include <string.h>
 
+// Following libraries is for test purposes only
+#include <openssl/bn.h>
+
 #define BN_ULONG_NUM_BITS 64
 // Number of hexadecimal symbols in a BN_ULONG value
 // Each hexadecimal symbol represents 4 bits
 #define BN_ULONG_NUM_SYMBOLS BN_ULONG_NUM_BITS/4
 #define MAX_BIGNUM_SIZE 3
-#define BN_ULONG unsigned long long
+// #define BN_ULONG unsigned long long
 
 typedef struct bignum_st {
     BN_ULONG d[MAX_BIGNUM_SIZE];

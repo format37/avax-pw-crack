@@ -204,7 +204,102 @@ unsigned char top_significant_symbol(BIGNUM_CUDA *a)
     return count;
 }
 
-// BN_ULONG get_value_from_to(BN_ULONG a, const int from_in, const int to_in)
+void get_value_from_to_2(BIGNUM_CUDA *result, BIGNUM_CUDA *words_original, const int S, const int N) {
+    // Reverse words
+    BIGNUM_CUDA words;
+    for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
+        words.d[i] = words_original->d[MAX_BIGNUM_SIZE - 1 - i];
+    }
+    // Concatenate all words together
+    int full_length = MAX_BIGNUM_SIZE * BN_ULONG_NUM_SYMBOLS;
+    char all_words[full_length + 1];
+    all_words[0] = '\0';
+    for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
+        char word[BN_ULONG_NUM_SYMBOLS + 1];
+        sprintf(word, "%016llx", words.d[i]);
+        strcat(all_words, word);
+    }
+
+    // Get the start_symbol
+    int start_symbol = full_length - S;
+    // Get the final_symbol
+    int final_symbol = full_length - N;
+    // Get the substring from start_symbol to the final_symbol
+    char substring[N - S + 1];
+    strncpy(substring, all_words + final_symbol, start_symbol - final_symbol);
+    substring[start_symbol - final_symbol] = '\0';
+
+    // Get the length of the substring
+    int substring_length = strlen(substring);
+    // Calculate the padding
+    int padding = full_length - substring_length;
+
+    // Initialize the result to zero
+    init_zero(result, MAX_BIGNUM_SIZE);
+
+    // print substring for debugging
+    printf("\nSubstring [%d, %d]: %s\n", S, N, substring);
+
+    unsigned char substring_symbol_id = MAX_BIGNUM_SIZE * BN_ULONG_NUM_SYMBOLS - 1;
+    // Define the mapping of the char symbol to the BN_ULONG symbol
+    // unsigned char char_values[16] = {
+    //     '0', '1', '2', '3', '4', '5', '6', '7',
+    //     '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'
+    // };
+    // BN_ULONG ulong_values[16] = {
+    //     0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7,
+    //     0x8, 0x9, 0xa, 0xb, 0xc, 0xd, 0xe, 0xf
+    // };
+    BN_ULONG char_to_ulong[256] = {0};
+    char_to_ulong['0'] = 0x0;
+    char_to_ulong['1'] = 0x1;
+    char_to_ulong['2'] = 0x2;
+    char_to_ulong['3'] = 0x3;
+    char_to_ulong['4'] = 0x4;
+    char_to_ulong['5'] = 0x5;
+    char_to_ulong['6'] = 0x6;
+    char_to_ulong['7'] = 0x7;
+    char_to_ulong['8'] = 0x8;
+    char_to_ulong['9'] = 0x9;
+    char_to_ulong['a'] = 0xa;
+    char_to_ulong['b'] = 0xb;
+    char_to_ulong['c'] = 0xc;
+    char_to_ulong['d'] = 0xd;
+    char_to_ulong['e'] = 0xe;
+    char_to_ulong['f'] = 0xf;
+    // Words: 298b56ae54fe2c3d e75656ab232452bf 0284619f7ea27d52
+    // Substring: 4fe2c3d
+    unsigned char word = 0;
+    unsigned char shifting = 0;
+    for (unsigned char i=0;i<substring_length;i++) {
+        printf("substring[%d]: %c\n", substring_length-i-1, substring[substring_length-i-1]);
+        BN_ULONG ulong_value = char_to_ulong[(unsigned char)substring[substring_length - i - 1]];
+        if (shifting == 0) {
+            result->d[word] |= ulong_value;
+        } else {
+            result->d[word] |= ulong_value << (shifting * 4);
+        }
+        // find the corresponding ulong value
+        // for (unsigned char j=0; j<16; j++) {
+        //     if (substring[substring_length-i-1] == char_values[j]) {
+        //         if (shifting == 0) {
+        //             result->d[word] |= ulong_values[j];
+        //         } else {
+        //             result->d[word] |= ulong_values[j] << (shifting * 4);
+        //         }
+        //         shifting++;
+        //         break;
+        //     }
+        // }
+        shifting++;
+        if (shifting == 16) {
+            shifting = 0;
+            word++;
+        }
+    }
+}
+
+// BN_ULONG get_value_from_to_1(BN_ULONG a, const int from_in, const int to_in)
 // {
 //     // TODO: Replace by BIGNUM
 //     // get_value_from_to(0xb0c89, 0, 4);  // 0x0C89
@@ -427,7 +522,6 @@ int bn_div(BIGNUM_CUDA *bn_dividend, BIGNUM_CUDA *bn_divisor, BIGNUM_CUDA *bn_qu
     
     bn_print_bn("\nbn_dividend = ", bn_dividend);
     printf("# 0. getting shift from %d to %d of the dividend\n", start_symbol, end_symbol);    
-    // shifted_dividend.d[0] = get_value_from_to(bn_dividend->d[0], start_symbol, end_symbol);
     get_value_from_to(&shifted_dividend, bn_dividend, start_symbol, end_symbol);
     bn_print_bn("shifted_dividend = ", &shifted_dividend);
     return 1;
