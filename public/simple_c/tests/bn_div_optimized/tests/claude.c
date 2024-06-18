@@ -86,7 +86,7 @@ void f(BIGNUM_CUDA* words_original, int S, int N, BIGNUM_CUDA* result) {
         '0', '1', '2', '3', '4', '5', '6', '7',
         '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'
     };
-    unsigned char ulong_values[16] = {
+    BN_ULONG ulong_values[16] = {
         0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7,
         0x8, 0x9, 0xa, 0xb, 0xc, 0xd, 0xe, 0xf
     };
