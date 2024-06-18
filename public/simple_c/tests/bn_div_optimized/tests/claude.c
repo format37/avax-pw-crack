@@ -82,68 +82,59 @@ void f(BIGNUM_CUDA* words_original, int S, int N, BIGNUM_CUDA* result) {
 
     unsigned char substring_symbol_id = MAX_BIGNUM_SIZE * BN_ULONG_NUM_SYMBOLS - 1;
     // Define the mapping of the char symbol to the BN_ULONG symbol
-    unsigned char char_values[16] = {
-        '0', '1', '2', '3', '4', '5', '6', '7',
-        '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'
-    };
-    BN_ULONG ulong_values[16] = {
-        0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7,
-        0x8, 0x9, 0xa, 0xb, 0xc, 0xd, 0xe, 0xf
-    };
+    // unsigned char char_values[16] = {
+    //     '0', '1', '2', '3', '4', '5', '6', '7',
+    //     '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'
+    // };
+    // BN_ULONG ulong_values[16] = {
+    //     0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7,
+    //     0x8, 0x9, 0xa, 0xb, 0xc, 0xd, 0xe, 0xf
+    // };
+    BN_ULONG char_to_ulong[256] = {0};
+    char_to_ulong['0'] = 0x0;
+    char_to_ulong['1'] = 0x1;
+    char_to_ulong['2'] = 0x2;
+    char_to_ulong['3'] = 0x3;
+    char_to_ulong['4'] = 0x4;
+    char_to_ulong['5'] = 0x5;
+    char_to_ulong['6'] = 0x6;
+    char_to_ulong['7'] = 0x7;
+    char_to_ulong['8'] = 0x8;
+    char_to_ulong['9'] = 0x9;
+    char_to_ulong['a'] = 0xa;
+    char_to_ulong['b'] = 0xb;
+    char_to_ulong['c'] = 0xc;
+    char_to_ulong['d'] = 0xd;
+    char_to_ulong['e'] = 0xe;
+    char_to_ulong['f'] = 0xf;
     // Words: 298b56ae54fe2c3d e75656ab232452bf 0284619f7ea27d52
     // Substring: 4fe2c3d
-    unsigned char revision = 1;
-    if (revision == 1) {
-        unsigned char word = 0;
-        unsigned char shifting = 0;
-        for (unsigned char i=0;i<substring_length;i++) {
-            printf("substring[%d]: %c\n", substring_length-i-1, substring[substring_length-i-1]);
-            // find the corresponding ulong value
-            for (unsigned char j=0; j<16; j++) {
-                if (substring[substring_length-i-1] == char_values[j]) {
-                    if (shifting == 0) {
-                        result->d[word] |= ulong_values[j];
-                    } else {
-                        result->d[word] |= ulong_values[j] << (shifting * 4);
-                    }
-                    shifting++;
-                    break;
-                }
-            }
-            if (shifting == 16) {
-                shifting = 0;
-                word++;
-            }
+    unsigned char word = 0;
+    unsigned char shifting = 0;
+    for (unsigned char i=0;i<substring_length;i++) {
+        printf("substring[%d]: %c\n", substring_length-i-1, substring[substring_length-i-1]);
+        BN_ULONG ulong_value = char_to_ulong[(unsigned char)substring[substring_length - i - 1]];
+        if (shifting == 0) {
+            result->d[word] |= ulong_value;
+        } else {
+            result->d[word] |= ulong_value << (shifting * 4);
         }
-    }
-    if (revision == 0) {
-        unsigned char shifting = 0;
-        for (unsigned char word=0; word<MAX_BIGNUM_SIZE; word++) { // 0,1,2
-            for (unsigned char i=0; i<BN_ULONG_NUM_SYMBOLS; i++) { // 0,1,2, .. 15
-                if (substring_symbol_id < substring_length) {
-                    // print the current word
-                    printf("word: %d ", word);
-                    // print the current current_symbol_id
-                    printf("substring_symbol_id: %d ", substring_symbol_id);
-                    // print the current symbol of the substring
-                    printf("substring[substring_symbol_id]: %c\n", substring[substring_symbol_id]);
-                    // find the corresponding ulong value
-                    for (unsigned char j=0; j<16; j++) {
-                        if (substring[substring_symbol_id] == char_values[j]) {
-                            if (shifting == 0) {
-                                result->d[MAX_BIGNUM_SIZE-word-1] |= ulong_values[j];
-                            } else {
-                                result->d[MAX_BIGNUM_SIZE-word-1] |= ulong_values[j] << (shifting * 4);
-                            }
-                            shifting++;
-                            // result->d[MAX_BIGNUM_SIZE-word-1] |= ulong_values[j] << (i * 4);
-                            // result->d[word] |= ulong_values[j] << (i * 4);
-                            break;
-                        }
-                    }
-                }
-                substring_symbol_id--;
-            }
+        // find the corresponding ulong value
+        // for (unsigned char j=0; j<16; j++) {
+        //     if (substring[substring_length-i-1] == char_values[j]) {
+        //         if (shifting == 0) {
+        //             result->d[word] |= ulong_values[j];
+        //         } else {
+        //             result->d[word] |= ulong_values[j] << (shifting * 4);
+        //         }
+        //         shifting++;
+        //         break;
+        //     }
+        // }
+        shifting++;
+        if (shifting == 16) {
+            shifting = 0;
+            word++;
         }
     }
 }
