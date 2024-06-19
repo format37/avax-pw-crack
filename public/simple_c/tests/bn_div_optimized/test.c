@@ -115,14 +115,24 @@ void bn_print_bn_line(const char* msg, BIGNUM_CUDA* a) {
     // printf("\n");
 }
 
+int find_top(const BIGNUM_CUDA *bn, int max_words) {
+    for (int i = MAX_BIGNUM_SIZE - 1; i >= 0; i--) {
+        if (bn->d[i] != 0) {
+            return i + 1;
+        }
+    }
+    return 1;
+}
+
 int bn_cmp(BIGNUM_CUDA* a, BIGNUM_CUDA* b) {
-    // -1: a < b
+    // -1: a < b6
     // 0: a == b
     // 1: a > b
     if (a->neg != b->neg) {
         return a->neg ? -1 : 1;
     }
-
+    a->top = find_top(a, MAX_BIGNUM_SIZE);
+    b->top = find_top(b, MAX_BIGNUM_SIZE);
     if (a->top != b->top) {
         return a->top > b->top ? 1 : -1;
     }
@@ -134,16 +144,6 @@ int bn_cmp(BIGNUM_CUDA* a, BIGNUM_CUDA* b) {
     }
 
     return 0;
-}
-
-int find_top(const BIGNUM_CUDA *bn, int max_words) {
-    bn_print_bn(">> find_top bn: ", bn);
-    for (int i = MAX_BIGNUM_SIZE - 1; i >= 0; i--) {
-        if (bn->d[i] != 0) {
-            return i + 1;
-        }
-    }
-    return 1;
 }
 
 unsigned char top_word_significant_symbols(BIGNUM_CUDA *a, const unsigned char top)
@@ -208,6 +208,7 @@ unsigned char top_significant_symbol(BIGNUM_CUDA *a)
 void get_value_from_to(BIGNUM_CUDA *result, BIGNUM_CUDA *words_original, const int S, const int N) {
     // Reverse words
     BIGNUM_CUDA words;
+    init_zero(&words, MAX_BIGNUM_SIZE);
     for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
         words.d[i] = words_original->d[MAX_BIGNUM_SIZE - 1 - i];
     }
@@ -463,8 +464,6 @@ int bn_div(BIGNUM_CUDA *bn_dividend, BIGNUM_CUDA *bn_divisor, BIGNUM_CUDA *bn_qu
         
         bn_print_bn("shifted_dividend = ", &shifted_dividend);
         
-        // if (shifted_dividend.d[0] < bn_divisor->d[0] ||
-        //     (dividend_words > 1 && shifted_dividend.d[0] < bn_divisor->d[0])) { // TODO: replace [0] by bugnum
         if (bn_cmp(&shifted_dividend, bn_divisor) < 0) {
 
             printf("\n# 1. shifted_dividend is less than ");
@@ -477,10 +476,6 @@ int bn_div(BIGNUM_CUDA *bn_dividend, BIGNUM_CUDA *bn_divisor, BIGNUM_CUDA *bn_qu
             start_symbol -= 1;
             printf("start_symbol = %d\n", start_symbol);
             printf("end_symbol = %d\n", end_symbol);
-            // BN_ULONG next_symbol = bn_dividend->d[0] >> (4 * start_symbol) & 0xF;
-            // printf("next_symbol = %X\n", next_symbol);
-            // shifted_dividend.d[dividend_words - 1] <<= 4;
-            // shifted_dividend.d[dividend_words - 1] |= next_symbol;
             BIGNUM_CUDA shifted_dividend_temp;
             init_zero(&shifted_dividend_temp, MAX_BIGNUM_SIZE);
             for (int i = 0; i < WORDS; i++) {
@@ -562,6 +557,13 @@ int bn_div(BIGNUM_CUDA *bn_dividend, BIGNUM_CUDA *bn_divisor, BIGNUM_CUDA *bn_qu
     printf("\n# final: assign the subtraction_result %016llX to the remainder\n", subtraction_result);
     bn_remainder->d[0] = subtraction_result;
 
+    // reverse bn_remainder
+    // for (int i = 0; i < WORDS / 2; i++) {
+    //     BN_ULONG temp = bn_remainder->d[i];
+    //     bn_remainder->d[i] = bn_remainder->d[WORDS - 1 - i];
+    //     bn_remainder->d[WORDS - 1 - i] = temp;
+    // }
+
     printf("\n-- bn_div --\n");
     return 1;
 }
@@ -573,8 +575,20 @@ void openssl_div(BIGNUM_CUDA *bn_dividend, BIGNUM_CUDA *bn_divisor, BIGNUM_CUDA 
     BIGNUM *bn_openssl_remainder = BN_new();
     BN_CTX *ctx = BN_CTX_new();
 
-    set_bignum_words(bn_openssl_dividend, bn_dividend->d, MAX_BIGNUM_SIZE);
-    set_bignum_words(bn_openssl_divisor, bn_divisor->d, MAX_BIGNUM_SIZE);
+    BIGNUM_CUDA bn_dividend_tmp;
+    BIGNUM_CUDA bn_divisor_tmp;
+    init_zero(&bn_dividend_tmp, MAX_BIGNUM_SIZE);
+    init_zero(&bn_divisor_tmp, MAX_BIGNUM_SIZE);
+    for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
+        bn_dividend_tmp.d[i] = bn_dividend->d[i];
+        bn_divisor_tmp.d[i] = bn_divisor->d[i];
+    }
+    // reverse
+    reverse_order(bn_dividend_tmp.d);
+    reverse_order(bn_divisor_tmp.d);
+
+    set_bignum_words(bn_openssl_dividend, bn_dividend_tmp.d, MAX_BIGNUM_SIZE);
+    set_bignum_words(bn_openssl_divisor, bn_divisor_tmp.d, MAX_BIGNUM_SIZE);
 
     printf("bn_openssl_dividend = ");
     print_bn_openssl("", bn_openssl_dividend);
@@ -614,6 +628,13 @@ void openssl_div(BIGNUM_CUDA *bn_dividend, BIGNUM_CUDA *bn_divisor, BIGNUM_CUDA 
     }
     bn_expected_remainder->top = i;
 
+    // // reverse bn_expected_remainder
+    // for (int i = 0; i < WORDS / 2; i++) {
+    //     BN_ULONG temp = bn_expected_remainder->d[i];
+    //     bn_expected_remainder->d[i] = bn_expected_remainder->d[WORDS - 1 - i];
+    //     bn_expected_remainder->d[WORDS - 1 - i] = temp;
+    // }
+
     OPENSSL_free(bn_quotient_str);
     OPENSSL_free(bn_remainder_str);
 
@@ -626,7 +647,7 @@ void openssl_div(BIGNUM_CUDA *bn_dividend, BIGNUM_CUDA *bn_divisor, BIGNUM_CUDA 
 
 int main()
 {
-    BN_ULONG tests_passed = 0;
+    unsigned long long tests_passed = 0;
     BIGNUM_CUDA bn_dividend, bn_divisor, bn_dividend_end, bn_divisor_end;
     init_zero(&bn_dividend, MAX_BIGNUM_SIZE);
     init_zero(&bn_divisor, MAX_BIGNUM_SIZE);
@@ -643,6 +664,12 @@ int main()
     bn_divisor_end.d[0] = 0x0;
     bn_divisor_end.d[1] = 0xab2f000e3f00d97;
 
+    // Reverse order of dividend and divisor because of different endianness
+    reverse_order(bn_dividend.d);
+    reverse_order(bn_dividend_end.d);
+    reverse_order(bn_divisor.d);
+    reverse_order(bn_divisor_end.d);
+
     BIGNUM_CUDA bn_quotient, bn_remainder;
 
     while (bn_cmp(&bn_dividend, &bn_dividend_end) <= 0) {
@@ -657,10 +684,7 @@ int main()
             init_zero(&bn_expected_remainder, MAX_BIGNUM_SIZE);
             // OpenSSL test
             openssl_div(&bn_dividend, &bn_divisor, &bn_expected_quotient, &bn_expected_remainder);
-
-            // Reverse order of dividend and divisor because of different endianness
-            reverse_order(bn_dividend.d);
-            reverse_order(bn_divisor.d);
+            
             bn_print_bn("bn_dividend = ", &bn_dividend);
             bn_print_bn("bn_divisor = ", &bn_divisor);
 
@@ -699,13 +723,17 @@ int main()
             }
 
             // Add 1 to divisor
-            bn_divisor.d[0]++; // TODO: Implement bignum addition
+            bn_divisor.d[1]++; // TODO: Implement bignum addition
+            // bn_add(&bn_divisor, &bn_divisor, &bn_divisor_end);
             tests_passed++;
+            // tests_passed = tests_passed + 1;
+            // printf("tests_passed: %llu\n", tests_passed);
         }
         // Add 1 to dividend
-        bn_dividend.d[0]++; // TODO: Implement bignum addition            
+        bn_dividend.d[1]++; // TODO: Implement bignum addition
+        // bn_add(&bn_dividend, &bn_dividend, &bn_dividend_end);
     }
 
-    printf("%llu tests passed\n", tests_passed);
+    printf("%llu tests passed_\n", tests_passed);
     return 0;
 }

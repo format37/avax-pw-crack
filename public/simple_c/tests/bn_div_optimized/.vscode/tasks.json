@@ -3,16 +3,18 @@
     "tasks": [
         {
             "type": "shell",
-            "label": "g++ build active file",
-            "command": "/usr/bin/g++",
+            "label": "gcc build active file",
+            "command": "/usr/bin/gcc",
             "args": [
                 "-g",
                 "${file}",
+                "-std=c99",
+                "-lcrypto",
                 "-o",
                 "${fileDirname}/${fileBasenameNoExtension}"
             ],
             "options": {
-                "cwd": "/usr/bin"
+                "cwd": "${workspaceFolder}"
             },
             "problemMatcher": [
                 "$gcc"
