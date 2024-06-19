@@ -379,10 +379,11 @@ void absolute_subtract(BIGNUM_CUDA *result, BIGNUM_CUDA *a, BIGNUM_CUDA *b) {
 
 unsigned char bn_add(BIGNUM_CUDA *result, BIGNUM_CUDA *a, BIGNUM_CUDA *b) {
     // Clear the result first.
-    result->top = 0;
-    for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
-        result->d[i] = 0;
-    }
+    // result->top = 0;
+    // for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
+    //     result->d[i] = 0;
+    // }
+    init_zero(result, MAX_BIGNUM_SIZE);
 
     if (a->neg == b->neg) {
         // Both numbers have the same sign, so we can directly add them.
@@ -671,6 +672,15 @@ int main()
     reverse_order(bn_divisor_end.d);
 
     BIGNUM_CUDA bn_quotient, bn_remainder;
+    BIGNUM_CUDA bn_one;
+            init_zero(&bn_one, MAX_BIGNUM_SIZE);
+            bn_one.d[1] = 0x1;
+    // reverse bn_one
+    for (int i = 0; i < WORDS / 2; i++) {
+        BN_ULONG temp = bn_one.d[i];
+        bn_one.d[i] = bn_one.d[WORDS - 1 - i];
+        bn_one.d[WORDS - 1 - i] = temp;
+    }        
 
     while (bn_cmp(&bn_dividend, &bn_dividend_end) <= 0) {
         while (bn_cmp(&bn_divisor, &bn_divisor_end) <= 0) {
@@ -723,17 +733,31 @@ int main()
             }
 
             // Add 1 to divisor
-            bn_divisor.d[1]++; // TODO: Implement bignum addition
-            // bn_add(&bn_divisor, &bn_divisor, &bn_divisor_end);
+            // bn_divisor.d[1]++; // TODO: Implement bignum addition
+            BIGNUM_CUDA bn_divisor_temp;
+            init_zero(&bn_divisor_temp, MAX_BIGNUM_SIZE);
+            for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
+                bn_divisor_temp.d[i] = bn_divisor.d[i];
+            }
+            bn_add(&bn_divisor, &bn_divisor_temp, &bn_one);
             tests_passed++;
             // tests_passed = tests_passed + 1;
             // printf("tests_passed: %llu\n", tests_passed);
+            break; // TODO: Remove break
         }
         // Add 1 to dividend
-        bn_dividend.d[1]++; // TODO: Implement bignum addition
-        // bn_add(&bn_dividend, &bn_dividend, &bn_dividend_end);
+        // bn_dividend.d[1]++; // TODO: Implement bignum addition
+        BIGNUM_CUDA bn_dividend_temp;
+        init_zero(&bn_dividend_temp, MAX_BIGNUM_SIZE);
+        for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
+            bn_dividend_temp.d[i] = bn_dividend.d[i];
+        }
+        bn_add(&bn_dividend, &bn_dividend_temp, &bn_one);
+        break; // TODO: Remove break
     }
 
     printf("%llu tests passed_\n", tests_passed);
+    bn_print_bn("bn_dividend = ", &bn_dividend);
+    bn_print_bn("bn_divisor = ", &bn_divisor);
     return 0;
 }
