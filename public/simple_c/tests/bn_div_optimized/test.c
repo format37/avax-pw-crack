@@ -137,6 +137,7 @@ int bn_cmp(BIGNUM_CUDA* a, BIGNUM_CUDA* b) {
 }
 
 int find_top(const BIGNUM_CUDA *bn, int max_words) {
+    bn_print_bn(">> find_top bn: ", bn);
     for (int i = MAX_BIGNUM_SIZE - 1; i >= 0; i--) {
         if (bn->d[i] != 0) {
             return i + 1;
@@ -242,14 +243,6 @@ void get_value_from_to(BIGNUM_CUDA *result, BIGNUM_CUDA *words_original, const i
 
     unsigned char substring_symbol_id = MAX_BIGNUM_SIZE * BN_ULONG_NUM_SYMBOLS - 1;
     // Define the mapping of the char symbol to the BN_ULONG symbol
-    // unsigned char char_values[16] = {
-    //     '0', '1', '2', '3', '4', '5', '6', '7',
-    //     '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'
-    // };
-    // BN_ULONG ulong_values[16] = {
-    //     0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7,
-    //     0x8, 0x9, 0xa, 0xb, 0xc, 0xd, 0xe, 0xf
-    // };
     BN_ULONG char_to_ulong[256] = {0};
     char_to_ulong['0'] = 0x0;
     char_to_ulong['1'] = 0x1;
@@ -279,18 +272,6 @@ void get_value_from_to(BIGNUM_CUDA *result, BIGNUM_CUDA *words_original, const i
         } else {
             result->d[word] |= ulong_value << (shifting * 4);
         }
-        // find the corresponding ulong value
-        // for (unsigned char j=0; j<16; j++) {
-        //     if (substring[substring_length-i-1] == char_values[j]) {
-        //         if (shifting == 0) {
-        //             result->d[word] |= ulong_values[j];
-        //         } else {
-        //             result->d[word] |= ulong_values[j] << (shifting * 4);
-        //         }
-        //         shifting++;
-        //         break;
-        //     }
-        // }
         shifting++;
         if (shifting == 16) {
             shifting = 0;
@@ -298,64 +279,6 @@ void get_value_from_to(BIGNUM_CUDA *result, BIGNUM_CUDA *words_original, const i
         }
     }
     bn_print_bn("from_to: ", result);
-}
-
-// BN_ULONG get_value_from_to_1(BN_ULONG a, const int from_in, const int to_in)
-// {
-//     // TODO: Replace by BIGNUM
-//     // get_value_from_to(0xb0c89, 0, 4);  // 0x0C89
-//     int from = from_in;
-//     if (from < 0) from = 0;
-//     int to = to_in;
-//     if (to > BN_ULONG_NUM_SYMBOLS) to = BN_ULONG_NUM_SYMBOLS;
-//     printf("get_value_from_to(%016llX, %d, %d)\n", a, from, to);
-//     BN_ULONG result;
-//     if (to == BN_ULONG_NUM_SYMBOLS) {
-//         result = a >> (4 * from);
-//     } else {
-//         result = (a >> (4 * from)) & ((1 << (4 * (to - from))) - 1);
-//     }
-//     printf("get_value_from_to result = %016llX\n", result);
-//     return result;
-// }
-
-void get_value_from_to_0(BIGNUM_CUDA *result, BIGNUM_CUDA *a, const int from_in, const int to_in)
-{
-    int from = from_in;
-    if (from < 0) from = 0;
-    int to = to_in;
-    if (to > MAX_BIGNUM_SIZE * BN_ULONG_NUM_SYMBOLS) to = MAX_BIGNUM_SIZE * BN_ULONG_NUM_SYMBOLS;
-
-    init_zero(result, MAX_BIGNUM_SIZE);
-
-    int word_from = from / BN_ULONG_NUM_SYMBOLS;
-    int word_to = to / BN_ULONG_NUM_SYMBOLS;
-    int symbol_from = from % BN_ULONG_NUM_SYMBOLS;
-    int symbol_to = to % BN_ULONG_NUM_SYMBOLS;
-
-    int result_word = 0;
-    for (int word = word_from; word <= word_to; word++) {
-        BN_ULONG temp = a->d[word];
-
-        if (word == word_from && word == word_to) {
-            temp = (temp >> (4 * symbol_from)) & ((1 << (4 * (symbol_to - symbol_from))) - 1);
-        } else if (word == word_from) {
-            temp = temp >> (4 * symbol_from);
-        } else if (word == word_to) {
-            temp = temp & ((1 << (4 * symbol_to)) - 1);
-            result->d[result_word] |= temp;
-            break;
-        }
-
-        result->d[result_word] |= temp << (4 * (BN_ULONG_NUM_SYMBOLS - (symbol_from + (word - word_from) * BN_ULONG_NUM_SYMBOLS)));
-
-        if (word < word_to) {
-            result_word++;
-        }
-    }
-
-    result->top = find_top(result, MAX_BIGNUM_SIZE);
-    bn_print_bn("get_value_from_to: ", result);
 }
 
 int absolute_compare(const BIGNUM_CUDA* a, const BIGNUM_CUDA* b) {
@@ -495,9 +418,11 @@ int bn_div(BIGNUM_CUDA *bn_dividend, BIGNUM_CUDA *bn_divisor, BIGNUM_CUDA *bn_qu
     // --------
     // divisor
     printf("++ bn_div ++\n");
+    bn_print_bn("bn_dividend = ", bn_dividend);
+    bn_print_bn("bn_divisor = ", bn_divisor);
     
-    unsigned char dividend_words = find_top(&bn_dividend, WORDS);
-    unsigned char divisor_words = find_top(&bn_divisor, WORDS);
+    unsigned char dividend_words = find_top(bn_dividend, WORDS);
+    unsigned char divisor_words = find_top(bn_divisor, WORDS);
     printf("dividend_words: %d\n", dividend_words);
     printf("divisor_words: %d\n", divisor_words);
     
@@ -538,21 +463,30 @@ int bn_div(BIGNUM_CUDA *bn_dividend, BIGNUM_CUDA *bn_divisor, BIGNUM_CUDA *bn_qu
         
         bn_print_bn("shifted_dividend = ", &shifted_dividend);
         
-        if (shifted_dividend.d[0] < bn_divisor->d[0] ||
-            (dividend_words > 1 && shifted_dividend.d[0] < bn_divisor->d[0])) {
+        // if (shifted_dividend.d[0] < bn_divisor->d[0] ||
+        //     (dividend_words > 1 && shifted_dividend.d[0] < bn_divisor->d[0])) { // TODO: replace [0] by bugnum
+        if (bn_cmp(&shifted_dividend, bn_divisor) < 0) {
 
-            printf("\n# 1. shifted_dividend is less than %016llX. performing an additional shift\n", bn_divisor->d[0]);
+            printf("\n# 1. shifted_dividend is less than ");
+            bn_print_bn_line("", bn_divisor);
+            printf(" performing additional shift\n");
             if (start_symbol == 0) {
-                printf("a. Error: start_symbol is 0\n"); // TODO: implement the case when start_symbol is 0
+                printf("a. Error: start_symbol is 0\n"); // TODO: check case when start_symbol is 0
                 return 0;
             }
             start_symbol -= 1;
             printf("start_symbol = %d\n", start_symbol);
             printf("end_symbol = %d\n", end_symbol);
-            BN_ULONG next_symbol = bn_dividend->d[0] >> (4 * start_symbol) & 0xF;
-            printf("next_symbol = %X\n", next_symbol);
-            shifted_dividend.d[dividend_words - 1] <<= 4;
-            shifted_dividend.d[dividend_words - 1] |= next_symbol;
+            // BN_ULONG next_symbol = bn_dividend->d[0] >> (4 * start_symbol) & 0xF;
+            // printf("next_symbol = %X\n", next_symbol);
+            // shifted_dividend.d[dividend_words - 1] <<= 4;
+            // shifted_dividend.d[dividend_words - 1] |= next_symbol;
+            BIGNUM_CUDA shifted_dividend_temp;
+            init_zero(&shifted_dividend_temp, MAX_BIGNUM_SIZE);
+            for (int i = 0; i < WORDS; i++) {
+                shifted_dividend_temp.d[i] = bn_dividend->d[i];
+            }
+            get_value_from_to(&shifted_dividend, &shifted_dividend_temp, start_symbol, end_symbol);
             bn_print_bn("shifted_dividend = ", &shifted_dividend);
         }
 
