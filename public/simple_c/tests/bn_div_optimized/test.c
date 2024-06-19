@@ -79,7 +79,7 @@ void print_bn_openssl(const char* label, const BIGNUM* bn) {
     OPENSSL_free(bn_str);
 }
 
-void bn_print_bn(const char* msg, BIGNUM_CUDA* a) {
+void bn_print_bn(const char *msg, BIGNUM_CUDA *a) {
     printf("%s", msg);
     if (a->neg) {
         printf("-");  // Handle the case where BIGNUM is negative
@@ -204,7 +204,7 @@ unsigned char top_significant_symbol(BIGNUM_CUDA *a)
     return count;
 }
 
-void get_value_from_to_2(BIGNUM_CUDA *result, BIGNUM_CUDA *words_original, const int S, const int N) {
+void get_value_from_to(BIGNUM_CUDA *result, BIGNUM_CUDA *words_original, const int S, const int N) {
     // Reverse words
     BIGNUM_CUDA words;
     for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
@@ -297,6 +297,7 @@ void get_value_from_to_2(BIGNUM_CUDA *result, BIGNUM_CUDA *words_original, const
             word++;
         }
     }
+    bn_print_bn("from_to: ", result);
 }
 
 // BN_ULONG get_value_from_to_1(BN_ULONG a, const int from_in, const int to_in)
@@ -318,7 +319,7 @@ void get_value_from_to_2(BIGNUM_CUDA *result, BIGNUM_CUDA *words_original, const
 //     return result;
 // }
 
-void get_value_from_to(BIGNUM_CUDA *result, BIGNUM_CUDA *a, const int from_in, const int to_in)
+void get_value_from_to_0(BIGNUM_CUDA *result, BIGNUM_CUDA *a, const int from_in, const int to_in)
 {
     int from = from_in;
     if (from < 0) from = 0;
@@ -354,6 +355,7 @@ void get_value_from_to(BIGNUM_CUDA *result, BIGNUM_CUDA *a, const int from_in, c
     }
 
     result->top = find_top(result, MAX_BIGNUM_SIZE);
+    bn_print_bn("get_value_from_to: ", result);
 }
 
 int absolute_compare(const BIGNUM_CUDA* a, const BIGNUM_CUDA* b) {
@@ -494,9 +496,10 @@ int bn_div(BIGNUM_CUDA *bn_dividend, BIGNUM_CUDA *bn_divisor, BIGNUM_CUDA *bn_qu
     // divisor
     printf("++ bn_div ++\n");
     
-    unsigned char dividend_words = find_top(bn_dividend, WORDS);
-    unsigned char divisor_words = find_top(bn_divisor, WORDS);
+    unsigned char dividend_words = find_top(&bn_dividend, WORDS);
+    unsigned char divisor_words = find_top(&bn_divisor, WORDS);
     printf("dividend_words: %d\n", dividend_words);
+    printf("divisor_words: %d\n", divisor_words);
     
     unsigned char dividend_significant_symbols = top_significant_symbol(bn_dividend); // OK
     // printf("dividend_significant_symbols: %d\n", dividend_significant_symbols);
@@ -524,7 +527,6 @@ int bn_div(BIGNUM_CUDA *bn_dividend, BIGNUM_CUDA *bn_divisor, BIGNUM_CUDA *bn_qu
     printf("# 0. getting shift from %d to %d of the dividend\n", start_symbol, end_symbol);    
     get_value_from_to(&shifted_dividend, bn_dividend, start_symbol, end_symbol);
     bn_print_bn("shifted_dividend = ", &shifted_dividend);
-    return 1;
     
     BN_ULONG subtraction_result = 0;
     BN_ULONG shifted_divisor_multiplicator = 0;
@@ -697,9 +699,9 @@ int main()
     init_zero(&bn_dividend_end, MAX_BIGNUM_SIZE);
     init_zero(&bn_divisor_end, MAX_BIGNUM_SIZE);
     // dividend
-    bn_dividend.d[0] = 0x0;
+    bn_dividend.d[0] = 0x7e;
     bn_dividend.d[1] = 0xda005671ffb0c893;
-    bn_dividend_end.d[0] = 0x0;
+    bn_dividend_end.d[0] = 0x7e;
     bn_dividend_end.d[1] = 0xda005671ffb0c893;
     // divisor
     bn_divisor.d[0] = 0x0;
