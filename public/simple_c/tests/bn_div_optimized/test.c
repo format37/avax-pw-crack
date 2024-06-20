@@ -125,7 +125,7 @@ int find_top(const BIGNUM_CUDA *bn, int max_words) {
 }
 
 int bn_cmp(BIGNUM_CUDA* a, BIGNUM_CUDA* b) {
-    // -1: a < b6
+    // -1: a < b
     // 0: a == b
     // 1: a > b
     if (a->neg != b->neg) {
@@ -321,8 +321,8 @@ void absolute_add(BIGNUM_CUDA *result, const BIGNUM_CUDA *a, const BIGNUM_CUDA *
 
     for (int i = 0; i <= max_top; ++i) {
         // Extract current words or zero if one bignum is shorter
-        BN_ULONG ai = (i < a->top) ? a->d[i] : 0;
-        BN_ULONG bi = (i < b->top) ? b->d[i] : 0;
+        BN_ULONG ai = (i <= a->top) ? a->d[i] : 0;
+        BN_ULONG bi = (i <= b->top) ? b->d[i] : 0;
 
         // Calculate sum and carry
         BN_ULONG sum = ai + bi + carry;
@@ -658,7 +658,7 @@ int main()
     bn_dividend.d[0] = 0x7e;
     bn_dividend.d[1] = 0xda005671ffb0c893;
     bn_dividend_end.d[0] = 0x7e;
-    bn_dividend_end.d[1] = 0xda005671ffb0c893;
+    bn_dividend_end.d[1] = 0xda005671ffb0c894;
     // divisor
     bn_divisor.d[0] = 0x0;
     bn_divisor.d[1] = 0xab2f000e3f00d97;
@@ -743,7 +743,7 @@ int main()
             tests_passed++;
             // tests_passed = tests_passed + 1;
             // printf("tests_passed: %llu\n", tests_passed);
-            break; // TODO: Remove break
+            // break; // TODO: Remove break
         }
         // Add 1 to dividend
         // bn_dividend.d[1]++; // TODO: Implement bignum addition
@@ -753,7 +753,7 @@ int main()
             bn_dividend_temp.d[i] = bn_dividend.d[i];
         }
         bn_add(&bn_dividend, &bn_dividend_temp, &bn_one);
-        break; // TODO: Remove break
+        // break; // TODO: Remove break
     }
 
     printf("%llu tests passed_\n", tests_passed);
