@@ -466,8 +466,8 @@ __device__ void absolute_add(BIGNUM *result, const BIGNUM *a, const BIGNUM *b) {
 
     for (int i = 0; i <= max_top; ++i) {
         // Extract current words or zero if one bignum is shorter
-        BN_ULONG ai = (i < a->top) ? a->d[i] : 0;
-        BN_ULONG bi = (i < b->top) ? b->d[i] : 0;
+        BN_ULONG ai = (i < a->top) ? a->d[i] : 0; // TODO: replace with i <= a->top #BUG_FIXING
+        BN_ULONG bi = (i < b->top) ? b->d[i] : 0; // TODO: replace with i <= b->top #BUG_FIXING
 
         // Calculate sum and carry
         BN_ULONG sum = ai + bi + carry;

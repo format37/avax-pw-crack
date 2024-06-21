@@ -654,16 +654,16 @@ int main()
     init_zero(&bn_divisor, MAX_BIGNUM_SIZE);
     init_zero(&bn_dividend_end, MAX_BIGNUM_SIZE);
     init_zero(&bn_divisor_end, MAX_BIGNUM_SIZE);
-    // dividend
+    
+    // Set initial and end values for dividend and divisor
     bn_dividend.d[0] = 0x7e;
     bn_dividend.d[1] = 0xda005671ffb0c893;
     bn_dividend_end.d[0] = 0x7e;
-    bn_dividend_end.d[1] = 0xda005671ffb0c894;
-    // divisor
+    bn_dividend_end.d[1] = 0xda005671ffb0c899;
     bn_divisor.d[0] = 0x0;
     bn_divisor.d[1] = 0xab2f000e3f00d97;
     bn_divisor_end.d[0] = 0x0;
-    bn_divisor_end.d[1] = 0xab2f000e3f00d97;
+    bn_divisor_end.d[1] = 0xab2f000e3f00d99;
 
     // Reverse order of dividend and divisor because of different endianness
     reverse_order(bn_dividend.d);
@@ -673,33 +673,41 @@ int main()
 
     BIGNUM_CUDA bn_quotient, bn_remainder;
     BIGNUM_CUDA bn_one;
-            init_zero(&bn_one, MAX_BIGNUM_SIZE);
-            bn_one.d[1] = 0x1;
-    // reverse bn_one
-    for (int i = 0; i < WORDS / 2; i++) {
-        BN_ULONG temp = bn_one.d[i];
-        bn_one.d[i] = bn_one.d[WORDS - 1 - i];
-        bn_one.d[WORDS - 1 - i] = temp;
-    }        
+    init_zero(&bn_one, MAX_BIGNUM_SIZE);
+    bn_one.d[1] = 0x1;
+    reverse_order(bn_one.d);
 
-    while (bn_cmp(&bn_dividend, &bn_dividend_end) <= 0) {
-        while (bn_cmp(&bn_divisor, &bn_divisor_end) <= 0) {
+    BIGNUM_CUDA current_dividend, current_divisor;
+    init_zero(&current_dividend, MAX_BIGNUM_SIZE);
+    init_zero(&current_divisor, MAX_BIGNUM_SIZE);
 
+    // Copy initial dividend to current_dividend
+    for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
+        current_dividend.d[i] = bn_dividend.d[i];
+    }
+
+    while (bn_cmp(&current_dividend, &bn_dividend_end) <= 0) {
+        // Reset current_divisor to initial divisor for each new dividend
+        for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
+            current_divisor.d[i] = bn_divisor.d[i];
+        }
+
+        while (bn_cmp(&current_divisor, &bn_divisor_end) <= 0) {
             init_zero(&bn_quotient, MAX_BIGNUM_SIZE);
             init_zero(&bn_remainder, MAX_BIGNUM_SIZE);
 
-            BIGNUM_CUDA bn_expected_quotient;
-            BIGNUM_CUDA bn_expected_remainder;
+            BIGNUM_CUDA bn_expected_quotient, bn_expected_remainder;
             init_zero(&bn_expected_quotient, MAX_BIGNUM_SIZE);
             init_zero(&bn_expected_remainder, MAX_BIGNUM_SIZE);
+
             // OpenSSL test
-            openssl_div(&bn_dividend, &bn_divisor, &bn_expected_quotient, &bn_expected_remainder);
+            openssl_div(&current_dividend, &current_divisor, &bn_expected_quotient, &bn_expected_remainder);
             
-            bn_print_bn("bn_dividend = ", &bn_dividend);
-            bn_print_bn("bn_divisor = ", &bn_divisor);
+            bn_print_bn("current_dividend = ", &current_dividend);
+            bn_print_bn("current_divisor = ", &current_divisor);
 
             // CUDA division
-            if (!bn_div(&bn_dividend, &bn_divisor, &bn_quotient, &bn_remainder)) {
+            if (!bn_div(&current_dividend, &current_divisor, &bn_quotient, &bn_remainder)) {
                 printf("Error: bn_div failed\n");
                 return 1;
             }
@@ -732,32 +740,36 @@ int main()
                 printf("\n");
             }
 
-            // Add 1 to divisor
-            // bn_divisor.d[1]++; // TODO: Implement bignum addition
-            BIGNUM_CUDA bn_divisor_temp;
-            init_zero(&bn_divisor_temp, MAX_BIGNUM_SIZE);
-            for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
-                bn_divisor_temp.d[i] = bn_divisor.d[i];
-            }
-            bn_add(&bn_divisor, &bn_divisor_temp, &bn_one);
             tests_passed++;
-            // tests_passed = tests_passed + 1;
-            // printf("tests_passed: %llu\n", tests_passed);
-            // break; // TODO: Remove break
+
+            // Increment divisor
+            if (bn_cmp(&current_divisor, &bn_divisor_end) < 0) {
+                BIGNUM_CUDA temp_divisor;
+                init_zero(&temp_divisor, MAX_BIGNUM_SIZE);
+                for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
+                    temp_divisor.d[i] = current_divisor.d[i];
+                }
+                bn_add(&current_divisor, &temp_divisor, &bn_one);
+            } else {
+                break;  // Move to next dividend if we've reached the end of divisors
+            }
         }
-        // Add 1 to dividend
-        // bn_dividend.d[1]++; // TODO: Implement bignum addition
-        BIGNUM_CUDA bn_dividend_temp;
-        init_zero(&bn_dividend_temp, MAX_BIGNUM_SIZE);
-        for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
-            bn_dividend_temp.d[i] = bn_dividend.d[i];
+
+        // Increment dividend
+        if (bn_cmp(&current_dividend, &bn_dividend_end) < 0) {
+            BIGNUM_CUDA temp_dividend;
+            init_zero(&temp_dividend, MAX_BIGNUM_SIZE);
+            for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
+                temp_dividend.d[i] = current_dividend.d[i];
+            }
+            bn_add(&current_dividend, &temp_dividend, &bn_one);
+        } else {
+            break;  // End the loop if we've tested all dividends
         }
-        bn_add(&bn_dividend, &bn_dividend_temp, &bn_one);
-        // break; // TODO: Remove break
     }
 
-    printf("%llu tests passed_\n", tests_passed);
-    bn_print_bn("bn_dividend = ", &bn_dividend);
-    bn_print_bn("bn_divisor = ", &bn_divisor);
+    printf("%llu tests passed\n", tests_passed);
+    bn_print_bn("Final dividend = ", &current_dividend);
+    bn_print_bn("Final divisor = ", &current_divisor);
     return 0;
 }
