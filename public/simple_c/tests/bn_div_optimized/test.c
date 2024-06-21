@@ -17,8 +17,8 @@
 // Number of hexadecimal symbols in a BN_ULONG value
 // Each hexadecimal symbol represents 4 bits
 #define BN_ULONG_NUM_SYMBOLS BN_ULONG_NUM_BITS/4
-#define WORDS 2
-#define MAX_BIGNUM_SIZE 2 // TODO: test 9
+#define WORDS 3
+#define MAX_BIGNUM_SIZE 3 // TODO: test 9
 
 typedef struct bignum_st {
   BN_ULONG d[MAX_BIGNUM_SIZE];
@@ -359,7 +359,7 @@ void absolute_subtract(BIGNUM_CUDA *result, BIGNUM_CUDA *a, BIGNUM_CUDA *b) {
     result->top = max_top;
 
     for (int i = 0; i < max_top; ++i) {
-        BN_ULONG ai = (i < a->top) ? a->d[i] : 0;
+        BN_ULONG ai = (i < a->top) ? a->d[i] : 0; // TODO: Check, do we need to replace i < a->top with i <= a->top
         BN_ULONG bi = (i < b->top) ? b->d[i] : 0;
 
         // Calculate the word subtraction with borrow
@@ -412,6 +412,36 @@ unsigned char bn_add(BIGNUM_CUDA *result, BIGNUM_CUDA *a, BIGNUM_CUDA *b) {
     // Lastly, normalize the result to remove any leading zeros that could have appeared.
     find_top(result, MAX_BIGNUM_SIZE);
     return 1;
+}
+
+void left_shift(BIGNUM_CUDA *a, int shift) {
+    if (shift == 0) return;  // No shift needed
+
+    int word_shift = shift / BN_ULONG_NUM_BITS;
+    int bit_shift = shift % BN_ULONG_NUM_BITS;
+
+    // Shift whole words
+    if (word_shift > 0) {
+        for (int i = MAX_BIGNUM_SIZE - 1; i >= word_shift; i--) {
+            a->d[i] = a->d[i - word_shift];
+        }
+        for (int i = 0; i < word_shift; i++) {
+            a->d[i] = 0;
+        }
+    }
+
+    // Shift remaining bits
+    if (bit_shift > 0) {
+        BN_ULONG carry = 0;
+        for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
+            BN_ULONG new_carry = a->d[i] >> (BN_ULONG_NUM_BITS - bit_shift);
+            a->d[i] = (a->d[i] << bit_shift) | carry;
+            carry = new_carry;
+        }
+    }
+
+    // Update top
+    a->top = find_top(a, MAX_BIGNUM_SIZE);
 }
 
 int bn_div(BIGNUM_CUDA *bn_dividend, BIGNUM_CUDA *bn_divisor, BIGNUM_CUDA *bn_quotient, BIGNUM_CUDA *bn_remainder)
@@ -491,14 +521,14 @@ int bn_div(BIGNUM_CUDA *bn_dividend, BIGNUM_CUDA *bn_divisor, BIGNUM_CUDA *bn_qu
         printf(" < ");
         bn_print_bn_line("", &shifted_dividend);
 
-        BN_ULONG dividend_top_word = shifted_dividend.d[0];
+        BN_ULONG dividend_least_significant_word = shifted_dividend.d[MAX_BIGNUM_SIZE-1];
         BIGNUM_CUDA multiplied_divisor;
         init_zero(&multiplied_divisor, MAX_BIGNUM_SIZE);
         for (int i = 0; i < WORDS; i++) {
             multiplied_divisor.d[i] = divisor_top_word.d[i];
         }
         BN_ULONG divisor_multiplicator = 1;
-        while (multiplied_divisor.d[0] < dividend_top_word) {
+        while (multiplied_divisor.d[0] < dividend_least_significant_word) {
             BIGNUM_CUDA result;
             init_zero(&result, MAX_BIGNUM_SIZE);
             bn_add(&result, &multiplied_divisor, &divisor_top_word); // result, a, b
@@ -508,7 +538,7 @@ int bn_div(BIGNUM_CUDA *bn_dividend, BIGNUM_CUDA *bn_divisor, BIGNUM_CUDA *bn_qu
 
             divisor_multiplicator++;
         }
-        if (multiplied_divisor.d[0] > dividend_top_word) {
+        if (multiplied_divisor.d[0] > dividend_least_significant_word) {
             multiplied_divisor.d[0] -= divisor_top_word.d[0];
             divisor_multiplicator--;
         }
@@ -520,16 +550,16 @@ int bn_div(BIGNUM_CUDA *bn_dividend, BIGNUM_CUDA *bn_divisor, BIGNUM_CUDA *bn_qu
         //printf("\nmultiplied_divisor = %016llX\n", multiplied_divisor);
         bn_print_bn("multiplied_divisor = ", &multiplied_divisor);
         
-        printf("\n# 3. %016llX - %016llX\n", dividend_top_word, multiplied_divisor.d[0]);
-        subtraction_result = dividend_top_word - multiplied_divisor.d[0];
+        printf("\n# 3. %016llX - %016llX\n", dividend_least_significant_word, multiplied_divisor.d[0]);
+        subtraction_result = dividend_least_significant_word - multiplied_divisor.d[0];
         printf("subtraction_result = %016llX\n", subtraction_result);
 
         printf("\n# 4. Assign the next symbol of the dividend to the remainder\n");
         for (int i = 0; i < WORDS; i++) {
             shifted_dividend.d[i] = bn_dividend->d[i];
         }
-        dividend_top_word = shifted_dividend.d[0];
-        printf("dividend_top_word = %016llX\n", dividend_top_word);
+        dividend_least_significant_word = shifted_dividend.d[0];
+        printf("dividend_least_significant_word = %016llX\n", dividend_least_significant_word);
 
         if (start_symbol == 0) {
             printf("Start_symbol is 0. Finish the division\n");
@@ -537,7 +567,7 @@ int bn_div(BIGNUM_CUDA *bn_dividend, BIGNUM_CUDA *bn_divisor, BIGNUM_CUDA *bn_qu
         }
         
         printf("start_symbol = %d\n", start_symbol -1);
-        BN_ULONG next_symbol = dividend_top_word >> (4 * (start_symbol -1)) & 0xF;
+        BN_ULONG next_symbol = dividend_least_significant_word >> (4 * (start_symbol -1)) & 0xF;
         printf("next_symbol = %X\n", next_symbol);
         
         subtraction_result <<= 4;
@@ -656,14 +686,25 @@ int main()
     init_zero(&bn_divisor_end, MAX_BIGNUM_SIZE);
     
     // Set initial and end values for dividend and divisor
-    bn_dividend.d[0] = 0x7e;
-    bn_dividend.d[1] = 0xda005671ffb0c893;
-    bn_dividend_end.d[0] = 0x7e;
-    bn_dividend_end.d[1] = 0xda005671ffb0c899;
+    bn_dividend.d[0] = 0x35f;
+    bn_dividend.d[1] = 0x7e;
+    bn_dividend.d[2] = 0xda005671ffb0c893;
+    bn_dividend_end.d[0] = 0x35f;
+    bn_dividend_end.d[1] = 0x7e;
+    bn_dividend_end.d[2] = 0xda005671ffb0c899;
     bn_divisor.d[0] = 0x0;
-    bn_divisor.d[1] = 0xab2f000e3f00d97;
+    bn_divisor.d[1] = 0x0;
+    bn_divisor.d[2] = 0xab2f000e3f00d97;
     bn_divisor_end.d[0] = 0x0;
-    bn_divisor_end.d[1] = 0xab2f000e3f00d99;
+    bn_divisor_end.d[1] = 0x0;
+    bn_divisor_end.d[2] = 0xab2f000e3f00d99;
+
+    BIGNUM_CUDA bn_one;
+    init_zero(&bn_one, MAX_BIGNUM_SIZE);
+    bn_one.d[0] = 0x0;
+    bn_one.d[1] = 0x0;
+    bn_one.d[2] = 0x1;
+    reverse_order(bn_one.d);
 
     // Reverse order of dividend and divisor because of different endianness
     reverse_order(bn_dividend.d);
@@ -672,11 +713,6 @@ int main()
     reverse_order(bn_divisor_end.d);
 
     BIGNUM_CUDA bn_quotient, bn_remainder;
-    BIGNUM_CUDA bn_one;
-    init_zero(&bn_one, MAX_BIGNUM_SIZE);
-    bn_one.d[1] = 0x1;
-    reverse_order(bn_one.d);
-
     BIGNUM_CUDA current_dividend, current_divisor;
     init_zero(&current_dividend, MAX_BIGNUM_SIZE);
     init_zero(&current_divisor, MAX_BIGNUM_SIZE);
