@@ -9,8 +9,8 @@
 // Number of hexadecimal symbols in a BN_ULONG value
 // Each hexadecimal symbol represents 4 bits
 #define BN_ULONG_NUM_SYMBOLS BN_ULONG_NUM_BITS/4
-#define WORDS 3
-#define MAX_BIGNUM_SIZE 3 // TODO: test 9
+#define WORDS 9
+#define MAX_BIGNUM_SIZE 9
 
 typedef struct bignum_st {
   BN_ULONG d[MAX_BIGNUM_SIZE];
@@ -749,18 +749,45 @@ int main()
     init_zero(&bn_divisor_end, MAX_BIGNUM_SIZE);
     
     // Set initial and end values for dividend and divisor
-    bn_dividend.d[0] = 0x0; //0x35f;
-    bn_dividend.d[1] = 0x7e000000000000; //0x7e;
-    bn_dividend.d[2] = 0xda005671ffb0c893;
-    bn_dividend_end.d[0] = 0x0;
-    bn_dividend_end.d[1] = 0x7e000000000000;
-    bn_dividend_end.d[2] = 0xda005671ffb0c893;
+    bn_dividend.d[0] = 0xf0;
+    bn_dividend.d[1] = 0x0;
+    bn_dividend.d[2] = 0x0;
+    bn_dividend.d[3] = 0x20;
+    bn_dividend.d[4] = 0x0;
+    bn_dividend.d[5] = 0x0;
+    bn_dividend.d[6] = 0x48fd0000ab7800;
+    bn_dividend.d[7] = 0x7e000000000000;
+    bn_dividend.d[8] = 0xda005671ffb0c893;
+    
+    bn_dividend_end.d[0] = 0xf0;
+    bn_dividend_end.d[1] = 0x0;
+    bn_dividend_end.d[2] = 0x0;
+    bn_dividend_end.d[3] = 0x20;
+    bn_dividend_end.d[4] = 0x0;
+    bn_dividend_end.d[5] = 0x0;
+    bn_dividend_end.d[6] = 0x48fd0000ab7800;
+    bn_dividend_end.d[7] = 0x7e000000000000;
+    bn_dividend_end.d[8] = 0xda005671ffb0c893;
+    
     bn_divisor.d[0] = 0x0;
     bn_divisor.d[1] = 0x0;
-    bn_divisor.d[2] = 0xab2f000e3f00d97;
+    bn_divisor.d[2] = 0x70;
+    bn_divisor.d[3] = 0x0;
+    bn_divisor.d[4] = 0x0;
+    bn_divisor.d[5] = 0x0;
+    bn_divisor.d[6] = 0xff1010000020;
+    bn_divisor.d[7] = 0x47d98a45df000470;
+    bn_divisor.d[8] = 0xab2f000e3f00d97;
+    
     bn_divisor_end.d[0] = 0x0;
     bn_divisor_end.d[1] = 0x0;
-    bn_divisor_end.d[2] = 0xab2f000e3f00d97;
+    bn_divisor_end.d[2] = 0x70;
+    bn_divisor_end.d[3] = 0x0;
+    bn_divisor_end.d[4] = 0x0;
+    bn_divisor_end.d[5] = 0x0;
+    bn_divisor_end.d[6] = 0xff1010000020;
+    bn_divisor_end.d[7] = 0x47d98a45df000470;
+    bn_divisor_end.d[8] = 0xab2f000e3f00d97;
 
     BIGNUM_CUDA bn_one;
     init_zero(&bn_one, MAX_BIGNUM_SIZE);
