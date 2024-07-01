@@ -603,57 +603,76 @@ int bn_div(BIGNUM_CUDA *bn_dividend, BIGNUM_CUDA *bn_divisor, BIGNUM_CUDA *bn_qu
         return 0;
     }
 
-    // Initialize variables
+    // Initialize quotient and remainder
     init_zero(bn_quotient, MAX_BIGNUM_SIZE);
     init_zero(bn_remainder, MAX_BIGNUM_SIZE);
-    
-    // Copy dividend to remainder
-    for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
-        bn_remainder->d[i] = bn_dividend->d[i];
+
+    // Find the actual size of dividend and divisor
+    int dividend_size = find_top(bn_dividend, MAX_BIGNUM_SIZE);
+    int divisor_size = find_top(bn_divisor, MAX_BIGNUM_SIZE);
+
+    // If dividend < divisor, quotient is 0 and remainder is dividend
+    if (bn_cmp(bn_dividend, bn_divisor) < 0) {
+        for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
+            bn_remainder->d[i] = bn_dividend->d[i];
+        }
+        return 1;
     }
 
-    BIGNUM_CUDA temp_divisor, temp_quotient, one;
-    init_zero(&temp_divisor, MAX_BIGNUM_SIZE);
-    init_zero(&temp_quotient, MAX_BIGNUM_SIZE);
-    init_zero(&one, MAX_BIGNUM_SIZE);
-    one.d[0] = 1;
+    // Perform long division
+    BIGNUM_CUDA current_dividend;
+    init_zero(&current_dividend, MAX_BIGNUM_SIZE);
 
-    while (bn_cmp(bn_remainder, bn_divisor) >= 0) {
-        // Find the largest multiple of the divisor <= remainder
-        for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
-            temp_divisor.d[i] = bn_divisor->d[i];
-            temp_quotient.d[i] = one.d[i];
-        }
+    for (int i = dividend_size - 1; i >= 0; i--) {
+        // Shift current_dividend left by one word and add next word of dividend
+        left_shift(&current_dividend, 64);
+        current_dividend.d[0] = bn_dividend->d[i];
 
-        while (1) {
-            BIGNUM_CUDA shifted_divisor;
-            init_zero(&shifted_divisor, MAX_BIGNUM_SIZE);
-            for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
-                shifted_divisor.d[i] = temp_divisor.d[i];
+        // Find quotient digit
+        BN_ULONG q = 0;
+        BN_ULONG left = 0, right = 0xFFFFFFFFFFFFFFFF;
+        while (left <= right) {
+            BN_ULONG mid = left + (right - left) / 2;
+            BIGNUM_CUDA temp;
+            init_zero(&temp, MAX_BIGNUM_SIZE);
+            temp.d[0] = mid;
+
+            BIGNUM_CUDA product;
+            init_zero(&product, MAX_BIGNUM_SIZE);
+            bn_mul(bn_divisor, &temp, &product);
+
+            if (bn_cmp(&product, &current_dividend) <= 0) {
+                q = mid;
+                left = mid + 1;
+            } else {
+                right = mid - 1;
             }
-            left_shift(&shifted_divisor, 1);
-
-            if (bn_cmp(&shifted_divisor, bn_remainder) > 0) {
-                break;
-            }
-            left_shift(&temp_divisor, 1);
-            left_shift(&temp_quotient, 1);
         }
 
-        // Subtract the multiple from the remainder and add to quotient
-        BIGNUM_CUDA new_remainder;
-        init_zero(&new_remainder, MAX_BIGNUM_SIZE);
-        bn_subtract(&new_remainder, bn_remainder, &temp_divisor);
-        for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
-            bn_remainder->d[i] = new_remainder.d[i];
-        }
+        // Add quotient digit to result
+        left_shift(bn_quotient, 64);
+        bn_quotient->d[0] |= q;
 
-        BIGNUM_CUDA new_quotient;
-        init_zero(&new_quotient, MAX_BIGNUM_SIZE);
-        bn_add(&new_quotient, bn_quotient, &temp_quotient);
-        for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
-            bn_quotient->d[i] = new_quotient.d[i];
+        // Subtract q * divisor from current_dividend
+        BIGNUM_CUDA temp;
+        init_zero(&temp, MAX_BIGNUM_SIZE);
+        temp.d[0] = q;
+
+        BIGNUM_CUDA product;
+        init_zero(&product, MAX_BIGNUM_SIZE);
+        bn_mul(bn_divisor, &temp, &product);
+
+        BIGNUM_CUDA new_current_dividend;
+        init_zero(&new_current_dividend, MAX_BIGNUM_SIZE);
+        bn_subtract(&new_current_dividend, &current_dividend, &product);
+        for (int j = 0; j < MAX_BIGNUM_SIZE; j++) {
+            current_dividend.d[j] = new_current_dividend.d[j];
         }
+    }
+
+    // Set remainder
+    for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
+        bn_remainder->d[i] = current_dividend.d[i];
     }
 
     bn_print_bn("bn_quotient = ", bn_quotient);
