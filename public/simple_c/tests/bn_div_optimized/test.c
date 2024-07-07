@@ -82,7 +82,7 @@ void bn_print_bn(const char *msg, BIGNUM_CUDA *a) {
         if (i == MAX_BIGNUM_SIZE - 1) {
             printf("%llx", a->d[i]);
         } else {
-            printf(" %016llx", a->d[i]);
+            printf("%016llx", a->d[i]);
             //printf("#%016llx", a->d[i]);
         }
     }
@@ -524,6 +524,36 @@ void left_shift(BIGNUM_CUDA *a, int shift) {
     printf("\n");
 }
 
+void right_shift(BIGNUM_CUDA *a, int shift) {
+    if (shift == 0) return;  // No shift needed
+
+    int word_shift = shift / BN_ULONG_NUM_BITS;
+    int bit_shift = shift % BN_ULONG_NUM_BITS;
+
+    // Handle full word shifts
+    if (word_shift > 0) {
+        for (int i = 0; i < MAX_BIGNUM_SIZE - word_shift; i++) {
+            a->d[i] = a->d[i + word_shift];
+        }
+        for (int i = MAX_BIGNUM_SIZE - word_shift; i < MAX_BIGNUM_SIZE; i++) {
+            a->d[i] = 0;
+        }
+    }
+
+    // Handle remaining bit shifts
+    if (bit_shift > 0) {
+        BN_ULONG carry = 0;
+        for (int i = MAX_BIGNUM_SIZE - 1; i >= 0; i--) {
+            BN_ULONG next_carry = a->d[i] << (BN_ULONG_NUM_BITS - bit_shift);
+            a->d[i] = (a->d[i] >> bit_shift) | carry;
+            carry = next_carry;
+        }
+    }
+
+    // Update top
+    a->top = find_top(a, MAX_BIGNUM_SIZE);
+}
+
 unsigned long long umul64hi(unsigned long long a, unsigned long long b) {
     unsigned long long lo, hi;
     __uint128_t product = (__uint128_t)a * b;
@@ -589,11 +619,203 @@ void bn_mul(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
     // printf("-- bn_mul --\n");
 }
 
+BN_ULONG estimate_quotient_digit(BIGNUM_CUDA *partial_remainder, BIGNUM_CUDA *divisor) {
+    int n = MAX_BIGNUM_SIZE - 1;
+    BN_ULONG q;
+
+    if (bn_cmp(partial_remainder, divisor) < 0) {
+        printf("Estimate: 0 (partial_remainder < divisor)\n");
+        return 0;
+    }
+
+    if (partial_remainder->d[n] >= divisor->d[n]) {
+        q = UINT64_MAX; // 2^64 - 1
+    } else {
+        q = (partial_remainder->d[n] << 64 | partial_remainder->d[n-1]) / (divisor->d[n] + 1);
+    }
+
+    printf("Estimate details: pr[n]=%llu, pr[n-1]=%llu, d[n]=%llu, q=%llu\n", 
+           partial_remainder->d[n], partial_remainder->d[n-1], divisor->d[n], q);
+    return q;
+}
+
+unsigned int find_most_significant_bit(BIGNUM_CUDA *a) {
+    printf("++ find_most_significant_bit ++\n");
+    bn_print_bn("Input value: ", a);
+
+    unsigned int msb = 0;
+    int found = 0;
+
+    // Iterate through words from most significant to least
+    for (int i = MAX_BIGNUM_SIZE - 1; i >= 0 && !found; i--) {
+        if (a->d[i] != 0) {
+            // Found a non-zero word
+            unsigned long long word = a->d[i];
+            for (int j = BN_ULONG_NUM_BITS - 1; j >= 0; j--) {
+                if (word & (1ULL << j)) {
+                    // Found the most significant bit in this word
+                    msb = i * BN_ULONG_NUM_BITS + j;
+                    found = 1;
+                    break;
+                }
+            }
+        }
+    }
+
+    printf("Most significant bit found at index: %u\n", msb);
+    printf("-- find_most_significant_bit --\n");
+    return msb;
+}
+
+void set_bit(BIGNUM_CUDA *a, unsigned int bit_index) {
+    printf("++ set_bit ++\n");
+    bn_print_bn("Input value before setting bit: ", a);
+    printf("Setting bit at index: %u\n", bit_index);
+
+    // Calculate which word the bit is in
+    unsigned int word_index = bit_index / BN_ULONG_NUM_BITS;
+    
+    // Calculate the position of the bit within the word
+    unsigned int bit_position = bit_index % BN_ULONG_NUM_BITS;
+
+    // Check if the word_index is within the bounds of our BIGNUM_CUDA
+    if (word_index < MAX_BIGNUM_SIZE) {
+        // Set the bit using bitwise OR
+        a->d[word_index] |= (1ULL << bit_position);
+
+        // Update the top if necessary
+        if (word_index >= a->top) {
+            a->top = word_index + 1;
+        }
+    } else {
+        printf("Error: Bit index out of bounds\n");
+    }
+
+    bn_print_bn("Value after setting bit: ", a);
+    printf("-- set_bit --\n");
+}
+
+unsigned char find_most_significant_byte(BIGNUM_CUDA *a) {
+    printf("++ find_most_significant_byte ++\n");
+    bn_print_bn("Input value: ", a);
+
+    unsigned int msb = 0;
+    int found = 0;
+
+    // Iterate through words from most significant to least
+    for (int i = MAX_BIGNUM_SIZE - 1; i >= 0 && !found; i--) {
+        if (a->d[i] != 0) {
+            // Found a non-zero word
+            unsigned long long word = a->d[i];
+            for (int j = 7; j >= 0; j--) {  // 8 bytes in a 64-bit word
+                unsigned char byte = (word >> (j * 8)) & 0xFF;
+                if (byte != 0) {
+                    // Found the most significant non-zero byte in this word
+                    msb = i * 8 + j;
+                    found = 1;
+                    break;
+                }
+            }
+        }
+    }
+
+    printf("Most significant byte found at index: %u\n", msb);
+    printf("-- find_most_significant_byte --\n");
+    return msb;
+}
+
+unsigned int get_bignum_hex_length(BIGNUM_CUDA *a) {
+    // printf("++ get_bignum_hex_length ++\n");
+    bn_print_bn(">> get_bignum_hex_length: ", a);
+    printf("\n");
+
+    int length = 0;
+    BIGNUM_CUDA BN_zero;
+    init_zero(&BN_zero, MAX_BIGNUM_SIZE);
+    BIGNUM_CUDA b;
+    init_zero(&b, MAX_BIGNUM_SIZE);
+    // Copy a to b
+    for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
+        b.d[i] = a->d[i];
+    }
+    while (bn_cmp(&b, &BN_zero) > 0) {
+        // shift right
+        right_shift(&b, 4);
+        length++;
+        // break;
+    }
+    printf("<< get_bignum_hex_length: %d\n", length);
+    printf("\n");
+    // printf("-- get_bignum_hex_length --\n");
+    return length;
+}
+
+
+unsigned int get_bignum_hex_length_0(BIGNUM_CUDA *a) {
+    // printf("++ get_bignum_hex_length ++\n");
+    bn_print_bn(">> get_bignum_hex_length: ", a);
+    printf("\n");
+
+    unsigned int length = 0;
+    int found_non_zero = 0;
+
+    // Iterate through words from most significant to least
+    for (int i = MAX_BIGNUM_SIZE - 1; i >= 0; i--) {
+        unsigned long long word = a->d[i];
+        
+        if (!found_non_zero && word != 0) {
+            // Found the most significant non-zero word
+            found_non_zero = 1;
+            
+            // Count leading zeros in the most significant non-zero word
+            int leading_zeros = __builtin_clzll(word);
+            length += (64 - leading_zeros + 3) / 4; // Convert bit count to hex digit count
+            
+            // No need to process the rest of this word
+            continue;
+        }
+        
+        if (found_non_zero) {
+            // For all subsequent words, each contributes 16 hex digits
+            length += 16;
+        }
+    }
+
+    // If the number is zero, return 1 (as '0' is represented by one hex digit)
+    if (length == 0) {
+        length = 1;
+    }
+
+    printf("<< get_bignum_hex_length: %u", length);
+    printf("\n");
+    // printf("-- get_bignum_hex_length --\n");
+    return length;
+}
+
 int bn_div(BIGNUM_CUDA *bn_dividend, BIGNUM_CUDA *bn_divisor, BIGNUM_CUDA *bn_quotient, BIGNUM_CUDA *bn_remainder)
 {
     printf("++ bn_div ++\n");
     bn_print_bn("bn_dividend = ", bn_dividend);
     bn_print_bn("bn_divisor = ", bn_divisor);
+    int msh_diff = get_bignum_hex_length(bn_dividend) - get_bignum_hex_length(bn_divisor);
+    printf("#### %d\n", msh_diff);
+
+    unsigned char msb_dividend = get_bignum_hex_length(bn_dividend);
+    unsigned char msb_divisor = get_bignum_hex_length(bn_divisor);
+    unsigned char shift = msb_dividend - msb_divisor;
+
+    BIGNUM_CUDA aligned_dividend;
+    init_zero(&aligned_dividend, MAX_BIGNUM_SIZE);
+    // left_shift(bn_dividend, shift, aligned_dividend);
+
+    // while (shift >= 0) {
+    //     if (aligned_dividend >= bn_divisor) {
+    //         subtract(aligned_dividend, divisor, &aligned_dividend);
+    //         set_bit(quotient, shift);
+    //     }
+    //     right_shift(&aligned_dividend, 1);
+    //     shift--;
+    // }
 
     // Handle the case where the divisor is zero
     BIGNUM_CUDA bn_zero;
@@ -758,7 +980,33 @@ void openssl_div(BIGNUM_CUDA *bn_dividend, BIGNUM_CUDA *bn_divisor, BIGNUM_CUDA 
     BN_CTX_free(ctx);
 }
 
-int main()
+// Helper function to generate a random 64-bit unsigned integer
+BN_ULONG rand_uint64() {
+    return ((BN_ULONG)rand() << 32) | rand();
+}
+
+// Generate a random BIGNUM_CUDA with a specified number of words
+void generate_random_bignum(BIGNUM_CUDA *bn, int num_words) {
+    init_zero(bn, MAX_BIGNUM_SIZE);
+    for (int i = 0; i < num_words; i++) {
+        bn->d[i] = rand_uint64();
+    }
+    bn->top = find_top(bn, MAX_BIGNUM_SIZE);
+}
+
+// Ensure divisor is less than or equal to dividend
+void adjust_divisor(BIGNUM_CUDA *divisor, BIGNUM_CUDA *dividend) {
+    while (bn_cmp(divisor, dividend) > 0) {
+        for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
+            divisor->d[i] >>= 1;
+        }
+        divisor->top = find_top(divisor, MAX_BIGNUM_SIZE);
+    }
+}
+
+
+
+int main_fixed()
 {
     unsigned long long tests_passed = 0;
     BIGNUM_CUDA bn_dividend, bn_divisor, bn_dividend_end, bn_divisor_end;
@@ -768,51 +1016,57 @@ int main()
     init_zero(&bn_divisor_end, MAX_BIGNUM_SIZE);
     
     // Set initial and end values for dividend and divisor
-    bn_dividend.d[0] = 0xf0;
-    bn_dividend.d[1] = 0x0;
-    bn_dividend.d[2] = 0x0;
-    bn_dividend.d[3] = 0x20;
-    bn_dividend.d[4] = 0x0;
-    bn_dividend.d[5] = 0x0;
-    bn_dividend.d[6] = 0x48fd0000ab7800;
-    bn_dividend.d[7] = 0x7e000000000000;
-    bn_dividend.d[8] = 0xda005671ffb0c893;
+    bn_dividend.d[0] = 0x3ed283a825b42270;
+    bn_dividend.d[1] = 0x4784810a5f24738a;
+    bn_dividend.d[2] = 0x00b98f9c393b0f2e;
+    bn_dividend.d[3] = 0x482aa0a22888bfe2;
+    bn_dividend.d[4] = 0x07d48f3a0e0836b6;
+    bn_dividend.d[5] = 0x7f815f9a69ca3854;
+    bn_dividend.d[6] = 0x70a173882ae69475;
+    bn_dividend.d[7] = 0x207281887e16a058;
+    bn_dividend.d[8] = 0x4f8c23302a77ff9d;
     
-    bn_dividend_end.d[0] = 0xf0;
-    bn_dividend_end.d[1] = 0x0;
-    bn_dividend_end.d[2] = 0x0;
-    bn_dividend_end.d[3] = 0x20;
-    bn_dividend_end.d[4] = 0x0;
-    bn_dividend_end.d[5] = 0x0;
-    bn_dividend_end.d[6] = 0x48fd0000ab7800;
-    bn_dividend_end.d[7] = 0x7e000000000000;
-    bn_dividend_end.d[8] = 0xda005671ffb0c893;
+    bn_dividend_end.d[0] = 0x3ed283a825b42270;
+    bn_dividend_end.d[1] = 0x4784810a5f24738a;
+    bn_dividend_end.d[2] = 0x00b98f9c393b0f2e;
+    bn_dividend_end.d[3] = 0x482aa0a22888bfe2;
+    bn_dividend_end.d[4] = 0x07d48f3a0e0836b6;
+    bn_dividend_end.d[5] = 0x7f815f9a69ca3854;
+    bn_dividend_end.d[6] = 0x70a173882ae69475;
+    bn_dividend_end.d[7] = 0x207281887e16a058;
+    bn_dividend_end.d[8] = 0x4f8c23302a77ff9d;
     
-    bn_divisor.d[0] = 0x0;
-    bn_divisor.d[1] = 0x0;
-    bn_divisor.d[2] = 0x70;
-    bn_divisor.d[3] = 0x0;
-    bn_divisor.d[4] = 0x0;
-    bn_divisor.d[5] = 0x0;
-    bn_divisor.d[6] = 0xff1010000020;
-    bn_divisor.d[7] = 0x47d98a45df000470;
-    bn_divisor.d[8] = 0xab2f000e3f00d97;
+    bn_divisor.d[0] = 0x25a9218055c0fb74;
+    bn_divisor.d[1] = 0x2ada66ff5112b434;
+    bn_divisor.d[2] = 0x52fc13dc3507adf8;
+    bn_divisor.d[3] = 0x0a8fae5a0a67e576;
+    bn_divisor.d[4] = 0x489ee1b9036ff0ac;
+    bn_divisor.d[5] = 0x01583cb8211584bb;
+    bn_divisor.d[6] = 0x42afce0e0068022e;
+    bn_divisor.d[7] = 0x4132f86a7fd78497;
+    bn_divisor.d[8] = 0x332787004d1e4b69;
     
-    bn_divisor_end.d[0] = 0x0;
-    bn_divisor_end.d[1] = 0x0;
-    bn_divisor_end.d[2] = 0x70;
-    bn_divisor_end.d[3] = 0x0;
-    bn_divisor_end.d[4] = 0x0;
-    bn_divisor_end.d[5] = 0x0;
-    bn_divisor_end.d[6] = 0xff1010000020;
-    bn_divisor_end.d[7] = 0x47d98a45df000470;
-    bn_divisor_end.d[8] = 0xab2f000e3f00d97;
+    bn_divisor_end.d[0] = 0x25a9218055c0fb74;
+    bn_divisor_end.d[1] = 0x2ada66ff5112b434;
+    bn_divisor_end.d[2] = 0x52fc13dc3507adf8;
+    bn_divisor_end.d[3] = 0x0a8fae5a0a67e576;
+    bn_divisor_end.d[4] = 0x489ee1b9036ff0ac;
+    bn_divisor_end.d[5] = 0x01583cb8211584bb;
+    bn_divisor_end.d[6] = 0x42afce0e0068022e;
+    bn_divisor_end.d[7] = 0x4132f86a7fd78497;
+    bn_divisor_end.d[8] = 0x332787004d1e4b69;
 
     BIGNUM_CUDA bn_one;
     init_zero(&bn_one, MAX_BIGNUM_SIZE);
     bn_one.d[0] = 0x0;
     bn_one.d[1] = 0x0;
-    bn_one.d[2] = 0x1;
+    bn_one.d[2] = 0x0;
+    bn_one.d[3] = 0x0;
+    bn_one.d[4] = 0x0;
+    bn_one.d[5] = 0x0;
+    bn_one.d[6] = 0x0;
+    bn_one.d[7] = 0x0;
+    bn_one.d[8] = 0x1;
     reverse_order(bn_one.d);
 
     // Reverse order of dividend and divisor because of different endianness
@@ -916,5 +1170,69 @@ int main()
     printf("%llu tests passed\n", tests_passed);
     bn_print_bn("Final dividend = ", &current_dividend);
     bn_print_bn("Final divisor = ", &current_divisor);
+    return 0;
+}
+
+int main() {
+    srand(time(NULL));  // Initialize random seed
+
+    int N = 100;  // Number of tests to run
+    unsigned long long tests_passed = 0;
+
+    for (int test = 0; test < N; test++) {
+        BIGNUM_CUDA bn_dividend, bn_divisor;
+        
+        // Randomly decide the number of words for dividend (1 to 9)
+        int dividend_words = rand() % 9 + 1;
+        generate_random_bignum(&bn_dividend, dividend_words);
+
+        // Generate divisor with same or fewer words
+        int divisor_words = rand() % dividend_words + 1;
+        generate_random_bignum(&bn_divisor, divisor_words);
+
+        // Ensure divisor is less than or equal to dividend
+        adjust_divisor(&bn_divisor, &bn_dividend);
+
+        BIGNUM_CUDA bn_quotient, bn_remainder;
+        BIGNUM_CUDA bn_expected_quotient, bn_expected_remainder;
+
+        // OpenSSL test
+        openssl_div(&bn_dividend, &bn_divisor, &bn_expected_quotient, &bn_expected_remainder);
+
+        // CUDA division
+        if (!bn_div(&bn_dividend, &bn_divisor, &bn_quotient, &bn_remainder)) {
+            printf("Error: bn_div failed\n");
+            return 1;
+        }
+        int msh_diff = get_bignum_hex_length(&bn_dividend) - get_bignum_hex_length(&bn_divisor);
+
+        if (bn_cmp(&bn_quotient, &bn_expected_quotient) != 0 || bn_cmp(&bn_remainder, &bn_expected_remainder) != 0) {
+            printf("Error: Division test failed for test %d\n", test + 1);
+            printf("Dividend: ");
+            bn_print_bn("", &bn_dividend);
+            printf("Divisor: ");
+            bn_print_bn("", &bn_divisor);
+            printf("Expected quotient: ");
+            bn_print_bn("", &bn_expected_quotient);
+            printf("Actual quotient: ");
+            bn_print_bn("", &bn_quotient);
+            printf("Expected remainder: ");
+            bn_print_bn("", &bn_expected_remainder);
+            printf("Actual remainder: ");
+            bn_print_bn("", &bn_remainder);
+            printf("Tests passed before failure: %llu\n", tests_passed);
+            // print most signioficant hex diff
+            printf("####FAIL %d\n", msh_diff);
+            // printf("Most significant hex dividend: %d\n", get_bignum_hex_length(&bn_dividend));
+            // printf("Most significant hex divisor: %d\n", get_bignum_hex_length(&bn_divisor));            
+            return 1;
+        }
+        // printf("Most significant hex dividend: %d\n", get_bignum_hex_length(&bn_dividend));
+        // printf("Most significant hex divisor: %d\n", get_bignum_hex_length(&bn_divisor));
+        // printf("####OK %d\n", msh_diff);
+        tests_passed++;
+    }
+
+    printf("%llu out of %d tests passed\n", tests_passed, N);
     return 0;
 }
