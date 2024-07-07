@@ -9,8 +9,8 @@
 // Number of hexadecimal symbols in a BN_ULONG value
 // Each hexadecimal symbol represents 4 bits
 #define BN_ULONG_NUM_SYMBOLS BN_ULONG_NUM_BITS/4
-#define WORDS 9
-#define MAX_BIGNUM_SIZE 9
+#define WORDS 10
+#define MAX_BIGNUM_SIZE 10 // It should be always one more than the actual size to store the edge case carry
 
 typedef struct bignum_st {
   BN_ULONG d[MAX_BIGNUM_SIZE];
@@ -1176,7 +1176,7 @@ int main_fixed()
 int main() {
     srand(time(NULL));  // Initialize random seed
 
-    int N = 100;  // Number of tests to run
+    int N = 10000;  // Number of tests to run
     unsigned long long tests_passed = 0;
 
     for (int test = 0; test < N; test++) {
