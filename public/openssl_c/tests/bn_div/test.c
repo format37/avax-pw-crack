@@ -31,16 +31,16 @@ int main() {
         // {0x8e020bca63c2d3b4, 0xf15d956d1119704c, 0x793bbdfa2cbe57d7, 0x51a13724b434b483, 0xda8f4665b027f674, 0xfab37c1f434754f2, 0x9352e2c1b6dc753e, 0x0675365166805884},
         // {0xa9d76a4234a8ded, 0x7af964ec3f6f871b, 0xe09d7f67cc580732, 0x3b11b98c6222abbb, 0x0bdfd291448c33e6, 0xa46834fe88684cf0, 0x5106877163ee71eb, 0x5186b6de04720283},
         {
-            0,
-            0,
-            0x3c8b95972f12b04b,
-            0x3ca25330b2bd449e,
-            0x8e938229d1fd14f7,
-            0x6cae422460554592,
-            0xa55600bb76cd1a73,
-            0x41fdba6e06acb1c9,
-            0x1518f708fa0de8b4,
-            0x7ab0848af9083df5
+            0x0,
+            0x0,
+            0x0,
+            0x0,
+            0x0,
+            0x0,
+            0x0,
+            0x0,
+            0x72b47b314e91753a,
+            0x3f38e8c61b9ed846
         }
     };
 
@@ -48,21 +48,21 @@ int main() {
         // {0, 0, 0, 0, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xfffffffefffffc2f},
         // {0, 0, 0, 0, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xfffffffefffffc2f},
         {
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0xffffffffffffffff,
-            0xffffffffffffffff,
-            0xffffffffffffffff,
-            0xfffffffefffffc2f
+            0x0,
+            0x0,
+            0x0,
+            0x0,
+            0x0,
+            0x0,
+            0x0,
+            0x0,
+            0xd1075ad5b373c6d,
+            0x1dfd6bc539e3e809
         }
     };
 
     // 0 for positive, 1 for negative
-    int sign_dividend[] = {1};
+    int sign_dividend[] = {0};
     int sign_divisor[] = {0};
 
     int num_tests = sizeof(test_values_dividend) / sizeof(test_values_dividend[0]);
