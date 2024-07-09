@@ -844,23 +844,6 @@ int bn_div(BIGNUM_CUDA *bn_dividend, BIGNUM_CUDA *bn_divisor, BIGNUM_CUDA *bn_qu
     int msh_diff = get_bignum_hex_length(bn_dividend) - get_bignum_hex_length(bn_divisor);
     printf("#### %d\n", msh_diff);
 
-    unsigned char msb_dividend = get_bignum_hex_length(bn_dividend);
-    unsigned char msb_divisor = get_bignum_hex_length(bn_divisor);
-    unsigned char shift = msb_dividend - msb_divisor;
-
-    BIGNUM_CUDA aligned_dividend;
-    init_zero(&aligned_dividend, MAX_BIGNUM_SIZE);
-    // left_shift(bn_dividend, shift, aligned_dividend);
-
-    // while (shift >= 0) {
-    //     if (aligned_dividend >= bn_divisor) {
-    //         subtract(aligned_dividend, divisor, &aligned_dividend);
-    //         set_bit(quotient, shift);
-    //     }
-    //     right_shift(&aligned_dividend, 1);
-    //     shift--;
-    // }
-
     // Handle the case where the divisor is zero
     BIGNUM_CUDA bn_zero;
     init_zero(&bn_zero, MAX_BIGNUM_SIZE);
@@ -868,6 +851,22 @@ int bn_div(BIGNUM_CUDA *bn_dividend, BIGNUM_CUDA *bn_divisor, BIGNUM_CUDA *bn_qu
         printf("Error: Division by zero\n");
         return 0;
     }
+
+    // Determine the sign of the quotient
+    int quotient_neg = (bn_dividend->neg != bn_divisor->neg);
+
+    // Create temporary absolute values for dividend and divisor
+    BIGNUM_CUDA abs_dividend, abs_divisor;
+    init_zero(&abs_dividend, MAX_BIGNUM_SIZE);
+    init_zero(&abs_divisor, MAX_BIGNUM_SIZE);
+
+    // Copy absolute values
+    for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
+        abs_dividend.d[i] = bn_dividend->d[i];
+        abs_divisor.d[i] = bn_divisor->d[i];
+    }
+    abs_dividend.neg = 0;
+    abs_divisor.neg = 0;
 
     // Initialize quotient and remainder
     init_zero(bn_quotient, MAX_BIGNUM_SIZE);
@@ -877,18 +876,37 @@ int bn_div(BIGNUM_CUDA *bn_dividend, BIGNUM_CUDA *bn_divisor, BIGNUM_CUDA *bn_qu
     int dividend_size = find_top(bn_dividend, MAX_BIGNUM_SIZE);
     int divisor_size = find_top(bn_divisor, MAX_BIGNUM_SIZE);
 
-    // If dividend < divisor, quotient is 0 and remainder is dividend
-    if (bn_cmp(bn_dividend, bn_divisor) < 0) {
-        for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
-            bn_remainder->d[i] = bn_dividend->d[i];
-        }
+    // Handle special cases
+    if (bn_cmp(bn_dividend, bn_divisor) == 0) {
+        // If dividend equals divisor (ignoring sign), quotient is 1 or -1
+        bn_quotient->d[0] = 1;
+        bn_quotient->top = 1;
+        bn_quotient->neg = bn_dividend->neg != bn_divisor->neg;
+        
+        // Remainder is 0
+        init_zero(bn_remainder, MAX_BIGNUM_SIZE);
         return 1;
     }
+
+    // // If absolute value of dividend < absolute value of divisor
+    // if (absolute_compare(bn_dividend, bn_divisor) < 0) {
+    //     // Quotient is 0
+    //     init_zero(bn_quotient, MAX_BIGNUM_SIZE);
+        
+    //     // Remainder is dividend
+    //     for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
+    //         bn_remainder->d[i] = bn_dividend->d[i];
+    //     }
+    //     bn_remainder->neg = bn_dividend->neg;
+    //     bn_remainder->top = bn_dividend->top;
+        
+    //     printf("# |bn_dividend| < |bn_divisor|. Quotient = 0, remainder = dividend\n");
+    //     return 1;
+    // }
 
     // Perform long division
     BIGNUM_CUDA current_dividend;
     init_zero(&current_dividend, MAX_BIGNUM_SIZE);
-    // return 1; // TODO: Remove this DEBUG line. The negative numbers issue testing
     for (int i = dividend_size - 1; i >= 0; i--) {
         // Shift current_dividend left by one word and add next word of dividend
         // print [i without newline
@@ -949,6 +967,10 @@ int bn_div(BIGNUM_CUDA *bn_dividend, BIGNUM_CUDA *bn_divisor, BIGNUM_CUDA *bn_qu
         bn_remainder->d[i] = current_dividend.d[i];
     }
 
+    // After division, set the correct sign for quotient and remainder
+    bn_quotient->neg = quotient_neg;
+    bn_remainder->neg = bn_dividend->neg;
+
     bn_print_bn("bn_quotient = ", bn_quotient);
     bn_print_bn("bn_remainder = ", bn_remainder);
     printf("-- bn_div --\n");
@@ -977,8 +999,8 @@ void openssl_div(BIGNUM_CUDA *bn_dividend, BIGNUM_CUDA *bn_divisor, BIGNUM_CUDA 
     set_bignum_words(bn_openssl_dividend, bn_dividend_tmp.d, MAX_BIGNUM_SIZE);
     set_bignum_words(bn_openssl_divisor, bn_divisor_tmp.d, MAX_BIGNUM_SIZE);
     // Copy negative flags
-    // BN_set_negative(bn_openssl_dividend, bn_dividend->neg);
-    // BN_set_negative(bn_openssl_divisor, bn_divisor->neg);
+    BN_set_negative(bn_openssl_dividend, bn_dividend->neg);
+    BN_set_negative(bn_openssl_divisor, bn_divisor->neg);
 
     printf("bn_openssl_dividend = ");
     print_bn_openssl("", bn_openssl_dividend);
@@ -1006,6 +1028,8 @@ void openssl_div(BIGNUM_CUDA *bn_dividend, BIGNUM_CUDA *bn_divisor, BIGNUM_CUDA 
         j -= BN_ULONG_NUM_SYMBOLS;
     }
     bn_expected_quotient->top = i;
+    // Copy negative flag
+    bn_expected_quotient->neg = BN_is_negative(bn_openssl_quotient);
 
     i = 0;
     j = strlen(bn_remainder_str);
@@ -1017,6 +1041,8 @@ void openssl_div(BIGNUM_CUDA *bn_dividend, BIGNUM_CUDA *bn_divisor, BIGNUM_CUDA 
         j -= BN_ULONG_NUM_SYMBOLS;
     }
     bn_expected_remainder->top = i;
+    // Copy negative flag
+    bn_expected_remainder->neg = BN_is_negative(bn_openssl_remainder);
 
     // // reverse bn_expected_remainder
     // for (int i = 0; i < WORDS / 2; i++) {
@@ -1048,7 +1074,7 @@ void generate_random_bignum(BIGNUM_CUDA *bn, int num_words) {
     }
     bn->top = find_top(bn, MAX_BIGNUM_SIZE);
     // Set .neg flag randomly 0 or 1 (negative)
-    // bn->neg = (rand() % 2 == 0) ? 0 : 1;
+    // bn->neg = (rand() % 2 == 0) ? 0 : 1; // TODO: Uncomment this line
 }
 
 // Ensure divisor is less than or equal to dividend
@@ -1063,7 +1089,7 @@ void adjust_divisor(BIGNUM_CUDA *divisor, BIGNUM_CUDA *dividend) {
 
 
 
-int main_f()
+int main()
 {
     unsigned long long tests_passed = 0;
     BIGNUM_CUDA bn_dividend, bn_divisor, bn_dividend_end, bn_divisor_end;
@@ -1083,10 +1109,15 @@ int main_f()
     bn_dividend.d[8] = 0x1518f708fa0de8b4;
     bn_dividend.d[9] = 0x7ab0848af9083df5;
 
+    // set negative flag
+    bn_dividend.neg = 1;
+
     // Fill bn_dividend_end with the same values
     for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
         bn_dividend_end.d[i] = bn_dividend.d[i];
     }
+    // copy negative flag
+    bn_dividend_end.neg = bn_dividend.neg;
 
     bn_divisor.d[0] = 0x0;
     bn_divisor.d[1] = 0x0;
@@ -1097,12 +1128,17 @@ int main_f()
     bn_divisor.d[6] = 0xffffffffffffffff;
     bn_divisor.d[7] = 0xffffffffffffffff;
     bn_divisor.d[8] = 0xffffffffffffffff;
-    bn_divisor.d[9] = 0xfffffffefffffc2f;    
+    bn_divisor.d[9] = 0xfffffffefffffc2f;
+
+    // set negative flag
+    bn_divisor.neg = 0;
 
     // Fill bn_divisor_end with the same values
     for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
         bn_divisor_end.d[i] = bn_divisor.d[i];
     }
+    // copy negative flag
+    bn_divisor_end.neg = bn_divisor.neg;
 
     BIGNUM_CUDA bn_one;
     init_zero(&bn_one, MAX_BIGNUM_SIZE);
@@ -1132,14 +1168,20 @@ int main_f()
     for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
         current_dividend.d[i] = bn_dividend.d[i];
     }
+    // copy negative flag
+    current_dividend.neg = bn_dividend.neg;
 
-    while (bn_cmp(&current_dividend, &bn_dividend_end) <= 0) {
+    // while (bn_cmp(&current_dividend, &bn_dividend_end) <= 0) {
+    while (1) {
         // Reset current_divisor to initial divisor for each new dividend
         for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
             current_divisor.d[i] = bn_divisor.d[i];
         }
+        // copy negative flag
+        current_divisor.neg = bn_divisor.neg;
 
-        while (bn_cmp(&current_divisor, &bn_divisor_end) <= 0) {
+        // while (bn_cmp(&current_divisor, &bn_divisor_end) <= 0) {
+        while (1) {
             init_zero(&bn_quotient, MAX_BIGNUM_SIZE);
             init_zero(&bn_remainder, MAX_BIGNUM_SIZE);
 
@@ -1196,10 +1238,14 @@ int main_f()
                 for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
                     temp_divisor.d[i] = current_divisor.d[i];
                 }
+                // copy negative flag
+                temp_divisor.neg = current_divisor.neg;
+
                 bn_add(&current_divisor, &temp_divisor, &bn_one);
             } else {
                 break;  // Move to next dividend if we've reached the end of divisors
             }
+            break; // negative numbers issue testing
         }
 
         // Increment dividend
@@ -1209,10 +1255,14 @@ int main_f()
             for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
                 temp_dividend.d[i] = current_dividend.d[i];
             }
+            // copy negative flag
+            temp_dividend.neg = current_dividend.neg;
+
             bn_add(&current_dividend, &temp_dividend, &bn_one);
         } else {
             break;  // End the loop if we've tested all dividends
         }
+        break; // negative numbers issue testing
     }
 
     printf("%llu tests passed\n", tests_passed);
@@ -1221,7 +1271,7 @@ int main_f()
     return 0;
 }
 
-int main() {
+int main_r() {
     srand(time(NULL));  // Initialize random seed
 
     int N = 1000;  // Number of tests to run

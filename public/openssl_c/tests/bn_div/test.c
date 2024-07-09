@@ -62,7 +62,7 @@ int main() {
     };
 
     // 0 for positive, 1 for negative
-    int sign_dividend[] = {0};
+    int sign_dividend[] = {1};
     int sign_divisor[] = {0};
 
     int num_tests = sizeof(test_values_dividend) / sizeof(test_values_dividend[0]);
