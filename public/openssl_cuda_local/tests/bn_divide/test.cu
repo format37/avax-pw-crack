@@ -3,7 +3,7 @@
 #include <cuda_runtime.h>
 #include "bignum.h"
 
-#define TEST_BIGNUM_WORDS 9
+#define TEST_BIGNUM_WORDS 10
 
 __device__ void reverse_order(BN_ULONG test_values_a[][TEST_BIGNUM_WORDS], BN_ULONG test_values_b[][TEST_BIGNUM_WORDS], size_t num_rows) {
     for (size_t i = 0; i < num_rows; i++) {
@@ -20,22 +20,37 @@ __device__ void reverse_order(BN_ULONG test_values_a[][TEST_BIGNUM_WORDS], BN_UL
 }
 
 __global__ void testKernel() {
-    /*BN_ULONG test_values_dividend[][MAX_BIGNUM_WORDS] = {
-        {0xffffffffffffffff, 0xffffffffffffffe, 0xbaaedce6af48a03b, 0xbfd25e8cd0364141},
-    };
-
-    BN_ULONG test_values_divisor[][MAX_BIGNUM_WORDS] = {
-        {0x1b2db4c027cdbaba, 0x70116675aa53aa8a, 0xad1c289591e564d3, 0xcaa5c571ffccab5a},
-    };*/
 
     BN_ULONG test_values_dividend[][TEST_BIGNUM_WORDS] = {
-        // {0,0x8e020bca63c2d3b4, 0xf15d956d1119704c, 0x793bbdfa2cbe57d7, 0x51a13724b434b483, 0xda8f4665b027f674, 0xfab37c1f434754f2, 0x9352e2c1b6dc753e, 0x0675365166805884},
-        {0,0xa9d76a4234a8ded, 0x7af964ec3f6f871b, 0xe09d7f67cc580732, 0x3b11b98c6222abbb, 0x0bdfd291448c33e6, 0xa46834fe88684cf0, 0x5106877163ee71eb, 0x5186b6de04720283},
+        //{0,0xa9d76a4234a8ded, 0x7af964ec3f6f871b, 0xe09d7f67cc580732, 0x3b11b98c6222abbb, 0x0bdfd291448c33e6, 0xa46834fe88684cf0, 0x5106877163ee71eb, 0x5186b6de04720283},
+        {
+            0,
+            0,
+            0x3c8b95972f12b04b,
+            0x3ca25330b2bd449e,
+            0x8e938229d1fd14f7,
+            0x6cae422460554592,
+            0xa55600bb76cd1a73,
+            0x41fdba6e06acb1c9,
+            0x1518f708fa0de8b4,
+            0x7ab0848af9083df5
+        }
     };
 
     BN_ULONG test_values_divisor[][TEST_BIGNUM_WORDS] = {
-        // {0, 0, 0, 0, 0, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xfffffffefffffc2f},
-        {0, 0, 0, 0, 0, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xfffffffefffffc2f},
+        //{0, 0, 0, 0, 0, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xfffffffefffffc2f},
+        {
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0xffffffffffffffff,
+            0xffffffffffffffff,
+            0xffffffffffffffff,
+            0xfffffffefffffc2f
+        }
     };
 
     reverse_order(test_values_dividend, test_values_divisor, sizeof(test_values_dividend) / (sizeof(BN_ULONG) * TEST_BIGNUM_WORDS));

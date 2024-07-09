@@ -283,7 +283,7 @@ __global__ void testKernel() {
     bn_mod(&newKey, &tmp, &curveOrder); // a = b mod c
     // bn_print("<< bn_mod newKey: ", &newKey);
     // printf("(expected): 2E09165B257A4C3E52C9F4FAA6322C66CEDE807B7D6B4EC3960820795EE5447F\n");
-    bn_print("\Private key: ", &newKey);
+    bn_print("\nPrivate key: ", &newKey);
     //return; // TODO: Remove this
     // Derive the public key
     printf("\nDeriving the public key..\n");
