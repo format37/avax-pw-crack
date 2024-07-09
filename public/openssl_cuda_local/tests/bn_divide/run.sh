@@ -8,13 +8,14 @@ rm -rf run.log
 # Get the start time
 start_time=$(date +%s.%N)
 
+./program >> run.log
+
 # Get the end time
 end_time=$(date +%s.%N)
 
 # Calculate the runtime
 runtime=$(echo "$end_time - $start_time" | bc)
 
-./program >> run.log
 cat run.log
 
 # Display the runtime

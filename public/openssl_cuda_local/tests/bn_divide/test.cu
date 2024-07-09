@@ -26,14 +26,14 @@ __global__ void testKernel() {
         {
             0,
             0,
-            0x3c8b95972f12b04b,
-            0x3ca25330b2bd449e,
-            0x8e938229d1fd14f7,
-            0x6cae422460554592,
-            0xa55600bb76cd1a73,
-            0x41fdba6e06acb1c9,
-            0x1518f708fa0de8b4,
-            0x7ab0848af9083df5
+            0,
+            0,
+            0,
+            0x1,
+            0x2e09165b257a4c3e,
+            0x52c9f4faa6322c65,
+            0x898d5d622cb3eeff,
+            0x55da7f062f1b85c0
         }
     };
 
@@ -47,9 +47,9 @@ __global__ void testKernel() {
             0,
             0,
             0xffffffffffffffff,
-            0xffffffffffffffff,
-            0xffffffffffffffff,
-            0xfffffffefffffc2f
+            0xfffffffffffffffe,
+            0xbaaedce6af48a03b,
+            0xbfd25e8cd0364141
         }
     };
 
@@ -87,11 +87,11 @@ __global__ void testKernel() {
         // Test division
         success = bn_div(&quotient, &remainder, &dividend, &divisor);
         // Print results
-        if (success) {
-            printf("Success\n");
-        } else {
-            printf("Failure\n");
-        }
+        // if (success) {
+        //     printf("Success\n");
+        // } else {
+        //     printf("Failure\n");
+        // }
         bn_print("# quotient : ", &quotient);
         bn_print("# remainder: ", &remainder);
         printf("\n");

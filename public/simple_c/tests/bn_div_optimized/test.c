@@ -139,142 +139,6 @@ int bn_cmp(BIGNUM_CUDA* a, BIGNUM_CUDA* b) {
     return 0;
 }
 
-unsigned char top_word_significant_symbols(BIGNUM_CUDA *a, const unsigned char top)
-{
-    printf("++ top_word_significant_symbols ++\n");
-    bn_print_bn(">> a: ", a);
-    printf("a[top - 1] = %016llX\n", a->d[top - 1]);
-    // return 0;
-    if (MAX_BIGNUM_SIZE > 256/16) {
-        printf("Error: MAX_BIGNUM_SIZE is bigger than top_word_significant_symbols can handle. Need to increase datatype\n");
-    }
-    unsigned char count = 0;
-    for (int i = 0; i < BN_ULONG_NUM_SYMBOLS; i++) {
-        BN_ULONG word = a->d[top - 1];
-        if ((word >> 4 * i) == 0) break;
-        count++;
-    }
-    printf("-- top_word_significant_symbols --\n");
-    return count;
-}
-
-unsigned char top_significant_symbol(BIGNUM_CUDA *a)
-{
-    // printf("++ top_significant_symbol ++\n");
-    // bn_print_bn(">> a: ", a);
-    // return 0;
-    if (MAX_BIGNUM_SIZE > 256/16) {
-        printf("Error: MAX_BIGNUM_SIZE is bigger than top_word_significant_symbols can handle. Need to increase datatype\n");
-    }
-    unsigned char count = 0;
-    int found_non_zero = 0;
-    int word = 0;
-    int i = 0;
-    for (word = MAX_BIGNUM_SIZE - 1; word >= 0; word--) {
-        for (i = BN_ULONG_NUM_SYMBOLS - 1; i >= 0; i--) {
-            BN_ULONG temp = a->d[word];
-            // printf("\n[%d][%d] temp = %016llX\n", word, i, temp);
-            temp = temp >> (4 * i);
-            // printf("[%d][%d] temp = %016llX\n", word, i, temp);
-            BN_ULONG symbol = temp & 0xF;
-            // printf("[%d][%d] symbol = %X\n", word, i, symbol);
-            if (symbol != 0) {
-                found_non_zero = 1;
-                // count++;
-            } 
-            // else if (!found_non_zero) {
-            //     count++;
-            // }
-            if (found_non_zero) {
-                break;
-            }
-        }
-        if (found_non_zero) {
-            break;
-        }
-    }
-    count = word * BN_ULONG_NUM_SYMBOLS + i + 1;
-    // printf("-- top_significant_symbol --\n");
-    return count;
-}
-
-void get_value_from_to(BIGNUM_CUDA *result, BIGNUM_CUDA *words_original, const int S, const int N) {
-    // Reverse words
-    BIGNUM_CUDA words;
-    init_zero(&words, MAX_BIGNUM_SIZE);
-    for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
-        words.d[i] = words_original->d[MAX_BIGNUM_SIZE - 1 - i];
-    }
-    // Concatenate all words together
-    int full_length = MAX_BIGNUM_SIZE * BN_ULONG_NUM_SYMBOLS;
-    char all_words[full_length + 1];
-    all_words[0] = '\0';
-    for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
-        char word[BN_ULONG_NUM_SYMBOLS + 1];
-        sprintf(word, "%016llx", words.d[i]);
-        strcat(all_words, word);
-    }
-
-    // Get the start_symbol
-    int start_symbol = full_length - S;
-    // Get the final_symbol
-    int final_symbol = full_length - N;
-    // Get the substring from start_symbol to the final_symbol
-    char substring[N - S + 1];
-    strncpy(substring, all_words + final_symbol, start_symbol - final_symbol);
-    substring[start_symbol - final_symbol] = '\0';
-
-    // Get the length of the substring
-    int substring_length = strlen(substring);
-    // Calculate the padding
-    int padding = full_length - substring_length;
-
-    // Initialize the result to zero
-    init_zero(result, MAX_BIGNUM_SIZE);
-
-    // print substring for debugging
-    printf("\nSubstring [%d, %d]: %s\n", S, N, substring);
-
-    unsigned char substring_symbol_id = MAX_BIGNUM_SIZE * BN_ULONG_NUM_SYMBOLS - 1;
-    // Define the mapping of the char symbol to the BN_ULONG symbol
-    BN_ULONG char_to_ulong[256] = {0};
-    char_to_ulong['0'] = 0x0;
-    char_to_ulong['1'] = 0x1;
-    char_to_ulong['2'] = 0x2;
-    char_to_ulong['3'] = 0x3;
-    char_to_ulong['4'] = 0x4;
-    char_to_ulong['5'] = 0x5;
-    char_to_ulong['6'] = 0x6;
-    char_to_ulong['7'] = 0x7;
-    char_to_ulong['8'] = 0x8;
-    char_to_ulong['9'] = 0x9;
-    char_to_ulong['a'] = 0xa;
-    char_to_ulong['b'] = 0xb;
-    char_to_ulong['c'] = 0xc;
-    char_to_ulong['d'] = 0xd;
-    char_to_ulong['e'] = 0xe;
-    char_to_ulong['f'] = 0xf;
-    // Words: 298b56ae54fe2c3d e75656ab232452bf 0284619f7ea27d52
-    // Substring: 4fe2c3d
-    unsigned char word = 0;
-    unsigned char shifting = 0;
-    for (unsigned char i=0;i<substring_length;i++) {
-        printf("substring[%d]: %c\n", substring_length-i-1, substring[substring_length-i-1]);
-        BN_ULONG ulong_value = char_to_ulong[(unsigned char)substring[substring_length - i - 1]];
-        if (shifting == 0) {
-            result->d[word] |= ulong_value;
-        } else {
-            result->d[word] |= ulong_value << (shifting * 4);
-        }
-        shifting++;
-        if (shifting == 16) {
-            shifting = 0;
-            word++;
-        }
-    }
-    bn_print_bn("from_to: ", result);
-}
-
 int absolute_compare(const BIGNUM_CUDA* a, const BIGNUM_CUDA* b) {
     // absolute_compare logic:
     //  1 when |a| is larger
@@ -340,38 +204,6 @@ void absolute_add(BIGNUM_CUDA *result, const BIGNUM_CUDA *a, const BIGNUM_CUDA *
 
     // Find the real top after addition (no leading zeroes)
     result->top = find_top(result, MAX_BIGNUM_SIZE);
-}
-
-void absolute_subtract_wrong(BIGNUM_CUDA *result, BIGNUM_CUDA *a, BIGNUM_CUDA *b) {
-    // This function assumes both 'a' and 'b' are positive.
-    // It subtracts the absolute values |b| from |a|, where |a| >= |b|.
-    // If |a| < |b|, it's the caller's responsibility to set result->neg appropriately.
-    bn_print_bn("\n>> absolute_subtract a: ", a);
-    bn_print_bn(">> absolute_subtract b: ", b);
-    printf("a.top: %d, b.top: %d\n", a->top, b->top);
-
-    int max_top = max(a->top, b->top);
-    BN_ULONG borrow = 0;
-    result->top = max_top;
-
-    for (int i = 0; i < max_top; ++i) {
-        BN_ULONG ai = (i < a->top) ? a->d[i] : 0; // TODO: Check, do we need to replace i < a->top with i <= a->top
-        BN_ULONG bi = (i < b->top) ? b->d[i] : 0;
-
-        // Calculate the word subtraction with borrow
-        BN_ULONG sub = ai - bi - borrow;
-        result->d[i] = sub;
-        
-        // Update borrow which is 1 if subtraction underflowed, 0 otherwise.
-        borrow = (ai < bi + borrow) ? 1 : 0;
-    }
-
-    // If there's a borrow left at the last word, this means |a| was less than |b|. Set top to 0 to denote invalid result.
-    if (borrow != 0) {
-        result->top = 0;  // Set to 0 to denote invalid bignum
-        printf("Error: Underflow in subtraction, result is invalid.\n");
-    }
-    bn_print_bn("<< absolute_subtract result: ", result);
 }
 
 void absolute_subtract(BIGNUM_CUDA *result, BIGNUM_CUDA *a, BIGNUM_CUDA *b) {
@@ -568,35 +400,35 @@ void left_shift(BIGNUM_CUDA *a, int shift) {
     printf("\n");
 }
 
-void right_shift(BIGNUM_CUDA *a, int shift) {
-    if (shift == 0) return;  // No shift needed
+// void right_shift(BIGNUM_CUDA *a, int shift) {
+//     if (shift == 0) return;  // No shift needed
 
-    int word_shift = shift / BN_ULONG_NUM_BITS;
-    int bit_shift = shift % BN_ULONG_NUM_BITS;
+//     int word_shift = shift / BN_ULONG_NUM_BITS;
+//     int bit_shift = shift % BN_ULONG_NUM_BITS;
 
-    // Handle full word shifts
-    if (word_shift > 0) {
-        for (int i = 0; i < MAX_BIGNUM_SIZE - word_shift; i++) {
-            a->d[i] = a->d[i + word_shift];
-        }
-        for (int i = MAX_BIGNUM_SIZE - word_shift; i < MAX_BIGNUM_SIZE; i++) {
-            a->d[i] = 0;
-        }
-    }
+//     // Handle full word shifts
+//     if (word_shift > 0) {
+//         for (int i = 0; i < MAX_BIGNUM_SIZE - word_shift; i++) {
+//             a->d[i] = a->d[i + word_shift];
+//         }
+//         for (int i = MAX_BIGNUM_SIZE - word_shift; i < MAX_BIGNUM_SIZE; i++) {
+//             a->d[i] = 0;
+//         }
+//     }
 
-    // Handle remaining bit shifts
-    if (bit_shift > 0) {
-        BN_ULONG carry = 0;
-        for (int i = MAX_BIGNUM_SIZE - 1; i >= 0; i--) {
-            BN_ULONG next_carry = a->d[i] << (BN_ULONG_NUM_BITS - bit_shift);
-            a->d[i] = (a->d[i] >> bit_shift) | carry;
-            carry = next_carry;
-        }
-    }
+//     // Handle remaining bit shifts
+//     if (bit_shift > 0) {
+//         BN_ULONG carry = 0;
+//         for (int i = MAX_BIGNUM_SIZE - 1; i >= 0; i--) {
+//             BN_ULONG next_carry = a->d[i] << (BN_ULONG_NUM_BITS - bit_shift);
+//             a->d[i] = (a->d[i] >> bit_shift) | carry;
+//             carry = next_carry;
+//         }
+//     }
 
-    // Update top
-    a->top = find_top(a, MAX_BIGNUM_SIZE);
-}
+//     // Update top
+//     a->top = find_top(a, MAX_BIGNUM_SIZE);
+// }
 
 unsigned long long umul64hi(unsigned long long a, unsigned long long b) {
     unsigned long long lo, hi;
@@ -663,178 +495,31 @@ void bn_mul(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
     // printf("-- bn_mul --\n");
 }
 
-BN_ULONG estimate_quotient_digit(BIGNUM_CUDA *partial_remainder, BIGNUM_CUDA *divisor) {
-    int n = MAX_BIGNUM_SIZE - 1;
-    BN_ULONG q;
+// unsigned int get_bignum_hex_length(BIGNUM_CUDA *a) {
+//     // printf("++ get_bignum_hex_length ++\n");
+//     bn_print_bn(">> get_bignum_hex_length: ", a);
+//     printf("\n");
 
-    if (bn_cmp(partial_remainder, divisor) < 0) {
-        printf("Estimate: 0 (partial_remainder < divisor)\n");
-        return 0;
-    }
-
-    if (partial_remainder->d[n] >= divisor->d[n]) {
-        q = UINT64_MAX; // 2^64 - 1
-    } else {
-        q = (partial_remainder->d[n] << 64 | partial_remainder->d[n-1]) / (divisor->d[n] + 1);
-    }
-
-    printf("Estimate details: pr[n]=%llu, pr[n-1]=%llu, d[n]=%llu, q=%llu\n", 
-           partial_remainder->d[n], partial_remainder->d[n-1], divisor->d[n], q);
-    return q;
-}
-
-unsigned int find_most_significant_bit(BIGNUM_CUDA *a) {
-    printf("++ find_most_significant_bit ++\n");
-    bn_print_bn("Input value: ", a);
-
-    unsigned int msb = 0;
-    int found = 0;
-
-    // Iterate through words from most significant to least
-    for (int i = MAX_BIGNUM_SIZE - 1; i >= 0 && !found; i--) {
-        if (a->d[i] != 0) {
-            // Found a non-zero word
-            unsigned long long word = a->d[i];
-            for (int j = BN_ULONG_NUM_BITS - 1; j >= 0; j--) {
-                if (word & (1ULL << j)) {
-                    // Found the most significant bit in this word
-                    msb = i * BN_ULONG_NUM_BITS + j;
-                    found = 1;
-                    break;
-                }
-            }
-        }
-    }
-
-    printf("Most significant bit found at index: %u\n", msb);
-    printf("-- find_most_significant_bit --\n");
-    return msb;
-}
-
-void set_bit(BIGNUM_CUDA *a, unsigned int bit_index) {
-    printf("++ set_bit ++\n");
-    bn_print_bn("Input value before setting bit: ", a);
-    printf("Setting bit at index: %u\n", bit_index);
-
-    // Calculate which word the bit is in
-    unsigned int word_index = bit_index / BN_ULONG_NUM_BITS;
-    
-    // Calculate the position of the bit within the word
-    unsigned int bit_position = bit_index % BN_ULONG_NUM_BITS;
-
-    // Check if the word_index is within the bounds of our BIGNUM_CUDA
-    if (word_index < MAX_BIGNUM_SIZE) {
-        // Set the bit using bitwise OR
-        a->d[word_index] |= (1ULL << bit_position);
-
-        // Update the top if necessary
-        if (word_index >= a->top) {
-            a->top = word_index + 1;
-        }
-    } else {
-        printf("Error: Bit index out of bounds\n");
-    }
-
-    bn_print_bn("Value after setting bit: ", a);
-    printf("-- set_bit --\n");
-}
-
-unsigned char find_most_significant_byte(BIGNUM_CUDA *a) {
-    printf("++ find_most_significant_byte ++\n");
-    bn_print_bn("Input value: ", a);
-
-    unsigned int msb = 0;
-    int found = 0;
-
-    // Iterate through words from most significant to least
-    for (int i = MAX_BIGNUM_SIZE - 1; i >= 0 && !found; i--) {
-        if (a->d[i] != 0) {
-            // Found a non-zero word
-            unsigned long long word = a->d[i];
-            for (int j = 7; j >= 0; j--) {  // 8 bytes in a 64-bit word
-                unsigned char byte = (word >> (j * 8)) & 0xFF;
-                if (byte != 0) {
-                    // Found the most significant non-zero byte in this word
-                    msb = i * 8 + j;
-                    found = 1;
-                    break;
-                }
-            }
-        }
-    }
-
-    printf("Most significant byte found at index: %u\n", msb);
-    printf("-- find_most_significant_byte --\n");
-    return msb;
-}
-
-unsigned int get_bignum_hex_length(BIGNUM_CUDA *a) {
-    // printf("++ get_bignum_hex_length ++\n");
-    bn_print_bn(">> get_bignum_hex_length: ", a);
-    printf("\n");
-
-    int length = 0;
-    BIGNUM_CUDA BN_zero;
-    init_zero(&BN_zero, MAX_BIGNUM_SIZE);
-    BIGNUM_CUDA b;
-    init_zero(&b, MAX_BIGNUM_SIZE);
-    // Copy a to b
-    for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
-        b.d[i] = a->d[i];
-    }
-    while (bn_cmp(&b, &BN_zero) > 0) {
-        // shift right
-        right_shift(&b, 4);
-        length++;
-        // break;
-    }
-    printf("<< get_bignum_hex_length: %d\n", length);
-    printf("\n");
-    // printf("-- get_bignum_hex_length --\n");
-    return length;
-}
-
-
-unsigned int get_bignum_hex_length_0(BIGNUM_CUDA *a) {
-    // printf("++ get_bignum_hex_length ++\n");
-    bn_print_bn(">> get_bignum_hex_length: ", a);
-    printf("\n");
-
-    unsigned int length = 0;
-    int found_non_zero = 0;
-
-    // Iterate through words from most significant to least
-    for (int i = MAX_BIGNUM_SIZE - 1; i >= 0; i--) {
-        unsigned long long word = a->d[i];
-        
-        if (!found_non_zero && word != 0) {
-            // Found the most significant non-zero word
-            found_non_zero = 1;
-            
-            // Count leading zeros in the most significant non-zero word
-            int leading_zeros = __builtin_clzll(word);
-            length += (64 - leading_zeros + 3) / 4; // Convert bit count to hex digit count
-            
-            // No need to process the rest of this word
-            continue;
-        }
-        
-        if (found_non_zero) {
-            // For all subsequent words, each contributes 16 hex digits
-            length += 16;
-        }
-    }
-
-    // If the number is zero, return 1 (as '0' is represented by one hex digit)
-    if (length == 0) {
-        length = 1;
-    }
-
-    printf("<< get_bignum_hex_length: %u", length);
-    printf("\n");
-    // printf("-- get_bignum_hex_length --\n");
-    return length;
-}
+//     int length = 0;
+//     BIGNUM_CUDA BN_zero;
+//     init_zero(&BN_zero, MAX_BIGNUM_SIZE);
+//     BIGNUM_CUDA b;
+//     init_zero(&b, MAX_BIGNUM_SIZE);
+//     // Copy a to b
+//     for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
+//         b.d[i] = a->d[i];
+//     }
+//     while (bn_cmp(&b, &BN_zero) > 0) {
+//         // shift right
+//         right_shift(&b, 4);
+//         length++;
+//         // break;
+//     }
+//     printf("<< get_bignum_hex_length: %d\n", length);
+//     printf("\n");
+//     // printf("-- get_bignum_hex_length --\n");
+//     return length;
+// }
 
 int bn_div(BIGNUM_CUDA *bn_dividend, BIGNUM_CUDA *bn_divisor, BIGNUM_CUDA *bn_quotient, BIGNUM_CUDA *bn_remainder)
 {
@@ -1042,16 +727,6 @@ void generate_random_bignum(BIGNUM_CUDA *bn, int num_words) {
     bn->neg = (rand() % 2 == 0) ? 0 : 1; // TODO: Uncomment this line
 }
 
-// Ensure divisor is less than or equal to dividend
-void adjust_divisor_non_abs(BIGNUM_CUDA *divisor, BIGNUM_CUDA *dividend) {
-    while (bn_cmp(divisor, dividend) > 0) {
-        for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
-            divisor->d[i] >>= 1;
-        }
-        divisor->top = find_top(divisor, MAX_BIGNUM_SIZE);
-    }
-}
-
 void adjust_divisor(BIGNUM_CUDA *divisor, BIGNUM_CUDA *dividend) {
     // Create temporary variables for absolute values
     BIGNUM_CUDA abs_divisor, abs_dividend;
@@ -1082,9 +757,7 @@ void adjust_divisor(BIGNUM_CUDA *divisor, BIGNUM_CUDA *dividend) {
     // Note: We don't change divisor->neg here, preserving the original sign
 }
 
-
-
-int main_f()
+int main()
 {
     unsigned long long tests_passed = 0;
     BIGNUM_CUDA bn_dividend, bn_divisor, bn_dividend_end, bn_divisor_end;
@@ -1098,14 +771,14 @@ int main_f()
     bn_dividend.d[2] = 0x0;
     bn_dividend.d[3] = 0x0;
     bn_dividend.d[4] = 0x0;
-    bn_dividend.d[5] = 0x0;
-    bn_dividend.d[6] = 0x0;
-    bn_dividend.d[7] = 0x0;
-    bn_dividend.d[8] = 0x72b47b314e91753a;
-    bn_dividend.d[9] = 0x3f38e8c61b9ed846;
+    bn_dividend.d[5] = 0x1;
+    bn_dividend.d[6] = 0x2e09165b257a4c3e;
+    bn_dividend.d[7] = 0x52c9f4faa6322c65;
+    bn_dividend.d[8] = 0x898d5d622cb3eeff;
+    bn_dividend.d[9] = 0x55da7f062f1b85c0;
 
     // set negative flag
-    bn_dividend.neg = 1;
+    bn_dividend.neg = 0;
 
     // Fill bn_dividend_end with the same values
     for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
@@ -1120,10 +793,10 @@ int main_f()
     bn_divisor.d[3] = 0x0;
     bn_divisor.d[4] = 0x0;
     bn_divisor.d[5] = 0x0;
-    bn_divisor.d[6] = 0x0;
-    bn_divisor.d[7] = 0x0;
-    bn_divisor.d[8] = 0xd1075ad5b373c6d;
-    bn_divisor.d[9] = 0x1dfd6bc539e3e809;
+    bn_divisor.d[6] = 0xffffffffffffffff;
+    bn_divisor.d[7] = 0xfffffffffffffffe;
+    bn_divisor.d[8] = 0xbaaedce6af48a03b;
+    bn_divisor.d[9] = 0xbfd25e8cd0364141;
 
     // set negative flag
     bn_divisor.neg = 0;
@@ -1266,7 +939,7 @@ int main_f()
     return 0;
 }
 
-int main() {
+int main_r() {
     srand(time(NULL));  // Initialize random seed
 
     int N = 10000;  // Number of tests to run
@@ -1314,15 +987,8 @@ int main() {
             printf("Actual remainder: ");
             bn_print_bn("", &bn_remainder);
             printf("Tests passed before failure: %llu\n", tests_passed);
-            // print most signioficant hex diff
-            // printf("####FAIL %d\n", msh_diff);
-            // printf("Most significant hex dividend: %d\n", get_bignum_hex_length(&bn_dividend));
-            // printf("Most significant hex divisor: %d\n", get_bignum_hex_length(&bn_divisor));            
             return 1;
         }
-        // printf("Most significant hex dividend: %d\n", get_bignum_hex_length(&bn_dividend));
-        // printf("Most significant hex divisor: %d\n", get_bignum_hex_length(&bn_divisor));
-        // printf("####OK %d\n", msh_diff);
         tests_passed++;
     }
 
