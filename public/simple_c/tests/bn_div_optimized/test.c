@@ -1084,7 +1084,7 @@ void adjust_divisor(BIGNUM_CUDA *divisor, BIGNUM_CUDA *dividend) {
 
 
 
-int main()
+int main_f()
 {
     unsigned long long tests_passed = 0;
     BIGNUM_CUDA bn_dividend, bn_divisor, bn_dividend_end, bn_divisor_end;
@@ -1266,10 +1266,10 @@ int main()
     return 0;
 }
 
-int main_r() {
+int main() {
     srand(time(NULL));  // Initialize random seed
 
-    int N = 10;  // Number of tests to run
+    int N = 10000;  // Number of tests to run
     unsigned long long tests_passed = 0;
 
     for (int test = 0; test < N; test++) {
