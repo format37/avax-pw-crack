@@ -19,7 +19,7 @@ __device__ EC_POINT ec_point_scalar_mul(
     BIGNUM *curve_prime, 
     BIGNUM *curve_a
     ) {
-    printf("++ ec_point_scalar_mul ++\n");
+    debug_printf("++ ec_point_scalar_mul ++\n");
     // Print point
     bn_print(">> point x: ", &point->x);
     bn_print(">> point y: ", &point->y);
@@ -43,7 +43,7 @@ __device__ EC_POINT ec_point_scalar_mul(
     unsigned int bits[256];                          // Assuming a 256-bit scalar
     bignum_to_bit_array(scalar, bits);               // You will need to implement bignum_to_bit_array()
     
-    // debug_printf("coef hex: %s\n", bignum_to_hex(scalar)); // Convert BIGNUM to hex string for printing
+    // printf("coef hex: %s\n", bignum_to_hex(scalar)); // Convert BIGNUM to hex string for printing
     bn_print("coef: ", scalar);  
     
     int debug_counter = 1;    
@@ -51,9 +51,9 @@ __device__ EC_POINT ec_point_scalar_mul(
     for (int i = 0; i < 256; i++) {                 // Assuming 256-bit scalars
         printf("\n### Step: %d\n", i);
         // if (i<debug_counter) {
-        //     // debug_printf("0 x: %s\n", bignum_to_hex(&current.x));
+        //     // printf("0 x: %s\n", bignum_to_hex(&current.x));
         //     bn_print("0 current.x: ", &current.x);
-        //     // debug_printf("0 y: %s\n", bignum_to_hex(&current.y));
+        //     // printf("0 y: %s\n", bignum_to_hex(&current.y));
         //     bn_print("0 current.y: ", &current.y);
         // }
         
@@ -84,9 +84,9 @@ __device__ EC_POINT ec_point_scalar_mul(
             bn_print("<< point_add result.y: ", &result.y);
             
             // if (i<debug_counter) printf("# b\n");
-            // debug_printf("1 x: %s\n", bignum_to_hex(&result.x));
+            // printf("1 x: %s\n", bignum_to_hex(&result.x));
             //  if (i<debug_counter) bn_print("1 result.x: ", &result.x);
-            // debug_printf("1 y: %s\n", bignum_to_hex(&result.y));
+            // printf("1 y: %s\n", bignum_to_hex(&result.y));
             //  if (i<debug_counter) bn_print("1 result.y: ", &result.y);
             printf("\n");
             
@@ -95,7 +95,7 @@ __device__ EC_POINT ec_point_scalar_mul(
         //     printf("1: Interrupting for debug\n");
         //     return result; // TODO: remove this
         // }
-        // if (i<debug_counter) debug_printf("# c\n");
+        // if (i<debug_counter) printf("# c\n");
 
         //point_double(&current, &current);           // Double current
         // point_double(&current, &current, &field_order);  // Double current and store the result in current
@@ -165,9 +165,9 @@ __device__ EC_POINT ec_point_scalar_mul(
         bn_print("\n<< point_add current.x: ", &current.x);
         bn_print("<< point_add current.y: ", &current.y);
 
-        // debug_printf("2 x: %s\n", bignum_to_hex(&current.x));
+        // printf("2 x: %s\n", bignum_to_hex(&current.x));
         // if (i<debug_counter) bn_print("2 current.x: ", &current.x);
-        // debug_printf("2 y: %s\n", bignum_to_hex(&current.y));
+        // printf("2 y: %s\n", bignum_to_hex(&current.y));
         // if (i<debug_counter) bn_print("2 current.y: ", &current.y);
         // if (i>1) {
         //     printf("### Breaking at i: %d\n", i);
@@ -175,9 +175,9 @@ __device__ EC_POINT ec_point_scalar_mul(
         // }
     }
 
-    // debug_printf("Final x: %s\n", bignum_to_hex(&result.x));
+    // printf("Final x: %s\n", bignum_to_hex(&result.x));
     bn_print("Final x: ", &result.x);
-    // debug_printf("Final y: %s\n", bignum_to_hex(&result.y));
+    // printf("Final y: %s\n", bignum_to_hex(&result.y));
     bn_print("Final y: ", &result.y);
     printf("-- ec_point_scalar_mul --\n");
     return result;
@@ -185,7 +185,7 @@ __device__ EC_POINT ec_point_scalar_mul(
 // Public key derivation --
 
 __global__ void testKernel() {
-
+    clock_t start = clock64();
     // BN_CTX *ctx = BN_CTX_new();
 
     // return;
@@ -378,17 +378,46 @@ __global__ void testKernel() {
     printf("Public key:\n");
     bn_print("Public key x: ", &publicKey.x);
     bn_print("Public key y: ", &publicKey.y);
-
+    stat_report("main", start);
 }
 
 // Main function
 int main() {
+    FunctionStats* h_functionStats;
+    int* h_functionCount;
+    FunctionStats* d_functionStats;
+    int* d_functionCount;
+
+    // Allocate host memory
+    h_functionStats = (FunctionStats*)malloc(MAX_FUNCTIONS * sizeof(FunctionStats));
+    h_functionCount = (int*)malloc(sizeof(int));
+
+    // Allocate device memory
+    cudaMalloc(&d_functionStats, MAX_FUNCTIONS * sizeof(FunctionStats));
+    cudaMalloc(&d_functionCount, sizeof(int));
+
+    // Initialize device memory
+    init_stats<<<1, 1>>>(d_functionStats, d_functionCount);
+
     testKernel<<<1, 1>>>();
     cudaError_t err = cudaGetLastError();
     if (err != cudaSuccess) {
         printf("Error: %s\n", cudaGetErrorString(err));
         return -1;
     }
+
+    // Copy results back to host
+    cudaMemcpy(h_functionStats, d_functionStats, MAX_FUNCTIONS * sizeof(FunctionStats), cudaMemcpyDeviceToHost);
+    cudaMemcpy(h_functionCount, d_functionCount, sizeof(int), cudaMemcpyDeviceToHost);
+
+    // Process results...
+
+    // Free memory
+    free(h_functionStats);
+    free(h_functionCount);
+    cudaFree(d_functionStats);
+    cudaFree(d_functionCount);
+
     cudaDeviceSynchronize();
     cudaDeviceReset(); // For cuda-memcheck leak-check option
     return 0;

@@ -400,36 +400,6 @@ void left_shift(BIGNUM_CUDA *a, int shift) {
     printf("\n");
 }
 
-// void right_shift(BIGNUM_CUDA *a, int shift) {
-//     if (shift == 0) return;  // No shift needed
-
-//     int word_shift = shift / BN_ULONG_NUM_BITS;
-//     int bit_shift = shift % BN_ULONG_NUM_BITS;
-
-//     // Handle full word shifts
-//     if (word_shift > 0) {
-//         for (int i = 0; i < MAX_BIGNUM_SIZE - word_shift; i++) {
-//             a->d[i] = a->d[i + word_shift];
-//         }
-//         for (int i = MAX_BIGNUM_SIZE - word_shift; i < MAX_BIGNUM_SIZE; i++) {
-//             a->d[i] = 0;
-//         }
-//     }
-
-//     // Handle remaining bit shifts
-//     if (bit_shift > 0) {
-//         BN_ULONG carry = 0;
-//         for (int i = MAX_BIGNUM_SIZE - 1; i >= 0; i--) {
-//             BN_ULONG next_carry = a->d[i] << (BN_ULONG_NUM_BITS - bit_shift);
-//             a->d[i] = (a->d[i] >> bit_shift) | carry;
-//             carry = next_carry;
-//         }
-//     }
-
-//     // Update top
-//     a->top = find_top(a, MAX_BIGNUM_SIZE);
-// }
-
 unsigned long long umul64hi(unsigned long long a, unsigned long long b) {
     unsigned long long lo, hi;
     __uint128_t product = (__uint128_t)a * b;
@@ -494,32 +464,6 @@ void bn_mul(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
     // bn_print("<< product: ", product);
     // printf("-- bn_mul --\n");
 }
-
-// unsigned int get_bignum_hex_length(BIGNUM_CUDA *a) {
-//     // printf("++ get_bignum_hex_length ++\n");
-//     bn_print_bn(">> get_bignum_hex_length: ", a);
-//     printf("\n");
-
-//     int length = 0;
-//     BIGNUM_CUDA BN_zero;
-//     init_zero(&BN_zero, MAX_BIGNUM_SIZE);
-//     BIGNUM_CUDA b;
-//     init_zero(&b, MAX_BIGNUM_SIZE);
-//     // Copy a to b
-//     for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
-//         b.d[i] = a->d[i];
-//     }
-//     while (bn_cmp(&b, &BN_zero) > 0) {
-//         // shift right
-//         right_shift(&b, 4);
-//         length++;
-//         // break;
-//     }
-//     printf("<< get_bignum_hex_length: %d\n", length);
-//     printf("\n");
-//     // printf("-- get_bignum_hex_length --\n");
-//     return length;
-// }
 
 int bn_div(BIGNUM_CUDA *bn_dividend, BIGNUM_CUDA *bn_divisor, BIGNUM_CUDA *bn_quotient, BIGNUM_CUDA *bn_remainder)
 {
