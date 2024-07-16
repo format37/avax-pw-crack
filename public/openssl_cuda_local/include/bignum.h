@@ -1,7 +1,7 @@
 // bignum.h
 #include "bn.h"
 #include <assert.h>
-#define debug_print false
+#define debug_print true
 #define BN_MASK2 0xffffffff
 #define BN_ULONG_NUM_BITS 64
 #define MAX_BIGNUM_WORDS 10     // For 576-bit numbers
@@ -19,7 +19,8 @@ __device__ double elapsed_time_bn_copy = 0;
 #define stat_print true
 #define MAX_FUNCTIONS 100
 #define MAX_FUNCTION_NAME 50
-#define MAX_CALLS_PER_FUNCTION 1000000
+#define MAX_CALLS_PER_FUNCTION 10000000000 // 232074247 max
+
 
 struct FunctionStats {
     char name[MAX_FUNCTION_NAME];
@@ -103,10 +104,6 @@ typedef struct bignum_st {
   int flags; // Check do we use it
 } BIGNUM;
 
-__device__ bool bn_add(BIGNUM *result, BIGNUM *a, BIGNUM *b);
-__device__ int bn_mod(BIGNUM *r, BIGNUM *m, BIGNUM *d);
-__device__ bool bn_is_zero(BIGNUM *a);
-
 __device__ void bn_print(const char* msg, BIGNUM* a) {
     printf("%s", msg);
     // if (a->top == 0) {
@@ -128,6 +125,27 @@ __device__ void bn_print(const char* msg, BIGNUM* a) {
     }
     printf("\n");
 }
+
+// Global zero-initialized BIGNUM
+__device__ const BN_ULONG ZERO_ARRAY[MAX_BIGNUM_SIZE] = {0};
+__device__ const BIGNUM ZERO_BIGNUM = {
+    {0},                  // d (will be properly initialized in init_zero)
+    1,                    // top (unsigned char)
+    MAX_BIGNUM_SIZE,      // dmax (int) TODO: Replace to unsigned char
+    0,                    // neg (int)
+    0                     // flags (int)
+};
+
+__device__ void init_zero(BIGNUM *bn, int capacity) {
+    *bn = ZERO_BIGNUM;
+    // memcpy(bn->d, ZERO_ARRAY, sizeof(BN_ULONG) * MAX_BIGNUM_SIZE);
+    // memcpy(bn, &ZERO_BIGNUM, sizeof(BIGNUM));
+    // bn_print("init_zero result: ", bn);
+}
+
+__device__ bool bn_add(BIGNUM *result, BIGNUM *a, BIGNUM *b);
+__device__ int bn_mod(BIGNUM *r, BIGNUM *m, BIGNUM *d);
+__device__ bool bn_is_zero(BIGNUM *a);
 
 __device__ size_t bn_strlen(const char *str) {
     size_t len = 0;
@@ -262,7 +280,7 @@ __device__ void reverse(BN_ULONG* d, int n) {
   }
 }
 
-__device__ void init_zero(BIGNUM *bn, int capacity) {
+__device__ void init_zero_0(BIGNUM *bn, int capacity) {
     for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
         bn->d[i] = 0;
     }
@@ -1256,8 +1274,9 @@ __device__ void bn_mul(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
     // bn_print(">> a: ", a);
     // bn_print(">> b: ", b);
     // Reset the product
-    for(int i = 0; i < a->top + b->top; i++)
-        product->d[i] = 0;
+    // for(int i = 0; i < a->top + b->top; i++)
+    //     product->d[i] = 0;
+    init_zero(product, MAX_BIGNUM_WORDS);
     
     // Perform multiplication of each word of a with each word of b
     for (int i = 0; i < a->top; ++i) {

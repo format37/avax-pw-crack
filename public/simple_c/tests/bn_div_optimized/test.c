@@ -23,6 +23,15 @@ typedef struct bignum_st {
   int flags;
 } BIGNUM_CUDA;
 
+// Global zero-initialized BIGNUM_CUDA
+const BIGNUM_CUDA ZERO_BIGNUM = {
+    .d = {0},
+    .top = 1,
+    .neg = 0,
+    .dmax = MAX_BIGNUM_SIZE - 1,
+    .flags = 0
+};
+
 // max() function for integers
 int max(int a, int b) {
     return a > b ? a : b;
@@ -47,12 +56,7 @@ void reverse_order(BN_ULONG *test_values_a) {
 }
 
 void init_zero(BIGNUM_CUDA *bn, int capacity) {
-    for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
-        bn->d[i] = 0;
-    }
-    bn->top = 1;
-    bn->neg = 0;
-    bn->dmax = MAX_BIGNUM_SIZE - 1;
+    memcpy(bn, &ZERO_BIGNUM, sizeof(BIGNUM_CUDA));
 }
 
 void bn_print(const char *prefix, const BN_ULONG *a)
@@ -421,8 +425,9 @@ void bn_mul(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
     // bn_print(">> a: ", a);
     // bn_print(">> b: ", b);
     // Reset the product
-    for(int i = 0; i < a->top + b->top; i++)
-        product->d[i] = 0;
+    // for(int i = 0; i < a->top + b->top; i++)
+    //     product->d[i] = 0;
+    init_zero(product, MAX_BIGNUM_SIZE);
     
     // Perform multiplication of each word of a with each word of b
     for (int i = 0; i < a->top; ++i) {
@@ -550,7 +555,11 @@ int bn_div(BIGNUM_CUDA *bn_quotient, BIGNUM_CUDA *bn_remainder, BIGNUM_CUDA *bn_
             init_zero(&product, MAX_BIGNUM_SIZE);
             temp.d[0] = mid;
 
+            //print what do we going to multiply
+            bn_print_bn("# temp = ", &temp);
+            bn_print_bn("# abs_divisor = ", &abs_divisor);
             bn_mul(&abs_divisor, &temp, &product);
+            bn_print_bn("# product = ", &product);
 
             if (bn_cmp(&product, &current_dividend) <= 0) {
                 q = mid;
@@ -913,6 +922,7 @@ int main() {
     srand(time(NULL));  // Initialize random seed
 
     int N = 100000;  // Number of tests to run
+    //int N = 1;  // Number of tests to run
     unsigned long long tests_passed = 0;
 
     for (int test = 0; test < N; test++) {
