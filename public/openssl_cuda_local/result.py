@@ -1,14 +1,14 @@
-def print_last_10_lines(filename):
+def print_last_n_lines(filename, lines_count):
     try:
         with open(filename, 'r') as file:
             # Read all lines and store them in a list
             lines = file.readlines()
             
-            # Get the last 10 lines (or all if file has fewer than 10 lines)
-            last_10_lines = lines[-10:]
+            # Get the last N lines (or all if file has fewer than 10 lines)
+            last_n_lines = lines[-lines_count:]
             
-            # Print the last 10 lines
-            for line in last_10_lines:
+            # Print the last n lines
+            for line in last_n_lines:
                 print(line.strip())
     except FileNotFoundError:
         print(f"Error: The file '{filename}' was not found.")
@@ -16,4 +16,4 @@ def print_last_10_lines(filename):
         print(f"Error: There was an issue reading the file '{filename}'.")
 
 # Call the function with the filename
-print_last_10_lines('run.log')
+print_last_n_lines('run.log', 30)

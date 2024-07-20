@@ -16,83 +16,68 @@ __device__ double elapsed_time_bn_mod_inverse = 0;
 __device__ double elapsed_time_bn_copy = 0;
 
 // Statistics module ++
-#define stat_print true
 #define MAX_FUNCTIONS 100
-#define MAX_FUNCTION_NAME 50
-#define MAX_CALLS_PER_FUNCTION 10000000000 // 232074247 max
 
-
-struct FunctionStats {
-    char name[MAX_FUNCTION_NAME];
-    int calls;
-    double call_times[MAX_CALLS_PER_FUNCTION];
+enum FunctionIndex {
+    FN_MAIN,
+    FN_BN_ADD,
+    FN_BN_SUB,
+    FN_BN_MUL,
+    FN_BN_DIV,
+    FN_BN_MOD,
+    FN_POINT_ADD,
+    FN_POINT_DOUBLE,
+    FN_EC_POINT_SCALAR_MUL,
+    // Add more functions as needed
+    FN_COUNT
 };
 
-__device__ FunctionStats* d_functionStats;
-__device__ int* d_functionCount;
+__device__ unsigned int g_function_calls[MAX_FUNCTIONS];
+__device__ unsigned long long g_function_times[MAX_FUNCTIONS];
 
-__device__ int clock_rate;
+__device__ void record_function(FunctionIndex fn, clock_t start_time) {
+    clock_t end_time = clock64();
+    atomicAdd(&g_function_calls[fn], 1);
+    atomicAdd(&g_function_times[fn], end_time - start_time);
+}
 
-__global__ void init_stats(FunctionStats* stats, int* count) {
-    d_functionStats = stats;
-    d_functionCount = count;
-    if (threadIdx.x == 0 && blockIdx.x == 0) {
-        *d_functionCount = 0;
-        clock_rate = 1708500; // Replace with actual clock rate of your GPU
+__device__ const char* get_function_name(FunctionIndex fn) {
+    switch(fn) {
+        case FN_MAIN: return "testKernel";
+        case FN_BN_ADD: return "bn_add";
+        case FN_BN_SUB: return "bn_sub";
+        case FN_BN_MUL: return "bn_mul";
+        case FN_BN_DIV: return "bn_div";
+        case FN_BN_MOD: return "bn_mod";
+        case FN_POINT_ADD: return "point_add";
+        case FN_POINT_DOUBLE: return "point_double";
+        case FN_EC_POINT_SCALAR_MUL: return "ec_point_scalar_mul";
+        default: return "Unknown";
     }
 }
 
-__device__ int dev_strcmp(const char* s1, const char* s2) {
-    while(*s1 && (*s1 == *s2)) {
-        s1++;
-        s2++;
+// __device__ void print_performance_report() {
+//     printf("Performance Report:\n");
+//     printf("Function            | Calls  | Total Time (cycles)\n");
+//     printf("-------------------|--------|--------------------\n");
+//     for (int i = 0; i < FN_COUNT; i++) {
+//         printf("%-18s | %6u | %20llu\n", 
+//                get_function_name((FunctionIndex)i), 
+//                g_function_calls[i], 
+//                g_function_times[i]);
+//     }
+// }
+__device__ void print_performance_report() {
+    // Print CSV header
+    printf("Function,Calls,TotalTime(cycles)\n");
+    
+    // Print data for each function
+    for (int i = 0; i < FN_COUNT; i++) {
+        printf("%s,%u,%llu\n", 
+               get_function_name((FunctionIndex)i), 
+               g_function_calls[i], 
+               g_function_times[i]);
     }
-    return *(const unsigned char*)s1 - *(const unsigned char*)s2;
-}
-
-__device__ char* dev_strcpy(char* dest, const char* src) {
-    char* d = dest;
-    while ((*d++ = *src++) != '\0');
-    return dest;
-}
-
-template<typename... Args>
-__device__ void stat_report(const char* func_name, Args... args) {
-    if (!stat_print) {
-        return;
-    }
-    clock_t end = clock64();
-    
-    int func_index = -1;
-    for (int i = 0; i < *d_functionCount; ++i) {
-        if (dev_strcmp(d_functionStats[i].name, func_name) == 0) {
-            func_index = i;
-            break;
-        }
-    }
-    
-    if (func_index == -1) {
-        func_index = atomicAdd(d_functionCount, 1);
-        dev_strcpy(d_functionStats[func_index].name, func_name);
-        d_functionStats[func_index].calls = 0;
-    }
-    
-    int call_index = atomicAdd(&d_functionStats[func_index].calls, 1);
-    
-    clock_t start = 0;
-    int dummy[] = {(start = args, 0)...};
-    (void)dummy; // Suppress unused variable warning
-    
-    double elapsed = (double)(end - start) / clock_rate;
-    
-    if (call_index < MAX_CALLS_PER_FUNCTION) {
-        d_functionStats[func_index].call_times[call_index] = elapsed;
-    }
-    
-    printf("Function: %s, Call: %d, Time: %f\n", 
-           func_name, 
-           call_index + 1, 
-           elapsed);
 }
 // Statistics module --
 
@@ -601,7 +586,8 @@ __device__ bool bn_subtract(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
         result->neg = a->neg; // The sign will be the same as the sign of 'a'.
         absolute_add(result, a, b); // Perform the addition of magnitudes here because signs are different.
         // bn_print("result: ", result);
-        stat_report("bn_subtract", start);
+        // stat_report("bn_subtract", start);
+        record_function(FN_BN_SUB, start);
         return true;
     }
 
@@ -625,7 +611,8 @@ __device__ bool bn_subtract(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
     if (result->top == 0) { 
         // Handle underflow if needed. 
     }
-    stat_report("bn_subtract", start);
+    // stat_report("bn_subtract", start);
+    record_function(FN_BN_SUB, start);
     return true;
 }
 
@@ -779,7 +766,8 @@ __device__ bool bn_add(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
 
     // Lastly, normalize the result to remove any leading zeros that could have appeared.
     find_top(result, MAX_BIGNUM_SIZE);
-    stat_report("bn_add", start);
+    // stat_report("bn_add", start);
+    record_function(FN_BN_ADD, start);
     return true;
 }
 
@@ -1325,7 +1313,8 @@ __device__ void bn_mul(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
     //bn_print("<< b: ", b);
     // bn_print("<< product: ", product);
     // printf("-- bn_mul --\n");
-    stat_report("bn_mul", start);
+    // stat_report("bn_mul", start);
+    record_function(FN_BN_MUL, start);
 }
 
 __device__ void bn_add_bit(BIGNUM *a, int bit_index) {
@@ -2494,7 +2483,8 @@ __device__ int bn_div(BIGNUM *bn_quotient, BIGNUM *bn_remainder, BIGNUM *bn_divi
     init_zero(&bn_zero, MAX_BIGNUM_SIZE);
     if (bn_cmp(bn_divisor, &bn_zero) == 0) {
         printf("Error: Division by zero\n");
-        stat_report("bn_div", start);
+        // stat_report("bn_div", start);
+        record_function(FN_BN_DIV, start);
         return 0;
     }
 
@@ -2523,7 +2513,8 @@ __device__ int bn_div(BIGNUM *bn_quotient, BIGNUM *bn_remainder, BIGNUM *bn_divi
         bn_quotient->top = 1;
         bn_quotient->neg = (dividend_neg != divisor_neg);
         printf("abs_dividend == abs_divisor. Quotient = 1\n");
-        stat_report("bn_div", start);
+        // stat_report("bn_div", start);
+        record_function(FN_BN_DIV, start);
         return 1;
     }
 
@@ -2599,7 +2590,8 @@ __device__ int bn_div(BIGNUM *bn_quotient, BIGNUM *bn_remainder, BIGNUM *bn_divi
     // bn_print("<< bn_quotient = ", bn_quotient);
     // bn_print("<< bn_remainder = ", bn_remainder);
     // printf("-- bn_div --\n");
-    stat_report("bn_div", start);
+    // stat_report("bn_div", start);
+    record_function(FN_BN_DIV, start);
     return 1;
 }
 

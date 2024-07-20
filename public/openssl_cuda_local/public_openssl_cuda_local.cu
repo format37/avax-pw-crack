@@ -378,26 +378,28 @@ __global__ void testKernel() {
     printf("Public key:\n");
     bn_print("Public key x: ", &publicKey.x);
     bn_print("Public key y: ", &publicKey.y);
-    stat_report("main", start);
+    // stat_report("main", start);
+    record_function(FN_MAIN, start);
+    print_performance_report();
 }
 
 // Main function
 int main() {
-    FunctionStats* h_functionStats;
-    int* h_functionCount;
-    FunctionStats* d_functionStats;
-    int* d_functionCount;
+    // FunctionStats* h_functionStats;
+    // int* h_functionCount;
+    // FunctionStats* d_functionStats;
+    // int* d_functionCount;
 
-    // Allocate host memory
-    h_functionStats = (FunctionStats*)malloc(MAX_FUNCTIONS * sizeof(FunctionStats));
-    h_functionCount = (int*)malloc(sizeof(int));
+    // // Allocate host memory
+    // h_functionStats = (FunctionStats*)malloc(MAX_FUNCTIONS * sizeof(FunctionStats));
+    // h_functionCount = (int*)malloc(sizeof(int));
 
-    // Allocate device memory
-    cudaMalloc(&d_functionStats, MAX_FUNCTIONS * sizeof(FunctionStats));
-    cudaMalloc(&d_functionCount, sizeof(int));
+    // // Allocate device memory
+    // cudaMalloc(&d_functionStats, MAX_FUNCTIONS * sizeof(FunctionStats));
+    // cudaMalloc(&d_functionCount, sizeof(int));
 
     // Initialize device memory
-    init_stats<<<1, 1>>>(d_functionStats, d_functionCount);
+    // init_stats<<<1, 1>>>(d_functionStats, d_functionCount);
 
     testKernel<<<1, 1>>>();
     cudaError_t err = cudaGetLastError();
@@ -407,16 +409,16 @@ int main() {
     }
 
     // Copy results back to host
-    cudaMemcpy(h_functionStats, d_functionStats, MAX_FUNCTIONS * sizeof(FunctionStats), cudaMemcpyDeviceToHost);
-    cudaMemcpy(h_functionCount, d_functionCount, sizeof(int), cudaMemcpyDeviceToHost);
+    // cudaMemcpy(h_functionStats, d_functionStats, MAX_FUNCTIONS * sizeof(FunctionStats), cudaMemcpyDeviceToHost);
+    // cudaMemcpy(h_functionCount, d_functionCount, sizeof(int), cudaMemcpyDeviceToHost);
 
     // Process results...
 
-    // Free memory
-    free(h_functionStats);
-    free(h_functionCount);
-    cudaFree(d_functionStats);
-    cudaFree(d_functionCount);
+    // // Free memory
+    // free(h_functionStats);
+    // free(h_functionCount);
+    // cudaFree(d_functionStats);
+    // cudaFree(d_functionCount);
 
     cudaDeviceSynchronize();
     cudaDeviceReset(); // For cuda-memcheck leak-check option
