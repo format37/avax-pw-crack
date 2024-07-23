@@ -65,7 +65,7 @@ def plot_comparison(df):
 
 # Main execution
 filename = 'run.log'
-n_lines = 10
+n_lines = 13
 
 try:
     lines = read_last_n_lines(filename, n_lines)

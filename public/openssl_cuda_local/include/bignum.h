@@ -1,7 +1,7 @@
 // bignum.h
 #include "bn.h"
 #include <assert.h>
-#define debug_print true
+#define debug_print false
 #define BN_MASK2 0xffffffff
 #define BN_ULONG_NUM_BITS 64
 #define MAX_BIGNUM_WORDS 10     // For 576-bit numbers
@@ -28,7 +28,9 @@ enum FunctionIndex {
     FN_POINT_ADD,
     FN_POINT_DOUBLE,
     FN_EC_POINT_SCALAR_MUL,
-    // Add more functions as needed
+    FN_LEFT_SHIFT,
+    FN_CACHED_BN_MUL,
+    FN_FIND_IN_CACHE,
     FN_COUNT
 };
 
@@ -52,6 +54,9 @@ __device__ const char* get_function_name(FunctionIndex fn) {
         case FN_POINT_ADD: return "point_add";
         case FN_POINT_DOUBLE: return "point_double";
         case FN_EC_POINT_SCALAR_MUL: return "ec_point_scalar_mul";
+        case FN_LEFT_SHIFT: return "left_shift";
+        case FN_CACHED_BN_MUL: return "cached_bn_mul";
+        case FN_FIND_IN_CACHE: return "find_in_cache";
         default: return "Unknown";
     }
 }
@@ -90,6 +95,8 @@ typedef struct bignum_st {
 } BIGNUM;
 
 __device__ void bn_print(const char* msg, BIGNUM* a) {
+    if (!debug_print) return;
+    
     printf("%s", msg);
     // if (a->top == 0) {
     //     printf("0\n");  // Handle the case where BIGNUM is zero
@@ -175,6 +182,7 @@ __device__ void hexStringToByteArray(const char *hexString, unsigned char *byteA
 }
 
 __device__ void print_as_hex_char(unsigned char *data, int len) {
+    if (!debug_print) return;
     for (int i = 0; i < len; i++) {
         printf("%02x", data[i]);
     }
@@ -182,6 +190,7 @@ __device__ void print_as_hex_char(unsigned char *data, int len) {
 }
 
 __device__ void bn_print_short(const char* msg, BIGNUM* a) {
+    if (!debug_print) return;
     printf("%s", msg);
     if (a->top == 0) {
         printf("0\n");  // Handle the case where BIGNUM is zero
@@ -203,6 +212,7 @@ __device__ void bn_print_short(const char* msg, BIGNUM* a) {
 }
 
 __device__ void bn_print_reversed(const char* msg, BIGNUM* a) {
+    if (!debug_print) return;
     printf("%s", msg);
     if (a->top == 0) {
         printf("0\n");  // Handle the case where BIGNUM is zero
@@ -274,17 +284,27 @@ __device__ void init_zero_0(BIGNUM *bn, int capacity) {
     bn->dmax = MAX_BIGNUM_SIZE - 1;
 }
 
+// __device__ void init_one(BIGNUM *bn, int capacity) {
+//     init_zero(bn, capacity); // Initialize the BIGNUM to zero first
+//     for (int i = 1; i < capacity; i++) {
+//         bn->d[i] = 0;
+//     }
+//     bn->d[0] = 1;           // Set the least significant word to 1
+//     // bn->top = (capacity > 0) ? 1 : 0; // There is one significant digit if capacity allows
+//     bn->top = 1;
+//     bn->neg = 0;             // The number is non-negative
+//     //bn->dmax = capacity;     // Track the capacity in dmax
+//     bn->dmax = MAX_BIGNUM_SIZE;
+// }
 __device__ void init_one(BIGNUM *bn, int capacity) {
-    init_zero(bn, capacity); // Initialize the BIGNUM to zero first
-    for (int i = 1; i < capacity; i++) {
-        bn->d[i] = 0;
-    }
-    bn->d[0] = 1;           // Set the least significant word to 1
-    // bn->top = (capacity > 0) ? 1 : 0; // There is one significant digit if capacity allows
+    // Initialize the BIGNUM to zero
+    *bn = ZERO_BIGNUM;
+    
+    // Set the least significant word to 1
+    bn->d[0] = 1;
+    
+    // Set the top to 1 (as there is one significant digit)
     bn->top = 1;
-    bn->neg = 0;             // The number is non-negative
-    //bn->dmax = capacity;     // Track the capacity in dmax
-    bn->dmax = MAX_BIGNUM_SIZE;
 }
 
 __device__ int bn_cmp(BIGNUM* a, BIGNUM* b) {
@@ -1004,6 +1024,106 @@ __device__ int bn_div(BIGNUM *a, BIGNUM *b, BIGNUM *q, BIGNUM *r);
 __device__ void bn_mul(BIGNUM *a, BIGNUM *b, BIGNUM *product);
 __device__ bool bn_sub(BIGNUM *a, BIGNUM *b, BIGNUM *r);
 
+// bn_mul cache ++
+// #define CACHE_SIZE 256  // Adjust based on your needs
+// #define CACHE_SIZE 52416
+#define CACHE_SIZE 320 // TODO: Remove this
+#define MAX_CACHE_SIZE 320
+
+// __device__ BN_ULONG B_values[MAX_CACHE_SIZE];
+// __device__ BIGNUM products[MAX_CACHE_SIZE];
+
+typedef struct {
+    BN_ULONG key;
+    BIGNUM value;
+    int valid;
+} CacheEntry;
+
+typedef struct {
+    CacheEntry entries[CACHE_SIZE];
+} Cache;
+
+__device__ unsigned int hash(BN_ULONG key) {
+    return key % CACHE_SIZE;
+}
+
+__device__ void cache_init(Cache* cache) {
+    memset(cache, 0, sizeof(Cache));
+}
+
+__device__ void cache_set(Cache* cache, BN_ULONG key, BIGNUM* value) {
+    unsigned int index = hash(key);
+    cache->entries[index].key = key;
+    cache->entries[index].value = *value;
+    cache->entries[index].valid = 1;
+}
+
+__device__ int cache_get(Cache* cache, BN_ULONG key, BIGNUM* value) {
+    clock_t start = clock64();
+    unsigned int index = hash(key);
+    if (cache->entries[index].valid && cache->entries[index].key == key) {
+        *value = cache->entries[index].value;
+        record_function(FN_CACHED_BN_MUL, start);
+        return 1;
+    }
+    record_function(FN_CACHED_BN_MUL, start);
+    return 0;
+}
+
+// #define CACHE_SIZE 1024  // Adjust based on your needs and available memory
+
+// typedef struct {
+//     BIGNUM key_a;
+//     BIGNUM key_b;
+//     BIGNUM result;
+//     int valid;
+// } CacheEntry;
+
+// __device__ CacheEntry mul_cache[CACHE_SIZE];
+
+// __device__ void init_cache() {
+//     for (int i = 0; i < CACHE_SIZE; i++) {
+//         mul_cache[i].valid = 0;
+//     }
+// }
+
+// __device__ unsigned int hash(BIGNUM* a, BIGNUM* b) {
+//     unsigned int hash = 0;
+//     for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
+//         hash = hash * 31 + a->d[i];
+//         hash = hash * 31 + b->d[i];
+//     }
+//     return hash % CACHE_SIZE;
+// }
+
+// __device__ int compare_bignums(BIGNUM* a, BIGNUM* b) {
+//     if (a->neg != b->neg) return 0;
+//     if (a->top != b->top) return 0;
+//     for (int i = 0; i < a->top; i++) {
+//         if (a->d[i] != b->d[i]) return 0;
+//     }
+//     return 1;
+// }
+
+// __device__ void cached_bn_mul(BIGNUM* a, BIGNUM* b, BIGNUM* result) {
+//     unsigned int index = hash(a, b);
+//     if (mul_cache[index].valid && 
+//         compare_bignums(a, &mul_cache[index].key_a) && 
+//         compare_bignums(b, &mul_cache[index].key_b)) {
+//         // Cache hit
+//         clock_t start = clock64();
+//         *result = mul_cache[index].result;
+//         record_function(FN_CACHED_BN_MUL, start);
+//     } else {
+//         // Cache miss
+//         bn_mul(a, b, result);
+//         mul_cache[index].key_a = *a;
+//         mul_cache[index].key_b = *b;
+//         mul_cache[index].result = *result;
+//         mul_cache[index].valid = 1;
+//     }
+// }
+// bn_mul cache --
 
 __device__ void set_bn(BIGNUM *dest, const BIGNUM *src) {
     debug_printf("set_bn 0\n");
@@ -1259,8 +1379,8 @@ __device__ void bn_add_bignum_words(BIGNUM *r, BIGNUM *a, int n) {
 __device__ void bn_mul(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
     clock_t start = clock64();
     // printf("++ bn_mul ++\n");
-    // bn_print(">> a: ", a);
-    // bn_print(">> b: ", b);
+    bn_print(">> a: ", a);
+    bn_print(">> b: ", b);
     // Reset the product
     // for(int i = 0; i < a->top + b->top; i++)
     //     product->d[i] = 0;
@@ -1309,8 +1429,8 @@ __device__ void bn_mul(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
     
     // Determine if the result should be negative
     product->neg = (a->neg != b->neg) ? 1 : 0;
-    //bn_print("<< a: ", a);
-    //bn_print("<< b: ", b);
+    // bn_print("<< a: ", a);
+    // bn_print("<< b: ", b);
     // bn_print("<< product: ", product);
     // printf("-- bn_mul --\n");
     // stat_report("bn_mul", start);
@@ -2438,6 +2558,7 @@ __device__ void bn_div_binary(
 // }
 
 __device__ void left_shift(BIGNUM *a, int shift) {
+    clock_t start = clock64();
     // bn_print_bn_line("\nleft_shift: ", a);
     // printf(" << %d", shift);
     if (shift == 0) return;  // No shift needed
@@ -2469,24 +2590,37 @@ __device__ void left_shift(BIGNUM *a, int shift) {
     a->top = find_top(a, MAX_BIGNUM_SIZE);
     // bn_print_bn_line(" : ", a);
     // printf("\n");
+    record_function(FN_LEFT_SHIFT, start);
+}
+
+// Function to search for a B value in the cache
+__device__ int find_in_cache(BN_ULONG B, BN_ULONG B_values[], int cache_count) {
+    // init start timer
+    // We may know the place of B in the cache. TODO: Implement a better search algorithm
+    clock_t start = clock64();
+    for (int i = 0; i < cache_count; i++) {
+        if (B_values[i] == B) {
+            record_function(FN_FIND_IN_CACHE, start);
+            return i;
+        }
+    }
+    record_function(FN_FIND_IN_CACHE, start);
+    return -1;
 }
 
 __device__ int bn_div(BIGNUM *bn_quotient, BIGNUM *bn_remainder, BIGNUM *bn_dividend, BIGNUM *bn_divisor)
 {
     clock_t start = clock64();
+
+    // Initialize the cache
+    // init_cache();
+    // Initialize cache for multiplication results
+    // Cache mul_cache;
+    // cache_init(&mul_cache);
+
     // printf("++ bn_div ++\n");
     // bn_print(">> bn_dividend = ", bn_dividend);
     // bn_print(">> bn_divisor = ", bn_divisor);
-
-    // Handle division by zero
-    BIGNUM bn_zero;
-    init_zero(&bn_zero, MAX_BIGNUM_SIZE);
-    if (bn_cmp(bn_divisor, &bn_zero) == 0) {
-        printf("Error: Division by zero\n");
-        // stat_report("bn_div", start);
-        record_function(FN_BN_DIV, start);
-        return 0;
-    }
 
     // Store signs and work with absolute values
     int dividend_neg = bn_dividend->neg;
@@ -2495,8 +2629,10 @@ __device__ int bn_div(BIGNUM *bn_quotient, BIGNUM *bn_remainder, BIGNUM *bn_divi
     init_zero(&abs_dividend, MAX_BIGNUM_SIZE);
     init_zero(&abs_divisor, MAX_BIGNUM_SIZE);
 
+    unsigned char divs_max_top = (bn_dividend->top > bn_divisor->top) ? bn_dividend->top : bn_divisor->top;
+
     // Copy absolute values
-    for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
+    for (int i = 0; i < divs_max_top; i++) {
         abs_dividend.d[i] = bn_dividend->d[i];
         abs_divisor.d[i] = bn_divisor->d[i];
     }
@@ -2518,22 +2654,20 @@ __device__ int bn_div(BIGNUM *bn_quotient, BIGNUM *bn_remainder, BIGNUM *bn_divi
         return 1;
     }
 
-    // if (bn_cmp(&abs_dividend, &abs_divisor) < 0) {
-    //     // Quotient is 0, remainder is dividend
-    //     for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
-    //         bn_remainder->d[i] = bn_dividend->d[i];
-    //     }
-    //     bn_remainder->neg = dividend_neg;
-    //     bn_remainder->top = bn_dividend->top;
-    //     printf("Abs dividend < abs divisor. Quotient = 0\n");
-    //     printf("-- bn_div --\n");
-    //     return 1;
-    // }
-
     // Perform long division
     BIGNUM current_dividend;
     init_zero(&current_dividend, MAX_BIGNUM_SIZE);
     int dividend_size = find_top(&abs_dividend, MAX_BIGNUM_SIZE);
+
+    // Initialize cache for multiplication results
+    // #define CACHE_SIZE 256 // Adjust based on your needs
+    // BIGNUM mul_cache[CACHE_SIZE];
+    // int cache_valid[CACHE_SIZE] = {0};
+
+    // Initialize cache arrays
+    BN_ULONG B_values[MAX_CACHE_SIZE];
+    BIGNUM products[MAX_CACHE_SIZE];
+    int cache_count = 0;
 
     for (int i = dividend_size - 1; i >= 0; i--) {
         // Shift current_dividend left by one word and add next word of dividend
@@ -2549,8 +2683,41 @@ __device__ int bn_div(BIGNUM *bn_quotient, BIGNUM *bn_remainder, BIGNUM *bn_divi
             init_zero(&temp, MAX_BIGNUM_SIZE);
             init_zero(&product, MAX_BIGNUM_SIZE);
             temp.d[0] = mid;
+            temp.top = 1;
 
-            bn_mul(&abs_divisor, &temp, &product);
+            // bn_mul(&abs_divisor, &temp, &product);
+            int cache_index = find_in_cache(mid, B_values, cache_count);
+            if (cache_index != -1) {
+                product = products[cache_index];
+            } else {
+                bn_mul(&abs_divisor, &temp, &product);
+                if (cache_count < MAX_CACHE_SIZE) {
+                    B_values[cache_count] = mid;
+                    products[cache_count] = product;
+                    cache_count++;
+                }
+                else {
+                    printf("[0] Cache miss. %016llx is more than %d\n", mid, MAX_CACHE_SIZE);
+                }
+            }
+            // Check cache first
+            // if (mid < CACHE_SIZE && cache_valid[mid]) {
+            //     product = mul_cache[mid];
+            // } else {
+            //     bn_mul(&abs_divisor, &temp, &product);
+            //     if (mid < CACHE_SIZE) {
+            //         mul_cache[mid] = product;
+            //         cache_valid[mid] = 1;
+            //     }
+            //     else {
+            //         printf("Cache miss. %016llx is more than %d\n", mid, CACHE_SIZE);
+            //     }
+            // }
+            // Check cache first
+            // if (!cache_get(&mul_cache, mid, &product)) {
+            //     bn_mul(&abs_divisor, &temp, &product);
+            //     cache_set(&mul_cache, mid, &product);
+            // }
 
             if (bn_cmp(&product, &current_dividend) <= 0) {
                 q = mid;
@@ -2558,6 +2725,15 @@ __device__ int bn_div(BIGNUM *bn_quotient, BIGNUM *bn_remainder, BIGNUM *bn_divi
             } else {
                 right = mid - 1;
             }
+            // Use cached multiplication
+            // cached_bn_mul(&abs_divisor, &temp, &product);
+
+            // if (bn_cmp(&product, &current_dividend) <= 0) {
+            //     q = mid;
+            //     left = mid + 1;
+            // } else {
+            //     right = mid - 1;
+            // }
         }
 
         // Add quotient digit to result
@@ -2569,8 +2745,24 @@ __device__ int bn_div(BIGNUM *bn_quotient, BIGNUM *bn_remainder, BIGNUM *bn_divi
         init_zero(&temp, MAX_BIGNUM_SIZE);
         init_zero(&product, MAX_BIGNUM_SIZE);
         temp.d[0] = q;
+        temp.top = 1;
 
-        bn_mul(&abs_divisor, &temp, &product);
+        // bn_mul(&abs_divisor, &temp, &product);
+        int cache_index = find_in_cache(q, B_values, cache_count); // Shell runtime: 362.258584028 seconds
+        if (cache_index != -1) {
+            product = products[cache_index];
+        } else {
+            bn_mul(&abs_divisor, &temp, &product);
+            if (cache_count < MAX_CACHE_SIZE) {
+                B_values[cache_count] = q;
+                products[cache_count] = product;
+                cache_count++;
+            }
+            else {
+                printf("[1] Cache miss. %016llx is more than %d\n", q, MAX_CACHE_SIZE);
+            }
+        }
+        // cached_bn_mul(&abs_divisor, &temp, &product);
         bn_subtract(&current_dividend, &current_dividend, &product);
     }
 
@@ -2590,7 +2782,7 @@ __device__ int bn_div(BIGNUM *bn_quotient, BIGNUM *bn_remainder, BIGNUM *bn_divi
     // bn_print("<< bn_quotient = ", bn_quotient);
     // bn_print("<< bn_remainder = ", bn_remainder);
     // printf("-- bn_div --\n");
-    // stat_report("bn_div", start);
+    // printf("bn_div Cache count: %d\n", cache_count);
     record_function(FN_BN_DIV, start);
     return 1;
 }
@@ -3227,7 +3419,7 @@ __device__ int point_add(
     BIGNUM *p, 
     BIGNUM *a
 ) {
-    bool debug = 1;
+    bool debug = 0;
     if (debug) {
         printf("++ point_add ++\n");
         bn_print(">> p1.x: ", &p1->x);
@@ -3293,7 +3485,7 @@ __device__ int point_add(
     //if (bn_cmp(&p1->x, &p2->x) == 0 && bn_cmp(&p1->y, &p2->y) == 0) {
     if (bn_cmp(&p1->x, &p2->x) == 0) {
         //if (debug) 
-        printf("p1.x == p2.x\n");
+        debug_printf("p1.x == p2.x\n");
         // Point doubling
         // BIGNUM two;
         init_zero(&two, MAX_BIGNUM_SIZE);
@@ -3407,7 +3599,7 @@ __device__ int point_add(
     } else {
         // Case 2: p1 != p2
         //if (debug) 
-        printf("p1.x != p2.x\n");
+        debug_printf("p1.x != p2.x\n");
         // Regular point addition
         bn_subtract(&tmp1, &p2->y, &p1->y);
         // bn_print("\n[a] << bn_subtract tmp1: ", &tmp1);
