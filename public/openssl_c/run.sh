@@ -6,7 +6,8 @@ rm -rf run.log
 # Get the start time
 start_time=$(date +%s.%N)
 
-./program >> run.log
+# ./program >> run.log
+valgrind --tool=callgrind ./program >> run.log
 
 # Get the end time
 end_time=$(date +%s.%N)

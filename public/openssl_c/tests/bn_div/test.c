@@ -93,19 +93,20 @@ int main() {
         // -------- = quotient, remainder
         // divisor
         // Multiplication back: quotient * divisor + remainder = dividend
-        BIGNUM *product = BN_new();
-        BN_mul(product, quotient, divisor, ctx);
-        // Print the product
-        print_bn("Product", product);
-        // Add the remainder
-        BN_add(product, product, remainder);
-        // Print the dividend
-        print_bn("Product + Remainder", product);
+        // BIGNUM *product = BN_new();
+        // BN_mul(product, quotient, divisor, ctx);
+        // // Print the product
+        // print_bn("Product", product);
+        // // Add the remainder
+        // BN_add(product, product, remainder);
+        // // Print the dividend
+        // print_bn("Product + Remainder", product);
 
         BN_free(dividend);
         BN_free(divisor);
         BN_free(quotient);
         BN_free(remainder);
+        break;
     }
 
     BN_CTX_free(ctx);

@@ -2,9 +2,10 @@
 #include "bn.h"
 #include <assert.h>
 #define debug_print false
+#define bn_mul_caching false
 #define BN_MASK2 0xffffffff
 #define BN_ULONG_NUM_BITS 64
-#define MAX_BIGNUM_WORDS 10     // For 576-bit numbers
+// #define MAX_BIGNUM_WORDS 10     // For 576-bit numbers
 #define MAX_BIGNUM_SIZE 10     // Allow room for temp calculations
 
 // Debug variables
@@ -61,17 +62,6 @@ __device__ const char* get_function_name(FunctionIndex fn) {
     }
 }
 
-// __device__ void print_performance_report() {
-//     printf("Performance Report:\n");
-//     printf("Function            | Calls  | Total Time (cycles)\n");
-//     printf("-------------------|--------|--------------------\n");
-//     for (int i = 0; i < FN_COUNT; i++) {
-//         printf("%-18s | %6u | %20llu\n", 
-//                get_function_name((FunctionIndex)i), 
-//                g_function_calls[i], 
-//                g_function_times[i]);
-//     }
-// }
 __device__ void print_performance_report() {
     // Print CSV header
     printf("Function,Calls,TotalTime(cycles)\n");
@@ -88,30 +78,39 @@ __device__ void print_performance_report() {
 
 typedef struct bignum_st {
   BN_ULONG d[MAX_BIGNUM_SIZE];
-  int top; // Replace to unsigned char
-  int dmax; // Replace to unsigned char
-  int neg; // Replace to bool
-  int flags; // Check do we use it
+  unsigned char top;
+  unsigned char dmax;
+  bool neg;
 } BIGNUM;
 
 __device__ void bn_print(const char* msg, BIGNUM* a) {
     if (!debug_print) return;
     
     printf("%s", msg);
-    // if (a->top == 0) {
-    //     printf("0\n");  // Handle the case where BIGNUM is zero
-    //     return;
-    // }
     if (a->neg) {
         printf("-");  // Handle the case where BIGNUM is negative
     }
-    // int size_of_d = sizeof(a->d);
     for (int i = MAX_BIGNUM_SIZE - 1; i >= 0; i--) {
         // Print words up to top - 1 with appropriate formatting
         if (i == MAX_BIGNUM_SIZE - 1) {
             printf("%llx", a->d[i]);
         } else {
-            //printf(" %016llx", a->d[i]);
+            printf("%016llx", a->d[i]);
+        }
+    }
+    printf("\n");
+}
+
+__device__ void bn_print_constant(const char* msg, BIGNUM* a) {    
+    printf("%s", msg);
+    if (a->neg) {
+        printf("-");  // Handle the case where BIGNUM is negative
+    }
+    for (int i = MAX_BIGNUM_SIZE - 1; i >= 0; i--) {
+        // Print words up to top - 1 with appropriate formatting
+        if (i == MAX_BIGNUM_SIZE - 1) {
+            printf("%llx", a->d[i]);
+        } else {
             printf("%016llx", a->d[i]);
         }
     }
@@ -123,16 +122,12 @@ __device__ const BN_ULONG ZERO_ARRAY[MAX_BIGNUM_SIZE] = {0};
 __device__ const BIGNUM ZERO_BIGNUM = {
     {0},                  // d (will be properly initialized in init_zero)
     1,                    // top (unsigned char)
-    MAX_BIGNUM_SIZE,      // dmax (int) TODO: Replace to unsigned char
-    0,                    // neg (int)
-    0                     // flags (int)
+    MAX_BIGNUM_SIZE,      // dmax (unsigned char)
+    0                    // neg (bool)
 };
 
-__device__ void init_zero(BIGNUM *bn, int capacity) {
+__device__ void init_zero(BIGNUM *bn) {
     *bn = ZERO_BIGNUM;
-    // memcpy(bn->d, ZERO_ARRAY, sizeof(BN_ULONG) * MAX_BIGNUM_SIZE);
-    // memcpy(bn, &ZERO_BIGNUM, sizeof(BIGNUM));
-    // bn_print("init_zero result: ", bn);
 }
 
 __device__ bool bn_add(BIGNUM *result, BIGNUM *a, BIGNUM *b);
@@ -151,10 +146,6 @@ __device__ size_t bn_strlen(const char *str) {
 __device__ void bn_strcpy(char *dest, const char *src) {
     size_t i = 0;
     while (src[i] != '\0') {
-        // printf("size of src: %d\n", sizeof(src));
-        // printf("size of dest: %d\n", sizeof(dest));
-        // printf("src[%d]: %c\n", i, src[i]);
-        // printf("dest[%d]: %c\n", i, dest[i]);
         dest[i] = src[i];
         ++i;
     }
@@ -233,7 +224,7 @@ __device__ void bn_print_reversed(const char* msg, BIGNUM* a) {
     printf("\n");
 }
 
-__device__ int find_top(const BIGNUM *bn, int max_words) {
+__device__ int find_top(const BIGNUM *bn) {
     for (int i = MAX_BIGNUM_SIZE - 1; i >= 0; i--) {
         if (bn->d[i] != 0) {
             return i + 1;
@@ -275,28 +266,7 @@ __device__ void reverse(BN_ULONG* d, int n) {
   }
 }
 
-__device__ void init_zero_0(BIGNUM *bn, int capacity) {
-    for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
-        bn->d[i] = 0;
-    }
-    bn->top = 1;
-    bn->neg = 0;
-    bn->dmax = MAX_BIGNUM_SIZE - 1;
-}
-
-// __device__ void init_one(BIGNUM *bn, int capacity) {
-//     init_zero(bn, capacity); // Initialize the BIGNUM to zero first
-//     for (int i = 1; i < capacity; i++) {
-//         bn->d[i] = 0;
-//     }
-//     bn->d[0] = 1;           // Set the least significant word to 1
-//     // bn->top = (capacity > 0) ? 1 : 0; // There is one significant digit if capacity allows
-//     bn->top = 1;
-//     bn->neg = 0;             // The number is non-negative
-//     //bn->dmax = capacity;     // Track the capacity in dmax
-//     bn->dmax = MAX_BIGNUM_SIZE;
-// }
-__device__ void init_one(BIGNUM *bn, int capacity) {
+__device__ void init_one(BIGNUM *bn) {
     // Initialize the BIGNUM to zero
     *bn = ZERO_BIGNUM;
     
@@ -314,8 +284,8 @@ __device__ int bn_cmp(BIGNUM* a, BIGNUM* b) {
     if (a->neg != b->neg) {
         return a->neg ? -1 : 1;
     }
-    a->top = find_top(a, MAX_BIGNUM_SIZE);
-    b->top = find_top(b, MAX_BIGNUM_SIZE);
+    a->top = find_top(a);
+    b->top = find_top(b);
     if (a->top != b->top) {
         return a->top > b->top ? 1 : -1;
     }
@@ -330,23 +300,6 @@ __device__ int bn_cmp(BIGNUM* a, BIGNUM* b) {
 }
 
 __device__ int bn_cmp_abs(BIGNUM *a, BIGNUM *b) {
-    // Check tops // TODO: This may need optimization. Top is often incorrect in point_add
-    // if (find_top(a, MAX_BIGNUM_SIZE) != a->top) {
-    //     printf("### bn_cmp_abs ### Error: Top is not set correctly in the source BIGNUM.\n");
-    //     printf("a->top: %d, actual top: %d\n", a->top, find_top(a, MAX_BIGNUM_WORDS));
-    //     // Print bn value
-    //     bn_print("a: ", a);
-    // }
-    // if (find_top(b, MAX_BIGNUM_SIZE) != b->top) {
-    //     printf("### bn_cmp_abs ### Error: Top is not set correctly in the source BIGNUM.\n");
-    //     printf("b->top: %d, actual top: %d\n", b->top, find_top(b, MAX_BIGNUM_WORDS));
-    //     // Print bn value
-    //     bn_print("b: ", b);
-    // }
-    // Set tops
-    //a->top = find_top(a, MAX_BIGNUM_SIZE); // This stuck in a loop
-    //b->top = find_top(b, MAX_BIGNUM_SIZE);
-
     if (a->top > b->top)
         return 1;
     if (b->top > a->top)
@@ -393,7 +346,7 @@ __device__ void bn_copy(BIGNUM *dest, BIGNUM *src) {
     bn_print(">> dest: ", dest);*/
 
     // Init dst as zero
-    init_zero(dest, MAX_BIGNUM_SIZE);
+    init_zero(dest);
     // int size = sizeof(src->d);
     // init_zero(dest, size);
 
@@ -401,7 +354,7 @@ __device__ void bn_copy(BIGNUM *dest, BIGNUM *src) {
         return;
     }
 
-    src->top = find_top(src, MAX_BIGNUM_SIZE);
+    src->top = find_top(src);
     //printf("# src.top: %d\n", src->top);
 
     // Copy the neg and top fields
@@ -419,7 +372,7 @@ __device__ void bn_copy(BIGNUM *dest, BIGNUM *src) {
     }
 
     // Check dst top
-    int top = find_top(dest, MAX_BIGNUM_SIZE);
+    int top = find_top(dest);
     dest->top = top;
 
     dest->dmax = src->dmax;
@@ -440,7 +393,7 @@ __device__ void bn_copy_0(BIGNUM *dest, BIGNUM *src) {
     bn_print(">> dest: ", dest);
 
     // Init dst as zero
-    init_zero(dest, MAX_BIGNUM_SIZE);
+    init_zero(dest);
     // Set dst top to 1
     dest->top = 1;
     // Set dst neg to 0
@@ -452,7 +405,7 @@ __device__ void bn_copy_0(BIGNUM *dest, BIGNUM *src) {
     }
 
     // Check src top
-    int top = find_top(src, MAX_BIGNUM_SIZE);
+    int top = find_top(src);
     if (top != src->top) {
         //printf("### bn_copy ### Error: SRC Top is not set correctly in the source BIGNUM.\n");
         //printf("src->top: %d, actual top: %d\n", src->top, top);
@@ -479,7 +432,7 @@ __device__ void bn_copy_0(BIGNUM *dest, BIGNUM *src) {
         dest->d[i] = 0;
     }
     // Check dst top
-    top = find_top(dest, MAX_BIGNUM_SIZE);
+    top = find_top(dest);
     if (top != dest->top) {
         //printf("### bn_copy ### Error: DST Top is not set correctly in the destination BIGNUM.\n");
         //printf("dest->top: %d, actual top: %d\n", dest->top, top);
@@ -534,7 +487,7 @@ __device__ void absolute_add(BIGNUM *result, const BIGNUM *a, const BIGNUM *b) {
     }
 
     // Find the real top after addition (no leading zeroes)
-    result->top = find_top(result, MAX_BIGNUM_SIZE);
+    result->top = find_top(result);
 }
 
 __device__ void absolute_subtract(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
@@ -579,28 +532,6 @@ __device__ void absolute_subtract(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
 
 __device__ bool bn_subtract(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
     clock_t start = clock64();
-    //printf("bn_subtract:\n");
-    // Check tops # TODO: This may need optimization. Top is often incorrect in point_add
-    // if (find_top(a, MAX_BIGNUM_SIZE) != a->top) {
-    //     printf("### bn_cmp_abs ### Error: Top is not set correctly in the source BIGNUM.\n");
-    //     printf("a->top: %d, actual top: %d\n", a->top, find_top(a, MAX_BIGNUM_SIZE));
-    // }
-    // if (find_top(b, MAX_BIGNUM_SIZE) != b->top) {
-    //     printf("### bn_cmp_abs ### Error: Top is not set correctly in the source BIGNUM.\n");
-    //     printf("b->top: %d, actual top: %d\n", b->top, find_top(b, MAX_BIGNUM_SIZE));
-    // }
-    // set tops
-    // a->top = find_top(a, MAX_BIGNUM_SIZE); // This stuck in a loop
-    // b->top = find_top(b, MAX_BIGNUM_SIZE);
-    //bn_print("a: ", a);
-    //bn_print("b: ", b);
-
-    // set tops
-    // a->top = find_top(a, MAX_BIGNUM_SIZE); // This stuck in a loop
-    // b->top = find_top(b, MAX_BIGNUM_SIZE);
-    // bn_print(">> a: ", a);
-    // bn_print(">> b: ", b);
-
     // If one is negative and the other is positive, it's essentially an addition.
     if (a->neg != b->neg) {
         result->neg = a->neg; // The sign will be the same as the sign of 'a'.
@@ -625,7 +556,7 @@ __device__ bool bn_subtract(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
     }
 
     // Update result.top based on the actual data in result.
-    result->top = find_top(result, MAX_BIGNUM_SIZE);
+    result->top = find_top(result);
 
     // Perform additional logic if underflow has been detected in absolute_subtract.
     if (result->top == 0) { 
@@ -634,67 +565,6 @@ __device__ bool bn_subtract(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
     // stat_report("bn_subtract", start);
     record_function(FN_BN_SUB, start);
     return true;
-}
-
-__device__ void bn_add_v0(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
-    if (a->neg != b->neg) {
-        // Handle the case where a and b have different signs
-        // This is a subtraction operation
-        bn_subtract(result, a, b);
-        return;
-    }
-    // Determine the maximum size to iterate over
-    int max_top = max(a->top, b->top)+1;
-    BN_ULONG carry = 0;
-
-    // Initialize result
-    for (int i = 0; i < max_top; ++i) { result->d[i] = 0; }
-    result->top = max_top;
-    
-    for (int i = 0; i < max_top; ++i) {
-        // Extract current words or zero if one bignum is shorter
-        BN_ULONG ai = (i < a->top) ? a->d[i] : 0;
-        BN_ULONG bi = (i < b->top) ? b->d[i] : 0;
-        
-        // Calculate sum and carry
-        BN_ULONG sum = ai + bi + carry;
-
-        // Store result
-        result->d[i] = sum; // Full sum with carry included
-
-        // Calculate carry, respecting the full width of BN_ULONG
-        carry = (sum < ai) || (carry > 0 && sum == ai) ? 1 : 0;
-    }
-    
-    // Handle carry out, expand result if necessary
-    if (carry > 0) {
-        if (result->top < MAX_BIGNUM_WORDS) {
-            result->d[result->top] = carry; // Assign carry to the new word
-            result->top++;
-        } else {
-            // Handle error: Result BIGNUM doesn't have space for an additional word.
-            // This should potentially be reported back to the caller.
-        }
-    }
-    result->top = find_top(result, MAX_BIGNUM_WORDS);
-    // Define the neg flag depends on bn_cmp, a and b neg
-    // Both numbers are negative
-    if (a->neg && b->neg) {
-        result->neg = 1;
-    }
-    // 'a' is negative, 'b' is positive
-    else if (a->neg && !b->neg) {
-        result->neg = (bn_cmp(a, b) > 0) ? 1 : 0;
-    }
-    // 'a' is positive, 'b' is negative
-    else if (!a->neg && b->neg) {
-        result->neg = (bn_cmp(a, b) < 0) ? 1 : 0;
-    }
-    // Both numbers are positive
-    else {
-        result->neg = 0;
-    }
-
 }
 
 __device__ int absolute_compare(const BIGNUM* a, const BIGNUM* b) {
@@ -725,40 +595,7 @@ __device__ int absolute_compare(const BIGNUM* a, const BIGNUM* b) {
 
 __device__ bool bn_add(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
     clock_t start = clock64();
-    // #define BN_ULONG_NUM_BITS 64
-    // #define MAX_BIGNUM_WORDS 4     // For 256-bit numbers
-    // #define MAX_BIGNUM_SIZE 8     // Allow room for temp calculations
-
-    // typedef struct bignum_st {
-    // BN_ULONG *d;
-    // int top;
-    // int dmax;
-    // int neg;
-    // int flags;
-    // } BIGNUM;
-    /*printf("++ bn_add ++\n");
-    bn_print(">> a: ", a);
-    printf(">> a.top: %d\n", a->top);
-    printf(">> a.dmax: %d\n", a->dmax);
-    printf(">> a.neg: %d\n", a->neg);
-    printf(">> a.flags: %d\n", a->flags);
-    bn_print(">> b: ", b);
-    printf(">> b.top: %d\n", b->top);
-    printf(">> b.dmax: %d\n", b->dmax);
-    printf(">> b.neg: %d\n", b->neg);
-    printf(">> b.flags: %d\n", b->flags);
-    bn_print(">> result: ", result);
-    printf(">> result.top: %d\n", result->top);
-    printf(">> result.dmax: %d\n", result->dmax);
-    printf(">> result.neg: %d\n", result->neg);
-    printf(">> result.flags: %d\n", result->flags);*/
-    // Clear the result first.
-    // Clear the result first.
-    // result->top = 0;
-    // for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
-    //     result->d[i] = 0;
-    // }
-    init_zero(result, MAX_BIGNUM_SIZE);
+    init_zero(result);
 
     if (a->neg == b->neg) {
         // Both numbers have the same sign, so we can directly add them.
@@ -785,152 +622,10 @@ __device__ bool bn_add(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
     }
 
     // Lastly, normalize the result to remove any leading zeros that could have appeared.
-    find_top(result, MAX_BIGNUM_SIZE);
+    find_top(result);
     // stat_report("bn_add", start);
     record_function(FN_BN_ADD, start);
     return true;
-}
-
-__device__ void bn_mod_deprecated(BIGNUM* r, BIGNUM* m, BIGNUM* d) {
-    //debug_printf("bn_mod 0\n");
-    printf("bn_mod 0\n");
-    // Copy m to r
-    for (int i = 0; i < m->top; i++) {
-        debug_printf("bn_mod: 0.%d r_top: %d m_top: %d\n", i, r->top, m->top);
-        r->d[i] = m->d[i];
-    }
-    printf("bn_mod 1\n");
-    r->top = m->top;
-    r->neg = 0;
-    printf("bn_mod 2\n");
-
-    // Ensure r has enough space to cover subtraction up to d->top
-    for (int i = m->top; i < d->top; i++) {
-        r->d[i] = 0; // Zero out any remaining indices
-    }
-    printf("bn_mod 3\n");
-    if (d->top > r->top) {
-        r->top = d->top; // Increase the top to match d, if necessary
-    }
-    printf("bn_mod 4\n");
-
-    // Keep subtracting d from r until r < d
-    while (true) {
-        // Check if r < d or r == d
-        int compare = bn_cmp(r, d); // Need to implement bn_cmp to compare BIGNUMs
-        //printf("bn_mod >> x\n");
-        //printf("bn_mod >> compare: %d\n", compare);
-        if (compare < 0) {
-            // r < d, we are done
-            //printf("bn_mod >> y\n");
-            break;
-        } else if (compare == 0) {
-            // r == d, set r to 0 and we are done
-            /*printf("bn_mod >> z\n");
-            printf("bn_mod >> r_top: %d\n", r->top);
-            printf("bn_mod >> r_neg: %d\n", r->neg);
-            printf("bn_mod >> r_dmax: %d\n", r->dmax);
-            printf("bn_mod >> r_flags: %d\n", r->flags);*/
-            init_zero(r, MAX_BIGNUM_SIZE);
-            // init_zero(r, MAX_BIGNUM_WORDS);
-            //printf("bn_mod >> 0\n");
-            break;
-        }
-
-        // r > d, so subtract d from r
-        int borrow = 0;
-        for (int i = 0; i < r->top; i++) {
-            printf(">> bn_mod: 1.%d r_top: %d d_top: %d\n", i, r->top, d->top);
-            long long res = (long long)r->d[i] - (long long)((i < d->top) ? d->d[i] : 0) - borrow;
-            borrow = (res < 0) ? 1 : 0;
-            if (res < 0) {
-                res += (1LL << BN_ULONG_NUM_BITS); // Assuming each BN_ULONG is 32 bits
-            }
-            r->d[i] = (BN_ULONG)res;
-        }
-
-        // Additional condition to ensure r->top shrinks if top words are zero.
-        while (r->top > 0 && r->d[r->top - 1] == 0) {
-            --r->top;
-        }
-    }
-    printf("bn_mod end\n");
-}
-
-__device__ int bn_nnmod_deprecated(BIGNUM *r, BIGNUM *m, BIGNUM *d)
-{
-    printf("++ BN_nnmod ++\n");
-    bn_print(">> r: ", r);
-    bn_print(">> m: ", m);
-    bn_print(">> d: ", d);
-    // Check for division by zero
-    if (d->top == 0) {
-        return 0; // Error code
-    }
-
-    // Check if r and d are the same pointer
-    if (r == d) {
-        printf("BN_nnmod: ERR_R_PASSED_INVALID_ARGUMENT\n");
-        return 0;
-    }
-
-    // Perform the modulo operation using BN_mod
-    if (!bn_mod(r, m, d)) {
-        printf("BN_mod failed\n");
-        return 0; // Error code
-    }
-    bn_print("[1] r: ", r);
-    bn_print("[1] m: ", m);
-    bn_print("[1] d: ", d);
-
-    // Check the sign of the result
-    if (!r->neg) {
-        printf("r is not negative\n");
-        return 1;
-    }
-
-    BIGNUM tmp;
-    init_zero(&tmp, MAX_BIGNUM_WORDS);
-    if (d->neg) {
-        printf("d is negative\n");
-        if (!bn_subtract(&tmp, r, d)) { // tmp = r - d
-            printf("BN_sub failed\n");
-            return 0;
-        }
-    } else {
-        printf("d is not negative\n");
-        if (!bn_add(r, r, d)) {
-            printf("BN_add failed\n");
-            return 0;
-        }
-    }
-
-    printf("returning 1\n");
-    return 1; // Success
-}
-
-__device__ int simple_BN_nnmod_deprecated(BIGNUM *r, const BIGNUM *m, const BIGNUM *d)
-{
-    printf("ATTENTION: simple_BN_nnmod can operates only with single word!\n");
-    // Check for division by zero
-    if (d->top == 0) {
-        return 0; // Error code
-    }
-
-    // Perform the modulo operation; this is a simplified operation assuming single-precision
-    BN_ULONG remainder = m->d[0] % d->d[0];
-
-    // Check the sign and adjust if necessary
-    if (m->neg) {
-        remainder = d->d[0] - remainder;
-    }
-
-    // Update the result BIGNUM
-    r->d[0] = remainder;
-    r->top = 1; // Simplified; assuming single-precision arithmetic
-    r->neg = 0; // Result is always non-negative
-
-    return 1; // Success
 }
 
 __device__ void big_num_add_mod(BN_ULONG *result, BN_ULONG *a, BN_ULONG *b, BN_ULONG *n, int num_words) {
@@ -1027,7 +722,7 @@ __device__ bool bn_sub(BIGNUM *a, BIGNUM *b, BIGNUM *r);
 // bn_mul cache ++
 // #define CACHE_SIZE 256  // Adjust based on your needs
 // #define CACHE_SIZE 52416
-#define CACHE_SIZE 320 // TODO: Remove this
+// #define CACHE_SIZE 320 // TODO: Remove this
 #define MAX_CACHE_SIZE 320
 
 // __device__ BN_ULONG B_values[MAX_CACHE_SIZE];
@@ -1040,11 +735,11 @@ typedef struct {
 } CacheEntry;
 
 typedef struct {
-    CacheEntry entries[CACHE_SIZE];
+    CacheEntry entries[MAX_CACHE_SIZE];
 } Cache;
 
 __device__ unsigned int hash(BN_ULONG key) {
-    return key % CACHE_SIZE;
+    return key % MAX_CACHE_SIZE;
 }
 
 __device__ void cache_init(Cache* cache) {
@@ -1069,61 +764,6 @@ __device__ int cache_get(Cache* cache, BN_ULONG key, BIGNUM* value) {
     record_function(FN_CACHED_BN_MUL, start);
     return 0;
 }
-
-// #define CACHE_SIZE 1024  // Adjust based on your needs and available memory
-
-// typedef struct {
-//     BIGNUM key_a;
-//     BIGNUM key_b;
-//     BIGNUM result;
-//     int valid;
-// } CacheEntry;
-
-// __device__ CacheEntry mul_cache[CACHE_SIZE];
-
-// __device__ void init_cache() {
-//     for (int i = 0; i < CACHE_SIZE; i++) {
-//         mul_cache[i].valid = 0;
-//     }
-// }
-
-// __device__ unsigned int hash(BIGNUM* a, BIGNUM* b) {
-//     unsigned int hash = 0;
-//     for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
-//         hash = hash * 31 + a->d[i];
-//         hash = hash * 31 + b->d[i];
-//     }
-//     return hash % CACHE_SIZE;
-// }
-
-// __device__ int compare_bignums(BIGNUM* a, BIGNUM* b) {
-//     if (a->neg != b->neg) return 0;
-//     if (a->top != b->top) return 0;
-//     for (int i = 0; i < a->top; i++) {
-//         if (a->d[i] != b->d[i]) return 0;
-//     }
-//     return 1;
-// }
-
-// __device__ void cached_bn_mul(BIGNUM* a, BIGNUM* b, BIGNUM* result) {
-//     unsigned int index = hash(a, b);
-//     if (mul_cache[index].valid && 
-//         compare_bignums(a, &mul_cache[index].key_a) && 
-//         compare_bignums(b, &mul_cache[index].key_b)) {
-//         // Cache hit
-//         clock_t start = clock64();
-//         *result = mul_cache[index].result;
-//         record_function(FN_CACHED_BN_MUL, start);
-//     } else {
-//         // Cache miss
-//         bn_mul(a, b, result);
-//         mul_cache[index].key_a = *a;
-//         mul_cache[index].key_b = *b;
-//         mul_cache[index].result = *result;
-//         mul_cache[index].valid = 1;
-//     }
-// }
-// bn_mul cache --
 
 __device__ void set_bn(BIGNUM *dest, const BIGNUM *src) {
     debug_printf("set_bn 0\n");
@@ -1208,7 +848,7 @@ __device__ int extended_gcd(BIGNUM *a, BIGNUM *mod, BIGNUM *x, BIGNUM *y) {
     // // zero.top = (zero_d[0] != 0); // If we've set zero_d[0] to 0, zero's top should be zero, implying an actual value of 0.
     // zero.top = 0;
     // zero.dmax = 1; // The maximum number of "words" in the BIGNUM. Since zero is just 0, this is 1.
-    init_zero(&zero, MAX_BIGNUM_WORDS);
+    init_zero(&zero);
 
     //BIGNUM *temp_remainder = new BIGNUM(); // If dynamic memory is allowed - or statically allocate enough space if not
     BIGNUM temp_remainder;
@@ -1268,8 +908,8 @@ __device__ bool bn_sub(BIGNUM *r, BIGNUM *a, BIGNUM *b) {
     // TODO: Implement check that r, a and b are different pointers
     //printf("++ bn_sub ++\n");
     // get top of a and b
-    a->top = find_top(a, MAX_BIGNUM_WORDS);
-    b->top = find_top(b, MAX_BIGNUM_WORDS);
+    a->top = find_top(a);
+    b->top = find_top(b);
 
     //bn_print(">> a: ", a);
     //bn_print(">> b: ", b);
@@ -1384,7 +1024,7 @@ __device__ void bn_mul(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
     // Reset the product
     // for(int i = 0; i < a->top + b->top; i++)
     //     product->d[i] = 0;
-    init_zero(product, MAX_BIGNUM_WORDS);
+    init_zero(product);
     
     // Perform multiplication of each word of a with each word of b
     for (int i = 0; i < a->top; ++i) {
@@ -1478,33 +1118,6 @@ __device__ int bn_is_bit_set(const BIGNUM *bn, int bit_index) {
     return (bn->d[word_index] & mask) ? 1 : 0;
 }
 
-__device__ void bn_lshift_deprecated(BIGNUM *a, int shift) {
-    if (shift <= 0) {
-        // No shift or invalid shift count; do nothing.
-        return;
-    }
-
-    // Perform the shift for each word from the most significant down to the least significant.
-    BN_ULONG carry = 0;
-    for (int i = a->top - 1; i >= 0; --i) {
-        BN_ULONG new_carry = a->d[i] >> (BN_ULONG_NUM_BITS - shift); // Capture the bits that will be shifted out.
-        a->d[i] = (a->d[i] << shift) | carry; // Shift current word and add bits from previous carry.
-        carry = new_carry; // Update carry for the next iteration.
-    }
-
-    // Update the 'top' if the left shift carried out of the msb.
-    if (carry != 0) {
-        if (a->top < a->dmax) {
-            a->d[a->top] = carry; // Assign the carry to the new most significant word.
-            a->top++; // Increase the top to account for the new most significant word.
-        } else {
-            // Handle overflow case where there's no room for an extra word.
-            // This would require either halting with an error or reallocating a->d.
-            debug_printf("Error: no room for extra word in bn_lshift\n");
-        }
-    }
-}
-
 __device__ int bn_mod_mpz(BIGNUM *r, BIGNUM *m, BIGNUM *d) {
     // printf("++ bn_mod ++\n");
     
@@ -1516,7 +1129,7 @@ __device__ int bn_mod_mpz(BIGNUM *r, BIGNUM *m, BIGNUM *d) {
 
     // Create a temporary BIGNUM to store the divisor
     BIGNUM temp_divisor;
-    init_zero(&temp_divisor, MAX_BIGNUM_WORDS);
+    init_zero(&temp_divisor);
 
     // Copy the divisor to the temporary BIGNUM
     if (r == d) {
@@ -1570,7 +1183,7 @@ __device__ int bn_mod(BIGNUM *r, BIGNUM *a, BIGNUM *n) {
         printf("\n");
     }*/
     BIGNUM q;
-    init_zero(&q, MAX_BIGNUM_SIZE);
+    init_zero(&q);
 
     if (r == n) {
         printf("bn_mod: ERR_R_PASSED_INVALID_ARGUMENT");
@@ -1588,7 +1201,7 @@ __device__ int bn_mod(BIGNUM *r, BIGNUM *a, BIGNUM *n) {
     // bn_print("<<1 r after bn_div: ", r);
 
     BIGNUM tmp;
-    init_zero(&tmp, MAX_BIGNUM_SIZE);
+    init_zero(&tmp);
 
     if (r->neg) {
         if (debug) printf("r is negative\n");
@@ -1617,33 +1230,6 @@ __device__ int bn_mod(BIGNUM *r, BIGNUM *a, BIGNUM *n) {
     return 1;
 }
 
-__device__ int bn_mod_v0(BIGNUM *r, BIGNUM *a, BIGNUM *n) {
-    printf("++ bn_mod ++\n");
-    // int BN_nnmod(BIGNUM *r, const BIGNUM *m, const BIGNUM *d, BN_CTX *ctx)
-    BIGNUM q;
-    init_zero(&q, MAX_BIGNUM_WORDS);
-
-    /*
-     * like BN_mod, but returns non-negative remainder (i.e., 0 <= r < |d|
-     * always holds)
-     */
-    /*if (r == n) {
-        printf("bn_mod_for_div: ERR_R_PASSED_INVALID_ARGUMENT")
-        return 0;
-    }*/
-
-    /*
-    - `dv` (quotient) is where the result of the division is stored.
-    - `rem` (remainder) is where the remainder of the division is stored.
-    - `m` is the dividend.
-    - `d` is the divisor.
-    - `ctx` is the context used for memory management during the operation in original OpenSSL implementation.
-    */
-    // return bn_divide_rev2(&q, r, a, n); // quotient, remainder, 
-    printf("-- bn_mod --> bn_div..\n");
-    return bn_div(&q, r, a, n); // quotient, remainder, 
-}
-
 __device__ void mod_mul(BIGNUM *a, BIGNUM *b, BIGNUM *mod, BIGNUM *result) {
     debug_printf("mod_mul 0\n");
     // Product array to store the intermediate multiplication result
@@ -1651,7 +1237,7 @@ __device__ void mod_mul(BIGNUM *a, BIGNUM *b, BIGNUM *mod, BIGNUM *result) {
     // Ensure that 'product' uses this pre-allocated array
     // BIGNUM product = { product_d, 0, MAX_BIGNUM_SIZE };
     BIGNUM product;
-    init_zero(&product, MAX_BIGNUM_SIZE);
+    init_zero(&product);
     debug_printf("mod_mul 1\n");
     // Now, you can call the bn_mul function and pass 'product' to it
     bn_mul(a, b, &product);
@@ -1730,7 +1316,7 @@ __device__ bool bn_is_zero(BIGNUM *a) {
     // printf("a->top: %d\n", a->top);
     // Check a top
 
-    int top = find_top(a, MAX_BIGNUM_SIZE);
+    int top = find_top(a);
     if (top != a->top) {
         // printf("WARNING: bn_is_zero: top is not correct\n");
         //printf("a->top: %d, actual top: %d\n", a->top, top);
@@ -1772,7 +1358,7 @@ __device__ bool bn_is_one(BIGNUM *a) {
     // Ensure that any other digits (if they exist in memory) are zero
     // This isn't strictly necessary if the 'top' index is always accurate
     // but is a good sanity check if there's any possibility of memory corruption or improper initialization.
-    for (int i = 1; i < MAX_BIGNUM_WORDS; ++i) {
+    for (int i = 1; i < MAX_BIGNUM_SIZE; ++i) {
         if (a->d[i] != 0) {
             /*printf(">> return: False\n");
             printf("-- bn_is_one --\n");*/
@@ -1804,8 +1390,8 @@ __device__ void copy_point(EC_POINT *dest, EC_POINT *src) {
     // dest->y.neg = 0;
     // dest->x.dmax = MAX_BIGNUM_WORDS;
     // dest->y.dmax = MAX_BIGNUM_WORDS;
-    init_zero(&dest->x, MAX_BIGNUM_WORDS);
-    init_zero(&dest->y, MAX_BIGNUM_WORDS);
+    init_zero(&dest->x);
+    init_zero(&dest->y);
 
     // Copy the BIGNUM x
     bn_copy(&dest->x, &src->x);
@@ -1840,10 +1426,10 @@ __device__ void set_point_at_infinity(EC_POINT *point) {
 
     // To set the point to 0 (as an example sentinel value), do:
     // bn_zero(&point->x); // A function that sets a BIGNUM to 0
-    init_zero(&point->x, MAX_BIGNUM_WORDS);
+    init_zero(&point->x);
 
     //bn_zero(&point->y); // Ensure that this logic matches how you identify point at infinity elsewhere
-    init_zero(&point->y, MAX_BIGNUM_WORDS);
+    init_zero(&point->y);
 }
 
 __device__ void bn_set_word(BIGNUM *bn, BN_ULONG word) {
@@ -1852,7 +1438,7 @@ __device__ void bn_set_word(BIGNUM *bn, BN_ULONG word) {
     // Setting a BIGNUM to a single-word value means that all other words are zero.
 
     // Clear all words in the BIGNUM
-    for (int i = 0; i < MAX_BIGNUM_WORDS; ++i) {
+    for (int i = 0; i < MAX_BIGNUM_SIZE; ++i) {
         bn->d[i] = 0;
     }
 
@@ -1888,8 +1474,8 @@ __device__ void bn_init_for_shift(BIGNUM *result, BIGNUM *a, int shift) {
     int new_top = a->top + extra_word;
 
     // Ensure result has enough space to hold the new value.
-    // It should at least match the new_top or be the maximum allowed by MAX_BIGNUM_WORDS.
-    result->dmax = min(new_top, MAX_BIGNUM_WORDS);
+    // It should at least match the new_top or be the maximum allowed by MAX_BIGNUM_SIZE.
+    result->dmax = min(new_top, MAX_BIGNUM_SIZE);
 
     // Initialize the 'result' words to zero.
     for (int i = 0; i < result->dmax; i++) {
@@ -2414,149 +2000,6 @@ __device__ void bn_div_binary(
     elapsed_time_bn_div_binary += (double)(end - start);
 }
 
-// __device__ int bn_div_o(BIGNUM *quotient_in, BIGNUM *remainder_in, BIGNUM *dividend_in, BIGNUM *divisor_in) {
-//     /*
-//     - `dv` (quotient) is where the result of the division is stored.
-//     - `rem` (remainder) is where the remainder of the division is stored.
-//     - `m` is the dividend.
-//     - `d` is the divisor.
-//     - `ctx` is the context used for memory management during the operation in original OpenSSL implementation.
-//     */
-
-//     // dividend
-//     // -------- = quotient, remainder
-//     // divisor
-//     //printf("\n++ bn_div ++\n");
-//     // Declare variable to store clock() value
-//     clock_t start, end;
-//     // Start the clock
-//     start = clock64();
-//     // printf("Start time: %lld\n", start);
-    
-//     debug_loop_counter_bn_div++;
-
-//     bool debug = 0;
-
-//     // Declare local BIGNUM variables
-//     BIGNUM quotient;
-//     BIGNUM remainder;
-//     BIGNUM dividend;
-//     BIGNUM divisor;
-//     //printf("# [0] #\n");
-//     // Initialize the BIGNUMs
-//     init_zero(&quotient, MAX_BIGNUM_SIZE);
-//     init_zero(&remainder, MAX_BIGNUM_SIZE);
-//     init_zero(&dividend, MAX_BIGNUM_SIZE);
-//     init_zero(&divisor, MAX_BIGNUM_SIZE);
-//     // if (debug) {
-//     //     printf("# [1] #\n");
-//     //     bn_print(">> dividend_in: ", dividend_in);
-//     //     bn_print(">> divisor_in: ", divisor_in);
-//     // };
-//     // Copy from input BIGNUMs
-//     bn_copy(&quotient, quotient_in);
-//     bn_copy(&remainder, remainder_in);
-//     bn_copy(&dividend, dividend_in);
-//     bn_copy(&divisor, divisor_in);
-//     //printf("# [2] #\n");
-//     // print input values
-//     /*bn_print(">> dividend: ", &dividend);
-//     bn_print(">> divisor: ", &divisor);*/
-
-//     // init zero to quotient and remainder
-//     init_zero(&quotient, MAX_BIGNUM_SIZE);
-//     init_zero(&remainder, MAX_BIGNUM_SIZE);
-//     quotient.neg = 0;
-//     remainder.neg = 0;
-    
-//     // Error checks similar to OpenSSL
-//     //bn_print(">>[1] bn_div divisor: ", &divisor);
-//     if (bn_is_zero(&divisor)) {
-//         // Handle division by zero or similar error
-//         // Free the allocated memory when done
-//         /*free(quotient);
-//         free(remainder);
-//         free(dividend);
-//         free(divisor);*/
-//         //printf("-- bn_div -- Error: Division by zero. Divisor is zero\n");
-//         return 0;
-//     }
-//     if (&divisor == NULL) {
-//         // Handle invalid divisor
-//         // Free the allocated memory when done
-//         /*free(quotient);
-//         free(remainder);
-//         free(dividend);
-//         free(divisor);*/
-//         //printf("-- bn_div -- Error: Invalid divisor\n");
-//         return 0;
-//     }
-//     if (&dividend == NULL) {
-//         // Handle invalid dividend
-//         // Free the allocated memory when done
-//         /*free(quotient);
-//         free(remainder);
-//         free(dividend);
-//         free(divisor);*/
-//         //printf("-- bn_div -- Error: Invalid dividend\n");
-//         return 0;
-//     }
-
-//     // Initialize variables
-//     BIGNUM temp_dividend, temp_divisor, temp_quotient, temp_remainder;
-//     init_zero(&temp_dividend, MAX_BIGNUM_SIZE);
-//     init_zero(&temp_divisor, MAX_BIGNUM_SIZE);
-//     init_zero(&temp_quotient, MAX_BIGNUM_SIZE);
-//     init_zero(&temp_remainder, MAX_BIGNUM_SIZE);
-
-//     bn_copy(&temp_dividend, &dividend);
-//     bn_copy(&temp_divisor, &divisor);
-
-//     // Normalize the divisor and dividend
-//     int shift = BN_ULONG_NUM_BITS - bn_get_top_bit(&temp_divisor);
-//     bn_lshift_res(&temp_divisor, &temp_divisor, shift);
-//     bn_lshift_res(&temp_dividend, &temp_dividend, shift);
-
-//     // Initialize the remainder
-//     bn_copy(&temp_remainder, &temp_dividend);
-
-//     // Main division loop
-//     for (int i = temp_dividend.top - temp_divisor.top; i >= 0; --i) {
-//         // Estimate quotient
-//         BN_ULONG qhat = bn_div_2_words(temp_remainder.d[i + temp_divisor.top], temp_remainder.d[i + temp_divisor.top - 1], temp_divisor.d[temp_divisor.top - 1]);
-
-//         // Multiply and subtract
-//         BN_ULONG carry = bn_mul_sub_words(&temp_remainder, &temp_divisor, i, qhat);
-
-//         // Correct the estimate if necessary
-//         while (carry != 0) {
-//             --qhat;
-//             carry = bn_add_words(&temp_remainder.d[i], temp_divisor.d, temp_divisor.top, i);
-//         }
-
-//         // Store the quotient
-//         temp_quotient.d[i] = qhat;
-//     }
-
-//     // Normalize the quotient and remainder
-//     bn_rshift_one(&temp_remainder);
-//     bn_copy(quotient_in, &temp_quotient);
-//     bn_copy(remainder_in, &temp_remainder);
-
-//     // Free the allocated memory when done
-//     /*free(quotient);
-//     free(remainder);
-//     free(dividend);
-//     free(divisor);*/
-//     //printf("-- bn_div --\n");
-//     // Stop the clock
-//     end = clock64();
-//     // elapsed_time_bn_div += (double)(end - start) / ((double)DEVICE_CLOCK_RATE*10000);
-//     elapsed_time_bn_div += (double)(end - start);
-
-//     return 1;
-// }
-
 __device__ void left_shift(BIGNUM *a, int shift) {
     clock_t start = clock64();
     // bn_print_bn_line("\nleft_shift: ", a);
@@ -2587,7 +2030,7 @@ __device__ void left_shift(BIGNUM *a, int shift) {
     }
 
     // Update top
-    a->top = find_top(a, MAX_BIGNUM_SIZE);
+    a->top = find_top(a);
     // bn_print_bn_line(" : ", a);
     // printf("\n");
     record_function(FN_LEFT_SHIFT, start);
@@ -2612,22 +2055,12 @@ __device__ int bn_div(BIGNUM *bn_quotient, BIGNUM *bn_remainder, BIGNUM *bn_divi
 {
     clock_t start = clock64();
 
-    // Initialize the cache
-    // init_cache();
-    // Initialize cache for multiplication results
-    // Cache mul_cache;
-    // cache_init(&mul_cache);
-
-    // printf("++ bn_div ++\n");
-    // bn_print(">> bn_dividend = ", bn_dividend);
-    // bn_print(">> bn_divisor = ", bn_divisor);
-
     // Store signs and work with absolute values
     int dividend_neg = bn_dividend->neg;
     int divisor_neg = bn_divisor->neg;
     BIGNUM abs_dividend, abs_divisor;
-    init_zero(&abs_dividend, MAX_BIGNUM_SIZE);
-    init_zero(&abs_divisor, MAX_BIGNUM_SIZE);
+    init_zero(&abs_dividend);
+    init_zero(&abs_divisor);
 
     unsigned char divs_max_top = (bn_dividend->top > bn_divisor->top) ? bn_dividend->top : bn_divisor->top;
 
@@ -2640,8 +2073,8 @@ __device__ int bn_div(BIGNUM *bn_quotient, BIGNUM *bn_remainder, BIGNUM *bn_divi
     abs_divisor.neg = 0;
 
     // Initialize quotient and remainder
-    init_zero(bn_quotient, MAX_BIGNUM_SIZE);
-    init_zero(bn_remainder, MAX_BIGNUM_SIZE);
+    init_zero(bn_quotient);
+    init_zero(bn_remainder);
 
     // Handle special cases
     if (bn_cmp(&abs_dividend, &abs_divisor) == 0) {
@@ -2653,21 +2086,17 @@ __device__ int bn_div(BIGNUM *bn_quotient, BIGNUM *bn_remainder, BIGNUM *bn_divi
         record_function(FN_BN_DIV, start);
         return 1;
     }
-
     // Perform long division
     BIGNUM current_dividend;
-    init_zero(&current_dividend, MAX_BIGNUM_SIZE);
-    int dividend_size = find_top(&abs_dividend, MAX_BIGNUM_SIZE);
+    init_zero(&current_dividend);
+    int dividend_size = find_top(&abs_dividend);
 
-    // Initialize cache for multiplication results
-    // #define CACHE_SIZE 256 // Adjust based on your needs
-    // BIGNUM mul_cache[CACHE_SIZE];
-    // int cache_valid[CACHE_SIZE] = {0};
-
-    // Initialize cache arrays
-    BN_ULONG B_values[MAX_CACHE_SIZE];
-    BIGNUM products[MAX_CACHE_SIZE];
-    int cache_count = 0;
+    #if bn_mul_caching
+        // Initialize cache arrays
+        BN_ULONG B_values[MAX_CACHE_SIZE];
+        BIGNUM products[MAX_CACHE_SIZE];
+        int cache_count = 0;
+    #endif
 
     for (int i = dividend_size - 1; i >= 0; i--) {
         // Shift current_dividend left by one word and add next word of dividend
@@ -2680,44 +2109,30 @@ __device__ int bn_div(BIGNUM *bn_quotient, BIGNUM *bn_remainder, BIGNUM *bn_divi
         while (left <= right) {
             BN_ULONG mid = left + (right - left) / 2;
             BIGNUM temp, product;
-            init_zero(&temp, MAX_BIGNUM_SIZE);
-            init_zero(&product, MAX_BIGNUM_SIZE);
+            init_zero(&temp);
+            init_zero(&product);
             temp.d[0] = mid;
             temp.top = 1;
 
-            // bn_mul(&abs_divisor, &temp, &product);
-            int cache_index = find_in_cache(mid, B_values, cache_count);
-            if (cache_index != -1) {
-                product = products[cache_index];
-            } else {
+            // 
+            #if bn_mul_caching
+                int cache_index = find_in_cache(mid, B_values, cache_count);
+                if (cache_index != -1) {
+                    product = products[cache_index];
+                } else {
+                    bn_mul(&abs_divisor, &temp, &product);
+                    if (cache_count < MAX_CACHE_SIZE) {
+                        B_values[cache_count] = mid;
+                        products[cache_count] = product;
+                        cache_count++;
+                    }
+                    else {
+                        printf("[0] Cache miss. %016llx is more than %d\n", mid, MAX_CACHE_SIZE);
+                    }
+                }
+            #else
                 bn_mul(&abs_divisor, &temp, &product);
-                if (cache_count < MAX_CACHE_SIZE) {
-                    B_values[cache_count] = mid;
-                    products[cache_count] = product;
-                    cache_count++;
-                }
-                else {
-                    printf("[0] Cache miss. %016llx is more than %d\n", mid, MAX_CACHE_SIZE);
-                }
-            }
-            // Check cache first
-            // if (mid < CACHE_SIZE && cache_valid[mid]) {
-            //     product = mul_cache[mid];
-            // } else {
-            //     bn_mul(&abs_divisor, &temp, &product);
-            //     if (mid < CACHE_SIZE) {
-            //         mul_cache[mid] = product;
-            //         cache_valid[mid] = 1;
-            //     }
-            //     else {
-            //         printf("Cache miss. %016llx is more than %d\n", mid, CACHE_SIZE);
-            //     }
-            // }
-            // Check cache first
-            // if (!cache_get(&mul_cache, mid, &product)) {
-            //     bn_mul(&abs_divisor, &temp, &product);
-            //     cache_set(&mul_cache, mid, &product);
-            // }
+            #endif
 
             if (bn_cmp(&product, &current_dividend) <= 0) {
                 q = mid;
@@ -2725,15 +2140,6 @@ __device__ int bn_div(BIGNUM *bn_quotient, BIGNUM *bn_remainder, BIGNUM *bn_divi
             } else {
                 right = mid - 1;
             }
-            // Use cached multiplication
-            // cached_bn_mul(&abs_divisor, &temp, &product);
-
-            // if (bn_cmp(&product, &current_dividend) <= 0) {
-            //     q = mid;
-            //     left = mid + 1;
-            // } else {
-            //     right = mid - 1;
-            // }
         }
 
         // Add quotient digit to result
@@ -2742,27 +2148,30 @@ __device__ int bn_div(BIGNUM *bn_quotient, BIGNUM *bn_remainder, BIGNUM *bn_divi
 
         // Subtract q * divisor from current_dividend
         BIGNUM temp, product;
-        init_zero(&temp, MAX_BIGNUM_SIZE);
-        init_zero(&product, MAX_BIGNUM_SIZE);
+        init_zero(&temp);
+        init_zero(&product);
         temp.d[0] = q;
         temp.top = 1;
 
-        // bn_mul(&abs_divisor, &temp, &product);
-        int cache_index = find_in_cache(q, B_values, cache_count); // Shell runtime: 362.258584028 seconds
-        if (cache_index != -1) {
-            product = products[cache_index];
-        } else {
+        #if bn_mul_caching
+            int cache_index = find_in_cache(q, B_values, cache_count); // Shell runtime: 362.258584028 seconds
+            if (cache_index != -1) {
+                product = products[cache_index];
+            } else {
+                bn_mul(&abs_divisor, &temp, &product);
+                if (cache_count < MAX_CACHE_SIZE) {
+                    B_values[cache_count] = q;
+                    products[cache_count] = product;
+                    cache_count++;
+                }
+                else {
+                    printf("[1] Cache miss. %016llx is more than %d\n", q, MAX_CACHE_SIZE);
+                }
+            }
+        #else
             bn_mul(&abs_divisor, &temp, &product);
-            if (cache_count < MAX_CACHE_SIZE) {
-                B_values[cache_count] = q;
-                products[cache_count] = product;
-                cache_count++;
-            }
-            else {
-                printf("[1] Cache miss. %016llx is more than %d\n", q, MAX_CACHE_SIZE);
-            }
-        }
-        // cached_bn_mul(&abs_divisor, &temp, &product);
+        #endif
+
         bn_subtract(&current_dividend, &current_dividend, &product);
     }
 
@@ -2776,8 +2185,8 @@ __device__ int bn_div(BIGNUM *bn_quotient, BIGNUM *bn_remainder, BIGNUM *bn_divi
     bn_remainder->neg = dividend_neg;
 
     // Normalize results
-    bn_quotient->top = find_top(bn_quotient, MAX_BIGNUM_SIZE);
-    bn_remainder->top = find_top(bn_remainder, MAX_BIGNUM_SIZE);
+    bn_quotient->top = find_top(bn_quotient);
+    bn_remainder->top = find_top(bn_remainder);
 
     // bn_print("<< bn_quotient = ", bn_quotient);
     // bn_print("<< bn_remainder = ", bn_remainder);
@@ -2828,10 +2237,10 @@ __device__ int bn_div_unoptimized(BIGNUM *quotient_in, BIGNUM *remainder_in, BIG
     BIGNUM divisor;
     //printf("# [0] #\n");
     // Initialize the BIGNUMs
-    init_zero(&quotient, MAX_BIGNUM_SIZE);
-    init_zero(&remainder, MAX_BIGNUM_SIZE);
-    init_zero(&dividend, MAX_BIGNUM_SIZE);
-    init_zero(&divisor, MAX_BIGNUM_SIZE);
+    init_zero(&quotient);
+    init_zero(&remainder);
+    init_zero(&dividend);
+    init_zero(&divisor);
     // if (debug) {
     //     printf("# [1] #\n");
     //     bn_print(">> dividend_in: ", dividend_in);
@@ -2848,8 +2257,8 @@ __device__ int bn_div_unoptimized(BIGNUM *quotient_in, BIGNUM *remainder_in, BIG
     bn_print(">> divisor: ", &divisor);*/
 
     // init zero to quotient and remainder
-    init_zero(&quotient, MAX_BIGNUM_SIZE);
-    init_zero(&remainder, MAX_BIGNUM_SIZE);
+    init_zero(&quotient);
+    init_zero(&remainder);
     quotient.neg = 0;
     remainder.neg = 0;
     
@@ -3019,8 +2428,8 @@ __device__ void bn_abs(BIGNUM *result, BIGNUM *a) {
 
 __device__ void bn_set_signed_word(BIGNUM *r, int64_t value) {
     // Clear any existing value in r.
-    // Assuming MAX_BIGNUM_WORDS is defined and represents the maximum size of d[].
-    for (int i = 0; i < MAX_BIGNUM_WORDS; ++i) {
+    // Assuming MAX_BIGNUM_SIZE is defined and represents the maximum size of d[].
+    for (int i = 0; i < MAX_BIGNUM_SIZE; ++i) {
         r->d[i] = 0;
     }
 
@@ -3093,9 +2502,9 @@ __device__ void bn_gcd(BIGNUM* r, BIGNUM* in_a, BIGNUM* in_b) {
     int shifts = 0;
 
     // Initialize BIGNUM variables
-    init_zero(&a, MAX_BIGNUM_WORDS);
-    init_zero(&b, MAX_BIGNUM_WORDS);
-    init_zero(&temp, MAX_BIGNUM_WORDS);
+    init_zero(&a);
+    init_zero(&b);
+    init_zero(&temp);
 
     // Copy in_a and in_b to a and b respectively because we need to modify them
     bn_copy(&a, in_a);
@@ -3151,7 +2560,7 @@ __device__ void bn_gcd(BIGNUM* r, BIGNUM* in_a, BIGNUM* in_b) {
 
     // Step 3: adjust the result to include the factors of 2 we removed earlier
     BIGNUM temp_a;
-    init_zero(&temp_a, MAX_BIGNUM_WORDS);
+    init_zero(&temp_a);
     bn_lshift_res(&temp_a, &a, shifts); // equivalent to a *= 2^shifts;
 
     //bn_print("<<GCD: ", &temp_a);
@@ -3168,24 +2577,24 @@ __device__ void bn_gcdext_deprecated(BIGNUM *g, BIGNUM *s, BIGNUM *t, BIGNUM *a,
 
     // Temporary BIGNUM for b, to avoid modifying the original b
     BIGNUM b_temp;
-    init_zero(&b_temp, MAX_BIGNUM_WORDS);
+    init_zero(&b_temp);
     bn_copy(&b_temp, b_original); // Copy original b to temporary variable
 
     // Temporary BIGNUM variables for intermediate calculations
     BIGNUM prev_s, prev_t, quotient, temp;
-    init_zero(&prev_s, MAX_BIGNUM_WORDS);
-    init_zero(&prev_t, MAX_BIGNUM_WORDS);
-    init_zero(&quotient, MAX_BIGNUM_WORDS);
-    init_zero(&temp, MAX_BIGNUM_WORDS);
+    init_zero(&prev_s);
+    init_zero(&prev_t);
+    init_zero(&quotient);
+    init_zero(&temp);
     
     // Initialize s and t coefficients for the extended GCD algorithm
-    init_one(s, MAX_BIGNUM_WORDS);     // s = 1
+    init_one(s);     // s = 1
     
-    init_zero(&prev_s, MAX_BIGNUM_WORDS);  // prev_s = 0
+    init_zero(&prev_s);  // prev_s = 0
     
-    init_zero(t, MAX_BIGNUM_WORDS);    // t = 0
+    init_zero(t);    // t = 0
     // printf("## bn_gcdext ##\n");
-    init_one(&prev_t, MAX_BIGNUM_WORDS);  // prev_t = 1
+    init_one(&prev_t);  // prev_t = 1
     
     // Initialize g and b for the gcd calculation
     bn_copy(g, a);
@@ -3228,12 +2637,12 @@ __device__ void bn_gcdext(BIGNUM *g, BIGNUM *s, BIGNUM *t, BIGNUM *a, BIGNUM *b)
     bn_print(">> b: ", b);
     printf("\n");
     BIGNUM old_s, old_t, old_r, r, quotient, temp;
-    init_zero(&old_s, MAX_BIGNUM_WORDS);
-    init_zero(&old_t, MAX_BIGNUM_WORDS);
-    init_zero(&old_r, MAX_BIGNUM_WORDS);
-    init_zero(&r, MAX_BIGNUM_WORDS);
-    init_zero(&quotient, MAX_BIGNUM_WORDS);
-    init_zero(&temp, MAX_BIGNUM_WORDS);
+    init_zero(&old_s);
+    init_zero(&old_t);
+    init_zero(&old_r);
+    init_zero(&r);
+    init_zero(&quotient);
+    init_zero(&temp);
 
     bn_copy(&old_r, b);
     bn_copy(&r, a);
@@ -3306,14 +2715,14 @@ __device__ bool bn_mod_inverse(BIGNUM *result, BIGNUM *a, BIGNUM *n) {
     BIGNUM tmp2;
     BIGNUM tmp3;
 
-    init_zero(&r, MAX_BIGNUM_SIZE);
-    init_zero(&nr, MAX_BIGNUM_SIZE);
-    init_zero(&t, MAX_BIGNUM_SIZE);
-    init_one(&nt, MAX_BIGNUM_SIZE);
-    init_zero(&q, MAX_BIGNUM_SIZE);
-    init_zero(&tmp, MAX_BIGNUM_SIZE);
-    init_zero(&tmp2, MAX_BIGNUM_SIZE);
-    init_zero(&tmp3, MAX_BIGNUM_SIZE);
+    init_zero(&r);
+    init_zero(&nr);
+    init_zero(&t);
+    init_one(&nt);
+    init_zero(&q);
+    init_zero(&tmp);
+    init_zero(&tmp2);
+    init_zero(&tmp3);
 
     bn_copy(&r, n);
     /*bn_print("\n[bn_mod_inverse pre_bn_mod] a = ", a);
@@ -3334,8 +2743,8 @@ __device__ bool bn_mod_inverse(BIGNUM *result, BIGNUM *a, BIGNUM *n) {
         bn_div(&q, &tmp, &r, &nr); // Compute quotient and remainder
         bn_copy(&tmp, &nt);
 
-        nt.top = find_top(&nt, MAX_BIGNUM_SIZE);
-        q.top = find_top(&q, MAX_BIGNUM_SIZE);
+        nt.top = find_top(&nt);
+        q.top = find_top(&q);
 
         //bn_print("\n[0] premul q = ", q);
         //bn_print("[1] premul nt = ", nt);
@@ -3343,7 +2752,7 @@ __device__ bool bn_mod_inverse(BIGNUM *result, BIGNUM *a, BIGNUM *n) {
         //bn_print("[2] postmul nt = ", tmp2);        
 
         //bn_print("[3] presub t = ", t);
-        init_zero(&tmp3, MAX_BIGNUM_SIZE);
+        init_zero(&tmp3);
         bn_subtract(&tmp3, &t, &tmp2); // tmp3 = t - tmp2
         //bn_print("[3.5] postsub tmp2 = ", tmp3);
         bn_copy(&nt, &tmp3); // dst << src
@@ -3358,7 +2767,7 @@ __device__ bool bn_mod_inverse(BIGNUM *result, BIGNUM *a, BIGNUM *n) {
         
         //bn_print("[8] presub r = ", r);
         // set zero to tmp3
-        init_zero(&tmp3, MAX_BIGNUM_SIZE);
+        init_zero(&tmp3);
         bn_subtract(&tmp3, &r, &tmp2); // tmp3 = r - tmp2
         bn_copy(&nr, &tmp3);
         //bn_print("[9] postsub nr = ", nr);
@@ -3379,7 +2788,7 @@ __device__ bool bn_mod_inverse(BIGNUM *result, BIGNUM *a, BIGNUM *n) {
 
     if (!bn_is_one(&r)) {
         // if (debug) printf("No modular inverse exists\n");
-        init_zero(result, MAX_BIGNUM_SIZE);
+        init_zero(result);
         delete &r;
         delete &nr;
         delete &t;
@@ -3458,14 +2867,14 @@ __device__ int point_add(
 
     // Initialize temporary BIGNUMs for calculation
     BIGNUM s, x3, y3, tmp1, tmp2, tmp3, two, tmp1_squared;
-    init_zero(&s, MAX_BIGNUM_SIZE);
-    init_zero(&x3, MAX_BIGNUM_SIZE);
-    init_zero(&y3, MAX_BIGNUM_SIZE);
-    init_zero(&tmp1, MAX_BIGNUM_SIZE);
-    init_zero(&tmp2, MAX_BIGNUM_SIZE);
-    init_zero(&tmp3, MAX_BIGNUM_SIZE);
-    init_zero(&two, MAX_BIGNUM_SIZE);
-    init_zero(&tmp1_squared, MAX_BIGNUM_SIZE);
+    init_zero(&s);
+    init_zero(&x3);
+    init_zero(&y3);
+    init_zero(&tmp1);
+    init_zero(&tmp2);
+    init_zero(&tmp3);
+    init_zero(&two);
+    init_zero(&tmp1_squared);
 
     
     
@@ -3488,12 +2897,12 @@ __device__ int point_add(
         debug_printf("p1.x == p2.x\n");
         // Point doubling
         // BIGNUM two;
-        init_zero(&two, MAX_BIGNUM_SIZE);
+        init_zero(&two);
         bn_set_word(&two, 2);
 
         // BIGNUM tmp1_squared;
-        init_zero(&tmp1_squared, MAX_BIGNUM_SIZE);
-        init_zero(&tmp1, MAX_BIGNUM_SIZE);
+        init_zero(&tmp1_squared);
+        init_zero(&tmp1);
         bn_copy(&tmp1, &p1->x); // dst << src
         if (debug) {
             bn_print("\n[0] >> bn_mul p1.x: ", &p1->x);
@@ -3504,21 +2913,21 @@ __device__ int point_add(
             bn_print("[0] << bn_mul tmp1: ", &tmp1_squared); // ERR
         }
 
-        init_zero(&tmp1, MAX_BIGNUM_SIZE);
+        init_zero(&tmp1);
         bn_copy(&tmp1, &tmp1_squared); // dst << src
         // Init tmp2 as 3
-        init_zero(&tmp2, MAX_BIGNUM_SIZE);
+        init_zero(&tmp2);
         bn_set_word(&tmp2, 3);
         bn_mul(&tmp1, &tmp2, &tmp1_squared);     // a * b = product
         if (debug) bn_print("\n[1] << bn_mul tmp1_squared: ", &tmp1_squared); // OK
 
         if (debug) bn_print("\n[2] << bn_add tmp1_squared: ", &tmp1_squared); // 
 
-        init_zero(&tmp1, MAX_BIGNUM_SIZE);
+        init_zero(&tmp1);
         if (debug) bn_print("\n# [3] >> bn_mod tmp1_squared: ", &tmp1_squared);
         bn_copy(&tmp1, &tmp1_squared); // dst << src        
         if (debug) bn_print("# [3] >> bn_mod tmp1: ", &tmp1);
-        init_zero(&tmp1_squared, MAX_BIGNUM_SIZE);
+        init_zero(&tmp1_squared);
         if (debug) bn_print("[3] >> bn_mod tmp1_squared: ", &tmp1_squared);
         if (debug) bn_print("[3] >> bn_mod tmp1: ", &tmp1);
         if (debug) bn_print("[3] >> bn_mod p: ", p);
@@ -3526,38 +2935,38 @@ __device__ int point_add(
         if (debug) bn_print("[3] << bn_mod tmp1_squared: ", &tmp1_squared); // OK
         if (debug) bn_print("[3] << bn_mod tmp1: ", &tmp1);
         
-        init_zero(&tmp2, MAX_BIGNUM_SIZE);
+        init_zero(&tmp2);
         bn_set_word(&two, 2);
         bn_mul(&p1->y, &two, &tmp2);  // tmp2 = 2 * p1.y
         if (debug) bn_print("\n[4] << bn_mul tmp2: ", &tmp2); // OK
 
-        init_zero(&tmp3, MAX_BIGNUM_SIZE);
+        init_zero(&tmp3);
         bn_copy(&tmp3, &tmp2); // dst << src
         bn_mod(&tmp2, &tmp3, p);           // tmp2 = tmp3 mod p
         if (debug) bn_print("\n[5] << bn_mod tmp2: ", &tmp2); // OK
         
-        init_zero(&tmp3, MAX_BIGNUM_SIZE);
+        init_zero(&tmp3);
         bn_copy(&tmp3, &tmp2); // dst << src
-        init_zero(&tmp2, MAX_BIGNUM_SIZE);
+        init_zero(&tmp2);
         if (debug) bn_print("\n[6] >> bn_mod_inverse tmp2: ", &tmp2);
         if (debug) bn_print("[6] >> bn_mod_inverse tmp3: ", &tmp3);
         if (debug) bn_print("[6] >> bn_mod_inverse p: ", p);
         bn_mod_inverse(&tmp2, &tmp3, p);  // tmp2 = tmp3 mod p
         if (debug) bn_print("[6] << bn_mod_inverse tmp2: ", &tmp2); // STUCK
         // return 0;//TODO: remove
-        init_zero(&tmp3, MAX_BIGNUM_SIZE);
+        init_zero(&tmp3);
         bn_copy(&tmp3, &tmp1_squared); // dst << src
         if (debug) bn_print("\n[7] >> bn_mul tmp3: ", &tmp3);
         if (debug) bn_print("[7] >> bn_mul tmp2: ", &tmp2);
         bn_mul(&tmp3, &tmp2, &s);  // tmp1 * tmp2 = s
         if (debug) bn_print("[7] << bn_mul s: ", &s); //
 
-        init_zero(&tmp3, MAX_BIGNUM_SIZE);
+        init_zero(&tmp3);
         bn_copy(&tmp3, &s); // dst << src
         bn_mod(&s, &tmp3, p);  // s = s mod p
         if (debug) bn_print("\n[8] << bn_mod s: ", &s); //
 
-        init_zero(&tmp3, MAX_BIGNUM_SIZE);
+        init_zero(&tmp3);
         bn_copy(&tmp3, &s); // dst << src
         bn_mul(&tmp3, &tmp3, &x3);  // x3 = s^2
         // bn_print("\n[9] << bn_mul x3: ", &x3); //
@@ -3568,31 +2977,31 @@ __device__ int point_add(
         bn_subtract(&x3, &x3, &p1->x);  // x3 = x3 - p1.x
         // bn_print("\n[11] << bn_subtract x3: ", &x3); //
 
-        init_zero(&tmp3, MAX_BIGNUM_SIZE);
+        init_zero(&tmp3);
         bn_copy(&tmp3, &x3); // dst << src
         bn_mod(&x3, &tmp3, p);  // x3 = x3 mod p
         // bn_print("\n[12] << bn_mod x3: ", &x3); // OK
 
-        init_zero(&tmp1, MAX_BIGNUM_SIZE);
+        init_zero(&tmp1);
         // bn_print("[13] >> bn_subtract p1.x: ", &p1->x); //
         // bn_print("[13] >> bn_subtract x3: ", &x3); //
         bn_subtract(&tmp1, &p1->x, &x3);  // tmp1 = p1.x - x3
         // bn_print("\n[13] << bn_subtract tmp1: ", &tmp1); //
 
-        init_zero(&tmp3, MAX_BIGNUM_SIZE);
+        init_zero(&tmp3);
         bn_copy(&tmp3, &s); // dst << src
         bn_mul(&tmp3, &tmp1, &y3);  // y3 = s * tmp1
         // bn_print("\n[14] << bn_mul y3: ", &y3); //
 
         //init_zero(&y3, MAX_BIGNUM_SIZE);
-        init_zero(&tmp3, MAX_BIGNUM_SIZE);
+        init_zero(&tmp3);
         bn_copy(&tmp3, &y3); // dst << src
         // bn_print("[15] >> bn_subtract tmp3: ", &tmp3); //
         // bn_print("[15] >> bn_subtract p1.y: ", &p1->y); //
         bn_subtract(&y3, &tmp3, &p1->y);  // y3 = y3 - p1.y
         // bn_print("\n[15] << bn_subtract y3: ", &y3); //
 
-        init_zero(&tmp3, MAX_BIGNUM_SIZE);
+        init_zero(&tmp3);
         bn_copy(&tmp3, &y3); // dst << src
         bn_mod(&y3, &tmp3, p);  // y3 = y3 mod p
         // bn_print("\n[16] << bn_mod y3: ", &y3); //
@@ -3603,19 +3012,19 @@ __device__ int point_add(
         // Regular point addition
         bn_subtract(&tmp1, &p2->y, &p1->y);
         // bn_print("\n[a] << bn_subtract tmp1: ", &tmp1);
-        init_zero(&tmp3, MAX_BIGNUM_WORDS);
+        init_zero(&tmp3);
         bn_copy(&tmp3, &tmp1); // dst << src
         // bn_mod(&tmp1, p, &tmp1);           // tmp1 = (p2.y - p1.y) mod p
-        init_zero(&tmp1, MAX_BIGNUM_WORDS);
+        init_zero(&tmp1);
         // bn_print("\n[c] >> bn_mod tmp3: ", &tmp3);
         // bn_print("\n[c] >> bn_mod p: ", p);        
         bn_mod(&tmp1, &tmp3, p);           // tmp1 = (p2.y - p1.y) mod p 
         // bn_print("\n[c] << bn_mod tmp1: ", &tmp1); // OK
         
-        init_zero(&tmp2, MAX_BIGNUM_WORDS);
+        init_zero(&tmp2);
         bn_subtract(&tmp2, &p2->x, &p1->x);
 
-        init_zero(&tmp3, MAX_BIGNUM_WORDS);
+        init_zero(&tmp3);
         bn_copy(&tmp3, &tmp2);
         //bn_mod(&tmp2, p, &tmp2);           // tmp2 = (p2.x - p1.x) mod p
         // bn_print("\n[d] >> bn_mod tmp3: ", &tmp3);
@@ -3626,9 +3035,9 @@ __device__ int point_add(
         // bn_print("\n[0] >> bn_mod_inverse tmp2: ", &tmp2);
         // bn_print("[0] >> bn_mod_inverse tmp3: ", &tmp3);
         // bn_print("[0] >> bn_mod_inverse p: ", p);
-        init_zero(&tmp3, MAX_BIGNUM_WORDS);
+        init_zero(&tmp3);
         bn_copy(&tmp3, &tmp2);
-        init_zero(&tmp2, MAX_BIGNUM_WORDS);
+        init_zero(&tmp2);
         //bn_mod_inverse(&tmp2, p, &tmp3);   // tmp2 = (p2.x - p1.x)^-1 mod p
         bn_mod_inverse(&tmp2, &tmp3, p);
         // bn_print("\n[1] << bn_mod_inverse tmp2: ", &tmp2); // OK
@@ -3637,24 +3046,24 @@ __device__ int point_add(
         // bn_print("\n[2] >> bn_mul s: ", &s);
         // bn_print("\n[2] >> bn_mul tmp1: ", &tmp1);
         // bn_print("\n[2] >> bn_mul tmp2: ", &tmp2);
-        init_zero(&s, MAX_BIGNUM_WORDS);
+        init_zero(&s);
         bn_mul(&tmp1, &tmp2, &s);
         // bn_print("\n[2] << bn_mul s: ", &s);
         // bn_print("\n[2] << bn_mul tmp1: ", &tmp1);
         // bn_print("\n[2] << bn_mul tmp2: ", &tmp2); // OK
 
         
-        init_zero(&tmp2, MAX_BIGNUM_SIZE);
+        init_zero(&tmp2);
         // bn_print("\n[3a] >> bn_mod s: ", &s);
         bn_copy(&tmp2, &s);
-        init_zero(&s, MAX_BIGNUM_SIZE);
+        init_zero(&s);
         // bn_print("\n[3b] >> bn_mod s: ", &s);
         // bn_print("\n[3] >> bn_mod tmp2: ", &tmp2);
         // bn_print("\n[3] >> bn_mod p: ", p); // OK
         bn_mod(&s, &tmp2, p);                 // s = (p2.y - p1.y) / (p2.x - p1.x) mod p
         // bn_print("\n[3] << bn_mod s: ", &s); // OK
 
-        init_zero(&tmp2, MAX_BIGNUM_WORDS);
+        init_zero(&tmp2);
         bn_copy(&tmp2, &s);
         // bn_print("\n[4] >> bn_mul x3: ", &x3);
         // bn_print("\n[4] >> bn_mul s: ", &s);
@@ -3664,7 +3073,7 @@ __device__ int point_add(
         // bn_print("\n[4] << bn_mul s: ", &s);
 
         //bn_mod(&x3, p, &x3);               // x3 = s^2 mod p
-        init_zero(&tmp2, MAX_BIGNUM_WORDS);
+        init_zero(&tmp2);
         bn_copy(&tmp2, &x3);
         // bn_print("\n[5] >> bn_subtract x3: ", &x3);
         // bn_print("\n[5] >> bn_subtract tmp2: ", &tmp2);
@@ -3675,7 +3084,7 @@ __device__ int point_add(
         bn_subtract(&x3, &x3, &p2->x);          // x3 = s^2 - p1.x - p2.x
         // bn_print("\n[6] << bn_subtract x3: ", &x3);
         
-        init_zero(&tmp2, MAX_BIGNUM_SIZE);
+        init_zero(&tmp2);
         //bn_mod(&x3, p, &x3); // x3 = (s^2 - p1.x - p2.x) mod p tmp2 = 
         bn_copy(&tmp2, &x3);
         // bn_print("\n[7] >> bn_mod x3: ", &x3);
@@ -3693,12 +3102,12 @@ __device__ int point_add(
 
         //bn_mod(&y3, p, &y3);               // y3 = s * (p1.x - x3) mod p
         
-        init_zero(&tmp2, MAX_BIGNUM_WORDS);
+        init_zero(&tmp2);
         bn_copy(&tmp2, &y3);
         bn_subtract(&y3, &tmp2, &p1->y);          // y3 = s * (p1.x - x3) - p1.y
         // bn_print("\n[10] << bn_mod y3: ", &y3); // OK
 
-        init_zero(&tmp2, MAX_BIGNUM_WORDS);
+        init_zero(&tmp2);
         bn_copy(&tmp2, &y3);
         bn_mod(&y3, &tmp2, p);               // y3 = tmp2 mod p
         // bn_print("\n[11] << bn_mod y3: ", &y3);
@@ -3769,7 +3178,7 @@ __device__ char* compress_public_key(EC_POINT public_key) {
 
 __device__ char* compress_public_key_bad_pref(EC_POINT public_key) {
     BIGNUM mod_result;
-    init_zero(&mod_result, MAX_BIGNUM_SIZE);
+    init_zero(&mod_result);
 
     // Calculate public_key.y % 2
     bn_mod(&mod_result, &public_key.y, &CURVE_P);
@@ -3794,28 +3203,6 @@ __device__ char* compress_public_key_bad_pref(EC_POINT public_key) {
     return compressed;
 }
 
-__device__ void bignum_to_bit_array_2(BIGNUM *n, unsigned int *bits) {
-    int index = 0;
-    n->top = find_top(n, MAX_BIGNUM_SIZE);
-    for (int i = n->top - 1; i >= 0; --i) {
-        BN_ULONG word = n->d[i];
-        for (int j = BN_ULONG_NUM_BITS - 1; j >= 0; --j) {
-            bits[index++] = (word >> j) & 1;
-        }
-    }
-}
-
-__device__ void bignum_to_bit_array_1(BIGNUM *n, unsigned int *bits) {
-    int index = 0;
-    n->top = find_top(n, MAX_BIGNUM_SIZE);
-    for (int i = 0; i < n->top; ++i) {
-        BN_ULONG word = n->d[i];
-        for (int j = 0; j < BN_ULONG_NUM_BITS; ++j) {  // Assuming BN_ULONG is 32 bits
-            bits[index++] = (word >> j) & 1;
-        }
-    }
-}
-
 __device__ void bignum_to_bit_array(const BIGNUM *n, unsigned int *bits) {
     int index = 0;
     for (int i = 0; i < n->top; ++i) {
@@ -3832,8 +3219,8 @@ __device__ void init_point_at_infinity(EC_POINT *P) {
     // For the x and y coordinates of P, we'll set the 'top' to 0,
     // which is our chosen convention for representing the point at infinity.
 
-    init_zero(&P->x, MAX_BIGNUM_SIZE);
-    init_zero(&P->y, MAX_BIGNUM_SIZE);
+    init_zero(&P->x);
+    init_zero(&P->y);
 
     P->x.top = 1; // No valid 'words' in the BIGNUM representing x
     P->y.top = 1; // No valid 'words' in the BIGNUM representing y
