@@ -2910,3 +2910,128 @@ __device__ void init_point_at_infinity(EC_POINT *P) {
     // set them accordingly here.
     // printf("-- init_point_at_infinity --\n");
 }
+
+__device__ EC_POINT ec_point_scalar_mul(
+    EC_POINT *point, 
+    BIGNUM *scalar, 
+    BIGNUM *curve_prime, 
+    BIGNUM *curve_a
+    ) {
+    // debug_printf("++ ec_point_scalar_mul ++\n");
+    // Print point
+    bn_print(">> point x: ", &point->x);
+    bn_print(">> point y: ", &point->y);
+    bn_print(">> scalar: ", scalar);
+    bn_print(">> curve_prime: ", curve_prime);
+    bn_print(">> curve_a: ", curve_a);    
+    
+    EC_POINT current = *point; // This initializes the current point with the input point
+    EC_POINT result; // Initialize the result variable, which accumulates the result
+    EC_POINT tmp_result;
+    EC_POINT tmp_a;
+    EC_POINT tmp_b;                                     
+    
+    init_point_at_infinity(&result);                 // Initialize it to the point at infinity
+    init_point_at_infinity(&tmp_result);                 // Initialize it to the point at infinity
+    init_point_at_infinity(&tmp_a);                 // Initialize it to the point at infinity
+    init_point_at_infinity(&tmp_b);                 // Initialize it to the point at infinity
+    
+    // Convert scalar BIGNUM to an array of integers that's easy to iterate bit-wise
+    unsigned int bits[256];                          // Assuming a 256-bit scalar
+    bignum_to_bit_array(scalar, bits);               // You will need to implement bignum_to_bit_array()
+    
+    // printf("coef hex: %s\n", bignum_to_hex(scalar)); // Convert BIGNUM to hex string for printing
+    bn_print("coef: ", scalar);  
+    
+    for (int i = 0; i < 256; i++) {                 // Assuming 256-bit scalars
+        // printf("\n### Step: %d\n", i);
+        // if (i<debug_counter) {
+        //     // printf("0 x: %s\n", bignum_to_hex(&current.x));
+        //     bn_print("0 current.x: ", &current.x);
+        //     // printf("0 y: %s\n", bignum_to_hex(&current.y));
+        //     bn_print("0 current.y: ", &current.y);
+        // }
+        
+
+        if (bits[i]) {// If the i-th bit is set
+            // printf("\n[0]\n");
+            // printf("0: Interrupting for debug\n");
+            // return result; // TODO: remove this
+            // if (i<debug_counter) printf("# 0\n");
+            // init tmp_result
+            init_point_at_infinity(&tmp_result); 
+            
+            bn_print(">> point_add result.x: ", &result.x);
+            bn_print(">> point_add result.y: ", &result.y);
+            bn_print(">> point_add current.x: ", &current.x);
+            bn_print(">> point_add current.y: ", &current.y);
+            bn_print(">> curve_prime: ", curve_prime);
+            bn_print(">> curve_a: ", curve_a);
+            point_add(&tmp_result, &result, &current, curve_prime, curve_a);  // Add current to the result
+            init_point_at_infinity(&result); // Reset result
+            bn_copy(&result.x, &tmp_result.x);
+            bn_copy(&result.y, &tmp_result.y);
+            bn_print("<< point_add result.x: ", &result.x);
+            bn_print("<< point_add result.y: ", &result.y);
+            
+            // if (i<debug_counter) printf("# b\n");
+            // printf("1 x: %s\n", bignum_to_hex(&result.x));
+            //  if (i<debug_counter) bn_print("1 result.x: ", &result.x);
+            // printf("1 y: %s\n", bignum_to_hex(&result.y));
+            //  if (i<debug_counter) bn_print("1 result.y: ", &result.y);
+            // printf("\n");
+            
+        }
+        // init tmp_result
+        init_point_at_infinity(&tmp_result);
+        // init tmp_a
+        init_point_at_infinity(&tmp_a);
+        // init tmp_b
+        init_point_at_infinity(&tmp_b);
+        // Copy current to tmp_a
+        bn_copy(&tmp_a.x, &current.x);
+        bn_copy(&tmp_a.y, &current.y);
+        // Copy current to tmp_b
+        bn_copy(&tmp_b.x, &current.x);
+        bn_copy(&tmp_b.y, &current.y);
+
+        // printf("\n[1]\n");
+        bn_print(">> point_add tmp_a.x: ", &tmp_a.x);
+        bn_print(">> point_add tmp_a.y: ", &tmp_a.y);
+        bn_print(">> point_add tmp_b.x: ", &tmp_b.x);
+        bn_print(">> point_add tmp_b.y: ", &tmp_b.y);
+        bn_print(">> point_add tmp_result.x: ", &tmp_result.x);
+        bn_print(">> point_add tmp_result.y: ", &tmp_result.y);
+        // print curve_prime and curve_a
+        bn_print(">> point_add curve_prime: ", curve_prime);
+        bn_print(">> point_add curve_a: ", curve_a);
+
+        point_add(&tmp_result, &tmp_a, &tmp_b, curve_prime, curve_a);  // Double current by adding to itself
+
+        bn_print("\n<< point_add tmp_result.x (pp.x): ", &tmp_result.x);
+        bn_print("<< point_add tmp_result.y (pp.y): ", &tmp_result.y);
+        bn_print("<< point_add tmp_a.x (p1.x): ", &tmp_a.x);
+        bn_print("<< point_add tmp_a.y (p1.y): ", &tmp_a.y);
+        bn_print("<< point_add tmp_b.x (p2.x): ", &tmp_b.x);
+        bn_print("<< point_add tmp_b.y (p2.y):", &tmp_b.y);
+        bn_print("<< point_add curve_prime: ", curve_prime);
+        bn_print("<< point_add curve_a: ", curve_a);
+
+        // Copy tmp_result to current
+        bn_copy(&current.x, &tmp_result.x);
+        bn_copy(&current.y, &tmp_result.y);
+        bn_print("\n<< point_add current.x: ", &current.x);
+        bn_print("<< point_add current.y: ", &current.y);
+
+        // printf("2 x: %s\n", bignum_to_hex(&current.x));
+        // if (i<debug_counter) bn_print("2 current.x: ", &current.x);
+        // printf("2 y: %s\n", bignum_to_hex(&current.y));
+    }
+
+    // // printf("Final x: %s\n", bignum_to_hex(&result.x));
+    // bn_print("Final x: ", &result.x);
+    // // printf("Final y: %s\n", bignum_to_hex(&result.y));
+    // bn_print("Final y: ", &result.y);
+    // printf("-- ec_point_scalar_mul --\n");
+    return result;
+}
