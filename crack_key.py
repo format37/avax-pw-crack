@@ -21,25 +21,12 @@ class Wallet(object):
     def avax_key(self, passphrase: str):
         print(' * passphrase:', passphrase)
         seed_bytes = self.seed_generator.Generate(passphrase)
-        # print('seed_bytes', seed_bytes)
         hex_result = seed_bytes.hex()
         print(' * hex_result:', hex_result)
         # convert from hex to bytes and store to seed_bytes_restored
         seed_bytes_restored = bytes.fromhex(hex_result)
         master = Bip32Slip10Secp256k1.FromSeed(seed_bytes_restored)
-        # print('master', master)
-        # print('Master Private Key', master.m_priv_key.Raw())
-        # print('Master Key Data', master.m_priv_key.m_key_data)
         print('HardenIndex(44):', Bip32KeyIndex.HardenIndex(44))
-        """print('master.ChildKey(0).PrivateKey():', master.ChildKey(0).PrivateKey().Raw().ToHex())
-        print('master.ChildKey(0).ChainCode():', master.ChildKey(0).ChainCode().ToHex())
-
-        
-        print('HardenIndex(9000):', Bip32KeyIndex.HardenIndex(9000))
-        print('HardenIndex(0):', Bip32KeyIndex.HardenIndex(0))
-        print('\n')
-        
-        """
         print('master.FingerPrint()', master.FingerPrint())
         print('master.PrivateKey().Raw()', master.PrivateKey().Raw())
         print('master.ChainCode():', master.ChainCode())
@@ -53,24 +40,6 @@ class Wallet(object):
         print('master.44.PublicKey().RawCompressed()', master.ChildKey(Bip32KeyIndex.HardenIndex(44)).PublicKey().RawCompressed())
         print('master.44.ChainCode():', master.ChildKey(Bip32KeyIndex.HardenIndex(44)).ChainCode())
         print('\n')
-        """
-        print('master.44.9000.FingerPrint()', master.ChildKey(Bip32KeyIndex.HardenIndex(44)).ChildKey(Bip32KeyIndex.HardenIndex(9000)).FingerPrint())
-        print('master.44.9000.PrivateKey().Raw()', master.ChildKey(Bip32KeyIndex.HardenIndex(44)).ChildKey(Bip32KeyIndex.HardenIndex(9000)).PrivateKey().Raw())
-        print('master.44.9000.ChainCode():', master.ChildKey(Bip32KeyIndex.HardenIndex(44)).ChildKey(Bip32KeyIndex.HardenIndex(9000)).ChainCode())
-        print('\n')
-        print('master.44.9000.0.FingerPrint()', master.ChildKey(Bip32KeyIndex.HardenIndex(44)).ChildKey(Bip32KeyIndex.HardenIndex(9000)).ChildKey(Bip32KeyIndex.HardenIndex(0)).FingerPrint())
-        print('master.44.9000.0.PrivateKey().Raw()', master.ChildKey(Bip32KeyIndex.HardenIndex(44)).ChildKey(Bip32KeyIndex.HardenIndex(9000)).ChildKey(Bip32KeyIndex.HardenIndex(0)).PrivateKey().Raw())
-        print('master.44.9000.0.ChainCode():', master.ChildKey(Bip32KeyIndex.HardenIndex(44)).ChildKey(Bip32KeyIndex.HardenIndex(9000)).ChildKey(Bip32KeyIndex.HardenIndex(0)).ChainCode())
-        print('\n')
-        print('master.44.9000.0.0.FingerPrint()', master.ChildKey(Bip32KeyIndex.HardenIndex(44)).ChildKey(Bip32KeyIndex.HardenIndex(9000)).ChildKey(Bip32KeyIndex.HardenIndex(0)).ChildKey(0).FingerPrint())
-        print('master.44.9000.0.0.PrivateKey().Raw()', master.ChildKey(Bip32KeyIndex.HardenIndex(44)).ChildKey(Bip32KeyIndex.HardenIndex(9000)).ChildKey(Bip32KeyIndex.HardenIndex(0)).ChildKey(0).PrivateKey().Raw())
-        print('master.44.9000.0.0.ChainCode():', master.ChildKey(Bip32KeyIndex.HardenIndex(44)).ChildKey(Bip32KeyIndex.HardenIndex(9000)).ChildKey(Bip32KeyIndex.HardenIndex(0)).ChildKey(0).ChainCode())
-        print('\n')
-        print('master.44.9000.0.0.0.FingerPrint()', master.ChildKey(Bip32KeyIndex.HardenIndex(44)).ChildKey(Bip32KeyIndex.HardenIndex(9000)).ChildKey(Bip32KeyIndex.HardenIndex(0)).ChildKey(0).ChildKey(0).FingerPrint())
-        print('master.44.9000.0.0.0.PrivateKey().Raw()', master.ChildKey(Bip32KeyIndex.HardenIndex(44)).ChildKey(Bip32KeyIndex.HardenIndex(9000)).ChildKey(Bip32KeyIndex.HardenIndex(0)).ChildKey(0).ChildKey(0).PrivateKey().Raw())
-        print('master.44.9000.0.0.0.ChainCode():', master.ChildKey(Bip32KeyIndex.HardenIndex(44)).ChildKey(Bip32KeyIndex.HardenIndex(9000)).ChildKey(Bip32KeyIndex.HardenIndex(0)).ChildKey(0).ChildKey(0).ChainCode())
-        print('\n')"""
-
 
         # m/44'/9000'/0'
         child = (master
@@ -88,8 +57,6 @@ class Wallet(object):
 
 def child_to_avaxp_address(child) -> str:
     m = hashlib.sha256()
-    # print('child.PublicKey().Raw():', child.PublicKey())
-    # print('child.PublicKey().RawCompressed():', child.PublicKey().RawCompressed())
     m.update(child.PublicKey().RawCompressed().ToBytes()) # NEED THIS child.PublicKey().RawCompressed()
     
     n = RIPEMD160.new()
@@ -109,22 +76,6 @@ def generate_10_avax_addresses(passphrase: str, wallet: Wallet) -> List[str]:
     print('base_child.m_priv_key.priv_key:', base_child.m_priv_key.m_priv_key)
     print('base_child.m_priv_key.priv_key:', base_child.m_priv_key.m_key_data)
     
-    # help(base_child.m_priv_key)
-    
-    # exit()
-    # print('base_child.m_pub_key:', base_child.m_pub_key)
-    #  print base_child as hex
-    # Assuming base_child.ChildKey(0) returns an integer or bytes
-    # print('base_child from wallet as hex:', hex(base_child.ChildKey(0)))
-    # help(base_child.ChildKey(0))
-    # exit()
-    # print(child.PublicKey().RawCompressed().ToBytes())    
-    # print('PublicKey RawUncompressed:', base_child.ChildKey(0).PublicKey().RawUncompressed())
-    # print('PublicKey RawCompressed:', base_child.ChildKey(0).PublicKey().RawCompressed())
-
-    
-    # print('child_to_avaxp_address', child_to_avaxp_address(base_child.ChildKey(0)))
-    # exit()
     for i in range(10):
         child = base_child.ChildKey(i)  # Iterate over the last index to generate 10 keys
         if (i==0):
@@ -137,11 +88,9 @@ def guess_avaxp_address(inputs: Iterable[str], wallet: Wallet, target_addresses:
     counter = 0
     print('guessing..')
     for test_passphrase in inputs:
+        print(f'counter: {counter}, test_passphrase: {test_passphrase}')
         if len(test_passphrase) != 10:
             continue
-        """if counter < 230:
-            counter += 1
-            continue"""
         if counter < 230: # TODO: remove this
             counter += 1
             continue

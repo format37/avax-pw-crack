@@ -57,3 +57,10 @@ sudo apt install nvidia-cuda-toolkit
 [crypto-cuda](https://github.com/peihongch/crypto-cuda/)
 [bip-0039](https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki)
 [libgpucrypto](https://shader.kaist.edu/sslshader/libgpucrypto/)
+#### CUDA implementation notes
+Having unique test_passphrase and mnemonic, each thread need to:  
+* Generate base_child.  
+* Make 10 child_to_avaxp_address.  
+* Compare each avaxp address with the target address.  
+* If avaxp and target are matches, then put avaxp address to the target fariable and set stop_brute_forcing flag to true.  
+* If stop_brute_forcing is true then exit from the searching loop.  
