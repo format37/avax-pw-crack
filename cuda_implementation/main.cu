@@ -3,17 +3,9 @@
 #include <stdio.h>
 #include <cuda.h>
 #include "bignum.h"
+#include "pbkdf2.h"
 
 #define TEST_BIGNUM_WORDS 4
-
-__device__ void print_as_hex(const uint8_t *s,  const uint32_t slen)
-{
-	for (uint32_t i = 0; i < slen; i++)
-	{
-		printf("%02X%s", s[ i ], (i % 4 == 3) && (i != slen - 1) ? "-" : "");
-	}
-	printf("\n");
-}
 
 __device__ void reverse_order(BIGNUM *test_values_a) {
     for (size_t j = 0; j < TEST_BIGNUM_WORDS / 2; j++) {
