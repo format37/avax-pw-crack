@@ -3,6 +3,7 @@
 #include <assert.h>
 #define debug_print false
 #define bn_mul_caching false
+#define collect_stats false
 #define BN_MASK2 0xffffffff
 #define BN_ULONG_NUM_BITS 64
 // #define MAX_BIGNUM_WORDS 10     // For 576-bit numbers
@@ -39,6 +40,7 @@ __device__ unsigned int g_function_calls[MAX_FUNCTIONS];
 __device__ unsigned long long g_function_times[MAX_FUNCTIONS];
 
 __device__ void record_function(FunctionIndex fn, clock_t start_time) {
+    if (!collect_stats) return;
     clock_t end_time = clock64();
     atomicAdd(&g_function_calls[fn], 1);
     atomicAdd(&g_function_times[fn], end_time - start_time);
@@ -63,6 +65,7 @@ __device__ const char* get_function_name(FunctionIndex fn) {
 }
 
 __device__ void print_performance_report() {
+    if (!collect_stats) return;
     // Print CSV header
     printf("Function,Calls,TotalTime(cycles)\n");
     
@@ -101,8 +104,24 @@ __device__ void bn_print(const char* msg, BIGNUM* a) {
     printf("\n");
 }
 
-__device__ void bn_print_constant(const char* msg, BIGNUM* a) {    
-    printf("%s", msg);
+// __device__ void bn_print_constant_0(const char* msg, BIGNUM* a) {    
+//     printf("%s", msg);
+//     if (a->neg) {
+//         printf("-");  // Handle the case where BIGNUM is negative
+//     }
+//     for (int i = MAX_BIGNUM_SIZE - 1; i >= 0; i--) {
+//         // Print words up to top - 1 with appropriate formatting
+//         if (i == MAX_BIGNUM_SIZE - 1) {
+//             printf("%llx", a->d[i]);
+//         } else {
+//             printf("%016llx", a->d[i]);
+//         }
+//     }
+//     printf("\n");
+// }
+
+__device__ void bn_print_constant(const char* msg, BIGNUM* a, int tid) {
+    printf("Thread %d - %s", tid, msg);
     if (a->neg) {
         printf("-");  // Handle the case where BIGNUM is negative
     }

@@ -1,3 +1,5 @@
+#include <fstream>
+#include <iomanip>
 #include <stdio.h>
 #include <cuda.h>
 #include "bignum.h"
@@ -12,14 +14,13 @@ __device__ void reverse_order(BIGNUM *test_values_a) {
     }
 }
 
-//__device__ EC_POINT ec_point_scalar_mul(EC_POINT *point, BIGNUM *scalar, BIGNUM *curve_order) {
 __device__ EC_POINT ec_point_scalar_mul(
     EC_POINT *point, 
     BIGNUM *scalar, 
     BIGNUM *curve_prime, 
     BIGNUM *curve_a
     ) {
-    debug_printf("++ ec_point_scalar_mul ++\n");
+    // debug_printf("++ ec_point_scalar_mul ++\n");
     // Print point
     bn_print(">> point x: ", &point->x);
     bn_print(">> point y: ", &point->y);
@@ -49,7 +50,7 @@ __device__ EC_POINT ec_point_scalar_mul(
     int debug_counter = 1;    
     
     for (int i = 0; i < 256; i++) {                 // Assuming 256-bit scalars
-        printf("\n### Step: %d\n", i);
+        // printf("\n### Step: %d\n", i);
         // if (i<debug_counter) {
         //     // printf("0 x: %s\n", bignum_to_hex(&current.x));
         //     bn_print("0 current.x: ", &current.x);
@@ -59,7 +60,7 @@ __device__ EC_POINT ec_point_scalar_mul(
         
 
         if (bits[i]) {// If the i-th bit is set
-            printf("\n[0]\n");
+            // printf("\n[0]\n");
             // printf("0: Interrupting for debug\n");
             // return result; // TODO: remove this
             // if (i<debug_counter) printf("# 0\n");
@@ -88,7 +89,7 @@ __device__ EC_POINT ec_point_scalar_mul(
             //  if (i<debug_counter) bn_print("1 result.x: ", &result.x);
             // printf("1 y: %s\n", bignum_to_hex(&result.y));
             //  if (i<debug_counter) bn_print("1 result.y: ", &result.y);
-            printf("\n");
+            // printf("\n");
             
         }
         // else {
@@ -131,7 +132,7 @@ __device__ EC_POINT ec_point_scalar_mul(
         bn_copy(&tmp_b.x, &current.x);
         bn_copy(&tmp_b.y, &current.y);
 
-        printf("\n[1]\n");
+        // printf("\n[1]\n");
         bn_print(">> point_add tmp_a.x: ", &tmp_a.x);
         bn_print(">> point_add tmp_a.y: ", &tmp_a.y);
         bn_print(">> point_add tmp_b.x: ", &tmp_b.x);
@@ -175,20 +176,19 @@ __device__ EC_POINT ec_point_scalar_mul(
         // }
     }
 
-    // printf("Final x: %s\n", bignum_to_hex(&result.x));
-    bn_print("Final x: ", &result.x);
-    // printf("Final y: %s\n", bignum_to_hex(&result.y));
-    bn_print("Final y: ", &result.y);
-    printf("-- ec_point_scalar_mul --\n");
+    // // printf("Final x: %s\n", bignum_to_hex(&result.x));
+    // bn_print("Final x: ", &result.x);
+    // // printf("Final y: %s\n", bignum_to_hex(&result.y));
+    // bn_print("Final y: ", &result.y);
+    // printf("-- ec_point_scalar_mul --\n");
     return result;
 }
 // Public key derivation --
 
-__global__ void testKernel() {
+__global__ void testKernel(BIGNUM* d_private_keys, EC_POINT* d_public_keys) {
+    int tid = blockIdx.x * blockDim.x + threadIdx.x; // Global thread ID
     clock_t start = clock64();
-    // BN_CTX *ctx = BN_CTX_new();
-
-    // return;
+    // printf("Thread %d - Starting execution\n", tid);
 
     // Addition
     BIGNUM a;
@@ -203,7 +203,6 @@ __global__ void testKernel() {
 
     BN_ULONG a_d[4];
     BN_ULONG b_d[4];
-    //BN_ULONG curveOrder_d[4];
 
     // Initialize a
     // C17747B1566D9FE8AB7087E3F0C50175B788A1C84F4C756C405000A0CA2248E1
@@ -246,11 +245,6 @@ __global__ void testKernel() {
 
     // Initialize curveOrder_d
     // FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
-
-    // Print inputs
-    // bn_print(">> reverse_order a: ", &a);
-    // bn_print(">> reverse_order b: ", &b);
-
     reverse_order(&a);
     reverse_order(&b);
     reverse_order(&curveOrder);
@@ -267,13 +261,7 @@ __global__ void testKernel() {
     // Modular Reduction
     BIGNUM m;
     init_zero(&m);
-    // BN_ULONG m_d[4];
-    // for (int i = 0; i < 4; i++) m_d[i] = 0;
-    // m_d[0] = 0x64; // 100
-    // m.d = m_d;
     m.d[0] = 0x64; // 100
-    // m.top = 1;
-    // m.neg = 0;
     
     BIGNUM tmp;
     init_zero(&tmp);
@@ -283,21 +271,17 @@ __global__ void testKernel() {
     bn_mod(&newKey, &tmp, &curveOrder); // a = b mod c
     // bn_print("<< bn_mod newKey: ", &newKey);
     // printf("(expected): 2E09165B257A4C3E52C9F4FAA6322C66CEDE807B7D6B4EC3960820795EE5447F\n");
-    bn_print("\nPrivate key: ", &newKey);
-    //return; // TODO: Remove this
+    // bn_print("\nPrivate key: ", &newKey);
+    // printf("Thread %d - After initialization\n", tid);
+    // bn_print_constant("Private key: ", &newKey, tid);
     // Derive the public key
-    printf("\nDeriving the public key..\n");
+    // printf("\nDeriving the public key..\n");
     // Initialize constants
     init_zero(&CURVE_A);
     
     // For secp256k1, CURVE_B should be initialized to 7 rather than 0
-    // for (int i = 0; i < 4; i++) CURVE_B_d[i] = 0;
     init_zero(&CURVE_B);
     CURVE_B.d[0] = 0x7;
-    // CURVE_B_d[0] = 0x7;
-    // CURVE_B.d = CURVE_B_d;
-    // CURVE_B.top = 4;
-    // CURVE_B.neg = 0;
 
     BN_ULONG CURVE_GX_values[MAX_BIGNUM_SIZE] = {
         0x79BE667EF9DCBBAC,
@@ -325,18 +309,10 @@ __global__ void testKernel() {
     EC_POINT G;
     init_zero(&G.x);
     init_zero(&G.y);
-    // G.x.d = CURVE_GX_d; 
-    // G.y.d = CURVE_GY_d;
     for (int j = 0; j < MAX_BIGNUM_SIZE; ++j) {
             G.x.d[j] = CURVE_GX_values[j];
             G.y.d[j] = CURVE_GY_values[j];
         }
-    // Set tops, negs
-    // G.x.top = 4;
-    // G.y.top = 4;
-
-    // G.x.neg = 0;
-    // G.y.neg = 0;
     // reverse
     reverse_order(&G.x);
     reverse_order(&G.y);
@@ -348,7 +324,6 @@ __global__ void testKernel() {
     //bn_copy(&CURVE_P, &curveOrder); // CURVE_P is curveOrder_d
     // Init curve prime
     // fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f
-    // BN_ULONG CURVE_P_d[4];
     BN_ULONG CURVE_P_values[MAX_BIGNUM_SIZE] = {
         0xFFFFFFFFFFFFFFFF,
         0xFFFFFFFFFFFFFFFF,
@@ -356,53 +331,58 @@ __global__ void testKernel() {
         0xFFFFFFFEFFFFFC2F,
         0,0,0,0        
         };
-    // for (int j = 0; j < MAX_BIGNUM_SIZE; ++j) {
-    //         CURVE_P_d[j] = CURVE_P_values[j];
-    //     }
-    // CURVE_P.d = CURVE_P_values;
     for (int j = 0; j < MAX_BIGNUM_SIZE; ++j) {
             CURVE_P.d[j] = CURVE_P_values[j];
         }
-    // CURVE_P.top = 4;
-    // CURVE_P.neg = 0;
     // reverse
     reverse_order(&CURVE_P);
     // find top
     CURVE_P.top = find_top(&CURVE_P);
     
     // Derive public key 
-    // EC_POINT publicKey = ec_point_scalar_mul(&G, &newKey, &curveOrder);    
     EC_POINT publicKey = ec_point_scalar_mul(&G, &newKey, &CURVE_P, &CURVE_A);
 
-    // Print public key
-    printf("Public key:\n");
+    // Store the results in global memory for test purposes
+    bn_copy(&d_private_keys[tid], &newKey);
+    bn_copy(&d_public_keys[tid].x, &publicKey.x);
+    bn_copy(&d_public_keys[tid].y, &publicKey.y);
     
-    bn_print_constant("Public key x: ", &publicKey.x);
-    bn_print_constant("Public key y: ", &publicKey.y);
-    // stat_report("main", start);
+    // Print public key
+    // printf("Thread %d - After public key derivation\n", tid);
+    // bn_print_constant("Public key x: ", &publicKey.x, tid);
+    // bn_print_constant("Public key y: ", &publicKey.y, tid);
     record_function(FN_MAIN, start);
-    print_performance_report();
+    // Only print performance report for thread 0 to avoid clutter
+    if (tid == 0) {
+        print_performance_report();
+    }
 }
 
-// Main function
 int main() {
-    // FunctionStats* h_functionStats;
-    // int* h_functionCount;
-    // FunctionStats* d_functionStats;
-    // int* d_functionCount;
+    
+    const int THREADS_PER_BLOCK = 192; // 344 seconds
+    // const int THREADS_PER_BLOCK = 200; // stuck
+    // const int THREADS_PER_BLOCK = 224; // stuck
+    // const int THREADS_PER_BLOCK = 256; // A good balance between occupancy and flexibility
+    
+    const int NUM_BLOCKS = 128; // One block per SM
+    
+    const int TOTAL_THREADS = THREADS_PER_BLOCK * NUM_BLOCKS; // 32,768 total threads
+    // Allocate memory for results
+    BIGNUM* h_private_keys = new BIGNUM[TOTAL_THREADS];
+    EC_POINT* h_public_keys = new EC_POINT[TOTAL_THREADS];
+    
+    BIGNUM* d_private_keys;
+    EC_POINT* d_public_keys;
 
-    // // Allocate host memory
-    // h_functionStats = (FunctionStats*)malloc(MAX_FUNCTIONS * sizeof(FunctionStats));
-    // h_functionCount = (int*)malloc(sizeof(int));
+    // Allocate device memory
+    cudaMalloc(&d_private_keys, TOTAL_THREADS * sizeof(BIGNUM));
+    cudaMalloc(&d_public_keys, TOTAL_THREADS * sizeof(EC_POINT));
 
-    // // Allocate device memory
-    // cudaMalloc(&d_functionStats, MAX_FUNCTIONS * sizeof(FunctionStats));
-    // cudaMalloc(&d_functionCount, sizeof(int));
+    // Launch kernel
+    testKernel<<<NUM_BLOCKS, THREADS_PER_BLOCK>>>(d_private_keys, d_public_keys);
 
-    // Initialize device memory
-    // init_stats<<<1, 1>>>(d_functionStats, d_functionCount);
-
-    testKernel<<<1, 1>>>();
+    // Check for errors
     cudaError_t err = cudaGetLastError();
     if (err != cudaSuccess) {
         printf("Error: %s\n", cudaGetErrorString(err));
@@ -410,18 +390,42 @@ int main() {
     }
 
     // Copy results back to host
-    // cudaMemcpy(h_functionStats, d_functionStats, MAX_FUNCTIONS * sizeof(FunctionStats), cudaMemcpyDeviceToHost);
-    // cudaMemcpy(h_functionCount, d_functionCount, sizeof(int), cudaMemcpyDeviceToHost);
+    cudaMemcpy(h_private_keys, d_private_keys, TOTAL_THREADS * sizeof(BIGNUM), cudaMemcpyDeviceToHost);
+    cudaMemcpy(h_public_keys, d_public_keys, TOTAL_THREADS * sizeof(EC_POINT), cudaMemcpyDeviceToHost);
 
-    // Process results...
+    // Save results to CSV file
+    std::ofstream outfile("all_results.csv");
+    outfile << "Thread,Key,Value\n";
 
-    // // Free memory
-    // free(h_functionStats);
-    // free(h_functionCount);
-    // cudaFree(d_functionStats);
-    // cudaFree(d_functionCount);
+    for (int i = 0; i < TOTAL_THREADS; i++) {
+        outfile << i << ",Private Key,";
+        for (int j = MAX_BIGNUM_SIZE - 1; j >= 0; j--) {
+            outfile << std::setfill('0') << std::setw(16) << std::hex << h_private_keys[i].d[j];
+        }
+        outfile << "\n";
+
+        outfile << i << ",Public Key X,";
+        for (int j = MAX_BIGNUM_SIZE - 1; j >= 0; j--) {
+            outfile << std::setfill('0') << std::setw(16) << std::hex << h_public_keys[i].x.d[j];
+        }
+        outfile << "\n";
+
+        outfile << i << ",Public Key Y,";
+        for (int j = MAX_BIGNUM_SIZE - 1; j >= 0; j--) {
+            outfile << std::setfill('0') << std::setw(16) << std::hex << h_public_keys[i].y.d[j];
+        }
+        outfile << "\n";
+    }
+
+    outfile.close();
+
+    // Free memory
+    delete[] h_private_keys;
+    delete[] h_public_keys;
+    cudaFree(d_private_keys);
+    cudaFree(d_public_keys);
 
     cudaDeviceSynchronize();
-    cudaDeviceReset(); // For cuda-memcheck leak-check option
+    cudaDeviceReset();
     return 0;
 }
