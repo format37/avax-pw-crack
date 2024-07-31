@@ -210,6 +210,7 @@ BN_CTX *BN_CTX_new_ex(OSSL_LIB_CTX *ctx);
 // __device__ BN_CTX *BN_CTX_new(void);
 __host__ __device__ BN_CTX *BN_CTX_new() {
   // host+device stub
+  return NULL;
 }
 BN_CTX *BN_CTX_secure_new_ex(OSSL_LIB_CTX *ctx);
 BN_CTX *BN_CTX_secure_new(void);
@@ -244,6 +245,7 @@ int BN_security_bits(int L, int N);
 // __device__ BIGNUM *BN_new(void);
 __host__ __device__ BIGNUM* BN_new() {
   // host+device stub
+  return NULL;
 }
 BIGNUM *BN_secure_new(void);
 void BN_clear_free(BIGNUM *a);
@@ -270,6 +272,7 @@ int BN_uadd(BIGNUM *r, const BIGNUM *a, const BIGNUM *b);
 // __device__ int BN_add(BIGNUM *r, const BIGNUM *a, const BIGNUM *b);
 __host__ __device__ int BN_add(BIGNUM *r, const BIGNUM *a, const BIGNUM *b) {
   // host+device stub
+  return 1; // True for success
 }
 int BN_mul(BIGNUM *r, const BIGNUM *a, const BIGNUM *b, BN_CTX *ctx);
 int BN_sqr(BIGNUM *r, const BIGNUM *a, BN_CTX *ctx);

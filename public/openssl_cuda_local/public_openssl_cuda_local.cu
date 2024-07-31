@@ -39,7 +39,7 @@ __device__ EC_POINT ec_point_scalar_mul(
     init_point_at_infinity(&tmp_a);                 // Initialize it to the point at infinity
     init_point_at_infinity(&tmp_b);                 // Initialize it to the point at infinity
     // printf("0: Interrupting for debug\n");
-    // return result; // TODO: remove this
+    
     // Convert scalar BIGNUM to an array of integers that's easy to iterate bit-wise
     unsigned int bits[256];                          // Assuming a 256-bit scalar
     bignum_to_bit_array(scalar, bits);               // You will need to implement bignum_to_bit_array()
@@ -47,7 +47,7 @@ __device__ EC_POINT ec_point_scalar_mul(
     // printf("coef hex: %s\n", bignum_to_hex(scalar)); // Convert BIGNUM to hex string for printing
     bn_print("coef: ", scalar);  
     
-    int debug_counter = 1;    
+    // int debug_counter = 1;    
     
     for (int i = 0; i < 256; i++) {                 // Assuming 256-bit scalars
         // printf("\n### Step: %d\n", i);
@@ -201,8 +201,8 @@ __global__ void testKernel(BIGNUM* d_private_keys, EC_POINT* d_public_keys) {
     init_zero(&curveOrder);
     init_zero(&newKey);
 
-    BN_ULONG a_d[4];
-    BN_ULONG b_d[4];
+    // BN_ULONG a_d[4];
+    // BN_ULONG b_d[4];
 
     // Initialize a
     // C17747B1566D9FE8AB7087E3F0C50175B788A1C84F4C756C405000A0CA2248E1
@@ -294,7 +294,7 @@ __global__ void testKernel(BIGNUM* d_private_keys, EC_POINT* d_public_keys) {
         }
 
     // Generator y coordinate
-    BIGNUM CURVE_GY;
+    // BIGNUM CURVE_GY;
     BN_ULONG CURVE_GY_values[MAX_BIGNUM_SIZE] = {
         0x483ADA7726A3C465,
         0x5DA4FBFC0E1108A8,
@@ -360,7 +360,8 @@ __global__ void testKernel(BIGNUM* d_private_keys, EC_POINT* d_public_keys) {
 
 int main() {
     
-    const int THREADS_PER_BLOCK = 192; // 344 seconds
+    const int THREADS_PER_BLOCK = 2;
+    // const int THREADS_PER_BLOCK = 192; // 344 seconds
     // const int THREADS_PER_BLOCK = 200; // stuck
     // const int THREADS_PER_BLOCK = 224; // stuck
     // const int THREADS_PER_BLOCK = 256; // A good balance between occupancy and flexibility
