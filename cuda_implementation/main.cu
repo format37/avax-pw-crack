@@ -346,34 +346,34 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
     printf("\n");
     return info;
 
-	bn_print("  * private: ", &newKey);
-	printf("\n");
+	// bn_print("  * private: ", &newKey);
+	// printf("\n");
 
-	// uint8_t newKeyBytes[32] = {0};  // Initialize to zero
-	printf("\n");
-	printf("  * public: ");	
-	size_t publicKeyLen = 0;
-	// Initialize public key
-	// BIGNUM publicKey;
-	for (int i = 0; i < 8; i++) publicKey_d[i] = 0;
-	// publicKey.d = publicKey_d;
-    for (int j = 0; j < 8; ++j) {
-        publicKey.d[j] = publicKey_d[j]; // TODO: Check do we need to reverse the order
-    }
-	publicKey.neg = 0;
-	publicKey.top = 0;
+	// // uint8_t newKeyBytes[32] = {0};  // Initialize to zero
+	// printf("\n");
+	// printf("  * public: ");	
+	// size_t publicKeyLen = 0;
+	// // Initialize public key
+	// // BIGNUM publicKey;
+	// for (int i = 0; i < 8; i++) publicKey_d[i] = 0;
+	// // publicKey.d = publicKey_d;
+    // for (int j = 0; j < 8; ++j) {
+    //     publicKey.d[j] = publicKey_d[j]; // TODO: Check do we need to reverse the order
+    // }
+	// publicKey.neg = 0;
+	// publicKey.top = 0;
 
-	// getPublicKey(&newKey, &publicKey, &publicKeyLen);
-	// Derive public key
-    derive_public_key(&newKey, &publicKey);
+	// // getPublicKey(&newKey, &publicKey, &publicKeyLen);
+	// // Derive public key
+    // derive_public_key(&newKey, &publicKey);
 
-	// Print the public key
-	for (int i = 0; i < 8; i++) {
-		printf("%02x", publicKey.d[i]);
-	}
-	printf("\n");
+	// // Print the public key
+	// for (int i = 0; i < 8; i++) {
+	// 	printf("%02x", publicKey.d[i]);
+	// }
+	// printf("\n");
 
-    return info;
+    // return info;
 }
 // Child key derivation --
 
@@ -426,17 +426,17 @@ __global__ void search_kernel() {
 	uint32_t index0Hardened = 0x80000000;
 	uint32_t index0 = 0x00000000;
     // TODO: remove _index from child_key variable. Write to the same variable instead.
-	BIP32Info child_key_0 = GetChildKeyDerivation(master_key.master_private_key, master_key.chain_code, index44);
+	BIP32Info child_key = GetChildKeyDerivation(master_key.master_private_key, master_key.chain_code, index44);
 	printf("[0] Child Chain Code: ");
-	print_as_hex_char_tmp(child_key_0.chain_code, 32);
+	print_as_hex_char_tmp(child_key.chain_code, 32);
 	printf("[0] Child Private Key: ");
-	print_as_hex_char_tmp(child_key_0.master_private_key, 32);
-    // BIP32Info child_key_1 = GetChildKeyDerivation(child_key_0.master_private_key, child_key_0.chain_code, index9000);
-    // printf("[1] Child Chain Code: ");
-    // print_as_hex_char_tmp(child_key_1.chain_code, 32);
-    // printf("[1] Child Private Key: ");
-    // print_as_hex_char_tmp(child_key_1.master_private_key, 32);
-
+	print_as_hex_char_tmp(child_key.master_private_key, 32);
+    
+    child_key = GetChildKeyDerivation(child_key.master_private_key, child_key.chain_code, index9000);
+    printf("[1] Child Chain Code: ");
+    print_as_hex_char_tmp(child_key.chain_code, 32);
+    printf("[1] Child Private Key: ");
+    print_as_hex_char_tmp(child_key.master_private_key, 32);
 
     printf("\n-- search_kernel --\n");    
 }
