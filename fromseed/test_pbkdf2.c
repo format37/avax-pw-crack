@@ -359,8 +359,11 @@ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uint32_t index
     if (index == 0) {
 		printf("    * INDEX is 0\n");
 		size_t publicKeyLen = 0;
+        printf("    >> key: ");
+        print_as_hex_uint(key, 32);
 		unsigned char *publicKeyBytes = GetPublicKey(key, 32, &publicKeyLen);
-		print_as_hex_char(publicKeyBytes, publicKeyLen);
+		printf("    [=] Public Key: ");
+        print_as_hex_char(publicKeyBytes, publicKeyLen);
 		memcpy(buffer, publicKeyBytes, 33);  // Copies the entire 33-byte compressed public key including the first byte
 		buffer_len += 33;		
     } else {

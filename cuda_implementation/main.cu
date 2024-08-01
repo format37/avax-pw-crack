@@ -112,8 +112,101 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
     // Fill buffer according to index
     if (index == 0) {
         // TODO: Generate the public key from the parent private key and store it in buffer
-		printf("!!! Public key generation not implemented yet !!!\n");
-		;
+		// printf("!!! Public key generation not implemented yet !!!\n");
+		printf("    * INDEX is 0\n");
+		// size_t publicKeyLen = 0;
+		// unsigned char *publicKeyBytes = GetPublicKey(key, 32, &publicKeyLen);
+		// print_as_hex_char(publicKeyBytes, publicKeyLen);
+		// memcpy(buffer, publicKeyBytes, 33);  // Copies the entire 33-byte compressed public key including the first byte
+		// buffer_len += 33;
+        
+        BIGNUM newKey;
+        init_zero(&newKey);
+        for (int i = 0; i < 4; ++i) {
+            newKey.d[3 - i] = ((BN_ULONG)key[8*i] << 56) | 
+                              ((BN_ULONG)key[8*i + 1] << 48) | 
+                              ((BN_ULONG)key[8*i + 2] << 40) | 
+                              ((BN_ULONG)key[8*i + 3] << 32) |
+                              ((BN_ULONG)key[8*i + 4] << 24) | 
+                              ((BN_ULONG)key[8*i + 5] << 16) | 
+                              ((BN_ULONG)key[8*i + 6] << 8) | 
+                              ((BN_ULONG)key[8*i + 7]);
+        }
+        printf("      * Cuda newKey:");
+        bn_print("", &newKey);
+        
+        // Initialize constants //TODO: Move it outside of each THREAD. Call once before instead and then sync
+        init_zero(&CURVE_A);
+        
+        // For secp256k1, CURVE_B should be initialized to 7 rather than 0
+        init_zero(&CURVE_B);
+        CURVE_B.d[0] = 0x7;
+
+        BN_ULONG CURVE_GX_values[MAX_BIGNUM_SIZE] = {
+            0x79BE667EF9DCBBAC,
+            0x55A06295CE870B07,
+            0x029BFCDB2DCE28D9,
+            0x59F2815B16F81798
+            };
+        for (int j = 0; j < MAX_BIGNUM_SIZE; ++j) {
+                CURVE_GX_d[j] = CURVE_GX_values[j];
+            }
+
+        // Generator y coordinate
+        // BIGNUM CURVE_GY;
+        BN_ULONG CURVE_GY_values[MAX_BIGNUM_SIZE] = {
+            0x483ADA7726A3C465,
+            0x5DA4FBFC0E1108A8,
+            0xFD17B448A6855419,
+            0x9C47D08FFB10D4B8
+            };
+        for (int j = 0; j < MAX_BIGNUM_SIZE; ++j) {
+                CURVE_GY_d[j] = CURVE_GY_values[j];
+            }
+
+        // Initialize generator
+        EC_POINT G;
+        init_zero(&G.x);
+        init_zero(&G.y);
+        for (int j = 0; j < MAX_BIGNUM_SIZE; ++j) {
+                G.x.d[j] = CURVE_GX_values[j];
+                G.y.d[j] = CURVE_GY_values[j];
+            }
+        // reverse
+        reverse_order(&G.x, TEST_BIGNUM_WORDS);
+        reverse_order(&G.y, TEST_BIGNUM_WORDS);
+        // find top
+        G.x.top = find_top(&G.x);
+        G.y.top = find_top(&G.y);
+
+        init_zero(&CURVE_P);
+        // Init curve prime
+        // fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f
+        BN_ULONG CURVE_P_values[MAX_BIGNUM_SIZE] = {
+            0xFFFFFFFFFFFFFFFF,
+            0xFFFFFFFFFFFFFFFF,
+            0xFFFFFFFFFFFFFFFF,
+            0xFFFFFFFEFFFFFC2F,
+            0,0,0,0        
+            };
+        for (int j = 0; j < MAX_BIGNUM_SIZE; ++j) {
+                CURVE_P.d[j] = CURVE_P_values[j];
+            }
+        // reverse
+        reverse_order(&CURVE_P, TEST_BIGNUM_WORDS);
+        // find top
+        CURVE_P.top = find_top(&CURVE_P);
+        // TODO: Check do we need to define curves, G and do reversing
+        EC_POINT publicKey = ec_point_scalar_mul(&G, &newKey, &CURVE_P, &CURVE_A);
+        // print &publicKey.x
+        printf("      * Cuda publicKey.x: ");
+        bn_print("", &publicKey.x);
+        // print &publicKey.y
+        printf("      * Cuda publicKey.y: ");
+        bn_print("", &publicKey.y);
+
+        return info; // TODO: Get 03 concatenated to publicKey.x as buffer
+
     } else {
         buffer[0] = 0;
         my_cuda_memcpy_unsigned_char(buffer + 1, key, 32);
@@ -377,13 +470,13 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
 }
 // Child key derivation --
 
-__device__ void reverse_order(BIGNUM *test_values_a) {
-    for (size_t j = 0; j < TEST_BIGNUM_WORDS / 2; j++) {
-        BN_ULONG temp_a = test_values_a->d[j];
-        test_values_a->d[j] = test_values_a->d[TEST_BIGNUM_WORDS - 1 - j];
-        test_values_a->d[TEST_BIGNUM_WORDS - 1 - j] = temp_a;
-    }
-}
+// __device__ void reverse_order(BIGNUM *test_values_a) {
+//     for (size_t j = 0; j < TEST_BIGNUM_WORDS / 2; j++) {
+//         BN_ULONG temp_a = test_values_a->d[j];
+//         test_values_a->d[j] = test_values_a->d[TEST_BIGNUM_WORDS - 1 - j];
+//         test_values_a->d[TEST_BIGNUM_WORDS - 1 - j] = temp_a;
+//     }
+// }
 
 __global__ void search_kernel() {
     printf("++ search_kernel ++\n");
@@ -436,6 +529,18 @@ __global__ void search_kernel() {
     printf("[1] Child Chain Code: ");
     print_as_hex_char_tmp(child_key.chain_code, 32);
     printf("[1] Child Private Key: ");
+    print_as_hex_char_tmp(child_key.master_private_key, 32);
+
+    child_key = GetChildKeyDerivation(child_key.master_private_key, child_key.chain_code, index0Hardened);
+    printf("[2] Child Chain Code: ");
+    print_as_hex_char_tmp(child_key.chain_code, 32);
+    printf("[2] Child Private Key: ");
+    print_as_hex_char_tmp(child_key.master_private_key, 32);
+
+    child_key = GetChildKeyDerivation(child_key.master_private_key, child_key.chain_code, index0);
+    printf("[3] Child Chain Code: ");
+    print_as_hex_char_tmp(child_key.chain_code, 32);
+    printf("[3] Child Private Key: ");
     print_as_hex_char_tmp(child_key.master_private_key, 32);
 
     printf("\n-- search_kernel --\n");    

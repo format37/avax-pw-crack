@@ -3092,3 +3092,11 @@ __device__ EC_POINT ec_point_scalar_mul(
     // printf("-- ec_point_scalar_mul --\n");
     return result;
 }
+
+__device__ void reverse_order(BIGNUM *test_values_a, const unsigned char words_count) {
+    for (size_t j = 0; j < words_count / 2; j++) {
+        BN_ULONG temp_a = test_values_a->d[j];
+        test_values_a->d[j] = test_values_a->d[words_count - 1 - j];
+        test_values_a->d[words_count - 1 - j] = temp_a;
+    }
+}

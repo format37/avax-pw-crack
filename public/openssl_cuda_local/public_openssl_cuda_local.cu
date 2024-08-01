@@ -6,14 +6,6 @@
 
 #define TEST_BIGNUM_WORDS 4
 
-__device__ void reverse_order(BIGNUM *test_values_a) {
-    for (size_t j = 0; j < TEST_BIGNUM_WORDS / 2; j++) {
-        BN_ULONG temp_a = test_values_a->d[j];
-        test_values_a->d[j] = test_values_a->d[TEST_BIGNUM_WORDS - 1 - j];
-        test_values_a->d[TEST_BIGNUM_WORDS - 1 - j] = temp_a;
-    }
-}
-
 __global__ void testKernel(BIGNUM* d_private_keys, EC_POINT* d_public_keys) {
     int tid = blockIdx.x * blockDim.x + threadIdx.x; // Global thread ID
     clock_t start = clock64();
