@@ -9,7 +9,7 @@
 
 #define BN_ULONG_MAX ((BN_ULONG)-1)
 
-#define debug_print false
+#define debug_print true
 #define bn_mul_caching false
 #define collect_stats false
 #define BN_MASK2 0xffffffff
@@ -127,6 +127,17 @@ __device__ void bn_print_constant(const char* msg, BIGNUM* a, int tid) {
         }
     }
     printf("\n");
+}
+
+__device__ void print_as_hex(const uint8_t *s,  const uint32_t slen)
+{
+	for (uint32_t i = 0; i < slen; i++)
+	{
+		// printf("%02X%s", s[ i ], (i % 4 == 3) && (i != slen - 1) ? "-" : "");
+        // print without the dash
+        printf("%02X", s[ i ]);
+	}
+	printf("\n");
 }
 
 // Global zero-initialized BIGNUM
@@ -544,6 +555,49 @@ __device__ int absolute_compare(const BIGNUM* a, const BIGNUM* b) {
     return 0; // |a| and |b| are equal in absolute value
 }
 
+__device__ void bn_add_private(BIGNUM* a, BIGNUM* b, BIGNUM* r) {
+    int max = a->top > b->top ? a->top : b->top;
+    BN_ULONG carry = 0;
+    printf("Starting addition... max: %d\n", max);
+
+    for(int i=max-1; i>=0; i--) {
+        BN_ULONG ai = (i < a->top) ? a->d[i] : 0;
+        BN_ULONG bi = (i < b->top) ? b->d[i] : 0;
+
+        BN_ULONG sum = ai + bi + carry;
+        r->d[i] = sum;
+        //carry = (sum < ai || sum < bi) ? 1 : 0;  // Another way to determine carry
+        carry = (sum < ai || (sum - ai) < bi) ? 1 : 0;
+
+
+        // Debug prints
+        printf("i: %d", i);
+        printf(", a->d[i]: %08x", ai);    
+        printf(", b->d[i]: %08x", bi);
+        printf(", sum: %08x", sum);
+        printf(", result: %08x", r->d[i]);
+        printf(", carry: %08x\n", carry);
+    }
+
+    // If there's a carry after processing all words
+    if (carry) {
+        r->top = max + 1;
+        for (int i = r->top-1; i > 0; i--) {   // Shift every word to the right
+            r->d[i] = r->d[i-1];
+        }
+        r->d[0] = carry;  // Place the carry on the leftmost side
+    } else {
+        r->top = max;
+    }
+
+    printf("Finished addition.\n");
+    // print r
+    printf("r: ");
+    for (int i = 0; i < r->top; i++) {
+        printf("%08x\n", r->d[i]);
+    }
+}
+
 __device__ bool bn_add(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
     clock_t start = clock64();
     init_zero(result);
@@ -864,8 +918,8 @@ __device__ void mod_inv(BIGNUM *value, BIGNUM *mod, BIGNUM *inv) {
 __device__ void bn_mul(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
     clock_t start = clock64();
     // printf("++ bn_mul ++\n");
-    bn_print(">> a: ", a);
-    bn_print(">> b: ", b);
+    // bn_print(">> a: ", a);
+    // bn_print(">> b: ", b);
     // Reset the product
     // for(int i = 0; i < a->top + b->top; i++)
     //     product->d[i] = 0;
@@ -1006,6 +1060,9 @@ __device__ int bn_mod_mpz(BIGNUM *r, BIGNUM *m, BIGNUM *d) {
 }
 
 __device__ int bn_mod(BIGNUM *r, BIGNUM *a, BIGNUM *n) {
+    // r: Remainder (updated)
+    // a: Dividend
+    // n: Modulus
     bool debug = 0;
     /*if (debug) {
         printf("++ bn_mod ++\n");
@@ -2348,8 +2405,8 @@ __device__ void swap_bignum_pointers(BIGNUM** a, BIGNUM** b) {
 
 __device__ void bn_gcdext(BIGNUM *g, BIGNUM *s, BIGNUM *t, BIGNUM *a, BIGNUM *b) {
     printf("\n++ bn_gcdext ++\n");
-    bn_print(">> a: ", a);
-    bn_print(">> b: ", b);
+    // bn_print(">> a: ", a);
+    // bn_print(">> b: ", b);
     printf("\n");
     BIGNUM old_s, old_t, old_r, r, quotient, temp;
     init_zero(&old_s);

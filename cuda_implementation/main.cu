@@ -65,6 +65,280 @@ __device__ BIP32Info bip32_from_seed_kernel(const uint8_t *seed, uint32_t seed_l
 }
 // BIP32 --
 
+// Public key derivation ++
+__device__ void derive_public_key(BIGNUM* private_key, BIGNUM* publicKey) {
+	// point_mul(private_key, publicKey);
+    printf("++ derive_public_key ++\n");
+    bn_print(">> private: ", private_key);
+    bn_print(">> public: ", publicKey);
+    printf("-- derive_public_key --\n");
+}
+// Public key derivation --
+
+// Child key derivation ++
+__device__ void my_cuda_memcpy_uint32_t(uint32_t *dst, const uint32_t *src, unsigned int n) {
+    for (unsigned int i = 0; i < n / sizeof(uint32_t); ++i) {
+        uint32_t val = src[i];
+        dst[i] = __byte_perm(val, 0, 0x0123);
+    }
+}
+
+__device__ void my_cuda_memcpy_uint32_t_to_unsigned_char(unsigned char *dst, const uint32_t *src, unsigned int n) {
+    for (unsigned int i = 0; i < n / sizeof(uint32_t); ++i) {
+        uint32_t val = src[i];
+        dst[4 * i] = (val) & 0xFF;
+        dst[4 * i + 1] = (val >> 8) & 0xFF;
+        dst[4 * i + 2] = (val >> 16) & 0xFF;
+        dst[4 * i + 3] = (val >> 24) & 0xFF;
+    }
+}
+
+__device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uint32_t index) {
+	printf("++ GetChildKeyDerivation ++\n");
+    printf(">> key: ");
+    print_as_hex(key, 32);
+    printf(">> chainCode: ");
+    print_as_hex(chainCode, 32);
+    printf(">> index: %u\n", index);
+    printf("\n* step 0 index: %u\n", index);
+    BIP32Info info;
+
+    // Compute HMAC-SHA512
+    HMAC_SHA512_CTX hmac;
+    uint8_t buffer[100];
+    uint8_t hash[64];
+    unsigned int len = 64;
+
+    // Fill buffer according to index
+    if (index == 0) {
+        // TODO: Generate the public key from the parent private key and store it in buffer
+		printf("!!! Public key generation not implemented yet !!!\n");
+		;
+    } else {
+        buffer[0] = 0;
+        my_cuda_memcpy_unsigned_char(buffer + 1, key, 32);
+    }
+
+    // Append index in big-endian format to buffer
+    buffer[33] = (index >> 24) & 0xFF;
+    buffer[34] = (index >> 16) & 0xFF;
+    buffer[35] = (index >> 8) & 0xFF;
+    buffer[36] = index & 0xFF;
+
+	hmac_sha512_init(&hmac, chainCode, 32);
+    hmac_sha512_update(&hmac, buffer, 37);  // Assuming buffer_len = 37 // TODO: Check would it be defined in "int len"? 64
+    hmac_sha512_final(&hmac, hash);
+
+	// Print the pre-HMAC values
+    printf("      * Cuda Pre-HMAC variable key:");
+    for (int i = 0; i < 32; i++) {
+        printf("%02x", key[i]);
+    }
+    printf("\n");
+
+    printf("      * Cuda Pre-HMAC Buffer:");
+    for (int i = 0; i < 37; i++) { // Assuming the buffer length up to the index is 37
+        printf("%02x", buffer[i]);
+    }
+    printf("\n");
+
+    printf("      * Cuda Pre-HMAC Key:");
+    for (int i = 0; i < 32; i++) {
+        printf("%02x", chainCode[i]);
+    }
+    printf("\n");   
+
+	uint32_t il[8], ir[8];
+	
+	// Populate il and ir from hash
+	my_cuda_memcpy_uint32_t(il, (uint32_t*)hash, 8 * sizeof(uint32_t)); // Using uint32_t version for il
+	my_cuda_memcpy_uint32_t(ir, (uint32_t*)(hash + 32), 8 * sizeof(uint32_t)); // Using uint32_t version for ir
+
+    // Print the hash from 32 to 64
+    printf("      * Cuda hash from 32 to 64:");
+    for (int i = 32; i < 64; i++) {
+        printf("%02x", hash[i]);
+    }
+    printf("\n");
+
+    // Copy the hash (from 32 to 64) to chain_code
+    my_cuda_memcpy_unsigned_char(info.chain_code, hash + 32, 32);
+
+    // ***
+
+    // return info;
+
+	// After HMAC-SHA512
+	printf("      * Cuda Post-HMAC hash:");
+	for (int i = 0; i < 64; i++) {
+		printf("%02x", hash[i]);
+	}
+	printf("\n");
+
+	printf("      * Cuda il as uint32_t: ");
+	for (int i = 0; i < 8; ++i) {
+		printf("%08x", il[i]);
+	}
+	printf("\n");
+
+	printf("      * Cuda ir as uint32_t: ");
+	for (int i = 0; i < 8; ++i) {
+		printf("%08x", ir[i]);
+	}
+	printf("\n");
+
+	// Print individual bytes of ir before copying
+	printf("      * Individual bytes of Cuda ir before copying: ");
+	uint8_t *ir_bytes = (uint8_t *) ir;
+	for (int i = 0; i < 32; ++i) {
+		printf("%02x", ir_bytes[i]);
+	}
+	printf("\n");
+
+	// Perform the copy
+	my_cuda_memcpy_uint32_t_to_unsigned_char(info.chain_code, ir, 32);
+
+	// Print individual bytes of chain_code after copying
+	printf("      * Individual bytes of Cuda chain_code after copying: ");
+	for (int i = 0; i < 32; ++i) {
+		printf("%02x", info.chain_code[i]);
+	}
+	printf("\n");
+
+	// After populating il and ir
+	printf("    * il: ");
+	for (int i = 0; i < 8; i++) {
+		printf("%08x", il[i]);
+	}
+	printf("\n");
+	printf("    * ir: ");
+	for (int i = 0; i < 8; i++) {
+		printf("%08x", ir[i]);
+	}
+	printf("\n");
+
+    // ir is uint32_t[8]
+    // info.chain_code is unsigned char[32]
+    
+	
+	// Addition
+	BIGNUM a;
+	BIGNUM b;
+	BIGNUM curveOrder;
+	BIGNUM newKey;
+	BIGNUM publicKey;
+
+    init_zero(&a);
+    init_zero(&b);
+    init_zero(&curveOrder);
+    init_zero(&newKey);
+    init_zero(&publicKey);
+
+	BN_ULONG a_d[8];
+  	BN_ULONG b_d[8];
+	BN_ULONG newKey_d[8];
+  	// BN_ULONG curveOrder_d[16];
+	BN_ULONG publicKey_d[8];
+	// uint32_t curveOrder[8] = {0xffffffff, 0xffffffff, 0xffffffff, 0xfffffffe, 0xbaaedce6, 0xaf48a03b, 0xbfd25e8c, 0xd0364141};
+	// Initialize curveOrder_d for secp256k1
+	// FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
+    // 
+    curveOrder.d[0] = 0xBFD25E8CD0364141;
+    curveOrder.d[1] = 0xBAAEDCE6AF48A03B;
+    curveOrder.d[2] = 0xFFFFFFFFFFFFFFFE;
+    curveOrder.d[3] = 0xFFFFFFFFFFFFFFFF;
+    curveOrder.neg = 0;
+    curveOrder.top = 4;
+    
+    // hash: uint8_t[64]
+    // il: uint32_t il[8]
+    // a.d: is BN_ULONG
+    // Initialize a from il
+    for (int i = 0; i < 4; ++i) {
+        a.d[3 - i] = ((BN_ULONG)il[2*i] << 32) | (BN_ULONG)il[2*i + 1];
+    }
+    a.neg = 0;
+    a.top = 4;  // We're using 4 64-bit words
+    bn_print("A: ", &a);
+
+	// key: uint8_t*
+    // b.d: BN_ULONG
+    // Initialize b from key
+	for (int i = 0; i < 4; ++i) {
+        b.d[3 - i] = ((BN_ULONG)key[8*i] << 56) | 
+                     ((BN_ULONG)key[8*i + 1] << 48) | 
+                     ((BN_ULONG)key[8*i + 2] << 40) | 
+                     ((BN_ULONG)key[8*i + 3] << 32) |
+                     ((BN_ULONG)key[8*i + 4] << 24) | 
+                     ((BN_ULONG)key[8*i + 5] << 16) | 
+                     ((BN_ULONG)key[8*i + 6] << 8) | 
+                     ((BN_ULONG)key[8*i + 7]);
+    }
+    b.neg = 0;
+    b.top = 4;  // We're using 4 64-bit words
+    bn_print("B: ", &b);
+
+    // return info;
+
+	// Initialize newKey_d
+	for (int i = 0; i < 8; i++) newKey_d[i] = 0;
+	// newKey.d = newKey_d;
+    for (int j = 0; j < 8; ++j) {
+        newKey.d[j] = newKey_d[j]; // TODO: Check do we need to reverse the order
+    }
+	newKey.neg = 0;
+	// newKey.top = 8;
+    newKey.top = find_top(&newKey);
+    bn_print("Debug Cuda newKey (Before add): ", &newKey);
+	
+    bn_add(&newKey, &a, &b);
+
+    // Print A + B
+    bn_print("Debug Cuda newKey (After add): ", &newKey);
+
+    // Print curve order
+    bn_print("Debug Cuda curveOrder: ", &curveOrder);
+
+    printf("Calling bn_mod\n");
+    bn_mod(&newKey, &newKey, &curveOrder);
+
+    // printf("After bn_mod\n");
+    bn_print("Debug Cuda newKey (After mod): ", &newKey);
+	
+    printf("\n");
+    return info;
+
+	bn_print("  * private: ", &newKey);
+	printf("\n");
+
+	// uint8_t newKeyBytes[32] = {0};  // Initialize to zero
+	printf("\n");
+	printf("  * public: ");	
+	size_t publicKeyLen = 0;
+	// Initialize public key
+	// BIGNUM publicKey;
+	for (int i = 0; i < 8; i++) publicKey_d[i] = 0;
+	// publicKey.d = publicKey_d;
+    for (int j = 0; j < 8; ++j) {
+        publicKey.d[j] = publicKey_d[j]; // TODO: Check do we need to reverse the order
+    }
+	publicKey.neg = 0;
+	publicKey.top = 0;
+
+	// getPublicKey(&newKey, &publicKey, &publicKeyLen);
+	// Derive public key
+    derive_public_key(&newKey, &publicKey);
+
+	// Print the public key
+	for (int i = 0; i < 8; i++) {
+		printf("%02x", publicKey.d[i]);
+	}
+	printf("\n");
+
+    return info;
+}
+// Child key derivation --
+
 __device__ void reverse_order(BIGNUM *test_values_a) {
     for (size_t j = 0; j < TEST_BIGNUM_WORDS / 2; j++) {
         BN_ULONG temp_a = test_values_a->d[j];
@@ -88,7 +362,7 @@ __global__ void search_kernel() {
         bip39seed[i] = 0;
     }
 
-    // Call pbkdf2_hmac to perform the key derivation
+    // Call pbkdf2_hmac to perform the bip39seed key derivation
     compute_pbkdf2(
         (uint8_t *) m_mnemonic, 
         my_strlen((const char*) m_mnemonic), 
@@ -101,13 +375,30 @@ __global__ void search_kernel() {
     printf("bip39seed: ");
     print_as_hex(bip39seed, 64);
 
-    // +++ Bip32FromSeed +++
+    // Bip32FromSeed
     BIP32Info master_key = bip32_from_seed_kernel(bip39seed, 64);
     printf("\nMaster Chain Code: ");
     print_as_hex_char_tmp(master_key.chain_code, 32);
     printf("\nMaster Private Key: ");
     print_as_hex_char_tmp(master_key.master_private_key, 32);
-    // --- Bip32FromSeed ---
+    
+    // Child key derivation
+	uint32_t index44 = 0x8000002C;
+	uint32_t index9000 = 0x80002328;
+	uint32_t index0Hardened = 0x80000000;
+	uint32_t index0 = 0x00000000;
+    // TODO: remove _index from child_key variable. Write to the same variable instead.
+	BIP32Info child_key_0 = GetChildKeyDerivation(master_key.master_private_key, master_key.chain_code, index44);
+	printf("[0] Child Chain Code: ");
+	print_as_hex_char_tmp(child_key_0.chain_code, 32);
+	printf("[0] Child Private Key: ");
+	print_as_hex_char_tmp(child_key_0.master_private_key, 32);
+    // BIP32Info child_key_1 = GetChildKeyDerivation(child_key_0.master_private_key, child_key_0.chain_code, index9000);
+    // printf("[1] Child Chain Code: ");
+    // print_as_hex_char_tmp(child_key_1.chain_code, 32);
+    // printf("[1] Child Private Key: ");
+    // print_as_hex_char_tmp(child_key_1.master_private_key, 32);
+
 
     printf("\n-- search_kernel --\n");    
 }

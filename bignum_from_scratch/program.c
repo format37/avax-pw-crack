@@ -61,8 +61,11 @@ int main() {
 
   BN_add(newKey, a, b);
   print_bn("Debug C newKey (After add)", newKey);
-  print_bn_hex("Debug C newKey (After add)", newKey);
-  
+  print_bn_hex("Debug C newKey (After add)", newKey);  
+  // Print curve order
+  print_bn("program C curveOrder (Before mod)", curveOrder);
+  print_bn_hex("program C curveOrder (Before mod)", curveOrder);
+
   BN_nnmod(newKey, newKey, curveOrder, ctx);
 	print_bn("Debug C newKey (After mod)", newKey);
   print_bn_hex("Debug C newKey (After mod)", newKey);

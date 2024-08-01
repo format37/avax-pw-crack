@@ -139,15 +139,6 @@ __device__ size_t my_strlen(const char *str) {
     return len;
 }
 
-__device__ void print_as_hex(const uint8_t *s,  const uint32_t slen)
-{
-	for (uint32_t i = 0; i < slen; i++)
-	{
-		printf("%02X%s", s[ i ], (i % 4 == 3) && (i != slen - 1) ? "-" : "");
-	}
-	printf("\n");
-}
-
 __device__ void sha512_init(SHA512_CTX *s)
 {
 	s->len = 0;

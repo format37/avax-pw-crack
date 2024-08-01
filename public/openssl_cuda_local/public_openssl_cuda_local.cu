@@ -185,13 +185,15 @@ __global__ void testKernel(BIGNUM* d_private_keys, EC_POINT* d_public_keys) {
 
 int main() {
     
-    const int THREADS_PER_BLOCK = 2;
+    const int THREADS_PER_BLOCK = 1;
     // const int THREADS_PER_BLOCK = 192; // 344 seconds (now stuck)
     // const int THREADS_PER_BLOCK = 200; // stuck
     // const int THREADS_PER_BLOCK = 224; // stuck
     // const int THREADS_PER_BLOCK = 256; // A good balance between occupancy and flexibility
     
-    const int NUM_BLOCKS = 128; // One block per SM
+    // const int NUM_BLOCKS = 128; // One block per SM
+    const int NUM_BLOCKS = 1;
+
     
     const int TOTAL_THREADS = THREADS_PER_BLOCK * NUM_BLOCKS; // 32,768 total threads
     // Allocate memory for results
