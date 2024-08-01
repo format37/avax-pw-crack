@@ -187,16 +187,38 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
 	}
 	printf("\n");
 
+    printf("      * Cuda ir as uint64_t: ");
+    uint64_t ir_64[4];
+    for (int i = 0; i < 8; ++i) {
+        ir_64[i] = ((uint64_t)ir[2*i] << 32) | (uint64_t)ir[2*i + 1];
+    }
+    for (int i = 0; i < 4; ++i) {
+        printf("%016lx", ir_64[i]);
+    }
+    printf("\n");
+    
+
 	// Print individual bytes of ir before copying
-	printf("      * Individual bytes of Cuda ir before copying: ");
-	uint8_t *ir_bytes = (uint8_t *) ir;
-	for (int i = 0; i < 32; ++i) {
-		printf("%02x", ir_bytes[i]);
-	}
-	printf("\n");
+	// printf("      * Individual bytes of Cuda ir before copying: ");
+	// uint8_t *ir_bytes = (uint8_t *) ir;
+	// for (int i = 0; i < 32; ++i) {
+	// 	printf("%02x", ir_bytes[i]);
+	// }
+	// printf("\n");
 
 	// Perform the copy
-	my_cuda_memcpy_uint32_t_to_unsigned_char(info.chain_code, ir, 32);
+	// my_cuda_memcpy_uint32_t_to_unsigned_char(info.chain_code, ir, 32);
+    // Copy ir_64 to chain_code
+    for (int i = 0; i < 4; i++) {
+        info.chain_code[8*i] = (ir_64[i] >> 56) & 0xFF;
+        info.chain_code[8*i + 1] = (ir_64[i] >> 48) & 0xFF;
+        info.chain_code[8*i + 2] = (ir_64[i] >> 40) & 0xFF;
+        info.chain_code[8*i + 3] = (ir_64[i] >> 32) & 0xFF;
+        info.chain_code[8*i + 4] = (ir_64[i] >> 24) & 0xFF;
+        info.chain_code[8*i + 5] = (ir_64[i] >> 16) & 0xFF;
+        info.chain_code[8*i + 6] = (ir_64[i] >> 8) & 0xFF;
+        info.chain_code[8*i + 7] = ir_64[i] & 0xFF;
+    }
 
 	// Print individual bytes of chain_code after copying
 	printf("      * Individual bytes of Cuda chain_code after copying: ");
@@ -304,6 +326,22 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
 
     // printf("After bn_mod\n");
     bn_print("Debug Cuda newKey (After mod): ", &newKey);
+
+    // Copy newKey to info.master_private_key
+    // for (int i = 0; i < 8; i++) {
+    //     info.master_private_key[i] = newKey.d[i];
+    // }
+    // Copy newKey to info.master_private_key
+    for (int i = 0; i < 4; i++) {
+        info.master_private_key[8*i] = (newKey.d[3 - i] >> 56) & 0xFF;
+        info.master_private_key[8*i + 1] = (newKey.d[3 - i] >> 48) & 0xFF;
+        info.master_private_key[8*i + 2] = (newKey.d[3 - i] >> 40) & 0xFF;
+        info.master_private_key[8*i + 3] = (newKey.d[3 - i] >> 32) & 0xFF;
+        info.master_private_key[8*i + 4] = (newKey.d[3 - i] >> 24) & 0xFF;
+        info.master_private_key[8*i + 5] = (newKey.d[3 - i] >> 16) & 0xFF;
+        info.master_private_key[8*i + 6] = (newKey.d[3 - i] >> 8) & 0xFF;
+        info.master_private_key[8*i + 7] = newKey.d[3 - i] & 0xFF;
+    }
 	
     printf("\n");
     return info;
