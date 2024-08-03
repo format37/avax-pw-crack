@@ -205,7 +205,7 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
         printf("      * Cuda publicKey.y: ");
         bn_print("", &publicKey.y);
 
-        // TODO: Check do we need to get 03 concatenated to publicKey.x as buffer
+        // TODO: Get 03 concatenated to publicKey.x as buffer
         
         // Copy the public key to buffer
         // my_cuda_memcpy_uint32_t_to_unsigned_char(buffer, publicKey.x.d, 32);
