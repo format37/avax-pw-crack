@@ -2934,14 +2934,14 @@ __device__ size_t dev_strlen(const char *str) {
 }
 
 __device__ void bignum_to_bit_array(BIGNUM *n, unsigned int *bits) {
-    printf("++ bignum_to_bit_array ++\n");
-    bn_print(">> n: ", n);
+    // printf("++ bignum_to_bit_array ++\n");
+    // bn_print(">> n: ", n);
     int index = 0;
     
     // Iterate through the words in reverse order
     for (int i = 0; i < n->top; ++i) {
         BN_ULONG word = n->d[i];
-        printf("word: %016llx\n", word);
+        // printf("word: %016llx\n", word);
         // For each word, iterate through bits from most significant to least significant
         for (int j = 0; j < BN_ULONG_NUM_BITS; ++j) {
             bits[index++] = (word >> j) & 1;
@@ -2953,7 +2953,7 @@ __device__ void bignum_to_bit_array(BIGNUM *n, unsigned int *bits) {
         bits[index++] = 0;
     }
 
-    printf("-- bignum_to_bit_array --\n");
+    // printf("-- bignum_to_bit_array --\n");
 }
 
 __device__ void init_point_at_infinity(EC_POINT *P) {
