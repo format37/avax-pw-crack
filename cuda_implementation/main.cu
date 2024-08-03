@@ -66,13 +66,13 @@ __device__ BIP32Info bip32_from_seed_kernel(const uint8_t *seed, uint32_t seed_l
 // BIP32 --
 
 // Public key derivation ++
-__device__ void derive_public_key(BIGNUM* private_key, BIGNUM* publicKey) {
-	// point_mul(private_key, publicKey);
-    printf("++ derive_public_key ++\n");
-    bn_print(">> private: ", private_key);
-    bn_print(">> public: ", publicKey);
-    printf("-- derive_public_key --\n");
-}
+// __device__ void derive_public_key(BIGNUM* private_key, BIGNUM* publicKey) {
+// 	// point_mul(private_key, publicKey);
+//     printf("++ derive_public_key ++\n");
+//     bn_print(">> private: ", private_key);
+//     bn_print(">> public: ", publicKey);
+//     printf("-- derive_public_key --\n");
+// }
 // Public key derivation --
 
 // Child key derivation ++

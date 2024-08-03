@@ -123,7 +123,9 @@ Point point_add(Point p1, Point p2) {
     
     // Free the temporary variables
     mpz_clears(s, x3, y3, tmp1, tmp2, NULL);
-
+    gmp_printf("<< result.x: %Zx\n", result.x);
+    gmp_printf("<< result.y: %Zx\n", result.y);
+    printf("-- point_add --\n");
     return result;
 }
 
@@ -174,7 +176,7 @@ Point point_multiply(Point p, mpz_t n) {
     pp = point_add(pp, pp);    
     gmp_printf("<< point_add pp.x: %Zx\n", pp.x);
     gmp_printf("<< point_add pp.y: %Zx\n", pp.y);
-    mpz_tdiv_q_ui(n, n, 2);
+    mpz_tdiv_q_ui(n, n, 2); // NEED TO IMPLEMENT THIS IN CUDA ?
     // print the current x and y
     // gmp_printf("2 x: %Zx\n", pp.x);
     // gmp_printf("2 y: %Zx\n", pp.y);
@@ -184,8 +186,8 @@ Point point_multiply(Point p, mpz_t n) {
       gmp_printf("3 y: %Zx\n", r.y);
       exit(0);
     }*/
-    // gmp_printf("3 x: %Zx\n", r.x);
-    // gmp_printf("3 y: %Zx\n", r.y);
+    gmp_printf("2 x: %Zx\n", r.x);
+    gmp_printf("2 y: %Zx\n", r.y);
     current_step++;
   }
 
@@ -249,7 +251,8 @@ int main() {
   // Initialize and set private key
   mpz_t private_key;
   mpz_init(private_key);
-  mpz_set_str(private_key, "2E09165B257A4C3E52C9F4FAA6322C66CEDE807B7D6B4EC3960820795EE5447F", 16);
+  // mpz_set_str(private_key, "2E09165B257A4C3E52C9F4FAA6322C66CEDE807B7D6B4EC3960820795EE5447F", 16);
+  mpz_set_str(private_key, "bbc611b700cbdb5c8361c267c2587992cac0bb2d97f0a86f6334ec00a7210d9c", 16);
 
   // Print private key
   gmp_printf("Private Key: %Zx\n", private_key);

@@ -2602,9 +2602,9 @@ __device__ int point_add(
     BIGNUM *p, 
     BIGNUM *a
 ) {
-    bool debug = 0;
+    bool debug = 1;
     if (debug) {
-        printf("++ point_add ++\n");
+        printf("++ point_add ++\n");    
         bn_print(">> p1.x: ", &p1->x);
         bn_print(">> p1.y: ", &p1->y);
         bn_print(">> p2.x: ", &p2->x);
@@ -2616,8 +2616,6 @@ __device__ int point_add(
         printf(">> a.top: %d\n", a->top);
         printf(">> a.neg: %d\n", a->neg);
     }
-
-    
 
     // Handle the point at infinity cases
     if (point_is_at_infinity(p1)) {
@@ -2893,6 +2891,11 @@ __device__ int point_add(
     bn_copy(&result->x, &x3);
     bn_copy(&result->y, &y3);
 
+    // print
+    bn_print("\n<< result->x: ", &result->x);
+    bn_print("<< result->y: ", &result->y);
+    printf("-- point_add --\n");
+
     // Free the dynamically allocated memory
     free_bignum(&s);
     free_bignum(&x3);
@@ -2930,15 +2933,27 @@ __device__ size_t dev_strlen(const char *str) {
     return len;
 }
 
-__device__ void bignum_to_bit_array(const BIGNUM *n, unsigned int *bits) {
+__device__ void bignum_to_bit_array(BIGNUM *n, unsigned int *bits) {
+    printf("++ bignum_to_bit_array ++\n");
+    bn_print(">> n: ", n);
     int index = 0;
+    
+    // Iterate through the words in reverse order
     for (int i = 0; i < n->top; ++i) {
         BN_ULONG word = n->d[i];
-        //for (int j = 0; j < 32; ++j) {  // Assuming BN_ULONG is 32 bits
-        for (int j = 0; j < BN_ULONG_NUM_BITS; ++j) {  // Assuming BN_ULONG is 32 bits
+        printf("word: %016llx\n", word);
+        // For each word, iterate through bits from most significant to least significant
+        for (int j = 0; j < BN_ULONG_NUM_BITS; ++j) {
             bits[index++] = (word >> j) & 1;
         }
     }
+
+    // If n->top < 4, fill the remaining bits with zeros
+    while (index < 256) {
+        bits[index++] = 0;
+    }
+
+    printf("-- bignum_to_bit_array --\n");
 }
 
 __device__ void init_point_at_infinity(EC_POINT *P) {
@@ -2974,7 +2989,7 @@ __device__ EC_POINT ec_point_scalar_mul(
     BIGNUM *curve_prime, 
     BIGNUM *curve_a
     ) {
-    // debug_printf("++ ec_point_scalar_mul ++\n");
+    debug_printf("++ ec_point_scalar_mul ++\n");
     // Print point
     bn_print(">> point x: ", &point->x);
     bn_print(">> point y: ", &point->y);
@@ -2995,13 +3010,15 @@ __device__ EC_POINT ec_point_scalar_mul(
     
     // Convert scalar BIGNUM to an array of integers that's easy to iterate bit-wise
     unsigned int bits[256];                          // Assuming a 256-bit scalar
-    bignum_to_bit_array(scalar, bits);               // You will need to implement bignum_to_bit_array()
+    scalar->top = find_top(scalar);
+    bignum_to_bit_array(scalar, bits);
     
     // printf("coef hex: %s\n", bignum_to_hex(scalar)); // Convert BIGNUM to hex string for printing
     bn_print("coef: ", scalar);  
     
     for (int i = 0; i < 256; i++) {                 // Assuming 256-bit scalars
-        // printf("\n### Step: %d\n", i);
+    // for (int i = 0; i < 3; i++) {                 // DEBUG
+        printf("\n### Step: %d\n", i);
         // if (i<debug_counter) {
         //     // printf("0 x: %s\n", bignum_to_hex(&current.x));
         //     bn_print("0 current.x: ", &current.x);
@@ -3011,7 +3028,8 @@ __device__ EC_POINT ec_point_scalar_mul(
         
 
         if (bits[i]) {// If the i-th bit is set
-            // printf("\n[0]\n");
+        // if (true) {// DEBUG
+            printf("\n[0]\n");
             // printf("0: Interrupting for debug\n");
             // return result; // TODO: remove this
             // if (i<debug_counter) printf("# 0\n");
@@ -3024,12 +3042,19 @@ __device__ EC_POINT ec_point_scalar_mul(
             bn_print(">> point_add current.y: ", &current.y);
             bn_print(">> curve_prime: ", curve_prime);
             bn_print(">> curve_a: ", curve_a);
+            
+            // bn_print(">> INITIAL result.x: ", &result.x);
+            // bn_print(">> INITIAL result.y: ", &result.y);            
+
             point_add(&tmp_result, &result, &current, curve_prime, curve_a);  // Add current to the result
+
             init_point_at_infinity(&result); // Reset result
             bn_copy(&result.x, &tmp_result.x);
             bn_copy(&result.y, &tmp_result.y);
             bn_print("<< point_add result.x: ", &result.x);
             bn_print("<< point_add result.y: ", &result.y);
+
+            // return result; // TODO: remove this
             
             // if (i<debug_counter) printf("# b\n");
             // printf("1 x: %s\n", bignum_to_hex(&result.x));
@@ -3039,6 +3064,7 @@ __device__ EC_POINT ec_point_scalar_mul(
             // printf("\n");
             
         }
+        printf("\n[1]\n");
         // init tmp_result
         init_point_at_infinity(&tmp_result);
         // init tmp_a
@@ -3083,13 +3109,21 @@ __device__ EC_POINT ec_point_scalar_mul(
         // printf("2 x: %s\n", bignum_to_hex(&current.x));
         // if (i<debug_counter) bn_print("2 current.x: ", &current.x);
         // printf("2 y: %s\n", bignum_to_hex(&current.y));
+        // print 2 result.x
+        bn_print("2 result.x: ", &result.x);
+        bn_print("2 result.y: ", &result.y);
     }
 
     // // printf("Final x: %s\n", bignum_to_hex(&result.x));
     // bn_print("Final x: ", &result.x);
     // // printf("Final y: %s\n", bignum_to_hex(&result.y));
     // bn_print("Final y: ", &result.y);
-    // printf("-- ec_point_scalar_mul --\n");
+    
+    // Copy current to result
+    // bn_copy(&result.x, &current.x);
+    // bn_print("3 result.x: ", &result.x);
+    // bn_print("3 result.y: ", &result.y);
+    printf("-- ec_point_scalar_mul --\n");
     return result;
 }
 
