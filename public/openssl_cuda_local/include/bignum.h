@@ -9,7 +9,7 @@
 
 #define BN_ULONG_MAX ((BN_ULONG)-1)
 
-#define debug_print true
+#define debug_print false
 #define bn_mul_caching false
 #define collect_stats false
 #define BN_MASK2 0xffffffff
@@ -2601,7 +2601,7 @@ __device__ int point_add(
     BIGNUM *p, 
     BIGNUM *a
 ) {
-    bool debug = 1;
+    bool debug = 0;
     if (debug) {
         printf("++ point_add ++\n");    
         bn_print(">> p1.x: ", &p1->x);
@@ -2893,7 +2893,7 @@ __device__ int point_add(
     // print
     bn_print("\n<< result->x: ", &result->x);
     bn_print("<< result->y: ", &result->y);
-    printf("-- point_add --\n");
+    // printf("-- point_add --\n");
 
     // Free the dynamically allocated memory
     free_bignum(&s);
@@ -3017,7 +3017,7 @@ __device__ EC_POINT ec_point_scalar_mul(
     
     for (int i = 0; i < 256; i++) {                 // Assuming 256-bit scalars
     // for (int i = 0; i < 3; i++) {                 // DEBUG
-        printf("\n### Step: %d\n", i);
+        // printf("\n### Step: %d\n", i);
         // if (i<debug_counter) {
         //     // printf("0 x: %s\n", bignum_to_hex(&current.x));
         //     bn_print("0 current.x: ", &current.x);
@@ -3028,7 +3028,7 @@ __device__ EC_POINT ec_point_scalar_mul(
 
         if (bits[i]) {// If the i-th bit is set
         // if (true) {// DEBUG
-            printf("\n[0]\n");
+            // printf("\n[0]\n");
             // printf("0: Interrupting for debug\n");
             // return result; // TODO: remove this
             // if (i<debug_counter) printf("# 0\n");
@@ -3063,7 +3063,7 @@ __device__ EC_POINT ec_point_scalar_mul(
             // printf("\n");
             
         }
-        printf("\n[1]\n");
+        // printf("\n[1]\n");
         // init tmp_result
         init_point_at_infinity(&tmp_result);
         // init tmp_a

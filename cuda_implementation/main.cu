@@ -183,6 +183,7 @@ int main() {
     // const int THREADS_PER_BLOCK = 256; // A good balance between occupancy and flexibility
     
     const int NUM_BLOCKS = 1;
+    // const int NUM_BLOCKS = 2;
     // const int NUM_BLOCKS = 128; // One block per SM OK
 
     // Launch kernel
