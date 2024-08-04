@@ -112,7 +112,6 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
     // Fill buffer according to index
     if (index == 0) {
         // TODO: Generate the public key from the parent private key and store it in buffer
-		// printf("!!! Public key generation not implemented yet !!!\n");
 		printf("    * INDEX is 0\n");
 		// size_t publicKeyLen = 0;
 		// unsigned char *publicKeyBytes = GetPublicKey(key, 32, &publicKeyLen);
@@ -219,11 +218,25 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
             buffer[8*i + 6] = (publicKey.x.d[3 - i] >> 8) & 0xFF;
             buffer[8*i + 7] = publicKey.x.d[3 - i] & 0xFF;
         }
-        // Print buffer value after public key copy
-        printf("      * Cuda Buffer after public key copy:");
+        
+        printf("      * [0] Cuda Buffer after public key copy: ");
         for (int i = 0; i < 32; i++) {
             printf("%02x", buffer[i]);
         }
+        printf("\n");
+
+        // Shift the buffer by 1 byte
+        for (int i = 33; i > 0; i--) {
+            buffer[i] = buffer[i - 1];
+        }
+        // Add 03 before the buffer
+        buffer[0] = 0x03;
+        // Print buffer value after adding 0x03
+        printf("      * [1] Cuda Buffer after adding 0x03:");
+        for (int i = 0; i < 33; i++) {
+            printf("%02x", buffer[i]);
+        }
+        printf("\n");
 
     } else {
         buffer[0] = 0;
