@@ -218,7 +218,7 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
             buffer[8*i + 6] = (publicKey.x.d[3 - i] >> 8) & 0xFF;
             buffer[8*i + 7] = publicKey.x.d[3 - i] & 0xFF;
         }
-        
+
         printf("      * [0] Cuda Buffer after public key copy: ");
         for (int i = 0; i < 32; i++) {
             printf("%02x", buffer[i]);
@@ -572,6 +572,12 @@ __global__ void search_kernel() {
     printf("[3] Child Chain Code: ");
     print_as_hex_char_tmp(child_key.chain_code, 32);
     printf("[3] Child Private Key: ");
+    print_as_hex_char_tmp(child_key.master_private_key, 32);
+
+    child_key = GetChildKeyDerivation(child_key.master_private_key, child_key.chain_code, index0);
+    printf("[4] Child Chain Code: ");
+    print_as_hex_char_tmp(child_key.chain_code, 32);
+    printf("[4] Child Private Key: ");
     print_as_hex_char_tmp(child_key.master_private_key, 32);
 
     printf("\n-- search_kernel --\n");    
