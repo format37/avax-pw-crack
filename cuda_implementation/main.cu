@@ -4,7 +4,8 @@
 #include <cuda.h>
 #include "bignum.h"
 #include "pbkdf2.h"
-#include "sha256.h" // SHA-256 hashing
+#include "sha256.h"
+#include "ripmd160.h"
 
 #define TEST_BIGNUM_WORDS 4
 
@@ -496,14 +497,6 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
 }
 // Child key derivation --
 
-// __device__ void reverse_order(BIGNUM *test_values_a) {
-//     for (size_t j = 0; j < TEST_BIGNUM_WORDS / 2; j++) {
-//         BN_ULONG temp_a = test_values_a->d[j];
-//         test_values_a->d[j] = test_values_a->d[TEST_BIGNUM_WORDS - 1 - j];
-//         test_values_a->d[TEST_BIGNUM_WORDS - 1 - j] = temp_a;
-//     }
-// }
-
 __global__ void search_kernel() {
     printf("++ search_kernel ++\n");
 
@@ -582,18 +575,6 @@ __global__ void search_kernel() {
     else 
     {
         printf("Debugging child key derivation\n");
-        // [4] Child Chain Code: ad98cc84c3cb974c9559efd5ed7a8e8fb0ceef5acd6b7a0fdd2e5d4181ff471e
-        // [4] Child Private Key: 2699c6b5a637828d0180832e1f117a3157bf0f4c1bda3cc942fec4f3f95ff437
-
-        // Define child_key
-        // BIP32Info child_key;
-        // Define child_key.chain_code
-        // unsigned char child_chain_code[32] = {
-        //     0xad, 0x98, 0xcc, 0x84, 0xc3, 0xcb, 0x97, 0x4c,
-        //     0x95, 0x59, 0xef, 0xd5, 0xed, 0x7a, 0x8e, 0x8f,
-        //     0xb0, 0xce, 0xef, 0x5a, 0xcd, 0x6b, 0x7a, 0x0f,
-        //     0xdd, 0x2e, 0x5d, 0x41, 0x81, 0xff, 0x47, 0x1e
-        // };
         // Define child_key.master_private_key
         unsigned char key[32] = {
             0x26, 0x99, 0xc6, 0xb5, 0xa6, 0x37, 0x82, 0x8d,
@@ -605,91 +586,6 @@ __global__ void search_kernel() {
         for (int i = 0; i < 32; i++) {
             child_key.master_private_key[i] = key[i];
         }
-        // // Getting public key from 4th private key
-        // BIGNUM newKey;
-        // init_zero(&newKey);
-        // for (int i = 0; i < 4; ++i) {
-        //     newKey.d[3 - i] = ((BN_ULONG)key[8*i] << 56) | 
-        //                       ((BN_ULONG)key[8*i + 1] << 48) | 
-        //                       ((BN_ULONG)key[8*i + 2] << 40) | 
-        //                       ((BN_ULONG)key[8*i + 3] << 32) |
-        //                       ((BN_ULONG)key[8*i + 4] << 24) | 
-        //                       ((BN_ULONG)key[8*i + 5] << 16) | 
-        //                       ((BN_ULONG)key[8*i + 6] << 8) | 
-        //                       ((BN_ULONG)key[8*i + 7]);
-        // }
-        // printf("      * [5] Cuda newKey:");
-        // bn_print("", &newKey);
-        
-        // // Initialize constants //TODO: Move it outside of each THREAD. Call once before instead and then sync
-        // init_zero(&CURVE_A);
-        
-        // // For secp256k1, CURVE_B should be initialized to 7 rather than 0
-        // init_zero(&CURVE_B);
-        // CURVE_B.d[0] = 0x7;
-
-        // BN_ULONG CURVE_GX_values[MAX_BIGNUM_SIZE] = {
-        //     0x79BE667EF9DCBBAC,
-        //     0x55A06295CE870B07,
-        //     0x029BFCDB2DCE28D9,
-        //     0x59F2815B16F81798
-        //     };
-        // for (int j = 0; j < MAX_BIGNUM_SIZE; ++j) {
-        //         CURVE_GX_d[j] = CURVE_GX_values[j];
-        //     }
-
-        // // Generator y coordinate
-        // // BIGNUM CURVE_GY;
-        // BN_ULONG CURVE_GY_values[MAX_BIGNUM_SIZE] = {
-        //     0x483ADA7726A3C465,
-        //     0x5DA4FBFC0E1108A8,
-        //     0xFD17B448A6855419,
-        //     0x9C47D08FFB10D4B8
-        //     };
-        // for (int j = 0; j < MAX_BIGNUM_SIZE; ++j) {
-        //         CURVE_GY_d[j] = CURVE_GY_values[j];
-        //     }
-
-        // // Initialize generator
-        // EC_POINT G;
-        // init_zero(&G.x);
-        // init_zero(&G.y);
-        // for (int j = 0; j < MAX_BIGNUM_SIZE; ++j) {
-        //         G.x.d[j] = CURVE_GX_values[j];
-        //         G.y.d[j] = CURVE_GY_values[j];
-        //     }
-        // // reverse
-        // reverse_order(&G.x, TEST_BIGNUM_WORDS);
-        // reverse_order(&G.y, TEST_BIGNUM_WORDS);
-        // // find top
-        // G.x.top = find_top(&G.x);
-        // G.y.top = find_top(&G.y);
-
-        // init_zero(&CURVE_P);
-        // // Init curve prime
-        // // fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f
-        // BN_ULONG CURVE_P_values[MAX_BIGNUM_SIZE] = {
-        //     0xFFFFFFFFFFFFFFFF,
-        //     0xFFFFFFFFFFFFFFFF,
-        //     0xFFFFFFFFFFFFFFFF,
-        //     0xFFFFFFFEFFFFFC2F,
-        //     0,0,0,0        
-        //     };
-        // for (int j = 0; j < MAX_BIGNUM_SIZE; ++j) {
-        //         CURVE_P.d[j] = CURVE_P_values[j];
-        //     }
-        // // reverse
-        // reverse_order(&CURVE_P, TEST_BIGNUM_WORDS);
-        // // find top
-        // CURVE_P.top = find_top(&CURVE_P);
-        // // TODO: Check do we need to define curves, G and do reversing
-        // EC_POINT publicKey = ec_point_scalar_mul(&G, &newKey, &CURVE_P, &CURVE_A);
-        // // print &publicKey.x
-        // printf("      * [5] Cuda publicKey.x: ");
-        // bn_print("", &publicKey.x);
-        // // print &publicKey.y
-        // printf("      * [5] Cuda publicKey.y: ");
-        // bn_print("", &publicKey.y);
     }
     // Final public key derivation
     // char *publicKeyHex;
@@ -698,18 +594,20 @@ __global__ void search_kernel() {
     // Allocate memory for the buffer
     uint8_t buffer[33];  // 32 bytes for the public key + 1 byte for the prefix
 
-    GetPublicKey(buffer, child_key.master_private_key, 0x02);
+    // GetPublicKey(buffer, child_key.master_private_key, 0x02); // TODO: Enable this line and disable the following DEBUG block
+    // DEBGUG ++
     // Define buffer as 02ffe1073d08f0163434453127e81181be1d49e78e88f9d5662af55416fcec9d80
-    // unsigned char buffer_values[33] = {
-    //     0x02, 0xff, 0xe1, 0x07, 0x3d, 0x08, 0xf0, 0x16,
-    //     0x34, 0x34, 0x45, 0x31, 0x27, 0xe8, 0x11, 0x81,
-    //     0xbe, 0x1d, 0x49, 0xe7, 0x8e, 0x88, 0xf9, 0xd5,
-    //     0x66, 0x2a, 0xf5, 0x54, 0x16, 0xfc, 0xec, 0x9d,
-    //     0x80
-    // };
-    // for (int i = 0; i < 33; i++) {
-    //     buffer[i] = buffer_values[i];
-    // }
+    unsigned char buffer_values[33] = {
+        0x02, 0xff, 0xe1, 0x07, 0x3d, 0x08, 0xf0, 0x16,
+        0x34, 0x34, 0x45, 0x31, 0x27, 0xe8, 0x11, 0x81,
+        0xbe, 0x1d, 0x49, 0xe7, 0x8e, 0x88, 0xf9, 0xd5,
+        0x66, 0x2a, 0xf5, 0x54, 0x16, 0xfc, 0xec, 0x9d,
+        0x80
+    };
+    for (int i = 0; i < 33; i++) {
+        buffer[i] = buffer_values[i];
+    }
+    // DEBGUG --
 
     printf("      * [==6==] Cuda buffer: ");
     for (int i = 0; i < 33; i++) {
@@ -735,8 +633,36 @@ __global__ void search_kernel() {
     printf("SHA-256: ");
     print_as_hex_uint(sha256Hash, MY_SHA256_DIGEST_LENGTH);
 
-    // ripemd160
+    // // ripemd160
+    // // define sha256Hash as a phrase
+    // char *sha256Hash_char;
+    // // Fill sha256Hash_char from sha256Hash
+    // define sha256Hash as a phrase
+    /*char sha256Hash_char[MY_SHA256_DIGEST_LENGTH * 2 + 1];  // Each byte becomes 2 hex chars, +1 for null terminator
+    // Fill sha256Hash_char from sha256Hash
+    for (int i = 0; i < MY_SHA256_DIGEST_LENGTH; i++) {
+        sha256Hash_char[i*2] = "0123456789abcdef"[sha256Hash[i] >> 4];
+        sha256Hash_char[i*2 + 1] = "0123456789abcdef"[sha256Hash[i] & 0xF];
+    }
+    sha256Hash_char[MY_SHA256_DIGEST_LENGTH * 2] = '\0';  // Ensure null-termination
 
+    printf("SHA256 as hex string: ");
+    for (int i = 0; i < MY_SHA256_DIGEST_LENGTH * 2; i++) {
+        printf("%c", sha256Hash_char[i]);
+    }
+    printf("\n");*/
+
+    unsigned char digest[RIPEMD160_DIGEST_SIZE];
+
+    // Hash the message
+    ripemd160((const uint8_t *)sha256Hash, MY_SHA256_DIGEST_LENGTH, digest);
+
+    // Print the digest
+    printf("RIPEMD-160: ");
+    for (int i = 0; i < RIPEMD160_DIGEST_SIZE; i++) {
+        printf("%02x", digest[i]);
+    }
+    printf("\n");
     printf("\n-- search_kernel --\n");    
 }
 
