@@ -155,14 +155,14 @@ PBKDF2_SHA256_DEF __device__ void sha256_update(SHA256_CTX *s, const uint8_t *m,
 	memcpy(s->buf, p, len);
 }
 
-__device__ void print_as_hex(const uint8_t *s,  const uint32_t slen)
-{
-	for (uint32_t i = 0; i < slen; i++)
-	{
-		printf("%02X", s[i]);
-	}
-	printf("\n");
-}
+// __device__ void print_as_hex(const uint8_t *s,  const uint32_t slen)
+// {
+// 	for (uint32_t i = 0; i < slen; i++)
+// 	{
+// 		printf("%02X", s[i]);
+// 	}
+// 	printf("\n");
+// }
 
 __device__ void compute_sha256(const uint8_t *msg, uint32_t mlen, uint8_t *outputHash)
 {

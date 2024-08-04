@@ -23,8 +23,8 @@ __global__ void testKernel() {
 
     uint8_t buffer[100];
     // Set buffer to 
-    // eacfd75e9a9861f1994e664fd81604470d5dc01edcd9a1fa1c975aadafbadbcb
-    //   03d75e9a9861f1994e664fd81604470d5dc01edcd9a1fa1c975aadafbadbcb0000
+    //  eacfd75e9a9861f1994e664fd81604470d5dc01edcd9a1fa1c975aadafbadbcb
+    //03eacfd75e9a9861f1994e664fd81604470d5dc01edcd9a1fa1c975aadafbadbcb
     buffer[0] = 0xea;
     buffer[1] = 0xcf;
     buffer[2] = 0xd7;

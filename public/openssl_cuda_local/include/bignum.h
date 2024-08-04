@@ -13,10 +13,9 @@
 #define bn_mul_caching false
 #define collect_stats false
 #define BN_MASK2 0xffffffff
-// #define BN_ULONG_NUM_BITS 64
-#define BN_ULONG_NUM_BITS (sizeof(BN_ULONG) * 8)
-// #define MAX_BIGNUM_WORDS 10     // For 576-bit numbers
+#define BN_ULONG_NUM_BITS (sizeof(BN_ULONG) * 8) // 64 bits
 #define MAX_BIGNUM_SIZE 10     // Allow room for temp calculations
+#define PUBLIC_KEY_SIZE 33  // Assuming a 33-byte public key (compressed format)
 
 // Debug variables
 #define DEVICE_CLOCK_RATE 1708500
@@ -3133,4 +3132,145 @@ __device__ void reverse_order(BIGNUM *test_values_a, const unsigned char words_c
         test_values_a->d[j] = test_values_a->d[words_count - 1 - j];
         test_values_a->d[words_count - 1 - j] = temp_a;
     }
+}
+
+__device__ void GetPublicKey(uint8_t* buffer, uint8_t* key, uint8_t prefix)
+{
+    // uint8_t buffer[100];
+    BIGNUM newKey;
+    init_zero(&newKey);
+    for (int i = 0; i < 4; ++i) {
+        newKey.d[3 - i] = ((BN_ULONG)key[8*i] << 56) | 
+                            ((BN_ULONG)key[8*i + 1] << 48) | 
+                            ((BN_ULONG)key[8*i + 2] << 40) | 
+                            ((BN_ULONG)key[8*i + 3] << 32) |
+                            ((BN_ULONG)key[8*i + 4] << 24) | 
+                            ((BN_ULONG)key[8*i + 5] << 16) | 
+                            ((BN_ULONG)key[8*i + 6] << 8) | 
+                            ((BN_ULONG)key[8*i + 7]);
+    }
+    printf("      * Cuda newKey:");
+    bn_print("", &newKey);
+    
+    // Initialize constants //TODO: Move it outside of each THREAD. Call once before instead and then sync
+    init_zero(&CURVE_A);
+    
+    // For secp256k1, CURVE_B should be initialized to 7 rather than 0
+    init_zero(&CURVE_B);
+    CURVE_B.d[0] = 0x7;
+
+    BN_ULONG CURVE_GX_values[MAX_BIGNUM_SIZE] = {
+        0x79BE667EF9DCBBAC,
+        0x55A06295CE870B07,
+        0x029BFCDB2DCE28D9,
+        0x59F2815B16F81798
+        };
+    for (int j = 0; j < MAX_BIGNUM_SIZE; ++j) {
+            CURVE_GX_d[j] = CURVE_GX_values[j];
+        }
+
+    // Generator y coordinate
+    // BIGNUM CURVE_GY;
+    BN_ULONG CURVE_GY_values[MAX_BIGNUM_SIZE] = {
+        0x483ADA7726A3C465,
+        0x5DA4FBFC0E1108A8,
+        0xFD17B448A6855419,
+        0x9C47D08FFB10D4B8
+        };
+    for (int j = 0; j < MAX_BIGNUM_SIZE; ++j) {
+            CURVE_GY_d[j] = CURVE_GY_values[j];
+        }
+
+    // Initialize generator
+    EC_POINT G;
+    init_zero(&G.x);
+    init_zero(&G.y);
+    for (int j = 0; j < MAX_BIGNUM_SIZE; ++j) {
+            G.x.d[j] = CURVE_GX_values[j];
+            G.y.d[j] = CURVE_GY_values[j];
+        }
+    # define TEST_BIGNUM_WORDS 4
+    // reverse
+    reverse_order(&G.x, TEST_BIGNUM_WORDS);
+    reverse_order(&G.y, TEST_BIGNUM_WORDS);
+    // find top
+    G.x.top = find_top(&G.x);
+    G.y.top = find_top(&G.y);
+
+    init_zero(&CURVE_P);
+    // Init curve prime
+    // fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f
+    BN_ULONG CURVE_P_values[MAX_BIGNUM_SIZE] = {
+        0xFFFFFFFFFFFFFFFF,
+        0xFFFFFFFFFFFFFFFF,
+        0xFFFFFFFFFFFFFFFF,
+        0xFFFFFFFEFFFFFC2F,
+        0,0,0,0        
+        };
+    for (int j = 0; j < MAX_BIGNUM_SIZE; ++j) {
+            CURVE_P.d[j] = CURVE_P_values[j];
+        }
+    // reverse
+    reverse_order(&CURVE_P, TEST_BIGNUM_WORDS);
+    // find top
+    CURVE_P.top = find_top(&CURVE_P);
+    // TODO: Check do we need to define curves, G and do reversing
+    EC_POINT publicKey = ec_point_scalar_mul(&G, &newKey, &CURVE_P, &CURVE_A);
+    // print &publicKey.x
+    printf("      * Cuda publicKey.x: ");
+    bn_print("", &publicKey.x);
+    // print &publicKey.y
+    printf("      * Cuda publicKey.y: ");
+    bn_print("", &publicKey.y);
+    
+    // Copy the public key to buffer
+    // my_cuda_memcpy_uint32_t_to_unsigned_char(buffer, publicKey.x.d, 32);
+    for (int i = 0; i < 4; i++) {
+        buffer[8*i] = (publicKey.x.d[3 - i] >> 56) & 0xFF;
+        buffer[8*i + 1] = (publicKey.x.d[3 - i] >> 48) & 0xFF;
+        buffer[8*i + 2] = (publicKey.x.d[3 - i] >> 40) & 0xFF;
+        buffer[8*i + 3] = (publicKey.x.d[3 - i] >> 32) & 0xFF;
+        buffer[8*i + 4] = (publicKey.x.d[3 - i] >> 24) & 0xFF;
+        buffer[8*i + 5] = (publicKey.x.d[3 - i] >> 16) & 0xFF;
+        buffer[8*i + 6] = (publicKey.x.d[3 - i] >> 8) & 0xFF;
+        buffer[8*i + 7] = publicKey.x.d[3 - i] & 0xFF;
+    }
+
+    printf("      * [0] Cuda Buffer after public key copy: ");
+    for (int i = 0; i < 32; i++) {
+        printf("%02x", buffer[i]);
+    }
+    printf("\n");
+
+    // Shift the buffer by 1 byte
+    for (int i = 33; i > 0; i--) {
+        buffer[i] = buffer[i - 1];
+    }
+    // Add prefix before the buffer
+    buffer[0] = prefix;
+    // Print buffer value after adding prefix
+    printf("      * [1] Cuda Buffer after adding prefix:");
+    for (int i = 0; i < 33; i++) {
+        printf("%02x", buffer[i]);
+    }
+    printf("\n");
+    // return buffer;
+}
+
+__device__ void bufferToHex_deprecated(const uint8_t *buffer, char *output) {
+    const char hex_chars[] = "0123456789abcdef";
+    for (size_t i = 0; i < PUBLIC_KEY_SIZE; i++) {
+        output[i * 2] = hex_chars[buffer[i] >> 4];
+        output[i * 2 + 1] = hex_chars[buffer[i] & 0xF];
+    }
+    output[PUBLIC_KEY_SIZE * 2] = '\0';
+}
+
+__device__ void bufferToHex(const uint8_t *buffer, char *output) {
+    const char hex_chars[] = "0123456789abcdef";
+    for (size_t i = 0; i < PUBLIC_KEY_SIZE; i++) {
+        output[i * 2] = hex_chars[buffer[i] >> 4];
+        output[i * 2 + 1] = hex_chars[buffer[i] & 0xF];
+    }
+    output[PUBLIC_KEY_SIZE * 2] = '\0';
 }
