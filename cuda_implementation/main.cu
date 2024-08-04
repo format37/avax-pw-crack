@@ -18,6 +18,7 @@ __device__ void print_as_hex_char_tmp(unsigned char *data, int len) {
 typedef struct {
     unsigned char master_private_key[32];
     unsigned char chain_code[32];
+    unsigned char public_key[33];
 } BIP32Info;
 
 __device__ void my_cuda_memcpy_unsigned_char_b(uint8_t *dst, const uint8_t *src, unsigned int n) {
@@ -93,7 +94,7 @@ __device__ void my_cuda_memcpy_uint32_t_to_unsigned_char(unsigned char *dst, con
     }
 }
 
-__device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uint32_t index) {
+__device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uint32_t index, uint8_t prefix) {
 	printf("++ GetChildKeyDerivation ++\n");
     printf(">> key: ");
     print_as_hex(key, 32);
@@ -230,7 +231,8 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
             buffer[i] = buffer[i - 1];
         }
         // Add 03 before the buffer
-        buffer[0] = 0x03;
+        // buffer[0] = 0x03;
+        buffer[0] = prefix;
         // Print buffer value after adding 0x03
         printf("      * [1] Cuda Buffer after adding 0x03:");
         for (int i = 0; i < 33; i++) {
@@ -550,31 +552,31 @@ __global__ void search_kernel() {
 	uint32_t index0Hardened = 0x80000000;
 	uint32_t index0 = 0x00000000;
     // TODO: remove _index from child_key variable. Write to the same variable instead.
-	BIP32Info child_key = GetChildKeyDerivation(master_key.master_private_key, master_key.chain_code, index44);
+	BIP32Info child_key = GetChildKeyDerivation(master_key.master_private_key, master_key.chain_code, index44, 0x00);
 	printf("[0] Child Chain Code: ");
 	print_as_hex_char_tmp(child_key.chain_code, 32);
 	printf("[0] Child Private Key: ");
 	print_as_hex_char_tmp(child_key.master_private_key, 32);
     
-    child_key = GetChildKeyDerivation(child_key.master_private_key, child_key.chain_code, index9000);
+    child_key = GetChildKeyDerivation(child_key.master_private_key, child_key.chain_code, index9000, 0x00);
     printf("[1] Child Chain Code: ");
     print_as_hex_char_tmp(child_key.chain_code, 32);
     printf("[1] Child Private Key: ");
     print_as_hex_char_tmp(child_key.master_private_key, 32);
 
-    child_key = GetChildKeyDerivation(child_key.master_private_key, child_key.chain_code, index0Hardened);
+    child_key = GetChildKeyDerivation(child_key.master_private_key, child_key.chain_code, index0Hardened, 0x00);
     printf("[2] Child Chain Code: ");
     print_as_hex_char_tmp(child_key.chain_code, 32);
     printf("[2] Child Private Key: ");
     print_as_hex_char_tmp(child_key.master_private_key, 32);
 
-    child_key = GetChildKeyDerivation(child_key.master_private_key, child_key.chain_code, index0);
+    child_key = GetChildKeyDerivation(child_key.master_private_key, child_key.chain_code, index0, 0x03);
     printf("[3] Child Chain Code: ");
     print_as_hex_char_tmp(child_key.chain_code, 32);
     printf("[3] Child Private Key: ");
     print_as_hex_char_tmp(child_key.master_private_key, 32);
 
-    child_key = GetChildKeyDerivation(child_key.master_private_key, child_key.chain_code, index0);
+    child_key = GetChildKeyDerivation(child_key.master_private_key, child_key.chain_code, index0, 0x02);
     printf("[4] Child Chain Code: ");
     print_as_hex_char_tmp(child_key.chain_code, 32);
     printf("[4] Child Private Key: ");
