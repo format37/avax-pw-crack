@@ -6,6 +6,7 @@
 #include "pbkdf2.h"
 #include "sha256.h"
 #include "ripmd160.h"
+#include "bech32.h"
 
 #define TEST_BIGNUM_WORDS 4
 
