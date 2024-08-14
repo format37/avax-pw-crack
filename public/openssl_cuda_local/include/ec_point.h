@@ -83,15 +83,15 @@ __device__ void point_double(EC_POINT *P, EC_POINT *R, BIGNUM *p) {
     
     bn_add(&m, &m, &m);             // m = 2x
     // bn_sub(&xR, &m, &xR);           // xR = s^2 - 2x
-    bn_subtract(&xR, &m, &xR);           // xR = s^2 - 2x
+    bn_sub(&xR, &m, &xR);           // xR = s^2 - 2x
     bn_mod(&xR, p, &xR);            // Modulo operation
 
     // Compute yR = s * (x - xR) - y mod p
     // bn_sub(&P->x, &xR, &yR);        // yR = x - xR
-    bn_subtract(&P->x, &xR, &yR);        // yR = x - xR
+    bn_sub(&P->x, &xR, &yR);        // yR = x - xR
     mod_mul(&s, &yR, p, &yR);       // yR = s * (x - xR)
     // bn_sub(&yR, &P->y, &yR);        // yR = s * (x - xR) - y
-    bn_subtract(&yR, &P->y, &yR);        // yR = s * (x - xR) - y
+    bn_sub(&yR, &P->y, &yR);        // yR = s * (x - xR) - y
     bn_mod(&yR, p, &yR);            // Modulo operation
 
     // Copy results to R only after all calculations are complete to allow in-place doubling (P == R)
@@ -304,10 +304,10 @@ __device__ int point_add(
         bn_mul(&tmp3, &tmp3, &x3);  // x3 = s^2
         // bn_print("\n[9] << bn_mul x3: ", &x3); //
 
-        bn_subtract(&x3, &x3, &p1->x);  // x3 = x3 - p1.x
+        bn_sub(&x3, &x3, &p1->x);  // x3 = x3 - p1.x
         // bn_print("\n[10] << bn_subtract x3: ", &x3); //
 
-        bn_subtract(&x3, &x3, &p1->x);  // x3 = x3 - p1.x
+        bn_sub(&x3, &x3, &p1->x);  // x3 = x3 - p1.x
         // bn_print("\n[11] << bn_subtract x3: ", &x3); //
 
         init_zero(&tmp3);
@@ -318,7 +318,7 @@ __device__ int point_add(
         init_zero(&tmp1);
         // bn_print("[13] >> bn_subtract p1.x: ", &p1->x); //
         // bn_print("[13] >> bn_subtract x3: ", &x3); //
-        bn_subtract(&tmp1, &p1->x, &x3);  // tmp1 = p1.x - x3
+        bn_sub(&tmp1, &p1->x, &x3);  // tmp1 = p1.x - x3
         // bn_print("\n[13] << bn_subtract tmp1: ", &tmp1); //
 
         init_zero(&tmp3);
@@ -331,7 +331,7 @@ __device__ int point_add(
         bn_copy(&tmp3, &y3); // dst << src
         // bn_print("[15] >> bn_subtract tmp3: ", &tmp3); //
         // bn_print("[15] >> bn_subtract p1.y: ", &p1->y); //
-        bn_subtract(&y3, &tmp3, &p1->y);  // y3 = y3 - p1.y
+        bn_sub(&y3, &tmp3, &p1->y);  // y3 = y3 - p1.y
         // bn_print("\n[15] << bn_subtract y3: ", &y3); //
 
         init_zero(&tmp3);
@@ -343,7 +343,7 @@ __device__ int point_add(
         //if (debug) 
         debug_printf("p1.x != p2.x\n");
         // Regular point addition
-        bn_subtract(&tmp1, &p2->y, &p1->y);
+        bn_sub(&tmp1, &p2->y, &p1->y);
         // bn_print("\n[a] << bn_subtract tmp1: ", &tmp1);
         init_zero(&tmp3);
         bn_copy(&tmp3, &tmp1); // dst << src
@@ -355,7 +355,7 @@ __device__ int point_add(
         // bn_print("\n[c] << bn_mod tmp1: ", &tmp1); // OK
         
         init_zero(&tmp2);
-        bn_subtract(&tmp2, &p2->x, &p1->x);
+        bn_sub(&tmp2, &p2->x, &p1->x);
 
         init_zero(&tmp3);
         bn_copy(&tmp3, &tmp2);
@@ -412,9 +412,9 @@ __device__ int point_add(
         // bn_print("\n[5] >> bn_subtract tmp2: ", &tmp2);
         // print p1.x
         // bn_print("\n[5] >> bn_subtract p1.x: ", &p1->x);
-        bn_subtract(&x3, &tmp2, &p1->x); // result = a - b
+        bn_sub(&x3, &tmp2, &p1->x); // result = a - b
         // bn_print("\n[5] << bn_subtract x3: ", &x3); //
-        bn_subtract(&x3, &x3, &p2->x);          // x3 = s^2 - p1.x - p2.x
+        bn_sub(&x3, &x3, &p2->x);          // x3 = s^2 - p1.x - p2.x
         // bn_print("\n[6] << bn_subtract x3: ", &x3);
         
         init_zero(&tmp2);
@@ -426,7 +426,7 @@ __device__ int point_add(
         bn_mod(&x3, &tmp2, p); // x3 = tmp2 mod p
         // bn_print("\n[7] << bn_mod x3: ", &x3); // OK
 
-        bn_subtract(&tmp1, &p1->x, &x3);
+        bn_sub(&tmp1, &p1->x, &x3);
         // bn_print("\n[8] << bn_subtract tmp1: ", &tmp1); // OK
 
         //bn_mul(&y3, &s, &tmp1);            // y3 = s * (p1.x - x3)
@@ -437,7 +437,7 @@ __device__ int point_add(
         
         init_zero(&tmp2);
         bn_copy(&tmp2, &y3);
-        bn_subtract(&y3, &tmp2, &p1->y);          // y3 = s * (p1.x - x3) - p1.y
+        bn_sub(&y3, &tmp2, &p1->y);          // y3 = s * (p1.x - x3) - p1.y
         // bn_print("\n[10] << bn_mod y3: ", &y3); // OK
 
         init_zero(&tmp2);

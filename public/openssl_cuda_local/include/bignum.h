@@ -493,7 +493,7 @@ __device__ void absolute_subtract(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
     // bn_print("<< absolute_subtract result: ", result);
 }
 
-__device__ bool bn_subtract(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
+__device__ bool bn_sub(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
     clock_t start = clock64();
     // If one is negative and the other is positive, it's essentially an addition.
     if (a->neg != b->neg) {
@@ -705,7 +705,7 @@ __device__ void robust_BN_nnmod(BIGNUM *r, BIGNUM *m, BIGNUM *d) {
 
     // Ensure the result is smaller than d
     while (bn_cmp(r, d) >= 0) {
-        bn_subtract(r, r, d);
+        bn_sub(r, r, d);
     }
 }
 
@@ -832,10 +832,10 @@ __device__ int extended_gcd(BIGNUM *a, BIGNUM *mod, BIGNUM *x, BIGNUM *y) {
 
         bn_mul(&quotient, x, &temp); // temp = quotient*x
         //bn_sub(&prev_x, &temp, &prev_x); // new prev_x = prev_x - temp
-        bn_subtract(&prev_x, &temp, &prev_x); // new prev_x = prev_x - temp
+        bn_sub(&prev_x, &temp, &prev_x); // new prev_x = prev_x - temp
         bn_mul(&quotient, y, &temp); // temp = quotient*y
         // bn_sub(&last_y, &temp, &last_y); // new last_y = last_y - temp
-        bn_subtract(&last_y, &temp, &last_y); // new last_y = last_y - temp
+        bn_sub(&last_y, &temp, &last_y); // new last_y = last_y - temp
         
         // Swap last_remainder with remainder
         // Swap prev_x with x
@@ -1003,7 +1003,7 @@ __device__ int bn_mod_mpz(BIGNUM *r, BIGNUM *m, BIGNUM *d) {
     if (r->neg) {
         // If the remainder is negative, add the absolute value of the divisor
         if (d->neg) {
-            if (!bn_subtract(r, r, d)) {
+            if (!bn_sub(r, r, d)) {
                 return 0;
             }
         } else {
@@ -1073,7 +1073,7 @@ __device__ int bn_mod(BIGNUM *r, BIGNUM *a, BIGNUM *n) {
         // If the remainder is negative, add the absolute value of the divisor
         if (n->neg) {
             if (debug) printf("d is negative\n");
-            result = bn_subtract(&tmp, r, n); // tmp = r - n
+            result = bn_sub(&tmp, r, n); // tmp = r - n
             if (!result) {
                 record_function(FN_BN_MOD, start);
                 return 0;
@@ -1848,7 +1848,7 @@ __device__ int bn_div(BIGNUM *bn_quotient, BIGNUM *bn_remainder, BIGNUM *bn_divi
             bn_mul(&abs_divisor, &temp, &product);
         #endif
 
-        bn_subtract(&current_dividend, &current_dividend, &product);
+        bn_sub(&current_dividend, &current_dividend, &product);
     }
 
     // Set remainder
@@ -2228,7 +2228,7 @@ __device__ void bn_gcd(BIGNUM* r, BIGNUM* in_a, BIGNUM* in_b) {
             bn_swap(&a, &b);
         }
 
-        bn_subtract(&b, &b, &a); // b = b - a
+        bn_sub(&b, &b, &a); // b = b - a
     } while (!bn_is_zero(&b));
     
     //bn_print(">>GCD: ", &a);
@@ -2280,12 +2280,12 @@ __device__ void bn_gcdext(BIGNUM *g, BIGNUM *s, BIGNUM *t, BIGNUM *a, BIGNUM *b)
         bn_copy(&r, &temp);
         bn_mul(&temp, &quotient, s);
         // bn_sub(&temp, &old_s, &temp);
-        bn_subtract(&temp, &old_s, &temp);
+        bn_sub(&temp, &old_s, &temp);
         bn_copy(&old_s, s);
         bn_copy(s, &temp);
         bn_mul(&temp, &quotient, t);
         // bn_sub(&temp, &old_t, &temp);
-        bn_subtract(&temp, &old_t, &temp);
+        bn_sub(&temp, &old_t, &temp);
         bn_copy(&old_t, t);
         bn_copy(t, &temp);
     }
@@ -2379,7 +2379,7 @@ __device__ bool bn_mod_inverse(BIGNUM *result, BIGNUM *a, BIGNUM *n) {
 
         //bn_print("[3] presub t = ", t);
         init_zero(&tmp3);
-        bn_subtract(&tmp3, &t, &tmp2); // tmp3 = t - tmp2
+        bn_sub(&tmp3, &t, &tmp2); // tmp3 = t - tmp2
         //bn_print("[3.5] postsub tmp2 = ", tmp3);
         bn_copy(&nt, &tmp3); // dst << src
         //bn_print("[4] postsub nt = ", nt);
@@ -2394,7 +2394,7 @@ __device__ bool bn_mod_inverse(BIGNUM *result, BIGNUM *a, BIGNUM *n) {
         //bn_print("[8] presub r = ", r);
         // set zero to tmp3
         init_zero(&tmp3);
-        bn_subtract(&tmp3, &r, &tmp2); // tmp3 = r - tmp2
+        bn_sub(&tmp3, &r, &tmp2); // tmp3 = r - tmp2
         bn_copy(&nr, &tmp3);
         //bn_print("[9] postsub nr = ", nr);
 
