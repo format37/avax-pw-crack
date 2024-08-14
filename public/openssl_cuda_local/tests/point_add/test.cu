@@ -106,16 +106,18 @@ __global__ void testKernel() {
     bn_print(">> p2.x: ", &p2.x);
     bn_print(">> p2.y: ", &p2.y);
     
-    // point_add(&result, &p1, &p2, curve_prime, curve_a);  // point addition: p1.x != p2.x    
-    // Convert affine points to Jacobian coordinates
-    JacobianPoint jac_p1, jac_p2, jac_result;
-    affine_to_jacobian(&jac_p1, &p1);
-    affine_to_jacobian(&jac_p2, &p2);
-    // Perform Jacobian point addition
-    jacobian_point_add(&jac_result, &jac_p1, &jac_p2, &CURVE_P);
-    // Convert result back to affine coordinates
-    // EC_POINT result;
-    jacobian_to_affine(&result, &jac_result, &CURVE_P);
+    if (0) point_add(&result, &p1, &p2, curve_prime, curve_a);  // point addition: p1.x != p2.x
+    else {
+        // Convert affine points to Jacobian coordinates
+        JacobianPoint jac_p1, jac_p2, jac_result;
+        affine_to_jacobian(&jac_p1, &p1);
+        affine_to_jacobian(&jac_p2, &p2);
+        // Perform Jacobian point addition
+        jacobian_point_add(&jac_result, &jac_p1, &jac_p2, &CURVE_P);
+        // Convert result back to affine coordinates
+        // EC_POINT result;
+        jacobian_to_affine(&result, &jac_result, &CURVE_P);
+    }
 
     bn_print("<< result.x: ", &result.x);
     bn_print("<< result.y: ", &result.y);

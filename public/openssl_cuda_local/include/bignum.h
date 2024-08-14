@@ -1018,6 +1018,51 @@ __device__ int bn_mod_mpz(BIGNUM *r, BIGNUM *m, BIGNUM *d) {
 }
 
 __device__ int bn_mod(BIGNUM *r, BIGNUM *a, BIGNUM *n) {
+    clock_t start = clock64();
+    bool debug = 0;
+    BIGNUM q, tmp_r;
+    init_zero(&q);
+    init_zero(&tmp_r);
+
+    BIGNUM *result = r;
+    bool using_tmp = false;
+
+    if (r == n) {
+        result = &tmp_r;
+        using_tmp = true;
+    }
+
+    if (!bn_div(&q, result, a, n)) {
+        record_function(FN_BN_MOD, start);
+        return 0;
+    }
+
+    if (result->neg) {
+        if (n->neg) {
+            if (!bn_sub(&tmp_r, result, n)) {
+                record_function(FN_BN_MOD, start);
+                return 0;
+            }
+        } else {
+            if (!bn_add(&tmp_r, result, n)) {
+                record_function(FN_BN_MOD, start);
+                return 0;
+            }
+        }
+        bn_copy(result, &tmp_r);
+    }
+
+    if (using_tmp) {
+        bn_copy(r, result);
+    }
+
+    if (debug) bn_print("<< r bn_mod: ", r);
+    if (debug) printf("-- bn_mod --\n");
+    record_function(FN_BN_MOD, start);
+    return 1;
+}
+
+__device__ int bn_mod_(BIGNUM *r, BIGNUM *a, BIGNUM *n) {
     // r: Remainder (updated)
     // a: Dividend
     // n: Modulus
