@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <cuda_runtime.h>
 #include "bignum.h"
+#include "ec_point.h"
 
 #define TEST_BIGNUM_WORDS 4
 
