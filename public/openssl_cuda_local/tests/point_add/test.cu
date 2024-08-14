@@ -28,7 +28,7 @@ __device__ void reverse_order_single(BIGNUM *test_values_a) {
 
 __global__ void testKernel() {
     printf("++ testKernel for point_add ++\n");
-
+    clock_t start = clock64();
     BIGNUM curveOrder;
     BN_ULONG curveOrder_d[4];
     BN_ULONG order_temp[4];
@@ -108,16 +108,27 @@ __global__ void testKernel() {
     bn_print("<< result.y: ", &result.y);
 
     printf("\n");
+    record_function(FN_MAIN, start);
+    print_performance_report();
 }
 
 // Main function
 int main() {
-    testKernel<<<1, 1>>>();
-    cudaError_t err = cudaGetLastError();
-    if (err != cudaSuccess) {
-        printf("Error: %s\n", cudaGetErrorString(err));
-        return -1;
+    for (int i = 0; i < 1; i++) {
+        testKernel<<<1, 1>>>();
+        cudaError_t err = cudaGetLastError();
+        if (err != cudaSuccess) {
+            printf("Error: %s\n", cudaGetErrorString(err));
+            return -1;
+        }
+        cudaDeviceSynchronize();
     }
-    cudaDeviceSynchronize();
+    // testKernel<<<1, 1>>>();
+    // cudaError_t err = cudaGetLastError();
+    // if (err != cudaSuccess) {
+    //     printf("Error: %s\n", cudaGetErrorString(err));
+    //     return -1;
+    // }
+    // cudaDeviceSynchronize();
     return 0;
 }

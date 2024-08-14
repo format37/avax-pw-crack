@@ -9,7 +9,7 @@ void print_bn(const char* label, const BIGNUM* bn) {
     OPENSSL_free(hex);
 }
 
-int main() {
+void test() {
     // Define the secp256k1 curve parameters
     const char *p_hex = "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F";
     const char *a_hex = "0000000000000000000000000000000000000000000000000000000000000000";
@@ -90,6 +90,12 @@ int main() {
     EC_POINT_free(result);
     BN_CTX_free(ctx);
     EC_GROUP_free(group);
+}
+
+int main() {
+    for (int i = 0; i < 255; i++) {
+        test();
+    }
 
     return 0;
 }

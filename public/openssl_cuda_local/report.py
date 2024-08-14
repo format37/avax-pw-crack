@@ -5,7 +5,13 @@ import numpy as np
 def read_last_n_lines(filename, n):
     with open(filename, 'r') as file:
         lines = file.readlines()
-        return lines[-n:]
+    # Search for the line starting from 'Function' and return the last n lines
+    for i, line in enumerate(reversed(lines)):
+        if line.startswith('Function'):
+            break
+    i+=1  # Adjusting for 0-based index
+    print(f'Found header at line {len(lines) - i}: {lines[-i]}')
+    return lines[-i:]
 
 def process_data(lines):
     data = [line.strip().split(',') for line in lines if line.strip()]
@@ -65,7 +71,7 @@ def plot_comparison(df):
 
 # Main execution
 filename = 'run.log'
-n_lines = 13
+n_lines = 25
 
 try:
     lines = read_last_n_lines(filename, n_lines)

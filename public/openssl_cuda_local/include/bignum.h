@@ -35,6 +35,7 @@ enum FunctionIndex {
     FN_BN_MUL,
     FN_BN_DIV,
     FN_BN_MOD,
+    FN_BN_MOD_INVERSE,
     FN_POINT_ADD,
     FN_POINT_DOUBLE,
     FN_EC_POINT_SCALAR_MUL,
@@ -62,6 +63,7 @@ __device__ const char* get_function_name(FunctionIndex fn) {
         case FN_BN_MUL: return "bn_mul";
         case FN_BN_DIV: return "bn_div";
         case FN_BN_MOD: return "bn_mod";
+        case FN_BN_MOD_INVERSE: return "bn_mod_inverse";
         case FN_POINT_ADD: return "point_add";
         case FN_POINT_DOUBLE: return "point_double";
         case FN_EC_POINT_SCALAR_MUL: return "ec_point_scalar_mul";
@@ -1062,6 +1064,8 @@ __device__ int bn_mod(BIGNUM *r, BIGNUM *a, BIGNUM *n) {
     // r: Remainder (updated)
     // a: Dividend
     // n: Modulus
+    // Define start
+    clock_t start = clock64();
     bool debug = 0;
     /*if (debug) {
         printf("++ bn_mod ++\n");
@@ -1088,6 +1092,7 @@ __device__ int bn_mod(BIGNUM *r, BIGNUM *a, BIGNUM *n) {
 
     if (r == n) {
         printf("bn_mod: ERR_R_PASSED_INVALID_ARGUMENT");
+        record_function(FN_BN_MOD, start);
         return 0;
     }
 
@@ -1096,6 +1101,7 @@ __device__ int bn_mod(BIGNUM *r, BIGNUM *a, BIGNUM *n) {
     if (!bn_div(&q, r, a, n)) {
         // bn_print("<<0 q after bn_div: ", &q);
         // bn_print("<<0 r after bn_div: ", r);
+        record_function(FN_BN_MOD, start);
         return 0;
     }
     // bn_print("<<1 q after bn_div: ", &q);
@@ -1112,6 +1118,7 @@ __device__ int bn_mod(BIGNUM *r, BIGNUM *a, BIGNUM *n) {
             if (debug) printf("d is negative\n");
             result = bn_subtract(&tmp, r, n); // tmp = r - n
             if (!result) {
+                record_function(FN_BN_MOD, start);
                 return 0;
             }
             // copy tmp to r
@@ -1120,6 +1127,7 @@ __device__ int bn_mod(BIGNUM *r, BIGNUM *a, BIGNUM *n) {
             if (debug) printf("d is not negative\n");
             result = bn_add(&tmp, r, n); // tmp = r + n            
             if (!result) {
+                record_function(FN_BN_MOD, start);
                 return 0;
             }
             // copy tmp to r
@@ -1128,6 +1136,7 @@ __device__ int bn_mod(BIGNUM *r, BIGNUM *a, BIGNUM *n) {
     }
     if (debug) bn_print("<< r bn_mod: ", r);
     if (debug) printf("-- bn_mod --\n");
+    record_function(FN_BN_MOD, start);
     return 1;
 }
 
@@ -2476,6 +2485,7 @@ __device__ bool bn_mod_inverse(BIGNUM *result, BIGNUM *a, BIGNUM *n) {
         // if (debug) {
         //     printf("bn_is_one(n) is true\n");
         // }
+        record_function(FN_BN_MOD_INVERSE, start);
         return false;  // No modular inverse exists
     }
 
@@ -2569,6 +2579,7 @@ __device__ bool bn_mod_inverse(BIGNUM *result, BIGNUM *a, BIGNUM *n) {
         delete &q;
         delete &tmp;
         delete &tmp2;
+        record_function(FN_BN_MOD_INVERSE, start);
         return false; // No modular inverse exists
     }
 
@@ -2591,6 +2602,7 @@ __device__ bool bn_mod_inverse(BIGNUM *result, BIGNUM *a, BIGNUM *n) {
     end = clock64();
     //elapsed_time_bn_mod_inverse += (double)(end - start) / ((double)DEVICE_CLOCK_RATE*10000);
     elapsed_time_bn_mod_inverse += (double)(end - start);
+    record_function(FN_BN_MOD_INVERSE, start);
     return true;
 }
 
