@@ -9,9 +9,9 @@
 
 #define BN_ULONG_MAX ((BN_ULONG)-1)
 
-#define debug_print false
+#define debug_print true
 #define bn_mul_caching false
-#define collect_stats false
+#define collect_stats true
 #define BN_MASK2 0xffffffff
 #define BN_ULONG_NUM_BITS (sizeof(BN_ULONG) * 8) // 64 bits
 #define MAX_BIGNUM_SIZE 10     // Allow room for temp calculations
@@ -2601,7 +2601,7 @@ __device__ int point_add(
     BIGNUM *p, 
     BIGNUM *a
 ) {
-    bool debug = 0;
+    bool debug = 1;
     if (debug) {
         printf("++ point_add ++\n");    
         bn_print(">> p1.x: ", &p1->x);
@@ -2893,7 +2893,6 @@ __device__ int point_add(
     // print
     bn_print("\n<< result->x: ", &result->x);
     bn_print("<< result->y: ", &result->y);
-    // printf("-- point_add --\n");
 
     // Free the dynamically allocated memory
     free_bignum(&s);
@@ -2904,7 +2903,7 @@ __device__ int point_add(
     free_bignum(&tmp3);
     free_bignum(&two);
     free_bignum(&tmp1_squared);
-
+    printf("-- point_add --\n");
     return 0;
 }
 
@@ -2982,6 +2981,85 @@ __device__ void init_point_at_infinity(EC_POINT *P) {
     // printf("-- init_point_at_infinity --\n");
 }
 
+__device__ EC_POINT ec_point_scalar_mul_optimized(EC_POINT* G, BIGNUM* k, BIGNUM* curve_prime, BIGNUM* curve_a) {
+    // printf("++ ec_point_scalar_mul_optimized ++\n");
+    EC_POINT result, current, tmp_result;
+    BIGNUM coef;
+
+    // Initialize result as point at infinity
+    init_zero(&result.x);
+    init_zero(&result.y);
+    init_point_at_infinity(&result);
+
+    // Initialize current as the base point G
+    bn_copy(&current.x, &G->x);
+    bn_copy(&current.y, &G->y);
+
+    // Copy the scalar to coef
+    bn_copy(&coef, k);
+    while (!bn_is_zero(&coef)) {
+        // printf("[a] coef: %s\n", bignum_to_hex(&coef)); // Convert BIGNUM to hex string for printing
+        bn_print("[a] coef: ", &coef);
+        if (coef.d[0] & 1) {  // If least significant bit is 1
+            // printf("[0] coef.d[0] & 1\n");
+            init_zero(&tmp_result.x);
+            init_zero(&tmp_result.y);
+            init_point_at_infinity(&tmp_result);
+            point_add(&result, &current, &tmp_result, curve_prime, curve_a);  // Add current to the result
+            copy_point(&result, &tmp_result);
+        }
+        
+        // Point doubling
+        EC_POINT doubled_point;
+        init_zero(&doubled_point.x);
+        init_zero(&doubled_point.y);
+        point_double(&current, &doubled_point, curve_prime);
+        copy_point(&current, &doubled_point);
+        
+        bn_rshift_one(&coef);
+        // printf("[1] coef: %s\n", bignum_to_hex(&coef)); // Convert BIGNUM to hex string for printing
+    }
+    printf("-- ec_point_scalar_mul_optimized --\n");
+    return result;
+}
+
+__device__ EC_POINT ec_point_scalar_mul_optimized_0(EC_POINT* G, BIGNUM* k, BIGNUM* curve_prime, BIGNUM* curve_a) {
+    EC_POINT result, current, tmp_result;
+    BIGNUM coef;
+
+    // Initialize result as point at infinity
+    init_zero(&result.x);
+    init_zero(&result.y);
+    // result.infinity = 1;
+    // Initialize it to the point at infinity
+    init_point_at_infinity(&result);
+
+    // Initialize current as the base point G
+    bn_copy(&current.x, &G->x);
+    bn_copy(&current.y, &G->y);
+    // current.infinity = 0;
+
+    // Copy the scalar to coef
+    bn_copy(&coef, k);
+
+    while (!bn_is_zero(&coef)) {
+        if (coef.d[0] & 1) {  // If least significant bit is 1
+            // result = ec_point_add(&result, &current, p, a);
+            init_zero(&tmp_result.x);
+            init_zero(&tmp_result.y);
+            init_point_at_infinity(&tmp_result);
+            point_add(&tmp_result, &result, &current, curve_prime, curve_a);  // Add current to the result
+            copy_point(&result, &tmp_result);
+        }
+        // current = ec_point_double(&current, p, a);
+        // current = point_double(&current, curve_prime, curve_a);
+        // bn_rshift1(&coef, &coef);  // Divide coef by 2
+        bn_rshift_one(&coef);
+    }
+
+    return result;
+}
+
 __device__ EC_POINT ec_point_scalar_mul(
     EC_POINT *point, 
     BIGNUM *scalar, 
@@ -2989,6 +3067,8 @@ __device__ EC_POINT ec_point_scalar_mul(
     BIGNUM *curve_a
     ) {
     debug_printf("++ ec_point_scalar_mul ++\n");
+
+    unsigned int debug_addictions_count = 0;
     // Print point
     bn_print(">> point x: ", &point->x);
     bn_print(">> point y: ", &point->y);
@@ -3015,8 +3095,8 @@ __device__ EC_POINT ec_point_scalar_mul(
     // printf("coef hex: %s\n", bignum_to_hex(scalar)); // Convert BIGNUM to hex string for printing
     bn_print("coef: ", scalar);  
     
-    for (int i = 0; i < 256; i++) {                 // Assuming 256-bit scalars
-    // for (int i = 0; i < 3; i++) {                 // DEBUG
+    for (int i = 0; i < 256; i++) {                 // Assuming 256-bit scalars // TODO: ENABLE THIS
+    //for (int i = 0; i < 3; i++) {                 // DEBUG
         // printf("\n### Step: %d\n", i);
         // if (i<debug_counter) {
         //     // printf("0 x: %s\n", bignum_to_hex(&current.x));
@@ -3046,6 +3126,7 @@ __device__ EC_POINT ec_point_scalar_mul(
             // bn_print(">> INITIAL result.y: ", &result.y);            
 
             point_add(&tmp_result, &result, &current, curve_prime, curve_a);  // Add current to the result
+            debug_addictions_count++;
 
             init_point_at_infinity(&result); // Reset result
             bn_copy(&result.x, &tmp_result.x);
@@ -3089,6 +3170,7 @@ __device__ EC_POINT ec_point_scalar_mul(
         bn_print(">> point_add curve_a: ", curve_a);
 
         point_add(&tmp_result, &tmp_a, &tmp_b, curve_prime, curve_a);  // Double current by adding to itself
+        debug_addictions_count++;
 
         bn_print("\n<< point_add tmp_result.x (pp.x): ", &tmp_result.x);
         bn_print("<< point_add tmp_result.y (pp.y): ", &tmp_result.y);
@@ -3111,6 +3193,7 @@ __device__ EC_POINT ec_point_scalar_mul(
         // print 2 result.x
         bn_print("2 result.x: ", &result.x);
         bn_print("2 result.y: ", &result.y);
+        // break; // TODO: remove this
     }
 
     // // printf("Final x: %s\n", bignum_to_hex(&result.x));
@@ -3122,6 +3205,7 @@ __device__ EC_POINT ec_point_scalar_mul(
     // bn_copy(&result.x, &current.x);
     // bn_print("3 result.x: ", &result.x);
     // bn_print("3 result.y: ", &result.y);
+    printf("debug_addictions_count: %d\n", debug_addictions_count);
     printf("-- ec_point_scalar_mul --\n");
     return result;
 }

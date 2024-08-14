@@ -63,9 +63,9 @@ __global__ void testKernel(BIGNUM* d_private_keys, EC_POINT* d_public_keys) {
 
     // Initialize curveOrder_d
     // FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
-    reverse_order(&a);
-    reverse_order(&b);
-    reverse_order(&curveOrder);
+    reverse_order(&a, TEST_BIGNUM_WORDS);
+    reverse_order(&b, TEST_BIGNUM_WORDS);
+    reverse_order(&curveOrder, TEST_BIGNUM_WORDS);
 
     // Print inputs
     // bn_print(">> bn_add a: ", &a);
@@ -132,8 +132,8 @@ __global__ void testKernel(BIGNUM* d_private_keys, EC_POINT* d_public_keys) {
             G.y.d[j] = CURVE_GY_values[j];
         }
     // reverse
-    reverse_order(&G.x);
-    reverse_order(&G.y);
+    reverse_order(&G.x, TEST_BIGNUM_WORDS);
+    reverse_order(&G.y, TEST_BIGNUM_WORDS);
     // find top
     G.x.top = find_top(&G.x);
     G.y.top = find_top(&G.y);
@@ -152,12 +152,13 @@ __global__ void testKernel(BIGNUM* d_private_keys, EC_POINT* d_public_keys) {
             CURVE_P.d[j] = CURVE_P_values[j];
         }
     // reverse
-    reverse_order(&CURVE_P);
+    reverse_order(&CURVE_P, TEST_BIGNUM_WORDS);
     // find top
     CURVE_P.top = find_top(&CURVE_P);
     
     // Derive public key 
     EC_POINT publicKey = ec_point_scalar_mul(&G, &newKey, &CURVE_P, &CURVE_A);
+    //EC_POINT publicKey = ec_point_scalar_mul_optimized(&G, &newKey, &CURVE_P, &CURVE_A);
 
     // Store the results in global memory for test purposes
     bn_copy(&d_private_keys[tid], &newKey);

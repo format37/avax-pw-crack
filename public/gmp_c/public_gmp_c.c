@@ -251,8 +251,8 @@ int main() {
   // Initialize and set private key
   mpz_t private_key;
   mpz_init(private_key);
-  // mpz_set_str(private_key, "2E09165B257A4C3E52C9F4FAA6322C66CEDE807B7D6B4EC3960820795EE5447F", 16);
-  mpz_set_str(private_key, "bbc611b700cbdb5c8361c267c2587992cac0bb2d97f0a86f6334ec00a7210d9c", 16);
+  mpz_set_str(private_key, "2E09165B257A4C3E52C9F4FAA6322C66CEDE807B7D6B4EC3960820795EE5447F", 16);
+  // mpz_set_str(private_key, "bbc611b700cbdb5c8361c267c2587992cac0bb2d97f0a86f6334ec00a7210d9c", 16);
 
   // Print private key
   gmp_printf("Private Key: %Zx\n", private_key);

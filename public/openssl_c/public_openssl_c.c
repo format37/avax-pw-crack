@@ -18,8 +18,8 @@ int main() {
     size_t compressed_pubkey_len;
 
     // Set private key
-    // BN_hex2bn(&priv_key, "2E09165B257A4C3E52C9F4FAA6322C66CEDE807B7D6B4EC3960820795EE5447F");
-    BN_hex2bn(&priv_key, "bbc611b700cbdb5c8361c267c2587992cac0bb2d97f0a86f6334ec00a7210d9c");
+    BN_hex2bn(&priv_key, "2E09165B257A4C3E52C9F4FAA6322C66CEDE807B7D6B4EC3960820795EE5447F");
+    // BN_hex2bn(&priv_key, "bbc611b700cbdb5c8361c267c2587992cac0bb2d97f0a86f6334ec00a7210d9c");
     EC_KEY_set_private_key(eckey, priv_key);
 
     // Generate public key
