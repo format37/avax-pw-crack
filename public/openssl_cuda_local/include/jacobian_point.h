@@ -155,6 +155,12 @@ __device__ void jacobian_point_add(JacobianPoint *R, JacobianPoint *P, JacobianP
     bn_mul(&S2, &P->Z, &S2);
     bn_mod(&S2, &S2, p);
 
+    // Debug print
+    bn_print("U1: ", &U1);
+    bn_print("U2: ", &U2);
+    bn_print("S1: ", &S1);
+    bn_print("S2: ", &S2);
+
     // Check if P == Q, if so, use point doubling
     if (bn_cmp(&U1, &U2) == 0 && bn_cmp(&S1, &S2) == 0) {
         jacobian_point_double(R, P, p);
@@ -173,6 +179,10 @@ __device__ void jacobian_point_add(JacobianPoint *R, JacobianPoint *P, JacobianP
         bn_add(&r, p, &r);
     }
 
+    // Debug print
+    bn_print("H: ", &H);
+    bn_print("r: ", &r);
+
     BIGNUM H2, H3, U1H2;
     init_zero(&H2);
     init_zero(&H3);
@@ -180,36 +190,22 @@ __device__ void jacobian_point_add(JacobianPoint *R, JacobianPoint *P, JacobianP
 
     // H2 = H^2
     bn_mul(&H, &H, &H2);
-    // bn_mod(&H2, p, &H2); // fix with mod_tmp
-    BIGNUM mod_tmp;
-    init_zero(&mod_tmp);
-    bn_mod(&mod_tmp, &H2, p);
-    bn_copy(&H2, &mod_tmp);
-
+    bn_mod(&H2, p, &H2);
 
     // H3 = H*H2
     bn_mul(&H, &H2, &H3);
-    // bn_mod(&H3, p, &H3); // fix with mod_tmp
-    init_zero(&mod_tmp);
-    bn_mod(&mod_tmp, &H3, p);
-    bn_copy(&H3, &mod_tmp);
+    bn_mod(&H3, p, &H3);
 
     // U1H2 = U1*H2
     bn_mul(&U1, &H2, &U1H2);
-    // bn_mod(&U1H2, p, &U1H2); // fix with mod_tmp
-    init_zero(&mod_tmp);
-    bn_mod(&mod_tmp, &U1H2, p);
-    bn_copy(&U1H2, &mod_tmp);
+    bn_mod(&U1H2, p, &U1H2);
 
     // X3 = r^2 - H3 - 2*U1H2
     bn_mul(&r, &r, &R->X);
     bn_sub(&R->X, &H3, &R->X);
     bn_sub(&R->X, &U1H2, &R->X);
     bn_sub(&R->X, &U1H2, &R->X);
-    // bn_mod(&R->X, p, &R->X); // fix with mod_tmp
-    init_zero(&mod_tmp);
-    bn_mod(&mod_tmp, &R->X, p);
-    bn_copy(&R->X, &mod_tmp);
+    bn_mod(&R->X, p, &R->X);
 
     // Y3 = r*(U1H2 - X3) - S1*H3
     bn_sub(&U1H2, &R->X, &R->Y);
@@ -218,18 +214,17 @@ __device__ void jacobian_point_add(JacobianPoint *R, JacobianPoint *P, JacobianP
     init_zero(&temp);
     bn_mul(&S1, &H3, &temp);
     bn_sub(&R->Y, &temp, &R->Y);
-    // bn_mod(&R->Y, p, &R->Y); // fix with mod_tmp
-    init_zero(&mod_tmp);
-    bn_mod(&mod_tmp, &R->Y, p);
-    bn_copy(&R->Y, &mod_tmp);
+    bn_mod(&R->Y, p, &R->Y);
 
     // Z3 = H*Z1*Z2
     bn_mul(&H, &P->Z, &R->Z);
     bn_mul(&R->Z, &Q->Z, &R->Z);
-    // bn_mod(&R->Z, p, &R->Z); // fix with mod_tmp
-    init_zero(&mod_tmp);
-    bn_mod(&mod_tmp, &R->Z, p);
-    bn_copy(&R->Z, &mod_tmp);
+    bn_mod(&R->Z, p, &R->Z);
+
+    // Debug print
+    bn_print("X3: ", &R->X);
+    bn_print("Y3: ", &R->Y);
+    bn_print("Z3: ", &R->Z);
 
     // Free temporary BIGNUMs
     free_bignum(&U1);
@@ -242,13 +237,17 @@ __device__ void jacobian_point_add(JacobianPoint *R, JacobianPoint *P, JacobianP
     free_bignum(&H3);
     free_bignum(&U1H2);
     free_bignum(&temp);
-    free_bignum(&mod_tmp);
 }
 
 __device__ void affine_to_jacobian(JacobianPoint *jac, EC_POINT *aff) {
     bn_copy(&jac->X, &aff->x);
     bn_copy(&jac->Y, &aff->y);
     bn_set_word(&jac->Z, 1);  // Z coordinate is 1 for affine points
+    
+    // Debug print
+    bn_print("Jacobian X: ", &jac->X);
+    bn_print("Jacobian Y: ", &jac->Y);
+    bn_print("Jacobian Z: ", &jac->Z);
 }
 
 __device__ void jacobian_to_affine(EC_POINT *aff, JacobianPoint *jac, BIGNUM *p) {
@@ -267,33 +266,23 @@ __device__ void jacobian_to_affine(EC_POINT *aff, JacobianPoint *jac, BIGNUM *p)
 
     // Compute z_inv_squared = z_inv^2
     bn_mul(&z_inv, &z_inv, &z_inv_squared);
-    // bn_mod(&z_inv_squared, p, &z_inv_squared); // fix with mod_tmp
-    BIGNUM mod_tmp;
-    init_zero(&mod_tmp);
-    bn_mod(&mod_tmp, &z_inv_squared, p);
-    bn_copy(&z_inv_squared, &mod_tmp);
+    bn_mod(&z_inv_squared, p, &z_inv_squared);
 
     // Compute z_inv_cubed = z_inv_squared * z_inv
     bn_mul(&z_inv_squared, &z_inv, &z_inv_cubed);
-    // bn_mod(&z_inv_cubed, p, &z_inv_cubed); // fix with mod_tmp
-    init_zero(&mod_tmp);
-    bn_mod(&mod_tmp, &z_inv_cubed, p);
-    bn_copy(&z_inv_cubed, &mod_tmp);
+    bn_mod(&z_inv_cubed, p, &z_inv_cubed);
 
     // Compute x = X * z_inv_squared
     bn_mul(&jac->X, &z_inv_squared, &aff->x);
-    // bn_mod(&aff->x, p, &aff->x); // fix with mod_tmp
-    init_zero(&mod_tmp);
-    bn_mod(&mod_tmp, &aff->x, p);
-    bn_copy(&aff->x, &mod_tmp);
-
+    bn_mod(&aff->x, p, &aff->x);
 
     // Compute y = Y * z_inv_cubed
     bn_mul(&jac->Y, &z_inv_cubed, &aff->y);
-    // bn_mod(&aff->y, p, &aff->y); // fix with mod_tmp
-    init_zero(&mod_tmp);
-    bn_mod(&mod_tmp, &aff->y, p);
-    bn_copy(&aff->y, &mod_tmp);
+    bn_mod(&aff->y, p, &aff->y);
+
+    // Debug print
+    bn_print("Affine x: ", &aff->x);
+    bn_print("Affine y: ", &aff->y);
 
     free_bignum(&z_inv);
     free_bignum(&z_inv_squared);
