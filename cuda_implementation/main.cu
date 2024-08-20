@@ -597,16 +597,41 @@ __global__ void search_kernel() {
 
     // SHA-256
     
-    // Convert to const char *publicKeyHex        
-    bufferToHex(buffer, publicKeyHex);
+    // Convert to const char *publicKeyHex
+    bufferToHex(buffer, publicKeyHex); // Bad influence
     printf("      * [==7==] Cuda publicKeyHex: %s\n", publicKeyHex);
     
-    // // // publicKeyHex = "02ffe1073d08f0163434453127e81181be1d49e78e88f9d5662af55416fcec9d80";
+    // const char *publicKeyHex_test = "02ffe1073d08f0163434453127e81181be1d49e78e88f9d5662af55416fcec9d80";
     unsigned char publicKeyBytes[128];
     int len = 33;
-    // hexStringToByteArray(publicKeyHex, publicKeyBytes, &len);
+    // int len;
+    // hexStringToByteArray(publicKeyHex, publicKeyBytes, &len); // Bad influence
     printf("[8] Public Key: ");
     print_as_hex_uint(publicKeyBytes, len);
+
+    // uint8_t sha256Hash[MY_SHA256_DIGEST_LENGTH];
+    // compute_sha256(publicKeyBytes, (uint32_t) len, sha256Hash);
+    // printf("SHA-256: ");
+    // print_as_hex_uint(sha256Hash, MY_SHA256_DIGEST_LENGTH);
+
+    // // ripemd160
+
+    // unsigned char digest[RIPEMD160_DIGEST_SIZE];
+
+    // // Hash the message
+    // ripemd160((const uint8_t *)sha256Hash, MY_SHA256_DIGEST_LENGTH, digest);
+
+    // // Print the digest
+    // printf("RIPEMD-160: ");
+    // for (int i = 0; i < RIPEMD160_DIGEST_SIZE; i++) {
+    //     printf("%02x", digest[i]);
+    // }
+    // printf("\n");
+
+    // // Bech32
+    // char b32Encoded[MAX_RESULT_LEN];
+    // Encode("avax", digest, RIPEMD160_DIGEST_LENGTH, b32Encoded);
+    // printf("Encoded: %s\n", b32Encoded);
 
     printf("\n-- search_kernel --\n");    
 }
