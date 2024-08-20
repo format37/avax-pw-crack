@@ -3134,6 +3134,15 @@ __device__ void reverse_order(BIGNUM *test_values_a, const unsigned char words_c
     }
 }
 
+__device__ void bufferToHex(const uint8_t *buffer, char *output) {
+    const char hex_chars[] = "0123456789abcdef";
+    for (size_t i = 0; i < PUBLIC_KEY_SIZE; i++) {
+        output[i * 2] = hex_chars[buffer[i] >> 4];
+        output[i * 2 + 1] = hex_chars[buffer[i] & 0xF];
+    }
+    output[PUBLIC_KEY_SIZE * 2] = '\0';
+}
+
 __device__ void GetPublicKey(uint8_t* buffer, uint8_t* key, uint8_t prefix)
 {
     // uint8_t buffer[100];
@@ -3255,22 +3264,4 @@ __device__ void GetPublicKey(uint8_t* buffer, uint8_t* key, uint8_t prefix)
     }
     printf("\n");
     // return buffer;
-}
-
-__device__ void bufferToHex_deprecated(const uint8_t *buffer, char *output) {
-    const char hex_chars[] = "0123456789abcdef";
-    for (size_t i = 0; i < PUBLIC_KEY_SIZE; i++) {
-        output[i * 2] = hex_chars[buffer[i] >> 4];
-        output[i * 2 + 1] = hex_chars[buffer[i] & 0xF];
-    }
-    output[PUBLIC_KEY_SIZE * 2] = '\0';
-}
-
-__device__ void bufferToHex(const uint8_t *buffer, char *output) {
-    const char hex_chars[] = "0123456789abcdef";
-    for (size_t i = 0; i < PUBLIC_KEY_SIZE; i++) {
-        output[i * 2] = hex_chars[buffer[i] >> 4];
-        output[i * 2 + 1] = hex_chars[buffer[i] & 0xF];
-    }
-    output[PUBLIC_KEY_SIZE * 2] = '\0';
 }

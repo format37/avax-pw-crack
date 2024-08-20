@@ -8,7 +8,7 @@
 #include "ripmd160.h"
 #include "bech32.h"
 #include "bip32.h"
-// #include "child_key.h"
+#include "child_key.h"
 
 #define TEST_BIGNUM_WORDS 4
 
@@ -81,22 +81,22 @@ __device__ void derive_public_key(BIGNUM* private_key, BIGNUM* publicKey) {
 // Public key derivation --
 
 // Child key derivation ++
-__device__ void my_cuda_memcpy_uint32_t(uint32_t *dst, const uint32_t *src, unsigned int n) {
-    for (unsigned int i = 0; i < n / sizeof(uint32_t); ++i) {
-        uint32_t val = src[i];
-        dst[i] = __byte_perm(val, 0, 0x0123);
-    }
-}
+// __device__ void my_cuda_memcpy_uint32_t(uint32_t *dst, const uint32_t *src, unsigned int n) {
+//     for (unsigned int i = 0; i < n / sizeof(uint32_t); ++i) {
+//         uint32_t val = src[i];
+//         dst[i] = __byte_perm(val, 0, 0x0123);
+//     }
+// }
 
-__device__ void my_cuda_memcpy_uint32_t_to_unsigned_char(unsigned char *dst, const uint32_t *src, unsigned int n) {
-    for (unsigned int i = 0; i < n / sizeof(uint32_t); ++i) {
-        uint32_t val = src[i];
-        dst[4 * i] = (val) & 0xFF;
-        dst[4 * i + 1] = (val >> 8) & 0xFF;
-        dst[4 * i + 2] = (val >> 16) & 0xFF;
-        dst[4 * i + 3] = (val >> 24) & 0xFF;
-    }
-}
+// __device__ void my_cuda_memcpy_uint32_t_to_unsigned_char(unsigned char *dst, const uint32_t *src, unsigned int n) {
+//     for (unsigned int i = 0; i < n / sizeof(uint32_t); ++i) {
+//         uint32_t val = src[i];
+//         dst[4 * i] = (val) & 0xFF;
+//         dst[4 * i + 1] = (val >> 8) & 0xFF;
+//         dst[4 * i + 2] = (val >> 16) & 0xFF;
+//         dst[4 * i + 3] = (val >> 24) & 0xFF;
+//     }
+// }
 
 __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uint32_t index) {
 	printf("++ GetChildKeyDerivation ++\n");
@@ -524,29 +524,89 @@ __global__ void search_kernel() {
 	uint32_t index0Hardened = 0x80000000;
 	uint32_t index0 = 0x00000000;
     // TODO: remove _index from child_key variable. Write to the same variable instead.
-	BIP32Info child_key = GetChildKeyDerivation(master_key.master_private_key, master_key.chain_code, index44);
-	printf("[0] Child Chain Code: ");
-	print_as_hex_char_tmp(child_key.chain_code, 32);
-	printf("[0] Child Private Key: ");
-	print_as_hex_char_tmp(child_key.master_private_key, 32);
+	// BIP32Info child_key = GetChildKeyDerivation(master_key.master_private_key, master_key.chain_code, index44);
+	// printf("[0] Child Chain Code: ");
+	// print_as_hex_char_tmp(child_key.chain_code, 32);
+	// printf("[0] Child Private Key: ");
+	// print_as_hex_char_tmp(child_key.master_private_key, 32);
     
-    child_key = GetChildKeyDerivation(child_key.master_private_key, child_key.chain_code, index9000);
+    // child_key = GetChildKeyDerivation(child_key.master_private_key, child_key.chain_code, index9000);
+    // printf("[1] Child Chain Code: ");
+    // print_as_hex_char_tmp(child_key.chain_code, 32);
+    // printf("[1] Child Private Key: ");
+    // print_as_hex_char_tmp(child_key.master_private_key, 32);
+
+    // child_key = GetChildKeyDerivation(child_key.master_private_key, child_key.chain_code, index0Hardened);
+    // printf("[2] Child Chain Code: ");
+    // print_as_hex_char_tmp(child_key.chain_code, 32);
+    // printf("[2] Child Private Key: ");
+    // print_as_hex_char_tmp(child_key.master_private_key, 32);
+
+    // child_key = GetChildKeyDerivation(child_key.master_private_key, child_key.chain_code, index0);
+    // printf("[3] Child Chain Code: ");
+    // print_as_hex_char_tmp(child_key.chain_code, 32);
+    // printf("[3] Child Private Key: ");
+    // print_as_hex_char_tmp(child_key.master_private_key, 32);
+
+    BIP32Info child_key;
+
+    child_key = GetChildKeyDerivation(master_key.master_private_key, master_key.chain_code, index44, 0x00);
+    printf("[0] Child Chain Code: ");
+    print_as_hex_char_tmp(child_key.chain_code, 32);
+    printf("[0] Child Private Key: ");
+    print_as_hex_char_tmp(child_key.master_private_key, 32);
+
+    child_key = GetChildKeyDerivation(child_key.master_private_key, child_key.chain_code, index9000, 0x00);
     printf("[1] Child Chain Code: ");
     print_as_hex_char_tmp(child_key.chain_code, 32);
     printf("[1] Child Private Key: ");
     print_as_hex_char_tmp(child_key.master_private_key, 32);
 
-    child_key = GetChildKeyDerivation(child_key.master_private_key, child_key.chain_code, index0Hardened);
+    child_key = GetChildKeyDerivation(child_key.master_private_key, child_key.chain_code, index0Hardened, 0x00);
     printf("[2] Child Chain Code: ");
     print_as_hex_char_tmp(child_key.chain_code, 32);
     printf("[2] Child Private Key: ");
     print_as_hex_char_tmp(child_key.master_private_key, 32);
 
-    child_key = GetChildKeyDerivation(child_key.master_private_key, child_key.chain_code, index0);
+    child_key = GetChildKeyDerivation(child_key.master_private_key, child_key.chain_code, index0, 0x03);
     printf("[3] Child Chain Code: ");
     print_as_hex_char_tmp(child_key.chain_code, 32);
     printf("[3] Child Private Key: ");
     print_as_hex_char_tmp(child_key.master_private_key, 32);
+
+    child_key = GetChildKeyDerivation(child_key.master_private_key, child_key.chain_code, index0, 0x02);
+    printf("[4] Child Chain Code: ");
+    print_as_hex_char_tmp(child_key.chain_code, 32);
+    printf("[4] Child Private Key: ");
+    print_as_hex_char_tmp(child_key.master_private_key, 32);
+
+    // Final public key derivation
+    // char *publicKeyHex;
+    char publicKeyHex[PUBLIC_KEY_SIZE * 2 + 1];  // +1 for null terminator
+
+    // Allocate memory for the buffer
+    uint8_t buffer[33];  // 32 bytes for the public key + 1 byte for the prefix
+
+    GetPublicKey(buffer, child_key.master_private_key, 0x02);
+
+    printf("      * [==6==] Cuda buffer: ");
+    for (int i = 0; i < 33; i++) {
+        printf("%02x", buffer[i]);
+    }
+    printf("\n");
+
+    // SHA-256
+    
+    // Convert to const char *publicKeyHex        
+    bufferToHex(buffer, publicKeyHex);
+    printf("      * [==7==] Cuda publicKeyHex: %s\n", publicKeyHex);
+    
+    // // // publicKeyHex = "02ffe1073d08f0163434453127e81181be1d49e78e88f9d5662af55416fcec9d80";
+    unsigned char publicKeyBytes[128];
+    int len = 33;
+    // hexStringToByteArray(publicKeyHex, publicKeyBytes, &len);
+    printf("[8] Public Key: ");
+    print_as_hex_uint(publicKeyBytes, len);
 
     printf("\n-- search_kernel --\n");    
 }
