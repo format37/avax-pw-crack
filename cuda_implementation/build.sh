@@ -5,7 +5,7 @@ rm -f program
 # -arch=sm_61 # NVIDIA GeForce GTX 1080 Ti
 # -diag-suppress 1444 \
 # -G \
-# -g \
+#     -g \
 nvcc \
     main.cu \
     -arch=sm_86 \

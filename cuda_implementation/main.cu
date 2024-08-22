@@ -12,6 +12,24 @@
 
 #define TEST_BIGNUM_WORDS 4
 
+__device__ void strcpy_cuda(char *dest, const char *src) {
+    while (*src) {
+        *dest = *src;
+        dest++;
+        src++;
+    }
+    *dest = '\0';
+}
+
+__device__ void bufferToHex_v1(const uint8_t *buffer, char *output) {
+    const char hex_chars[] = "0123456789abcdef";
+    for (int i = 0; i < 33; i++) {
+        output[i * 2] = hex_chars[buffer[i] >> 4];
+        output[i * 2 + 1] = hex_chars[buffer[i] & 0xF];
+    }
+    output[66] = '\0';
+}
+
 __device__ void print_as_hex_char_tmp(unsigned char *data, int len) {
     for (int i = 0; i < len; i++) {
         printf("%02x", data[i]);
@@ -485,6 +503,14 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
 
 __global__ void search_kernel() {
     printf("++ search_kernel ++\n");
+    // Exit if the thread is not the first one
+    if (threadIdx.x != 0) {
+        return;
+    }
+    // Exit if the block is not the first one
+    if (blockIdx.x != 0) {
+        return;
+    }
 
     // Convert the mnemonic and passphrase to byte arrays
     uint8_t *m_mnemonic = (unsigned char *)"sell stereo useless course suffer tribe jazz monster fresh excess wire again father film sudden pelican always room attack rubber pelican trash alone cancel";
@@ -598,24 +624,37 @@ __global__ void search_kernel() {
     // SHA-256
     
     // Convert to const char *publicKeyHex
-    bufferToHex(buffer, publicKeyHex); // Bad influence
+    bufferToHex_v1(buffer, publicKeyHex);
+    // Use strcpy_cuda instead
+    // strcpy_cuda(publicKeyHex, buffer);
     printf("      * [==7==] Cuda publicKeyHex: %s\n", publicKeyHex);
-    
-    // const char *publicKeyHex_test = "02ffe1073d08f0163434453127e81181be1d49e78e88f9d5662af55416fcec9d80";
+
     unsigned char publicKeyBytes[128];
     int len = 33;
-    // int len;
     // hexStringToByteArray(publicKeyHex, publicKeyBytes, &len); // Bad influence
+    hexStringTo33ByteArray(publicKeyHex, publicKeyBytes);
     printf("[8] Public Key: ");
     print_as_hex_uint(publicKeyBytes, len);
 
-    // uint8_t sha256Hash[MY_SHA256_DIGEST_LENGTH];
-    // compute_sha256(publicKeyBytes, (uint32_t) len, sha256Hash);
-    // printf("SHA-256: ");
-    // print_as_hex_uint(sha256Hash, MY_SHA256_DIGEST_LENGTH);
+    // Copy publicKeyBytes to publicKeyBytes_test
+    unsigned char publicKeyBytes_test[33];
+    for (int i = 0; i < 33; i++) {
+        publicKeyBytes_test[i] = publicKeyBytes[i];
+    }
+    printf("[9] Public Key Test: ");
+    print_as_hex_uint(publicKeyBytes_test, len);
 
-    // // ripemd160
+    uint8_t sha256Hash[MY_SHA256_DIGEST_LENGTH];
+    // Init as zeroes
+    for (int i = 0; i < MY_SHA256_DIGEST_LENGTH; i++) {
+        sha256Hash[i] = 0;
+    }
+    // compute_sha256(publicKeyBytes_test, (uint32_t) len, sha256Hash);
+    // compute_sha256(publicKeyBytes_test, (uint32_t)len, sha256Hash);
+    printf("SHA-256: ");
+    print_as_hex_uint(sha256Hash, MY_SHA256_DIGEST_LENGTH);
 
+    // ripemd160
     // unsigned char digest[RIPEMD160_DIGEST_SIZE];
 
     // // Hash the message

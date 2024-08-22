@@ -174,7 +174,12 @@ __device__ void bn_strcpy(char *dest, const char *src) {
     dest[i] = '\0';
 }
 
-__device__ void hexStringToByteArray(const char *hexString, unsigned char *byteArray, int *byteArrayLength) {
+__device__ void hexStringToByteArray_v0(const char *hexString, unsigned char *byteArray, int *byteArrayLength) {
+// __device__ void hexStringToByteArray(
+    // const char hexString[PUBLIC_KEY_SIZE * 2 + 1], 
+    // unsigned char *byteArray, 
+    // int *byteArrayLength
+    // ) {
     *byteArrayLength = bn_strlen(hexString) / 2;
     // printf("Expected length: %d\n", *byteArrayLength);  // Debug print
     
@@ -191,6 +196,61 @@ __device__ void hexStringToByteArray(const char *hexString, unsigned char *byteA
             }
         }
         byteArray[i] = byte;
+    }
+}
+
+__device__ void hexStringTo33ByteArray_0(
+    char hexString[PUBLIC_KEY_SIZE * 2 + 1], 
+    unsigned char *byteArray
+    ) {
+    
+    for (int i = 0; i < 33; ++i) {
+        unsigned char byte = 0;
+        for (int j = 0; j < 2; ++j) {
+            char c = hexString[2 * i + j];
+            if (c >= '0' && c <= '9') {
+                byte = (byte << 4) | (c - '0');
+            } else if (c >= 'a' && c <= 'f') {
+                byte = (byte << 4) | (c - 'a' + 10);
+            } else if (c >= 'A' && c <= 'F') {
+                byte = (byte << 4) | (c - 'A' + 10);
+            } else {
+                printf("Invalid character in hex string: %c\n", c);
+            }
+        }
+        byteArray[i] = byte;
+    }
+}
+
+#define PUBLIC_KEY_SIZE 33
+
+__device__ void hexStringTo33ByteArray(
+        const char hexString[PUBLIC_KEY_SIZE * 2],
+        unsigned char byteArray[PUBLIC_KEY_SIZE]
+    ) {
+    __shared__ unsigned char hexValues[256];
+    
+    // Initialize the lookup table
+    if (threadIdx.x == 0) {
+        for (int i = 0; i < 256; i++) {
+            if (i >= '0' && i <= '9') hexValues[i] = i - '0';
+            else if (i >= 'a' && i <= 'f') hexValues[i] = i - 'a' + 10;
+            else if (i >= 'A' && i <= 'F') hexValues[i] = i - 'A' + 10;
+            else hexValues[i] = 0xFF;  // Invalid character
+        }
+    }
+    __syncthreads();
+
+    for (int i = 0; i < PUBLIC_KEY_SIZE; ++i) {
+        unsigned char highNibble = hexValues[(unsigned char)hexString[2 * i]];
+        unsigned char lowNibble = hexValues[(unsigned char)hexString[2 * i + 1]];
+        
+        if (highNibble == 0xFF || lowNibble == 0xFF) {
+            printf("Invalid character in hex string at position %d\n", 2 * i);
+            return;
+        }
+        
+        byteArray[i] = (highNibble << 4) | lowNibble;
     }
 }
 
