@@ -69,7 +69,7 @@ def restore_p_chain_address(mnemonic, passphrase):
     
     # Perform RIPEMD160 hash
     ripemd160_hash = RIPEMD160.new(sha256_hash).digest()
-    print('RIPEMD160 hash:', ripemd160_hash.hex())
+    # print('RIPEMD160 hash:', ripemd160_hash.hex())
     
     # Encode with Bech32
     bech32_address = Bech32Encoder().Encode('avax', ripemd160_hash)

@@ -12,10 +12,10 @@ __device__ void my_cuda_memcpy_unsigned_char_b(uint8_t *dst, const uint8_t *src,
 }
 
 __device__ BIP32Info bip32_from_seed_kernel(const uint8_t *seed, uint32_t seed_len) {
-    printf("++ bip32_from_seed_kernel ++\n");
-    printf(">> seed: ");
-    print_as_hex(seed, seed_len);
-    printf(">> seed_len: %d\n", seed_len);
+    // printf("++ bip32_from_seed_kernel ++\n");
+    // printf(">> seed: ");
+    // print_as_hex(seed, seed_len);
+    // printf(">> seed_len: %d\n", seed_len);
 
     BIP32Info info;
 	// Initialize HMAC_SHA512_CTX
@@ -35,9 +35,9 @@ __device__ BIP32Info bip32_from_seed_kernel(const uint8_t *seed, uint32_t seed_l
     }
     hmac_sha512_final(&hmac, hash);
 
-    // Print hash
-    printf("# hash: ");
-    print_as_hex(hash, 64);
+    // // Print hash
+    // printf("# hash: ");
+    // print_as_hex(hash, 64);
     
     // Copy the first 32 bytes to master_private_key and the next 32 bytes to chain_code
     //my_cuda_memcpy_unsigned_char(info->master_private_key, hash, 32);
@@ -45,7 +45,7 @@ __device__ BIP32Info bip32_from_seed_kernel(const uint8_t *seed, uint32_t seed_l
 	my_cuda_memcpy_unsigned_char_b(info.master_private_key, hash, 32);
 	my_cuda_memcpy_unsigned_char_b(info.chain_code, hash + 32, 32);
 
-    printf("-- bip32_from_seed_kernel --\n");
+    // printf("-- bip32_from_seed_kernel --\n");
 	return info;
 }
 // BIP32 --

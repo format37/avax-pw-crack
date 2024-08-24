@@ -5,11 +5,9 @@
 #include "bignum.h"
 # include "p_chain.h"
 
-// #define TEST_BIGNUM_WORDS 4
-
 __global__ void search_kernel() {
     uint8_t *mnemonic = (unsigned char *)"sell stereo useless course suffer tribe jazz monster fresh excess wire again father film sudden pelican always room attack rubber pelican trash alone cancel";
-    char *passphrase = "TESTPHRASE";
+    const char *passphrase = "TESTPHRASE";
     P_CHAIN_ADDRESS_STRUCT p_chain_address = restore_p_chain_address(mnemonic, passphrase);
     printf("Restored P-chain address: %s\n", p_chain_address.data);
 }

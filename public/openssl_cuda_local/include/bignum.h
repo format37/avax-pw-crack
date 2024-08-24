@@ -3057,13 +3057,13 @@ __device__ EC_POINT ec_point_scalar_mul(
     BIGNUM *curve_prime, 
     BIGNUM *curve_a
     ) {
-    debug_printf("++ ec_point_scalar_mul ++\n");
-    // Print point
-    bn_print(">> point x: ", &point->x);
-    bn_print(">> point y: ", &point->y);
-    bn_print(">> scalar: ", scalar);
-    bn_print(">> curve_prime: ", curve_prime);
-    bn_print(">> curve_a: ", curve_a);    
+    // debug_printf("++ ec_point_scalar_mul ++\n");
+    // // Print point
+    // bn_print(">> point x: ", &point->x);
+    // bn_print(">> point y: ", &point->y);
+    // bn_print(">> scalar: ", scalar);
+    // bn_print(">> curve_prime: ", curve_prime);
+    // bn_print(">> curve_a: ", curve_a);    
     
     EC_POINT current = *point; // This initializes the current point with the input point
     EC_POINT result; // Initialize the result variable, which accumulates the result
@@ -3082,7 +3082,7 @@ __device__ EC_POINT ec_point_scalar_mul(
     bignum_to_bit_array(scalar, bits);
     
     // printf("coef hex: %s\n", bignum_to_hex(scalar)); // Convert BIGNUM to hex string for printing
-    bn_print("coef: ", scalar);  
+    // bn_print("coef: ", scalar);  
     
     for (int i = 0; i < 256; i++) {                 // Assuming 256-bit scalars
     // for (int i = 0; i < 3; i++) {                 // DEBUG
@@ -3104,12 +3104,12 @@ __device__ EC_POINT ec_point_scalar_mul(
             // init tmp_result
             init_point_at_infinity(&tmp_result); 
             
-            bn_print(">> point_add result.x: ", &result.x);
-            bn_print(">> point_add result.y: ", &result.y);
-            bn_print(">> point_add current.x: ", &current.x);
-            bn_print(">> point_add current.y: ", &current.y);
-            bn_print(">> curve_prime: ", curve_prime);
-            bn_print(">> curve_a: ", curve_a);
+            // bn_print(">> point_add result.x: ", &result.x);
+            // bn_print(">> point_add result.y: ", &result.y);
+            // bn_print(">> point_add current.x: ", &current.x);
+            // bn_print(">> point_add current.y: ", &current.y);
+            // bn_print(">> curve_prime: ", curve_prime);
+            // bn_print(">> curve_a: ", curve_a);
             
             // bn_print(">> INITIAL result.x: ", &result.x);
             // bn_print(">> INITIAL result.y: ", &result.y);            
@@ -3119,8 +3119,8 @@ __device__ EC_POINT ec_point_scalar_mul(
             init_point_at_infinity(&result); // Reset result
             bn_copy(&result.x, &tmp_result.x);
             bn_copy(&result.y, &tmp_result.y);
-            bn_print("<< point_add result.x: ", &result.x);
-            bn_print("<< point_add result.y: ", &result.y);
+            // bn_print("<< point_add result.x: ", &result.x);
+            // bn_print("<< point_add result.y: ", &result.y);
 
             // return result; // TODO: remove this
             
@@ -3146,40 +3146,40 @@ __device__ EC_POINT ec_point_scalar_mul(
         bn_copy(&tmp_b.x, &current.x);
         bn_copy(&tmp_b.y, &current.y);
 
-        // printf("\n[1]\n");
-        bn_print(">> point_add tmp_a.x: ", &tmp_a.x);
-        bn_print(">> point_add tmp_a.y: ", &tmp_a.y);
-        bn_print(">> point_add tmp_b.x: ", &tmp_b.x);
-        bn_print(">> point_add tmp_b.y: ", &tmp_b.y);
-        bn_print(">> point_add tmp_result.x: ", &tmp_result.x);
-        bn_print(">> point_add tmp_result.y: ", &tmp_result.y);
-        // print curve_prime and curve_a
-        bn_print(">> point_add curve_prime: ", curve_prime);
-        bn_print(">> point_add curve_a: ", curve_a);
+        // // printf("\n[1]\n");
+        // bn_print(">> point_add tmp_a.x: ", &tmp_a.x);
+        // bn_print(">> point_add tmp_a.y: ", &tmp_a.y);
+        // bn_print(">> point_add tmp_b.x: ", &tmp_b.x);
+        // bn_print(">> point_add tmp_b.y: ", &tmp_b.y);
+        // bn_print(">> point_add tmp_result.x: ", &tmp_result.x);
+        // bn_print(">> point_add tmp_result.y: ", &tmp_result.y);
+        // // print curve_prime and curve_a
+        // bn_print(">> point_add curve_prime: ", curve_prime);
+        // bn_print(">> point_add curve_a: ", curve_a);
 
         point_add(&tmp_result, &tmp_a, &tmp_b, curve_prime, curve_a);  // Double current by adding to itself
 
-        bn_print("\n<< point_add tmp_result.x (pp.x): ", &tmp_result.x);
-        bn_print("<< point_add tmp_result.y (pp.y): ", &tmp_result.y);
-        bn_print("<< point_add tmp_a.x (p1.x): ", &tmp_a.x);
-        bn_print("<< point_add tmp_a.y (p1.y): ", &tmp_a.y);
-        bn_print("<< point_add tmp_b.x (p2.x): ", &tmp_b.x);
-        bn_print("<< point_add tmp_b.y (p2.y):", &tmp_b.y);
-        bn_print("<< point_add curve_prime: ", curve_prime);
-        bn_print("<< point_add curve_a: ", curve_a);
+        // bn_print("\n<< point_add tmp_result.x (pp.x): ", &tmp_result.x);
+        // bn_print("<< point_add tmp_result.y (pp.y): ", &tmp_result.y);
+        // bn_print("<< point_add tmp_a.x (p1.x): ", &tmp_a.x);
+        // bn_print("<< point_add tmp_a.y (p1.y): ", &tmp_a.y);
+        // bn_print("<< point_add tmp_b.x (p2.x): ", &tmp_b.x);
+        // bn_print("<< point_add tmp_b.y (p2.y):", &tmp_b.y);
+        // bn_print("<< point_add curve_prime: ", curve_prime);
+        // bn_print("<< point_add curve_a: ", curve_a);
 
         // Copy tmp_result to current
         bn_copy(&current.x, &tmp_result.x);
         bn_copy(&current.y, &tmp_result.y);
-        bn_print("\n<< point_add current.x: ", &current.x);
-        bn_print("<< point_add current.y: ", &current.y);
+        // bn_print("\n<< point_add current.x: ", &current.x);
+        // bn_print("<< point_add current.y: ", &current.y);
 
         // printf("2 x: %s\n", bignum_to_hex(&current.x));
         // if (i<debug_counter) bn_print("2 current.x: ", &current.x);
         // printf("2 y: %s\n", bignum_to_hex(&current.y));
         // print 2 result.x
-        bn_print("2 result.x: ", &result.x);
-        bn_print("2 result.y: ", &result.y);
+        // bn_print("2 result.x: ", &result.x);
+        // bn_print("2 result.y: ", &result.y);
     }
 
     // // printf("Final x: %s\n", bignum_to_hex(&result.x));
@@ -3191,7 +3191,7 @@ __device__ EC_POINT ec_point_scalar_mul(
     // bn_copy(&result.x, &current.x);
     // bn_print("3 result.x: ", &result.x);
     // bn_print("3 result.y: ", &result.y);
-    printf("-- ec_point_scalar_mul --\n");
+    // printf("-- ec_point_scalar_mul --\n");
     return result;
 }
 
@@ -3234,8 +3234,8 @@ __device__ void GetPublicKey(uint8_t* buffer, uint8_t* key, uint8_t prefix)
                             ((BN_ULONG)key[8*i + 6] << 8) | 
                             ((BN_ULONG)key[8*i + 7]);
     }
-    printf("      * Cuda newKey:");
-    bn_print("", &newKey);
+    // printf("      * Cuda newKey:");
+    // bn_print("", &newKey);
     
     // Initialize constants //TODO: Move it outside of each THREAD. Call once before instead and then sync
     init_zero(&CURVE_A);
@@ -3302,11 +3302,11 @@ __device__ void GetPublicKey(uint8_t* buffer, uint8_t* key, uint8_t prefix)
     // TODO: Check do we need to define curves, G and do reversing
     EC_POINT publicKey = ec_point_scalar_mul(&G, &newKey, &CURVE_P, &CURVE_A);
     // print &publicKey.x
-    printf("      * Cuda publicKey.x: ");
-    bn_print("", &publicKey.x);
-    // print &publicKey.y
-    printf("      * Cuda publicKey.y: ");
-    bn_print("", &publicKey.y);
+    // printf("      * Cuda publicKey.x: ");
+    // bn_print("", &publicKey.x);
+    // // print &publicKey.y
+    // printf("      * Cuda publicKey.y: ");
+    // bn_print("", &publicKey.y);
     
     // Copy the public key to buffer
     // my_cuda_memcpy_uint32_t_to_unsigned_char(buffer, publicKey.x.d, 32);
@@ -3321,11 +3321,11 @@ __device__ void GetPublicKey(uint8_t* buffer, uint8_t* key, uint8_t prefix)
         buffer[8*i + 7] = publicKey.x.d[3 - i] & 0xFF;
     }
 
-    printf("      * [0] Cuda Buffer after public key copy: ");
-    for (int i = 0; i < 32; i++) {
-        printf("%02x", buffer[i]);
-    }
-    printf("\n");
+    // printf("      * [0] Cuda Buffer after public key copy: ");
+    // for (int i = 0; i < 32; i++) {
+    //     printf("%02x", buffer[i]);
+    // }
+    // printf("\n");
 
     // Shift the buffer by 1 byte
     for (int i = 33; i > 0; i--) {
@@ -3334,10 +3334,10 @@ __device__ void GetPublicKey(uint8_t* buffer, uint8_t* key, uint8_t prefix)
     // Add prefix before the buffer
     buffer[0] = prefix;
     // Print buffer value after adding prefix
-    printf("      * [1] Cuda Buffer after adding prefix:");
-    for (int i = 0; i < 33; i++) {
-        printf("%02x", buffer[i]);
-    }
-    printf("\n");
+    // printf("      * [1] Cuda Buffer after adding prefix:");
+    // for (int i = 0; i < 33; i++) {
+    //     printf("%02x", buffer[i]);
+    // }
+    // printf("\n");
     // return buffer;
 }
