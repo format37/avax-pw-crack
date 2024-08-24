@@ -231,7 +231,7 @@ __device__ void hexStringTo33ByteArray_0(
     }
 }
 
-#define PUBLIC_KEY_SIZE 33
+// #define PUBLIC_KEY_SIZE 33
 
 __device__ void hexStringTo33ByteArray(
         const char hexString[PUBLIC_KEY_SIZE * 2],
@@ -3204,6 +3204,13 @@ __device__ void reverse_order(BIGNUM *test_values_a, const unsigned char words_c
 }
 
 __device__ void bufferToHex(const uint8_t *buffer, char *output) {
+    // Init output
+    for (size_t i = 0; i < PUBLIC_KEY_SIZE * 2 + 1; i++) {
+        output[i] = '\0';
+        if (i > 66) {
+            printf("Error: bufferToHex output buffer overflow\n");
+        }
+    }
     const char hex_chars[] = "0123456789abcdef";
     for (size_t i = 0; i < PUBLIC_KEY_SIZE; i++) {
         output[i * 2] = hex_chars[buffer[i] >> 4];
