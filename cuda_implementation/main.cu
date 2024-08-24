@@ -19,8 +19,9 @@ int main() {
     // const int NUM_BLOCKS = 128; // One block per SM OK
 
     
-    const int THREADS_PER_BLOCK = 256;
-    const int NUM_BLOCKS = 512;
+    const int THREADS_PER_BLOCK = 256; // 32 threads per warp. 8 warps per block.
+    const int NUM_BLOCKS = 512; // 64 warps.
+    // 256 * 512 = 131072 which is max threads per SM.
 
     // Launch kernel
     search_kernel<<<NUM_BLOCKS, THREADS_PER_BLOCK>>>();
