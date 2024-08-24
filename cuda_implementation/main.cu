@@ -31,7 +31,7 @@ __device__ void strcat_cuda(char *dest, const char *src) {
     *dest = '\0';
 }
 
-__device__ void print_as_hex_char_tmp(unsigned char *data, int len) {
+__device__ void print_as_hex_char_permanently_enabled(unsigned char *data, int len) {
     for (int i = 0; i < len; i++) {
         printf("%02x", data[i]);
     }
@@ -368,15 +368,88 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
 }
 // Child key derivation --
 
-__global__ void search_kernel() {
+struct P_CHAIN_ADDRESS_STRUCT {
+    char data[MAX_RESULT_LEN + 2];
+};
+
+__device__ void generate_salt(const char* prefix, const char* passphrase, char* salt, int max_salt_len) {
+    int i = 0;
+    int j = 0;
+
+    // Copy prefix
+    while (prefix[i] != '\0' && i < max_salt_len - 1) {
+        salt[i] = prefix[i];
+        i++;
+    }
+
+    // Copy passphrase
+    while (passphrase[j] != '\0' && i < max_salt_len - 1) {
+        salt[i] = passphrase[j];
+        i++;
+        j++;
+    }
+
+    // Null-terminate the salt
+    salt[i] = '\0';
+}
+
+__device__ P_CHAIN_ADDRESS_STRUCT restore_p_chain_address(uint8_t *m_mnemonic, char *passphrase) {
     printf("++ search_kernel ++\n");
+    
+    // print_as_hex(m_mnemonic, 156);
+    printf("Mnemonic: %s\n", m_mnemonic);
 
-    // Convert the mnemonic and passphrase to byte arrays
-    uint8_t *m_mnemonic = (unsigned char *)"sell stereo useless course suffer tribe jazz monster fresh excess wire again father film sudden pelican always room attack rubber pelican trash alone cancel";
-    // print as hex
-    print_as_hex(m_mnemonic, 156);
+    P_CHAIN_ADDRESS_STRUCT completeAddress;
 
-    uint8_t *salt = (unsigned char *)"mnemonicTESTPHRASE";
+    // char* salt_prefix = "mnemonic";
+    // Allocate memory for the salt
+    // size_t salt_len = strlen(salt_prefix) + strlen(passphrase) + 1;  // +1 for null terminator
+    
+    // uint8_t *salt = (unsigned char *)"mnemonicTESTPHRASE";
+
+    // Calculate the length of the passphrase
+    int passphrase_len = 0;
+    while (passphrase[passphrase_len] != '\0') {
+        passphrase_len++;
+    }
+    
+    // Calculate the total length of the salt
+    const char *prefix = "mnemonic";
+    int prefix_len = 8; // length of "mnemonic" including null terminator
+    int salt_len = prefix_len + passphrase_len; // -1 to avoid double null terminator
+    
+    // Allocate memory for the salt
+    char *salt = (char*)malloc(salt_len);
+    
+    // Copy the prefix and passphrase into the salt
+    for (int i = 0; i < prefix_len; i++) {
+        salt[i] = prefix[i];
+    }
+    for (int i = 0; i < passphrase_len; i++) {
+        salt[prefix_len + i] = passphrase[i];
+    }
+    
+    // Use the salt in your further processing
+    // For demonstration, let's print the salt
+    printf("Salt: %s\n", salt);
+
+    // // Debug ++
+    // // Fill the completeAddress with some dummy data & terminator
+    // strcpy_cuda(completeAddress.data, "P-");
+    // // Add terminator
+    // completeAddress.data[2] = '\0';
+    // return completeAddress; // TODO: Remove debug section
+    // // Debug --
+    
+    // uint8_t *salt = (uint8_t *)malloc(salt_len);
+    // if (salt == NULL) {
+    //     // Handle memory allocation failure
+    //     printf("Failed to allocate memory for salt\n");
+    //     return P_CHAIN_ADDRESS_STRUCT();
+    // }
+    // // Combine the prefix and passphrase to create the salt
+    // snprintf((char *)salt, salt_len, "%s%s", salt_prefix, passphrase);
+
     unsigned char bip39seed[64];  // This will hold the generated seed
     // Initialize bip39seed to zeros
     for (int i = 0; i < 64; ++i) {
@@ -399,9 +472,9 @@ __global__ void search_kernel() {
     // Bip32FromSeed
     BIP32Info master_key = bip32_from_seed_kernel(bip39seed, 64);
     printf("\nMaster Chain Code: ");
-    print_as_hex_char_tmp(master_key.chain_code, 32);
+    print_as_hex_char(master_key.chain_code, 32);
     printf("\nMaster Private Key: ");
-    print_as_hex_char_tmp(master_key.master_private_key, 32);
+    print_as_hex_char(master_key.master_private_key, 32);
     
     // Child key derivation
 	uint32_t index44 = 0x8000002C;
@@ -413,33 +486,33 @@ __global__ void search_kernel() {
 
     child_key = GetChildKeyDerivation(master_key.master_private_key, master_key.chain_code, index44, 0x00);
     printf("[0] Child Chain Code: ");
-    print_as_hex_char_tmp(child_key.chain_code, 32);
+    print_as_hex_char(child_key.chain_code, 32);
     printf("[0] Child Private Key: ");
-    print_as_hex_char_tmp(child_key.master_private_key, 32);
+    print_as_hex_char(child_key.master_private_key, 32);
 
     child_key = GetChildKeyDerivation(child_key.master_private_key, child_key.chain_code, index9000, 0x00);
     printf("[1] Child Chain Code: ");
-    print_as_hex_char_tmp(child_key.chain_code, 32);
+    print_as_hex_char(child_key.chain_code, 32);
     printf("[1] Child Private Key: ");
-    print_as_hex_char_tmp(child_key.master_private_key, 32);
+    print_as_hex_char(child_key.master_private_key, 32);
 
     child_key = GetChildKeyDerivation(child_key.master_private_key, child_key.chain_code, index0Hardened, 0x00);
     printf("[2] Child Chain Code: ");
-    print_as_hex_char_tmp(child_key.chain_code, 32);
+    print_as_hex_char(child_key.chain_code, 32);
     printf("[2] Child Private Key: ");
-    print_as_hex_char_tmp(child_key.master_private_key, 32);
+    print_as_hex_char(child_key.master_private_key, 32);
 
     child_key = GetChildKeyDerivation(child_key.master_private_key, child_key.chain_code, index0, 0x03);
     printf("[3] Child Chain Code: ");
-    print_as_hex_char_tmp(child_key.chain_code, 32);
+    print_as_hex_char(child_key.chain_code, 32);
     printf("[3] Child Private Key: ");
-    print_as_hex_char_tmp(child_key.master_private_key, 32);
+    print_as_hex_char(child_key.master_private_key, 32);
 
     child_key = GetChildKeyDerivation(child_key.master_private_key, child_key.chain_code, index0, 0x02);
     printf("[4] Child Chain Code: ");
-    print_as_hex_char_tmp(child_key.chain_code, 32);
+    print_as_hex_char(child_key.chain_code, 32);
     printf("[4] Child Private Key: ");
-    print_as_hex_char_tmp(child_key.master_private_key, 32);
+    print_as_hex_char(child_key.master_private_key, 32);
 
     // Final public key derivation
 
@@ -493,16 +566,20 @@ __global__ void search_kernel() {
     printf("Encoded: %s\n", b32Encoded);
 
     // Create the complete P-chain address with "P-" prefix
-    char completeAddress[MAX_RESULT_LEN + 2];  // +2 for "P-" prefix
-    strcpy_cuda(completeAddress, "P-");
-    strcat_cuda(completeAddress, b32Encoded);
-
-    printf("Restored P-chain address: %s\n", completeAddress);
-
-    // Copy the result to the output parameter
-    // strcpy_cuda(result, completeAddress);
+    // char completeAddress[MAX_RESULT_LEN + 2];  // +2 for "P-" prefix
+    strcpy_cuda(completeAddress.data, "P-");
+    strcat_cuda(completeAddress.data, b32Encoded);
 
     printf("-- search_kernel --\n");
+
+    return completeAddress;
+}
+
+__global__ void search_kernel() {
+    uint8_t *mnemonic = (unsigned char *)"sell stereo useless course suffer tribe jazz monster fresh excess wire again father film sudden pelican always room attack rubber pelican trash alone cancel";
+    char *passphrase = "TESTPHRASE";
+    P_CHAIN_ADDRESS_STRUCT p_chain_address = restore_p_chain_address(mnemonic, passphrase);
+    printf("# Restored P-chain address: %s\n", p_chain_address.data);
 }
 
 int main() {
