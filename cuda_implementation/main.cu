@@ -6,18 +6,19 @@
 # include "p_chain.h"
 
 __global__ void search_kernel() {
+    int thread_id = blockIdx.x * blockDim.x + threadIdx.x;
     uint8_t *mnemonic = (unsigned char *)"sell stereo useless course suffer tribe jazz monster fresh excess wire again father film sudden pelican always room attack rubber pelican trash alone cancel";
     const char *passphrase = "TESTPHRASE";
     P_CHAIN_ADDRESS_STRUCT p_chain_address = restore_p_chain_address(mnemonic, passphrase);
-    printf("Restored P-chain address: %s\n", p_chain_address.data);
+    printf("[%d] Restored P-chain address: %s\n", thread_id, p_chain_address.data);
 }
 
 int main() {
     
-    const int THREADS_PER_BLOCK = 1;
+    const int THREADS_PER_BLOCK = 256;
     // const int THREADS_PER_BLOCK = 256; // A good balance between occupancy and flexibility
     
-    const int NUM_BLOCKS = 1;
+    const int NUM_BLOCKS = 2;
     // const int NUM_BLOCKS = 128; // One block per SM OK
 
     // Launch kernel
