@@ -1,7 +1,9 @@
 // bignum.h
 #include <limits.h>
-#include "bn.h"
 #include <assert.h>
+#include <stdio.h>
+// #include <cuda_runtime.h>
+#include <stdint.h>
 
 #ifndef BN_ULONG
 #define BN_ULONG unsigned long long
@@ -128,15 +130,22 @@ __device__ void bn_print_constant(const char* msg, BIGNUM* a, int tid) {
     printf("\n");
 }
 
-__device__ void print_as_hex(const uint8_t *s,  const uint32_t slen)
-{
-	for (uint32_t i = 0; i < slen; i++)
-	{
-		// printf("%02X%s", s[ i ], (i % 4 == 3) && (i != slen - 1) ? "-" : "");
-        // print without the dash
-        printf("%02X", s[ i ]);
-	}
-	printf("\n");
+// __device__ void print_as_hex(const uint8_t *s,  const uint32_t slen)
+// {
+// 	for (uint32_t i = 0; i < slen; i++)
+// 	{
+// 		// printf("%02X%s", s[ i ], (i % 4 == 3) && (i != slen - 1) ? "-" : "");
+//         // print without the dash
+//         printf("%02X", s[ i ]);
+// 	}
+// 	printf("\n");
+// }
+
+__device__ void print_as_hex(const uint8_t *data, const uint32_t len) {
+    for (uint32_t i = 0; i < len; i++) {
+        printf("%02x", data[i]);
+    }
+    printf("\n");
 }
 
 // Global zero-initialized BIGNUM
@@ -630,12 +639,12 @@ __device__ void bn_add_private(BIGNUM* a, BIGNUM* b, BIGNUM* r) {
 
 
         // Debug prints
-        printf("i: %d", i);
-        printf(", a->d[i]: %08x", ai);    
-        printf(", b->d[i]: %08x", bi);
-        printf(", sum: %08x", sum);
-        printf(", result: %08x", r->d[i]);
-        printf(", carry: %08x\n", carry);
+        // printf("i: %d", i);
+        // printf(", a->d[i]: %08x", ai);    
+        // printf(", b->d[i]: %08x", bi);
+        // printf(", sum: %08x", sum);
+        // printf(", result: %08x", r->d[i]);
+        // printf(", carry: %08x\n", carry);
     }
 
     // If there's a carry after processing all words
@@ -649,12 +658,12 @@ __device__ void bn_add_private(BIGNUM* a, BIGNUM* b, BIGNUM* r) {
         r->top = max;
     }
 
-    printf("Finished addition.\n");
-    // print r
-    printf("r: ");
-    for (int i = 0; i < r->top; i++) {
-        printf("%08x\n", r->d[i]);
-    }
+    // printf("Finished addition.\n");
+    // // print r
+    // printf("r: ");
+    // for (int i = 0; i < r->top; i++) {
+    //     printf("%08x\n", r->d[i]);
+    // }
 }
 
 __device__ bool bn_add(BIGNUM *result, BIGNUM *a, BIGNUM *b) {

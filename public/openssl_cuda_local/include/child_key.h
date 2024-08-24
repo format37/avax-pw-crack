@@ -30,7 +30,7 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
     HMAC_SHA512_CTX hmac;
     uint8_t buffer[100];
     uint8_t hash[64];
-    unsigned int len = 64;
+    // unsigned int len = 64;
 
     // Fill buffer according to index
     if (index == 0) {
@@ -161,11 +161,11 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
     init_zero(&newKey);
     init_zero(&publicKey);
 
-	BN_ULONG a_d[8];
-  	BN_ULONG b_d[8];
+	// BN_ULONG a_d[8];
+  	// BN_ULONG b_d[8];
 	BN_ULONG newKey_d[8];
   	// BN_ULONG curveOrder_d[16];
-	BN_ULONG publicKey_d[8];
+	// BN_ULONG publicKey_d[8];
 	// uint32_t curveOrder[8] = {0xffffffff, 0xffffffff, 0xffffffff, 0xfffffffe, 0xbaaedce6, 0xaf48a03b, 0xbfd25e8c, 0xd0364141};
 	// Initialize curveOrder_d for secp256k1
 	// FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141

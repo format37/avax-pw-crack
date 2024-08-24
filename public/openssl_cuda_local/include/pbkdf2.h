@@ -2,8 +2,10 @@
 
 // The rotate operation for 64bits
 #define ROR64(x,n) ((x >> n) | (x << (64 - n)))
-#define CH(x,y,z)  (z ^ (x & (y ^ z)))
-#define MAJ(x,y,z) ((x & y) | (z & (x | y)))
+#define CH(x,y,z)  (z ^ (x & (y ^ z))) // pbkdf2 version
+#define MAJ(x,y,z) ((x & y) | (z & (x | y))) // pbkdf2 version
+// #define CH(x,y,z)  ((z) ^ ((x) & ((y) ^ (z)))) // SHA256 version
+// #define MAJ(x,y,z) (((x) & (y)) | ((z) & ((x) | (y)))) // SHA256 version
 #define S0_64(x)   (ROR64((x), 28) ^ ROR64((x),  34) ^ ROR64((x), 39)) 
 #define S1_64(x)   (ROR64((x), 14) ^ ROR64((x),  18) ^ ROR64((x), 41)) 
 #define R0_64(x)   (ROR64((x), 1)  ^ ROR64((x),  8)  ^ ((x) >> 7)) 

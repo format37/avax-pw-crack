@@ -126,11 +126,17 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
     printf("\n* step 0 index: %u\n", index);
     BIP32Info info;
 
+    // Set info to zero
+    for (int i = 0; i < 32; i++) {
+        info.chain_code[i] = 0;
+        info.master_private_key[i] = 0;
+    }
+
     // Compute HMAC-SHA512
     HMAC_SHA512_CTX hmac;
     uint8_t buffer[100];
     uint8_t hash[64];
-    unsigned int len = 64;
+    // unsigned int len = 64;
 
     // Fill buffer according to index
     if (index == 0) {
@@ -372,11 +378,11 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
     init_zero(&newKey);
     init_zero(&publicKey);
 
-	BN_ULONG a_d[8];
-  	BN_ULONG b_d[8];
+	// BN_ULONG a_d[8];
+  	// BN_ULONG b_d[8];
 	BN_ULONG newKey_d[8];
   	// BN_ULONG curveOrder_d[16];
-	BN_ULONG publicKey_d[8];
+	// BN_ULONG publicKey_d[8];
 	// uint32_t curveOrder[8] = {0xffffffff, 0xffffffff, 0xffffffff, 0xfffffffe, 0xbaaedce6, 0xaf48a03b, 0xbfd25e8c, 0xd0364141};
 	// Initialize curveOrder_d for secp256k1
 	// FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
@@ -629,12 +635,14 @@ __global__ void search_kernel() {
     // strcpy_cuda(publicKeyHex, buffer);
     printf("      * [==7==] Cuda publicKeyHex: %s\n", publicKeyHex);
 
-    unsigned char publicKeyBytes[128];
-    int len = 33;
+    // unsigned char publicKeyBytes[128];
+    unsigned char publicKeyBytes[33];  // Changed from 128 to 33
+    // int len = 33; // Try tet to 64 or 66? according to child.h
     // hexStringToByteArray(publicKeyHex, publicKeyBytes, &len); // Bad influence
     hexStringTo33ByteArray(publicKeyHex, publicKeyBytes);
     printf("[8] Public Key: ");
-    print_as_hex_uint(publicKeyBytes, len);
+    // print_as_hex_uint(publicKeyBytes, len);
+    print_as_hex(publicKeyBytes, 33);
 
     // Copy publicKeyBytes to publicKeyBytes_test
     unsigned char publicKeyBytes_test[33];
@@ -642,17 +650,26 @@ __global__ void search_kernel() {
         publicKeyBytes_test[i] = publicKeyBytes[i];
     }
     printf("[9] Public Key Test: ");
-    print_as_hex_uint(publicKeyBytes_test, len);
+    // print_as_hex_uint(publicKeyBytes_test, len);
+    print_as_hex(publicKeyBytes_test, 33);
 
-    uint8_t sha256Hash[MY_SHA256_DIGEST_LENGTH];
+    // uint8_t sha256Hash[MY_SHA256_DIGEST_LENGTH];
+    uint8_t sha256Hash[SHA256_DIGEST_SIZE];
     // Init as zeroes
-    for (int i = 0; i < MY_SHA256_DIGEST_LENGTH; i++) {
-        sha256Hash[i] = 0;
+    // for (int i = 0; i < MY_SHA256_DIGEST_LENGTH; i++) {
+    //     sha256Hash[i] = 0;
+    // }
+    for (int i = 0; i < SHA256_DIGEST_SIZE; i++) {
+        sha256Hash[i] = 0; // TODO: Remove this
     }
     // compute_sha256(publicKeyBytes_test, (uint32_t) len, sha256Hash);
     // compute_sha256(publicKeyBytes_test, (uint32_t)len, sha256Hash);
+    // compute_sha256(publicKeyBytes_test, 33, sha256Hash);
+
     printf("SHA-256: ");
-    print_as_hex_uint(sha256Hash, MY_SHA256_DIGEST_LENGTH);
+    // print_as_hex_uint(sha256Hash, MY_SHA256_DIGEST_LENGTH);
+    // print_as_hex(sha256Hash, MY_SHA256_DIGEST_LENGTH);
+    print_as_hex(sha256Hash, SHA256_DIGEST_SIZE);
 
     // ripemd160
     // unsigned char digest[RIPEMD160_DIGEST_SIZE];
