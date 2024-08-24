@@ -509,10 +509,6 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
 
 __global__ void search_kernel() {
     printf("++ search_kernel ++\n");
-    // Exit if the thread is not the first one
-    if (threadIdx.x != 0 || blockIdx.x != 0) {
-        return;
-    }
 
     // Convert the mnemonic and passphrase to byte arrays
     uint8_t *m_mnemonic = (unsigned char *)"sell stereo useless course suffer tribe jazz monster fresh excess wire again father film sudden pelican always room attack rubber pelican trash alone cancel";
@@ -551,30 +547,6 @@ __global__ void search_kernel() {
 	uint32_t index9000 = 0x80002328;
 	uint32_t index0Hardened = 0x80000000;
 	uint32_t index0 = 0x00000000;
-    // TODO: remove _index from child_key variable. Write to the same variable instead.
-	// BIP32Info child_key = GetChildKeyDerivation(master_key.master_private_key, master_key.chain_code, index44);
-	// printf("[0] Child Chain Code: ");
-	// print_as_hex_char_tmp(child_key.chain_code, 32);
-	// printf("[0] Child Private Key: ");
-	// print_as_hex_char_tmp(child_key.master_private_key, 32);
-    
-    // child_key = GetChildKeyDerivation(child_key.master_private_key, child_key.chain_code, index9000);
-    // printf("[1] Child Chain Code: ");
-    // print_as_hex_char_tmp(child_key.chain_code, 32);
-    // printf("[1] Child Private Key: ");
-    // print_as_hex_char_tmp(child_key.master_private_key, 32);
-
-    // child_key = GetChildKeyDerivation(child_key.master_private_key, child_key.chain_code, index0Hardened);
-    // printf("[2] Child Chain Code: ");
-    // print_as_hex_char_tmp(child_key.chain_code, 32);
-    // printf("[2] Child Private Key: ");
-    // print_as_hex_char_tmp(child_key.master_private_key, 32);
-
-    // child_key = GetChildKeyDerivation(child_key.master_private_key, child_key.chain_code, index0);
-    // printf("[3] Child Chain Code: ");
-    // print_as_hex_char_tmp(child_key.chain_code, 32);
-    // printf("[3] Child Private Key: ");
-    // print_as_hex_char_tmp(child_key.master_private_key, 32);
 
     BIP32Info child_key;
 
@@ -637,12 +609,12 @@ __global__ void search_kernel() {
     print_as_hex(publicKeyBytes, 33);
     printf("\n");
 
-    printf("[9] Public Key Test: ");
-    print_as_hex(publicKeyBytes, 33);
-    printf("\n");
+    // printf("[9] Public Key Test: ");
+    // print_as_hex(publicKeyBytes, 33);
+    // printf("\n");
 
     // Ensure all threads have completed their work before proceeding
-    __syncthreads();
+    // __syncthreads(); // Don't need it for now
 
     // Compute SHA256
     uint8_t sha256Hash[SHA256_DIGEST_SIZE];
@@ -652,11 +624,30 @@ __global__ void search_kernel() {
     print_as_hex(sha256Hash, SHA256_DIGEST_SIZE);
     printf("\n");
 
+    // ripemd160
+    unsigned char digest[RIPEMD160_DIGEST_SIZE];
+
+    // // Hash the message
+    ripemd160((const uint8_t *)sha256Hash, MY_SHA256_DIGEST_LENGTH, digest);
+
+    // Print the digest
+    print_as_hex(digest, RIPEMD160_DIGEST_SIZE);
+    // printf("RIPEMD-160: ");
+    // for (int i = 0; i < RIPEMD160_DIGEST_SIZE; i++) {
+    //     printf("%02x", digest[i]);
+    // }
+    // printf("\n");
+
+    // // Bech32
+    char b32Encoded[MAX_RESULT_LEN];
+    Encode("avax", digest, RIPEMD160_DIGEST_LENGTH, b32Encoded);
+    printf("Encoded: %s\n", b32Encoded);
+
     printf("-- search_kernel --\n");
 
 }
 
-__global__ void search_kernel_0() {
+__global__ void search_kernel_0_wrong() {
     printf("++ search_kernel ++\n");
     // Exit if the thread is not the first one
     if (threadIdx.x != 0) {
