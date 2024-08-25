@@ -17,10 +17,12 @@ echo Start: $(date)
 # -O0 \ # Disable optimizations
 nvcc \
     --threads 8 \
-    -O0 \
+    -O3 \
     main.cu \
     -arch=sm_86 \
     -I/home/alex/projects/avax-pw-crack/public/openssl_cuda_local/include/ \
+    -lineinfo \
+    -use_fast_math \
     -o program 2> build.log
 
 cat build.log
