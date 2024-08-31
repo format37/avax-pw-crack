@@ -124,31 +124,31 @@ __device__ P_CHAIN_ADDRESS_STRUCT restore_p_chain_address(uint8_t *m_mnemonic, c
 
     BIP32Info child_key;
 
-    child_key = GetChildKeyDerivation(master_key.master_private_key, master_key.chain_code, index44, 0x00);
+    child_key = GetChildKeyDerivation(master_key.master_private_key, master_key.chain_code, index44);
     // printf("[0] Child Chain Code: ");
     // print_as_hex_char(child_key.chain_code, 32);
     // printf("[0] Child Private Key: ");
     // print_as_hex_char(child_key.master_private_key, 32);
 
-    child_key = GetChildKeyDerivation(child_key.master_private_key, child_key.chain_code, index9000, 0x00);
+    child_key = GetChildKeyDerivation(child_key.master_private_key, child_key.chain_code, index9000);
     // printf("[1] Child Chain Code: ");
     // print_as_hex_char(child_key.chain_code, 32);
     // printf("[1] Child Private Key: ");
     // print_as_hex_char(child_key.master_private_key, 32);
 
-    child_key = GetChildKeyDerivation(child_key.master_private_key, child_key.chain_code, index0Hardened, 0x00);
+    child_key = GetChildKeyDerivation(child_key.master_private_key, child_key.chain_code, index0Hardened);
     // printf("[2] Child Chain Code: ");
     // print_as_hex_char(child_key.chain_code, 32);
     // printf("[2] Child Private Key: ");
     // print_as_hex_char(child_key.master_private_key, 32);
 
-    child_key = GetChildKeyDerivation(child_key.master_private_key, child_key.chain_code, index0, 0x03);
+    child_key = GetChildKeyDerivation(child_key.master_private_key, child_key.chain_code, index0);
     // printf("[3] Child Chain Code: ");
     // print_as_hex_char(child_key.chain_code, 32);
     // printf("[3] Child Private Key: ");
     // print_as_hex_char(child_key.master_private_key, 32);
 
-    child_key = GetChildKeyDerivation(child_key.master_private_key, child_key.chain_code, index0, 0x03); // 0x02
+    child_key = GetChildKeyDerivation(child_key.master_private_key, child_key.chain_code, index0);
     // printf("[4] Child Chain Code: ");
     // print_as_hex_char(child_key.chain_code, 32);
     // printf("[4] Child Private Key: ");
@@ -158,7 +158,7 @@ __device__ P_CHAIN_ADDRESS_STRUCT restore_p_chain_address(uint8_t *m_mnemonic, c
 
     // Buffer for the public key
     unsigned char buffer[33];
-    GetPublicKey(buffer, child_key.master_private_key, 0x02);
+    GetPublicKey(buffer, child_key.master_private_key);
 
     // printf("      * [==6==] Cuda buffer: ");
     // print_as_hex(buffer, 33);

@@ -3219,7 +3219,7 @@ __device__ void bufferToHex(const uint8_t *buffer, char *output) {
     output[PUBLIC_KEY_SIZE * 2] = '\0';
 }
 
-__device__ void GetPublicKey(uint8_t* buffer, uint8_t* key, uint8_t prefix)
+__device__ void GetPublicKey(uint8_t* buffer, uint8_t* key)
 {
     // uint8_t buffer[100];
     BIGNUM newKey;
@@ -3341,7 +3341,7 @@ __device__ void GetPublicKey(uint8_t* buffer, uint8_t* key, uint8_t prefix)
     // Set two to 2
     bn_set_word(&two, 2);
     bn_div(&quotient, &remainder, &publicKey.y, &two);
-    prefix = bn_is_zero(&remainder) ? 0x02 : 0x03;
+    uint8_t prefix = bn_is_zero(&remainder) ? 0x02 : 0x03;
     printf("Prefix: %02x\n", prefix);
     // Add prefix before the buffer
     buffer[0] = prefix;
