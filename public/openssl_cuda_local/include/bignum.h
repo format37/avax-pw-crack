@@ -11,7 +11,7 @@
 
 #define BN_ULONG_MAX ((BN_ULONG)-1)
 
-#define debug_print false
+#define debug_print true
 #define bn_mul_caching false
 #define collect_stats false
 #define BN_MASK2 0xffffffff
@@ -2734,7 +2734,7 @@ __device__ int point_add(
     //if (bn_cmp(&p1->x, &p2->x) == 0 && bn_cmp(&p1->y, &p2->y) == 0) {
     if (bn_cmp(&p1->x, &p2->x) == 0) {
         //if (debug) 
-        debug_printf("p1.x == p2.x\n");
+        // debug_printf("p1.x == p2.x\n");
         // Point doubling
         // BIGNUM two;
         init_zero(&two);
@@ -2848,7 +2848,7 @@ __device__ int point_add(
     } else {
         // Case 2: p1 != p2
         //if (debug) 
-        debug_printf("p1.x != p2.x\n");
+        // debug_printf("p1.x != p2.x\n");
         // Regular point addition
         bn_subtract(&tmp1, &p2->y, &p1->y);
         // bn_print("\n[a] << bn_subtract tmp1: ", &tmp1);
@@ -2960,8 +2960,8 @@ __device__ int point_add(
     bn_copy(&result->y, &y3);
 
     // print
-    bn_print("\n<< result->x: ", &result->x);
-    bn_print("<< result->y: ", &result->y);
+    // bn_print("\n<< result->x: ", &result->x);
+    // bn_print("<< result->y: ", &result->y);
     // printf("-- point_add --\n");
 
     // Free the dynamically allocated memory
@@ -3057,13 +3057,13 @@ __device__ EC_POINT ec_point_scalar_mul(
     BIGNUM *curve_prime, 
     BIGNUM *curve_a
     ) {
-    // debug_printf("++ ec_point_scalar_mul ++\n");
+    debug_printf("++ ec_point_scalar_mul ++\n");
     // // Print point
-    // bn_print(">> point x: ", &point->x);
-    // bn_print(">> point y: ", &point->y);
-    // bn_print(">> scalar: ", scalar);
-    // bn_print(">> curve_prime: ", curve_prime);
-    // bn_print(">> curve_a: ", curve_a);    
+    bn_print(">> point x: ", &point->x);
+    bn_print(">> point y: ", &point->y);
+    bn_print(">> scalar: ", scalar);
+    bn_print(">> curve_prime: ", curve_prime);
+    bn_print(">> curve_a: ", curve_a);
     
     EC_POINT current = *point; // This initializes the current point with the input point
     EC_POINT result; // Initialize the result variable, which accumulates the result
@@ -3189,8 +3189,8 @@ __device__ EC_POINT ec_point_scalar_mul(
     
     // Copy current to result
     // bn_copy(&result.x, &current.x);
-    // bn_print("3 result.x: ", &result.x);
-    // bn_print("3 result.y: ", &result.y);
+    bn_print("3 result.x: ", &result.x);
+    bn_print("3 result.y: ", &result.y);
     // printf("-- ec_point_scalar_mul --\n");
     return result;
 }
@@ -3331,8 +3331,21 @@ __device__ void GetPublicKey(uint8_t* buffer, uint8_t* key, uint8_t prefix)
     for (int i = 33; i > 0; i--) {
         buffer[i] = buffer[i - 1];
     }
+    
+    
+    // Determine the prefix based on the Y coordinate
+    BIGNUM two, quotient, remainder;
+    init_zero(&two);
+    init_zero(&quotient);
+    init_zero(&remainder);
+    // Set two to 2
+    bn_set_word(&two, 2);
+    bn_div(&quotient, &remainder, &publicKey.y, &two);
+    prefix = bn_is_zero(&remainder) ? 0x02 : 0x03;
+    printf("Prefix: %02x\n", prefix);
     // Add prefix before the buffer
     buffer[0] = prefix;
+
     // Print buffer value after adding prefix
     // printf("      * [1] Cuda Buffer after adding prefix:");
     // for (int i = 0; i < 33; i++) {

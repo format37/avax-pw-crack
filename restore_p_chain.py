@@ -4,6 +4,12 @@ from bip_utils import (
 )
 from Crypto.Hash import RIPEMD160
 
+def print_child_key_info(child_key, index):
+    print(f'[{index}] Child key -> chain code:', child_key.ChainCode().ToHex())
+    print(f'[{index}] Child key -> private key:', child_key.PrivateKey().Raw().ToHex())
+    print(f'[{index}] Child key -> public key:', child_key.PublicKey().RawCompressed().ToHex())
+    print('\n')
+
 def restore_p_chain_address(mnemonic, passphrase):
     # Generate seed from mnemonic and passphrase
     seed_bytes = Bip39SeedGenerator(mnemonic).Generate(passphrase)
@@ -27,35 +33,45 @@ def restore_p_chain_address(mnemonic, passphrase):
     #              .ChildKey(0)
     #              .ChildKey(0))
     
-    child_key = (master_key.ChildKey(Bip32KeyIndex.HardenIndex(44)))
-    print('Child key -> chain code:', child_key.ChainCode().ToHex())
-    print('Child key -> private key:', child_key.PrivateKey().Raw().ToHex())
-    print('Child key -> public key:', child_key.PublicKey().RawCompressed().ToHex())
-    print('\n')
+    index = 44
+    child_key = (master_key.ChildKey(Bip32KeyIndex.HardenIndex(index)))
+    # print(f'[{index}] Child key -> chain code:', child_key.ChainCode().ToHex())
+    # print(f'[{index}] Child key -> private key:', child_key.PrivateKey().Raw().ToHex())
+    # print(f'[{index}] Child key -> public key:', child_key.PublicKey().RawCompressed().ToHex())
+    # print('\n')
+    print_child_key_info(child_key, index)
 
-    child_key = (child_key.ChildKey(Bip32KeyIndex.HardenIndex(9000)))
-    print('Child key -> chain code:', child_key.ChainCode().ToHex())
-    print('Child key -> private key:', child_key.PrivateKey().Raw().ToHex())
-    print('Child key -> public key:', child_key.PublicKey().RawCompressed().ToHex())
-    print('\n')
+    index = 9000
+    child_key = (child_key.ChildKey(Bip32KeyIndex.HardenIndex(index)))
+    # print('Child key -> chain code:', child_key.ChainCode().ToHex())
+    # print('Child key -> private key:', child_key.PrivateKey().Raw().ToHex())
+    # print('Child key -> public key:', child_key.PublicKey().RawCompressed().ToHex())
+    # print('\n')
+    print_child_key_info(child_key, index)
 
-    child_key = (child_key.ChildKey(Bip32KeyIndex.HardenIndex(0)))
-    print('Child key -> chain code:', child_key.ChainCode().ToHex())
-    print('Child key -> private key:', child_key.PrivateKey().Raw().ToHex())
-    print('Child key -> public key:', child_key.PublicKey().RawCompressed().ToHex())
-    print('\n')
+    index = 0
+    child_key = (child_key.ChildKey(Bip32KeyIndex.HardenIndex(index)))
+    # print('Child key -> chain code:', child_key.ChainCode().ToHex())
+    # print('Child key -> private key:', child_key.PrivateKey().Raw().ToHex())
+    # print('Child key -> public key:', child_key.PublicKey().RawCompressed().ToHex())
+    # print('\n')
+    print_child_key_info(child_key, index)
 
-    child_key = (child_key.ChildKey(0))
-    print('Child key -> chain code:', child_key.ChainCode().ToHex())
-    print('Child key -> private key:', child_key.PrivateKey().Raw().ToHex())
-    print('Child key -> public key:', child_key.PublicKey().RawCompressed().ToHex())
-    print('\n')
+    index = 0
+    child_key = (child_key.ChildKey(index))
+    # print('Child key -> chain code:', child_key.ChainCode().ToHex())
+    # print('Child key -> private key:', child_key.PrivateKey().Raw().ToHex())
+    # print('Child key -> public key:', child_key.PublicKey().RawCompressed().ToHex())
+    # print('\n')
+    print_child_key_info(child_key, index)
 
-    child_key = (child_key.ChildKey(0))
-    print('Child key -> chain code:', child_key.ChainCode().ToHex())
-    print('Child key -> private key:', child_key.PrivateKey().Raw().ToHex())
-    print('Child key -> public key:', child_key.PublicKey().RawCompressed().ToHex())
-    print('\n')
+    index = 0
+    child_key = (child_key.ChildKey(index))
+    # print('Child key -> chain code:', child_key.ChainCode().ToHex())
+    # print('Child key -> private key:', child_key.PrivateKey().Raw().ToHex())
+    # print('Child key -> public key:', child_key.PublicKey().RawCompressed().ToHex())
+    # print('\n')
+    print_child_key_info(child_key, index)
 
     # exit()
     
@@ -81,6 +97,10 @@ def restore_p_chain_address(mnemonic, passphrase):
 # Example usage
 mnemonic = "sell stereo useless course suffer tribe jazz monster fresh excess wire again father film sudden pelican always room attack rubber pelican trash alone cancel"
 passphrase = "TESTPHRASE"
+# passphrase = "TESTPHRASA"
+# passphrase = "A"
+# passphrase = "passphrase"
+# passphrase = "a"
 
 p_chain_address = restore_p_chain_address(mnemonic, passphrase)
-print(f"Your restored P-chain address: {p_chain_address}")
+print(f"Your restored P-chain address on a passphrase: [{passphrase}]: {p_chain_address}")

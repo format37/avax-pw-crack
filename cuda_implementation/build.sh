@@ -10,7 +10,7 @@ export CUDA_NVCC_EXECUTABLE="ccache nvcc"
 # Get the start time
 start_time=$(date +%s.%N)
 # Print the current date
-echo Start: $(date)
+echo Start building: $(date)
 
 # -g \ # Generate host code debug information
 # -G \ # Generate device code debug information

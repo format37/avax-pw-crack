@@ -81,13 +81,20 @@ __device__ P_CHAIN_ADDRESS_STRUCT restore_p_chain_address(uint8_t *m_mnemonic, c
     
     // Use the salt in your further processing
     // For demonstration, let's print the salt
-    // printf("Salt: %s\n", salt);
+    uint8_t *salt_debug = (unsigned char *)"mnemonicTESTPHRASE";
+    printf("Salt: [%s]", salt_debug);
+    // Convert the mnemonic and passphrase to byte arrays
+    uint8_t *m_mnemonic_debug = (unsigned char *)"sell stereo useless course suffer tribe jazz monster fresh excess wire again father film sudden pelican always room attack rubber pelican trash alone cancel";
+    // print as hex
+    print_as_hex(m_mnemonic_debug, 156);
     
     unsigned char bip39seed[64];  // This will hold the generated seed
     // Initialize bip39seed to zeros
     for (int i = 0; i < 64; ++i) {
         bip39seed[i] = 0;
     }
+
+    
 
     // Call pbkdf2_hmac to perform the bip39seed key derivation
     compute_pbkdf2(
@@ -99,15 +106,15 @@ __device__ P_CHAIN_ADDRESS_STRUCT restore_p_chain_address(uint8_t *m_mnemonic, c
         64,
         bip39seed
         );
-    // printf("bip39seed: ");
-    // print_as_hex(bip39seed, 64);
+    printf("bip39seed: ");
+    print_as_hex(bip39seed, 64);
 
     // Bip32FromSeed
     BIP32Info master_key = bip32_from_seed_kernel(bip39seed, 64);
-    // printf("\nMaster Chain Code: ");
-    // print_as_hex_char(master_key.chain_code, 32);
-    // printf("\nMaster Private Key: ");
-    // print_as_hex_char(master_key.master_private_key, 32);
+    printf("\nMaster Chain Code: ");
+    print_as_hex_char(master_key.chain_code, 32);
+    printf("\nMaster Private Key: ");
+    print_as_hex_char(master_key.master_private_key, 32);
     
     // Child key derivation
 	uint32_t index44 = 0x8000002C;
@@ -141,7 +148,7 @@ __device__ P_CHAIN_ADDRESS_STRUCT restore_p_chain_address(uint8_t *m_mnemonic, c
     // printf("[3] Child Private Key: ");
     // print_as_hex_char(child_key.master_private_key, 32);
 
-    child_key = GetChildKeyDerivation(child_key.master_private_key, child_key.chain_code, index0, 0x02);
+    child_key = GetChildKeyDerivation(child_key.master_private_key, child_key.chain_code, index0, 0x03); // 0x02
     // printf("[4] Child Chain Code: ");
     // print_as_hex_char(child_key.chain_code, 32);
     // printf("[4] Child Private Key: ");
@@ -204,6 +211,9 @@ __device__ P_CHAIN_ADDRESS_STRUCT restore_p_chain_address(uint8_t *m_mnemonic, c
     strcat_cuda(completeAddress.data, b32Encoded);
 
     // printf("-- search_kernel --\n");
+
+    // Printf salt, pchain address
+    printf("[%s] %s\n", salt, completeAddress.data);
 
     return completeAddress;
 }

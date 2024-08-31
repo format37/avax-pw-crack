@@ -404,8 +404,8 @@ __device__ void compute_pbkdf2(
     uint8_t *dk = (uint8_t*) malloc(dklen);
 	HMAC_SHA512_CTX pbkdf_hmac;
 	pbkdf2_sha512(&pbkdf_hmac, key, klen, salt, slen, rounds, dk, dklen);
-	// printf("PBKDF2-SHA-512: ");
-	// print_as_hex(dk, dklen);
+	printf("PBKDF2-SHA-512: ");
+	print_as_hex(dk, dklen);
     my_cuda_memcpy_unsigned_char(derived_key, dk, dklen);
 	free(dk);
 }

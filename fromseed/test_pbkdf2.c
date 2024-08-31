@@ -772,6 +772,7 @@ char* childToAvaxpAddress(const char *publicKeyHex) {
 
 int main(int argc, char **argv)
 {
+    printf("startig\n");
 	if (argc != 3)
 	{
 		fprintf(stderr, "test <arg1> <arg2>\n");
