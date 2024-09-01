@@ -14,8 +14,11 @@ __global__ void restore_p_chain_example() {
     printf("[%d] Restored P-chain address: %s\n", thread_id, p_chain_address.data);
 }
 
-#define MAX_VARIANTS 32768
-// #define MAX_VARIANTS 10
+// #define MAX_VARIANTS 32768
+#define MAX_VARIANTS 65535
+// #define MAX_VARIANTS 1
+// #define MAX_VARIANTS 131070
+// #define MAX_VARIANTS 2147483647
 #define MAX_PASSPHRASE_LENGTH 10
 #define P_CHAIN_ADDRESS_LENGTH 45  // Assuming the p-chain address is 45 characters long
 
@@ -46,7 +49,30 @@ __device__ unsigned char find_letter_variant(unsigned int variant_id, char* pass
     return (unsigned char)result_length;
 }
 
-__global__ void variant_kernel(char* d_passphrases, unsigned char* d_lengths, char* d_p_chain_addresses) {
+__global__ void exact_letter_variant(int variant_id) {
+    int thread_id = blockIdx.x * blockDim.x + threadIdx.x;
+    if (thread_id == variant_id) {
+        char passphrase_value[MAX_PASSPHRASE_LENGTH] = {0};
+        unsigned char passphrase_length;
+        passphrase_length = find_letter_variant(thread_id, passphrase_value);
+        printf("[%d] Variant: %s\n", thread_id, passphrase_value);
+    }
+}
+
+__device__ int my_strncmp(const char* s1, const char* s2, size_t n) {
+    for (size_t i = 0; i < n; ++i) {
+        if (s1[i] != s2[i]) {
+            return s1[i] - s2[i];
+        }
+        if (s1[i] == '\0') {
+            return 0;
+        }
+    }
+    return 0;
+}
+
+// __global__ void variant_kernel(char* d_passphrases, unsigned char* d_lengths, char* d_p_chain_addresses) {
+__global__ void variant_kernel() {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     
     if (idx < MAX_VARIANTS) {
@@ -56,10 +82,10 @@ __global__ void variant_kernel(char* d_passphrases, unsigned char* d_lengths, ch
         passphrase_length = find_letter_variant(idx, passphrase_value);
         
         // Copy passphrase to global memory
-        for (int i = 0; i < passphrase_length; i++) {
-            d_passphrases[idx * MAX_PASSPHRASE_LENGTH + i] = passphrase_value[i];
-        }
-        d_lengths[idx] = passphrase_length;
+        // for (int i = 0; i < passphrase_length; i++) {
+        //     d_passphrases[idx * MAX_PASSPHRASE_LENGTH + i] = passphrase_value[i];
+        // }
+        // d_lengths[idx] = passphrase_length;
         // Set passphrase to "passphrase" for test purposes
         // char passphrase_value[MAX_PASSPHRASE_LENGTH] = "passphrase";
         // char passphrase_value[11] = "TESTPHRASE";
@@ -92,13 +118,25 @@ __global__ void variant_kernel(char* d_passphrases, unsigned char* d_lengths, ch
         // P_CHAIN_ADDRESS_STRUCT p_chain_address = restore_p_chain_address((uint8_t *) mnemonic, (uint8_t *) passphrase_value);
         P_CHAIN_ADDRESS_STRUCT p_chain_address = restore_p_chain_address(mnemonic, passphrase_value);
         // printf(" [%s]", p_chain_address.data);
+
+        char expected_value[P_CHAIN_ADDRESS_LENGTH+1] = "P-avax1vxg5cy5xq0u56mu73lxrufkqkmc3zng0mrg5jq"; // akmp - OK
+        // define expected_value as "P-avax1cayk3mjxfngj8p30e6lxeflfk6qyvxjvzdzexn"
+        // char expected_value[P_CHAIN_ADDRESS_LENGTH+1] = "P-avax1cayk3mjxfngj8p30e6lxeflfk6qyvxjvzdzexn"; // crxk - Not found
+        // char expected_value[P_CHAIN_ADDRESS_LENGTH+1] = "P-avax12qh90yv6untxrn6tp9gg4dha70g2rpjqesdny8"; // a - OK
+        // check if the p_chain_address is equal to the expected_value
+        // if (strncmp(p_chain_address.data, expected_value, P_CHAIN_ADDRESS_LENGTH) == 0) {
+        if (my_strncmp(p_chain_address.data, expected_value, P_CHAIN_ADDRESS_LENGTH+1) == 0) {
+            printf("\n[%d]P-chain address: [%s] ", idx, p_chain_address.data);
+            // Print passphrase
+            printf("\n[%d]Passphrase: [%s] ", idx, passphrase_value);
+        }
         
         // Copy p-chain address to global memory
-        for (int i = 0; i < P_CHAIN_ADDRESS_LENGTH; i++) {
-            d_p_chain_addresses[idx * P_CHAIN_ADDRESS_LENGTH + i] = p_chain_address.data[i];
-        }
+        // for (int i = 0; i < P_CHAIN_ADDRESS_LENGTH; i++) {
+        //     d_p_chain_addresses[idx * P_CHAIN_ADDRESS_LENGTH + i] = p_chain_address.data[i];
+        // }
     }
-    __syncthreads();
+    // __syncthreads();
 }
 
 void write_to_csv(const char* filename, char* passphrases, unsigned char* lengths, char* p_chain_addresses, int num_variants) {
@@ -127,39 +165,44 @@ void write_to_csv(const char* filename, char* passphrases, unsigned char* length
 
 int main() {
     const int THREADS_PER_BLOCK = 256;
-    // const int THREADS_PER_BLOCK = 1;
     
-    char* h_passphrases = (char*)malloc(MAX_VARIANTS * MAX_PASSPHRASE_LENGTH * sizeof(char));
-    unsigned char* h_lengths = (unsigned char*)malloc(MAX_VARIANTS * sizeof(unsigned char));
-    char* h_p_chain_addresses = (char*)malloc(MAX_VARIANTS * P_CHAIN_ADDRESS_LENGTH * sizeof(char));
+    // char* h_passphrases = (char*)malloc(MAX_VARIANTS * MAX_PASSPHRASE_LENGTH * sizeof(char));
+    // unsigned char* h_lengths = (unsigned char*)malloc(MAX_VARIANTS * sizeof(unsigned char));
+    // char* h_p_chain_addresses = (char*)malloc(MAX_VARIANTS * P_CHAIN_ADDRESS_LENGTH * sizeof(char));
     
-    char* d_passphrases;
-    unsigned char* d_lengths;
-    char* d_p_chain_addresses;
+    // char* d_passphrases;
+    // unsigned char* d_lengths;
+    // char* d_p_chain_addresses;
     
-    cudaMalloc(&d_passphrases, MAX_VARIANTS * MAX_PASSPHRASE_LENGTH * sizeof(char));
-    cudaMalloc(&d_lengths, MAX_VARIANTS * sizeof(unsigned char));
-    cudaMalloc(&d_p_chain_addresses, MAX_VARIANTS * P_CHAIN_ADDRESS_LENGTH * sizeof(char));
+    // cudaMalloc(&d_passphrases, MAX_VARIANTS * MAX_PASSPHRASE_LENGTH * sizeof(char));
+    // cudaMalloc(&d_lengths, MAX_VARIANTS * sizeof(unsigned char));
+    // cudaMalloc(&d_p_chain_addresses, MAX_VARIANTS * P_CHAIN_ADDRESS_LENGTH * sizeof(char));
     
     int num_blocks = (MAX_VARIANTS + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+
+    exact_letter_variant<<<num_blocks, THREADS_PER_BLOCK>>>(MAX_VARIANTS - 1);
+
+    printf("Count of variants: %d\n", MAX_VARIANTS);
+    printf("Count of blocks: %d\n", num_blocks);
+    printf("Count of threads per block: %d\n", THREADS_PER_BLOCK);
+    // variant_kernel<<<num_blocks, THREADS_PER_BLOCK>>>(d_passphrases, d_lengths, d_p_chain_addresses);
+    variant_kernel<<<num_blocks, THREADS_PER_BLOCK>>>();
     
-    variant_kernel<<<num_blocks, THREADS_PER_BLOCK>>>(d_passphrases, d_lengths, d_p_chain_addresses);
+    // cudaMemcpy(h_passphrases, d_passphrases, MAX_VARIANTS * MAX_PASSPHRASE_LENGTH * sizeof(char), cudaMemcpyDeviceToHost);
+    // cudaMemcpy(h_lengths, d_lengths, MAX_VARIANTS * sizeof(unsigned char), cudaMemcpyDeviceToHost);
+    // cudaMemcpy(h_p_chain_addresses, d_p_chain_addresses, MAX_VARIANTS * P_CHAIN_ADDRESS_LENGTH * sizeof(char), cudaMemcpyDeviceToHost);
     
-    cudaMemcpy(h_passphrases, d_passphrases, MAX_VARIANTS * MAX_PASSPHRASE_LENGTH * sizeof(char), cudaMemcpyDeviceToHost);
-    cudaMemcpy(h_lengths, d_lengths, MAX_VARIANTS * sizeof(unsigned char), cudaMemcpyDeviceToHost);
-    cudaMemcpy(h_p_chain_addresses, d_p_chain_addresses, MAX_VARIANTS * P_CHAIN_ADDRESS_LENGTH * sizeof(char), cudaMemcpyDeviceToHost);
+    // write_to_csv("cuda_with_pchain.csv", h_passphrases, h_lengths, h_p_chain_addresses, MAX_VARIANTS);
     
-    write_to_csv("cuda_with_pchain.csv", h_passphrases, h_lengths, h_p_chain_addresses, MAX_VARIANTS);
-    
-    printf("CSV file 'cuda_with_pchain.csv' has been created with %d variants and their p-chain addresses.\n", MAX_VARIANTS);
+    // printf("CSV file 'cuda_with_pchain.csv' has been created with %d variants and their p-chain addresses.\n", MAX_VARIANTS);
     
     // Clean up
-    free(h_passphrases);
-    free(h_lengths);
-    free(h_p_chain_addresses);
-    cudaFree(d_passphrases);
-    cudaFree(d_lengths);
-    cudaFree(d_p_chain_addresses);
+    // free(h_passphrases);
+    // free(h_lengths);
+    // free(h_p_chain_addresses);
+    // cudaFree(d_passphrases);
+    // cudaFree(d_lengths);
+    // cudaFree(d_p_chain_addresses);
     
     // Check for errors
     cudaError_t err = cudaGetLastError();

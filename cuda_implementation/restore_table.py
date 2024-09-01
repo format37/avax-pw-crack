@@ -63,8 +63,9 @@ def generate_variant_pchain_table(start, end, mnemonic, base_passphrase):
 def generator():
     # Configuration
     start_variant = 0
-    end_variant = 32768  # This will generate variants from 0 to 32767
-    # end_variant = 10
+    # end_variant = 32768  # This will generate variants from 0 to 32767
+    # end_variant = 65535
+    end_variant = 131070
     mnemonic = "sell stereo useless course suffer tribe jazz monster fresh excess wire again father film sudden pelican always room attack rubber pelican trash alone cancel"
     base_passphrase = "mnemonic"
 
