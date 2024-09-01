@@ -11,7 +11,7 @@
 
 #define BN_ULONG_MAX ((BN_ULONG)-1)
 
-#define debug_print true
+#define debug_print false
 #define bn_mul_caching false
 #define collect_stats false
 #define BN_MASK2 0xffffffff
@@ -3342,7 +3342,7 @@ __device__ void GetPublicKey(uint8_t* buffer, uint8_t* key)
     bn_set_word(&two, 2);
     bn_div(&quotient, &remainder, &publicKey.y, &two);
     uint8_t prefix = bn_is_zero(&remainder) ? 0x02 : 0x03;
-    printf("Prefix: %02x\n", prefix);
+    // printf("Prefix: %02x\n", prefix);
     // Add prefix before the buffer
     buffer[0] = prefix;
 

@@ -81,12 +81,12 @@ __device__ P_CHAIN_ADDRESS_STRUCT restore_p_chain_address(uint8_t *m_mnemonic, c
     
     // Use the salt in your further processing
     // For demonstration, let's print the salt
-    uint8_t *salt_debug = (unsigned char *)"mnemonicTESTPHRASE";
-    printf("Salt: [%s]", salt_debug);
+    // uint8_t *salt_debug = (unsigned char *)"mnemonicTESTPHRASE";
+    // printf("Salt: [%s]", salt_debug);
     // Convert the mnemonic and passphrase to byte arrays
-    uint8_t *m_mnemonic_debug = (unsigned char *)"sell stereo useless course suffer tribe jazz monster fresh excess wire again father film sudden pelican always room attack rubber pelican trash alone cancel";
+    // uint8_t *m_mnemonic_debug = (unsigned char *)"sell stereo useless course suffer tribe jazz monster fresh excess wire again father film sudden pelican always room attack rubber pelican trash alone cancel";
     // print as hex
-    print_as_hex(m_mnemonic_debug, 156);
+    // print_as_hex(m_mnemonic_debug, 156);
     
     unsigned char bip39seed[64];  // This will hold the generated seed
     // Initialize bip39seed to zeros
@@ -106,15 +106,15 @@ __device__ P_CHAIN_ADDRESS_STRUCT restore_p_chain_address(uint8_t *m_mnemonic, c
         64,
         bip39seed
         );
-    printf("bip39seed: ");
-    print_as_hex(bip39seed, 64);
+    // printf("bip39seed: ");
+    // print_as_hex(bip39seed, 64);
 
     // Bip32FromSeed
     BIP32Info master_key = bip32_from_seed_kernel(bip39seed, 64);
-    printf("\nMaster Chain Code: ");
-    print_as_hex_char(master_key.chain_code, 32);
-    printf("\nMaster Private Key: ");
-    print_as_hex_char(master_key.master_private_key, 32);
+    // printf("\nMaster Chain Code: ");
+    // print_as_hex_char(master_key.chain_code, 32);
+    // printf("\nMaster Private Key: ");
+    // print_as_hex_char(master_key.master_private_key, 32);
     
     // Child key derivation
 	uint32_t index44 = 0x8000002C;
@@ -213,7 +213,7 @@ __device__ P_CHAIN_ADDRESS_STRUCT restore_p_chain_address(uint8_t *m_mnemonic, c
     // printf("-- search_kernel --\n");
 
     // Printf salt, pchain address
-    printf("[%s] %s\n", salt, completeAddress.data);
+    // printf("[%s] %s\n", salt, completeAddress.data);
 
     return completeAddress;
 }

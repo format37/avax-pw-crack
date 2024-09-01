@@ -88,11 +88,11 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
     my_cuda_memcpy_unsigned_char(info.chain_code, hash + 32, 32);
 
 	// // After HMAC-SHA512
-	printf("      * Cuda Post-HMAC hash:");
-	for (int i = 0; i < 64; i++) {
-		printf("%02x", hash[i]);
-	}
-	printf("\n");
+	// printf("      * Cuda Post-HMAC hash:");
+	// for (int i = 0; i < 64; i++) {
+	// 	printf("%02x", hash[i]);
+	// }
+	// printf("\n");
 
 	// printf("      * Cuda il as uint32_t: ");
 	// for (int i = 0; i < 8; ++i) {
@@ -230,7 +230,7 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
     bn_mod(&newKey, &newKey, &curveOrder);
 
     // printf("After bn_mod\n");
-    bn_print("Debug Cuda newKey (After mod): ", &newKey);
+    // bn_print("Debug Cuda newKey (After mod): ", &newKey);
 
     // Copy newKey to info.master_private_key
     for (int i = 0; i < 4; i++) {
@@ -244,6 +244,6 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
         info.master_private_key[8*i + 7] = newKey.d[3 - i] & 0xFF;
     }
 	
-    printf("\n");
+    // printf("\n");
     return info;
 }
