@@ -96,11 +96,13 @@ def restore_p_chain_address(mnemonic, passphrase):
 
 # Example usage
 mnemonic = "sell stereo useless course suffer tribe jazz monster fresh excess wire again father film sudden pelican always room attack rubber pelican trash alone cancel"
-passphrase = "TESTPHRASE"
+# passphrase = "TESTPHRASE"
 # passphrase = "TESTPHRASA"
 # passphrase = "A"
 # passphrase = "passphrase"
 # passphrase = "a"
+passphrase = "fxshqkm"
+# 2147482623 is: fxshqkm
 
 p_chain_address = restore_p_chain_address(mnemonic, passphrase)
 print(f"Your restored P-chain address on a passphrase: [{passphrase}]: {p_chain_address}")

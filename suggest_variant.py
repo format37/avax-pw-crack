@@ -20,7 +20,8 @@ def find_letter_variant(n):
     
     return ''.join(reversed(result))
 
-variant_number = 87239553796647
+# variant_number = 87239553796647
+variant_number = 2147482623
 result = find_letter_variant(variant_number)
 print(f"The letter variant corresponding to {variant_number} is: {result}")
 
