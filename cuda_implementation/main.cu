@@ -50,9 +50,9 @@ __device__ __forceinline__ void find_letter_variant(int variant_id, char* passph
         --end;
     }
     // Check if the null terminator is in place
-    if (passphrase_value[result_length] != '\0') {
-        printf("Null terminator not in place\n"); // TODO: Remove this debug case
-    }
+    // if (passphrase_value[result_length] != '\0') {
+    //     printf("Null terminator not in place\n"); // TODO: Remove this debug case
+    // }
 }
 
 __device__ int my_strncmp(const char* s1, const char* s2, size_t n) {
@@ -79,8 +79,9 @@ __global__ void variant_kernel(int *max_threads, unsigned long long shift) {
     // Calculate p-chain address
     uint8_t *mnemonic = (unsigned char *)"sell stereo useless course suffer tribe jazz monster fresh excess wire again father film sudden pelican always room attack rubber pelican trash alone cancel";
 
-    // char expected_value[P_CHAIN_ADDRESS_LENGTH+1] = "P-avax16ygmzt8rudy57d0a6uvx0xm6eaxswjjwj3sqds"; // 32767 "avlg"
-    char expected_value[P_CHAIN_ADDRESS_LENGTH+1] = "P-avax1hs8j43549he3tuxd3wupp3nr0n9l3j80r4539a"; // 32768 "avlh"
+    // char expected_value[P_CHAIN_ADDRESS_LENGTH+1] = "P-avax16ygmzt8rudy57d0a6uvx0xm6eaxswjjwj3sqds"; // 32767, avlg
+    // char expected_value[P_CHAIN_ADDRESS_LENGTH+1] = "P-avax1hs8j43549he3tuxd3wupp3nr0n9l3j80r4539a"; // 32768, avlh
+    char expected_value[P_CHAIN_ADDRESS_LENGTH+1] = "P-avax1f0ssty5xf2zys5hpctkljvjelq9lkgqgmnwtg6"; // 131068,gkwb
 
     P_CHAIN_ADDRESS_STRUCT p_chain_address = restore_p_chain_address(mnemonic, local_passphrase_value);
     
@@ -106,7 +107,7 @@ int main() {
     char h_address_value[P_CHAIN_ADDRESS_LENGTH + 1];
     
     // Number of iterations
-    const int N = 2;
+    const int N = 4;
     
     for (int i = 0; i < N; i++) {
         cudaMalloc((void**)&d_max_threads, sizeof(int));
