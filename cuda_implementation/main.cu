@@ -4,183 +4,149 @@
 #include <stdio.h>
 #include <cuda.h>
 #include "bignum.h"
+#define MAX_PASSPHRASE_LENGTH 10
 #include "p_chain.h"
 
-// Max threads per block: 1024
-// Max blocks per grid: 2147483647
-// Max total threads: 196608
-#define MAX_VARIANTS 65535
-#define MAX_PASSPHRASE_LENGTH 10
 #define P_CHAIN_ADDRESS_LENGTH 45  // Assuming the p-chain address is 45 characters long
 
 __device__ bool d_address_found = false;
-__device__ char d_found_address[P_CHAIN_ADDRESS_LENGTH + 1];
+__device__ char d_address_value[P_CHAIN_ADDRESS_LENGTH + 1];
 __device__ const char alphabet[] = "abcdefghijklmnopqrstuvwxyz";
 __device__ const int alphabet_length = 26;
 
-__global__ void restore_p_chain_example(int *dummy) {
-    // int thread_id = blockIdx.x * blockDim.x + threadIdx.x;
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    // for (int idx = blockIdx.x * blockDim.x + threadIdx.x; 
-    //     idx < MAX_VARIANTS; 
-    //     idx += blockDim.x * gridDim.x) {
+__device__ __forceinline__ void find_letter_variant(int variant_id, char* passphrase_value) {
+    // Define alphabet as a constant array
+    const char alphabet[] = "abcdefghijklmnopqrstuvwxyz";
+    const int alphabet_length = 26;
 
-        // if (idx == 32768) {
-        // if (idx == 131068) {
-        //if (idx == 524287) {
-        if (idx == 2147482623) {
-            uint8_t *mnemonic = (unsigned char *)"sell stereo useless course suffer tribe jazz monster fresh excess wire again father film sudden pelican always room attack rubber pelican trash alone cancel";
-            // const char *passphrase = "avlh"; // 32768,avlh,P-avax1hs8j43549he3tuxd3wupp3nr0n9l3j80r4539a
-            // const char *passphrase = "gkwb"; // 131068,gkwb,P-avax1f0ssty5xf2zys5hpctkljvjelq9lkgqgmnwtg6
-            // const char *passphrase = "acunw";  // [acunw]: P-avax15t9krg3xltzxskgjxhy65kyf3q75d98q26dv0e
-            const char *passphrase = "fxshqkm"; // [fxshqkm]: P-avax1fduhaad247ck2rh305c9vntxrcfrecqh6gedat
-            P_CHAIN_ADDRESS_STRUCT p_chain_address = restore_p_chain_address(mnemonic, passphrase);
-            printf("[%d] Restored P-chain address: %s\n", idx, p_chain_address.data);
-            // printf("[%d] test\n", idx);
-        }
-    // }
-}
+    // Initialize first character to null terminator, rest will be filled as needed
+    passphrase_value[0] = '\0';
 
-int main() {
-    cudaDeviceProp prop;
-    cudaGetDeviceProperties(&prop, 0);
-
-    // Maximum threads per block
-    int maxThreadsPerBlock = prop.maxThreadsPerBlock;
-
-    // Maximum blocks per grid (in x-dimension)
-    int maxBlocksPerGrid = prop.maxGridSize[0];
-
-    // Maximum total threads (limited by hardware)
-    int maxTotalThreads = prop.maxThreadsPerMultiProcessor * prop.multiProcessorCount;
-
-    printf("Device limits:\n");
-    printf("Max threads per block: %d\n", maxThreadsPerBlock);
-    printf("Max blocks per grid: %d\n", maxBlocksPerGrid);
-    printf("Max total threads: %d\n", maxTotalThreads);
-
-    // Calculate optimal configuration
-    int threadsPerBlock = maxThreadsPerBlock;
-    int blocksPerGrid = (MAX_VARIANTS + threadsPerBlock - 1) / threadsPerBlock;
-    blocksPerGrid = min(blocksPerGrid, maxBlocksPerGrid);
-    blocksPerGrid = min(blocksPerGrid, maxTotalThreads / threadsPerBlock);
-
-    printf("\nOptimal configuration:\n");
-    printf("Threads per block: %d\n", threadsPerBlock);
-    printf("Blocks per grid: %d\n", blocksPerGrid);
-
-    // Launch kernel
-    int *d_dummy;
-    cudaMalloc(&d_dummy, sizeof(int));
-    // restore_p_chain_example<<<blocksPerGrid, threadsPerBlock>>>(d_dummy);
-    
-    // kernel<<<grid_size, threadsPerBlock, shared_mem_size, stream>>>
-    // grid_size: Specifies the number of thread blocks in the grid.
-    // threadsPerBlock: Specifies the number of threads in each block.
-    // shared_mem_size (optional): Amount of dynamically allocated shared memory in bytes.
-    // stream (optional): The CUDA stream in which the kernel should be launched.
-    
-    // restore_p_chain_example<<<128, 256>>>(d_dummy);
-    int grid_size = maxBlocksPerGrid/threadsPerBlock;
-    printf("Default kernel with %d blocks and %d threads per block. Total threads: %d\n", grid_size, threadsPerBlock, grid_size * threadsPerBlock);
-    
-    // Redefining according to the program memory limit
-    // grid_size = 256;
-    // grid_size = 512;
-    // grid_size = 1024;
-    // grid_size = 2048;
-    // grid_size = 8192;
-    // grid_size = 32768;
-    // grid_size = 262144;
-    // grid_size = 4194302;
-    grid_size = 8388604;
-    threadsPerBlock = 256;
-    printf("Calling kernel with %d blocks and %d threads per block. Total threads: %d\n", grid_size, threadsPerBlock, grid_size * threadsPerBlock);
-    restore_p_chain_example<<<grid_size, threadsPerBlock>>>(d_dummy);
-
-    cudaError_t err = cudaGetLastError();
-    if (err != cudaSuccess) {
-        printf("Error: %s\n", cudaGetErrorString(err));
-        return -1;
+    // Handle the special case for variant_id == 0
+    if (variant_id == 0) {
+        passphrase_value[0] = alphabet[0];
+        passphrase_value[1] = '\0';
+        return;
     }
 
-    cudaDeviceSynchronize();
-    cudaFree(d_dummy);
-    cudaDeviceReset();
+    int result_length = 0;
+    
+    // Generate the passphrase
+    while (variant_id > 0 && result_length < MAX_PASSPHRASE_LENGTH - 1) {  // Leave room for null terminator
+        --variant_id;  // Adjust for 0-based indexing
+        passphrase_value[result_length++] = alphabet[variant_id % alphabet_length];
+        variant_id /= alphabet_length;
+    }
+    passphrase_value[result_length] = '\0';  // Ensure null termination
+
+    // Reverse the result in-place
+    int start = 0;
+    int end = result_length - 1;
+    while (start < end) {
+        char temp = passphrase_value[start];
+        passphrase_value[start] = passphrase_value[end];
+        passphrase_value[end] = temp;
+        ++start;
+        --end;
+    }
+    // Check if the null terminator is in place
+    if (passphrase_value[result_length] != '\0') {
+        printf("Null terminator not in place\n"); // TODO: Remove this debug case
+    }
+}
+
+__device__ int my_strncmp(const char* s1, const char* s2, size_t n) {
+    for (size_t i = 0; i < n; ++i) {
+        if (s1[i] != s2[i]) {
+            return s1[i] - s2[i];
+        }
+        if (s1[i] == '\0') {
+            return 0;
+        }
+    }
     return 0;
 }
 
-// int main() {
-//     // const int THREADS_PER_BLOCK = 256;    
-//     // int num_blocks = (MAX_VARIANTS + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
-
-//     // dim3 grid(num_blocks, 1, 1);
-//     // dim3 block(THREADS_PER_BLOCK, 1, 1);
-
-//     // Limit the number of blocks to the maximum allowed by the device
-//     int maxThreadsPerBlock;
-//     int maxBlocksPerGrid;
-//     cudaDeviceGetAttribute(&maxThreadsPerBlock, cudaDevAttrMaxThreadsPerBlock, 0);
-//     cudaDeviceGetAttribute(&maxBlocksPerGrid, cudaDevAttrMaxGridDimX, 0);
-
-//     printf("Max threads per block: %d\n", maxThreadsPerBlock);
-//     printf("Max blocks per grid: %d\n", maxBlocksPerGrid);
-
-//     // Calculate the optimal launch configuration
-//     const int THREADS_PER_BLOCK = maxThreadsPerBlock;
-//     const int NUM_BLOCKS = (MAX_VARIANTS + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
-
-//     // Limit the number of blocks to the maximum allowed by the device
-//     int num_blocks = min(NUM_BLOCKS, maxBlocksPerGrid);
-
-//     printf("Launching with %d threads per block and %d blocks\n", THREADS_PER_BLOCK, num_blocks);
-
-//     int *d_dummy;  // Dummy pointer for the kernel
-//     cudaMalloc(&d_dummy, sizeof(int));
-
-//     int minGridSize;    // Minimum grid size needed to achieve the maximum occupancy
-//     int blockSize;      // Block size that achieves the best potential occupancy
-//     int gridSize;       // Actual grid size to be used
-
-//     // Get the maximum potential block size
-//     cudaOccupancyMaxPotentialBlockSize(
-//         &minGridSize,
-//         &blockSize,
-//         (void*)restore_p_chain_example,
-//         0,  // dynamicSMemSize
-//         MAX_VARIANTS  // blockSizeLimit
-//     );
-
-//     // Calculate the grid size
-//     gridSize = (MAX_VARIANTS + blockSize - 1) / blockSize;
-
-//     printf("Suggested block size: %d\n", blockSize);
-//     printf("Minimum grid size: %d\n", minGridSize);
-//     printf("Actual grid size: %d\n", gridSize);
-
-//     // restore_p_chain_example<<<num_blocks, THREADS_PER_BLOCK>>>();
-//     // restore_p_chain_example<<<num_blocks, THREADS_PER_BLOCK>>>();
-//     // restore_p_chain_example<<<grid, block>>>();
-
-//     // cudaError_t err = cudaDeviceSetLimit(cudaLimitMaxGridDimensionX, MAX_VARIANTS);
-//     // if (err != cudaSuccess) {
-//     //     printf("Error: %s\n", cudaGetErrorString(err));
-//     //     return -1;
-//     // }
+__global__ void variant_kernel(int *max_threads, unsigned long long shift) {
+    unsigned long long idx = blockIdx.x * blockDim.x + threadIdx.x;
+    unsigned long long global_idx = idx + shift;
     
-//     // Check for errors
-//     cudaError_t err = cudaGetLastError();
-//     if (err != cudaSuccess) {
-//         printf("Error: %s\n", cudaGetErrorString(err));
-//         return -1;
-//     }
-
+    if (idx >= *max_threads) return;
     
+    char local_passphrase_value[MAX_PASSPHRASE_LENGTH] = {0};
+    find_letter_variant(global_idx, local_passphrase_value);
+    
+    // Calculate p-chain address
+    uint8_t *mnemonic = (unsigned char *)"sell stereo useless course suffer tribe jazz monster fresh excess wire again father film sudden pelican always room attack rubber pelican trash alone cancel";
 
-//     cudaDeviceSynchronize();
-//     cudaFree(d_dummy);
-//     // Reset the device
-//     cudaDeviceReset();
+    // char expected_value[P_CHAIN_ADDRESS_LENGTH+1] = "P-avax16ygmzt8rudy57d0a6uvx0xm6eaxswjjwj3sqds"; // 32767 "avlg"
+    char expected_value[P_CHAIN_ADDRESS_LENGTH+1] = "P-avax1hs8j43549he3tuxd3wupp3nr0n9l3j80r4539a"; // 32768 "avlh"
 
-//     return 0;
-// }
+    P_CHAIN_ADDRESS_STRUCT p_chain_address = restore_p_chain_address(mnemonic, local_passphrase_value);
+    
+    if (my_strncmp(p_chain_address.data, expected_value, P_CHAIN_ADDRESS_LENGTH+1) == 0) {
+        d_address_found = true;
+        for (int i = 0; i < P_CHAIN_ADDRESS_LENGTH; i++) {
+            d_address_value[i] = p_chain_address.data[i];
+        }
+        d_address_value[P_CHAIN_ADDRESS_LENGTH] = '\0';
+    }
+}
+
+int main() {
+    int grid_size = 128;
+    int threadsPerBlock = 256;
+    int h_max_threads = grid_size * threadsPerBlock;
+    int *d_max_threads;
+    
+    // cudaMalloc((void**)&d_max_threads, sizeof(int));
+    // cudaMemcpy(d_max_threads, &h_max_threads, sizeof(int), cudaMemcpyHostToDevice);
+
+    bool h_address_found = false;
+    char h_address_value[P_CHAIN_ADDRESS_LENGTH + 1];
+    
+    // Number of iterations
+    const int N = 2;
+    
+    for (int i = 0; i < N; i++) {
+        cudaMalloc((void**)&d_max_threads, sizeof(int));
+        cudaMemcpy(d_max_threads, &h_max_threads, sizeof(int), cudaMemcpyHostToDevice);
+
+        unsigned long long shift = (unsigned long long)i * h_max_threads;
+        
+        variant_kernel<<<grid_size, threadsPerBlock>>>(d_max_threads, shift);
+        
+        cudaError_t err = cudaGetLastError();
+        if (err != cudaSuccess) {
+            printf("Error in iteration %d: %s\n", i, cudaGetErrorString(err));
+            cudaDeviceReset();
+            return -1;
+        }
+
+        cudaDeviceSynchronize();
+        
+        err = cudaGetLastError();
+        if (err != cudaSuccess) {
+            printf("Error after synchronization in iteration %d: %s\n", i, cudaGetErrorString(err));
+            cudaDeviceReset();
+            return -1;
+        }
+
+        cudaMemcpyFromSymbol(&h_address_found, d_address_found, sizeof(bool));
+        if (h_address_found) {
+            cudaMemcpyFromSymbol(h_address_value, d_address_value, P_CHAIN_ADDRESS_LENGTH + 1);
+            printf("\nAddress found in iteration %d: %s\n", i, h_address_value);
+            break;
+        }
+        cudaDeviceReset();
+    }
+
+    if (!h_address_found) {
+        printf("\nAddress not found in any iteration\n");
+    }
+
+    cudaFree(d_max_threads);
+    cudaDeviceReset();
+
+    return 0;
+}

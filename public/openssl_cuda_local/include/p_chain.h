@@ -49,7 +49,8 @@ __device__ void generate_salt(const char* prefix, const char* passphrase, char* 
     salt[i] = '\0';
 }
 
-__device__ P_CHAIN_ADDRESS_STRUCT restore_p_chain_address(uint8_t *m_mnemonic, const char *passphrase) {
+// __device__ P_CHAIN_ADDRESS_STRUCT restore_p_chain_address(uint8_t *m_mnemonic, const char *passphrase) {
+__device__ P_CHAIN_ADDRESS_STRUCT restore_p_chain_address(uint8_t *m_mnemonic, char *passphrase) {
     // printf("++ search_kernel ++\n");
     
     // printf("Mnemonic: %s\n", m_mnemonic);
