@@ -11,6 +11,7 @@
 
 __device__ bool d_address_found = false;
 __device__ char d_address_value[P_CHAIN_ADDRESS_LENGTH + 1];
+__device__ char d_passphrase_value[MAX_PASSPHRASE_LENGTH];
 __device__ const char alphabet[] = "abcdefghijklmnopqrstuvwxyz";
 __device__ const int alphabet_length = 26;
 
@@ -79,9 +80,9 @@ __global__ void variant_kernel(int *max_threads, unsigned long long shift) {
     // Calculate p-chain address
     uint8_t *mnemonic = (unsigned char *)"sell stereo useless course suffer tribe jazz monster fresh excess wire again father film sudden pelican always room attack rubber pelican trash alone cancel";
 
-    // char expected_value[P_CHAIN_ADDRESS_LENGTH+1] = "P-avax16ygmzt8rudy57d0a6uvx0xm6eaxswjjwj3sqds"; // 32767, avlg
+    char expected_value[P_CHAIN_ADDRESS_LENGTH+1] = "P-avax16ygmzt8rudy57d0a6uvx0xm6eaxswjjwj3sqds"; // 32767, avlg
     // char expected_value[P_CHAIN_ADDRESS_LENGTH+1] = "P-avax1hs8j43549he3tuxd3wupp3nr0n9l3j80r4539a"; // 32768, avlh
-    char expected_value[P_CHAIN_ADDRESS_LENGTH+1] = "P-avax1f0ssty5xf2zys5hpctkljvjelq9lkgqgmnwtg6"; // 131068,gkwb
+    // char expected_value[P_CHAIN_ADDRESS_LENGTH+1] = "P-avax1f0ssty5xf2zys5hpctkljvjelq9lkgqgmnwtg6"; // 131068,gkwb
 
     P_CHAIN_ADDRESS_STRUCT p_chain_address = restore_p_chain_address(mnemonic, local_passphrase_value);
     
@@ -89,6 +90,10 @@ __global__ void variant_kernel(int *max_threads, unsigned long long shift) {
         d_address_found = true;
         for (int i = 0; i < P_CHAIN_ADDRESS_LENGTH; i++) {
             d_address_value[i] = p_chain_address.data[i];
+        }
+        // Set the passphrase value
+        for (int i = 0; i < MAX_PASSPHRASE_LENGTH; i++) {
+            d_passphrase_value[i] = local_passphrase_value[i];
         }
         d_address_value[P_CHAIN_ADDRESS_LENGTH] = '\0';
     }
@@ -105,6 +110,7 @@ int main() {
 
     bool h_address_found = false;
     char h_address_value[P_CHAIN_ADDRESS_LENGTH + 1];
+    char h_passphrase_value[MAX_PASSPHRASE_LENGTH];
     
     // Number of iterations
     const int N = 4;
@@ -137,6 +143,8 @@ int main() {
         if (h_address_found) {
             cudaMemcpyFromSymbol(h_address_value, d_address_value, P_CHAIN_ADDRESS_LENGTH + 1);
             printf("\nAddress found in iteration %d: %s\n", i, h_address_value);
+            cudaMemcpyFromSymbol(h_passphrase_value, d_passphrase_value, MAX_PASSPHRASE_LENGTH);
+            printf("Passphrase: %s\n", h_passphrase_value);
             break;
         }
         cudaDeviceReset();
