@@ -101,7 +101,7 @@ mnemonic = "sell stereo useless course suffer tribe jazz monster fresh excess wi
 # passphrase = "A"
 # passphrase = "passphrase"
 # passphrase = "a"
-passphrase = "fxshqkm"
+passphrase = "book"
 # 2147482623 is: fxshqkm
 
 p_chain_address = restore_p_chain_address(mnemonic, passphrase)
