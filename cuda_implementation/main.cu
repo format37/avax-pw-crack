@@ -14,6 +14,8 @@
 
 #define P_CHAIN_ADDRESS_LENGTH 45  // Assuming the p-chain address is 45 characters long
 #define MAX_MNEMONIC_LENGTH 1024  // Adjust this value based on your maximum expected mnemonic length
+#define MAX_BLOCKS_PER_GRID 128
+#define THREADS_PER_BLOCK 256
 
 __device__ bool d_address_found = false;
 __device__ char d_address_value[P_CHAIN_ADDRESS_LENGTH + 1];
@@ -109,33 +111,31 @@ __global__ void variant_kernel(
     unsigned long long start_variant_id,
     unsigned long long end_variant_id, 
     const char *expected_value, 
-    const char *mnemonic
+    const char *mnemonic,
+    unsigned long long variants_per_thread
 ) {
-    unsigned long long idx = blockIdx.x * blockDim.x + threadIdx.x;
-    unsigned long long global_idx = start_variant_id + idx;
-    
-    if (global_idx > end_variant_id) {
-        return;
-    }
-    
-    char local_passphrase_value[MAX_PASSPHRASE_LENGTH] = {0};
-    find_letter_variant(global_idx, local_passphrase_value);
-    // if (global_idx == 45702) printf("[%llu] %llu: %s\n", idx, global_idx, local_passphrase_value); // boot
-    // if (global_idx == 45693) printf("[%llu] %llu: %s\n", idx, global_idx, local_passphrase_value); // book
-    
-    // Calculate p-chain address
-    P_CHAIN_ADDRESS_STRUCT p_chain_address = restore_p_chain_address((uint8_t*)mnemonic, local_passphrase_value);
-    
-    if (my_strncmp(p_chain_address.data, expected_value, P_CHAIN_ADDRESS_LENGTH+1) == 0) {
-        d_address_found = true;
-        for (int i = 0; i < P_CHAIN_ADDRESS_LENGTH; i++) {
-            d_address_value[i] = p_chain_address.data[i];
+    unsigned long long thread_id = blockIdx.x * blockDim.x + threadIdx.x;
+    unsigned long long start_for_thread = start_variant_id + thread_id * variants_per_thread;
+    unsigned long long end_for_thread = min(start_for_thread + variants_per_thread, end_variant_id + 1);
+
+    for (unsigned long long global_idx = start_for_thread; global_idx < end_for_thread && !d_address_found; global_idx++) {
+        char local_passphrase_value[MAX_PASSPHRASE_LENGTH] = {0};
+        find_letter_variant(global_idx, local_passphrase_value);
+        
+        P_CHAIN_ADDRESS_STRUCT p_chain_address = restore_p_chain_address((uint8_t*)mnemonic, local_passphrase_value);
+        
+        if (my_strncmp(p_chain_address.data, expected_value, P_CHAIN_ADDRESS_LENGTH+1) == 0) {
+            d_address_found = true;
+            for (int i = 0; i < P_CHAIN_ADDRESS_LENGTH; i++) {
+                d_address_value[i] = p_chain_address.data[i];
+            }
+            for (int i = 0; i < MAX_PASSPHRASE_LENGTH; i++) {
+                d_passphrase_value[i] = local_passphrase_value[i];
+            }
+            d_address_value[P_CHAIN_ADDRESS_LENGTH] = '\0';
+            printf("Found match at variant %llu: %s\n", global_idx, local_passphrase_value);
+            return;
         }
-        // Set the passphrase value
-        for (int i = 0; i < MAX_PASSPHRASE_LENGTH; i++) {
-            d_passphrase_value[i] = local_passphrase_value[i];
-        }
-        d_address_value[P_CHAIN_ADDRESS_LENGTH] = '\0';
     }
 }
 
@@ -146,6 +146,7 @@ unsigned long long calculate_iterations(unsigned long long start_variant_id, uns
 
 int main() {
     int threadsPerBlock = 256;
+    int blocksPerGrid = 128; // Maximum blocks per grid yet. Need a kernel optimization to increase
 
     bool h_address_found = false;
     char h_address_value[P_CHAIN_ADDRESS_LENGTH + 1];
@@ -189,12 +190,6 @@ int main() {
     std::cout << "End variant id: " << end_variant_id << std::endl;
     std::cout << "Search area: " << end_variant_id - start_variant_id + 1 << std::endl;
 
-    // Calculate total number of threads needed
-    unsigned long long total_threads = end_variant_id - start_variant_id + 1;
-
-    // Calculate grid and block dimensions
-    int blocksPerGrid = (total_threads + threadsPerBlock - 1) / threadsPerBlock;
-
     char *d_expected_value;
     cudaMalloc((void**)&d_expected_value, P_CHAIN_ADDRESS_LENGTH + 1);
     cudaMemcpy(d_expected_value, expected_value.c_str(), P_CHAIN_ADDRESS_LENGTH + 1, cudaMemcpyHostToDevice);
@@ -203,51 +198,66 @@ int main() {
     cudaMalloc((void**)&d_mnemonic, mnemonic.length() + 1);
     cudaMemcpy(d_mnemonic, mnemonic.c_str(), mnemonic.length() + 1, cudaMemcpyHostToDevice);
 
-    std::cout << "Launching kernel with " << blocksPerGrid << " blocks and " << threadsPerBlock << " threads per block" << std::endl;
+    unsigned long long total_variants = end_variant_id - start_variant_id + 1;
+    unsigned long long total_threads = MAX_BLOCKS_PER_GRID * THREADS_PER_BLOCK;
+    unsigned long long variants_per_thread = (total_variants + total_threads - 1) / total_threads;
+    unsigned long long iterations = (total_variants + variants_per_thread * total_threads - 1) / (variants_per_thread * total_threads);
 
-    // Launch kernel
-    variant_kernel<<<blocksPerGrid, threadsPerBlock>>>(
-        start_variant_id, 
-        end_variant_id, 
-        d_expected_value, 
-        d_mnemonic
-    );
+    std::cout << "Total iterations: " << iterations << std::endl;
+    std::cout << "Variants per thread: " << variants_per_thread << std::endl;
 
-    cudaError_t err = cudaGetLastError();
-    if (err != cudaSuccess) {
-        printf("Error launching kernel: %s\n", cudaGetErrorString(err));
-        cudaDeviceReset();
-        return -1;
-    }
+    for (unsigned long long iter = 0; iter < iterations; iter++) {
+        unsigned long long current_start = start_variant_id + iter * variants_per_thread * total_threads;
+        unsigned long long current_end = min(current_start + variants_per_thread * total_threads - 1, end_variant_id);
 
-    cudaDeviceSynchronize();
+        std::cout << "Iteration " << iter + 1 << "/" << iterations << ": " << current_start << " to " << current_end << std::endl;
 
-    err = cudaGetLastError();
-    if (err != cudaSuccess) {
-        printf("Error after synchronization: %s\n", cudaGetErrorString(err));
-        cudaDeviceReset();
-        return -1;
-    }
+        variant_kernel<<<MAX_BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
+            current_start, 
+            current_end, 
+            d_expected_value, 
+            d_mnemonic,
+            variants_per_thread
+        );
 
-    // Check if address was found
-    cudaMemcpyFromSymbol(&h_address_found, d_address_found, sizeof(bool));
-    if (h_address_found) {
-        cudaMemcpyFromSymbol(h_address_value, d_address_value, P_CHAIN_ADDRESS_LENGTH + 1);
-        printf("\nAddress found: %s\n", h_address_value);
-        cudaMemcpyFromSymbol(h_passphrase_value, d_passphrase_value, MAX_PASSPHRASE_LENGTH);
-        printf("Passphrase: %s\n", h_passphrase_value);
-
-        // Save results to file
-        std::ofstream result_file("result.txt");
-        if (result_file.is_open()) {
-            result_file << "Address: " << h_address_value << std::endl;
-            result_file << "Passphrase: " << h_passphrase_value << std::endl;
-            result_file.close();
-            std::cout << "Results saved to result.txt" << std::endl;
-        } else {
-            std::cerr << "Unable to open result.txt for writing" << std::endl;
+        cudaError_t err = cudaGetLastError();
+        if (err != cudaSuccess) {
+            printf("Error launching kernel: %s\n", cudaGetErrorString(err));
+            cudaDeviceReset();
+            return -1;
         }
-    } else {
+
+        cudaDeviceSynchronize();
+
+        bool h_address_found = false;
+        cudaMemcpyFromSymbol(&h_address_found, d_address_found, sizeof(bool));
+        
+        if (h_address_found) {
+            char h_address_value[P_CHAIN_ADDRESS_LENGTH + 1];
+            char h_passphrase_value[MAX_PASSPHRASE_LENGTH];
+            
+            cudaMemcpyFromSymbol(h_address_value, d_address_value, P_CHAIN_ADDRESS_LENGTH + 1);
+            cudaMemcpyFromSymbol(h_passphrase_value, d_passphrase_value, MAX_PASSPHRASE_LENGTH);
+            
+            printf("\nAddress found: %s\n", h_address_value);
+            printf("Passphrase: %s\n", h_passphrase_value);
+
+            // Save results to file
+            std::ofstream result_file("result.txt");
+            if (result_file.is_open()) {
+                result_file << "Address: " << h_address_value << std::endl;
+                result_file << "Passphrase: " << h_passphrase_value << std::endl;
+                result_file.close();
+                std::cout << "Results saved to result.txt" << std::endl;
+            } else {
+                std::cerr << "Unable to open result.txt for writing" << std::endl;
+            }
+            
+            break;  // Exit the loop if address is found
+        }
+    }
+
+    if (!h_address_found) {
         printf("\nAddress not found\n");
     }
 
