@@ -152,7 +152,7 @@ unsigned long long calculate_iterations(unsigned long long start_variant_id, uns
 
 int main() {
     int threadsPerBlock = 256;
-    int blocksPerGrid = 256; // TODO: Try to increase
+    int blocksPerGrid = 512;
 
     bool h_address_found = false;
     char h_address_value[P_CHAIN_ADDRESS_LENGTH + 1];
