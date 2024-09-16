@@ -25,11 +25,14 @@ def find_letter_variant(n):
 # variant_number = 18446744073709551614
 # variant_number = 46261
 # variant_number = 3337400
-variant_number = 131071
+# variant_number = 131071
+# variant_number = 262143
+# variant_number = 140737488355328
+variant_number = 1
 result = find_letter_variant(variant_number)
 print(f"The letter variant corresponding to {variant_number} is: {result}")
 
 # passphrase = 'passphrase'
-passphrase = 'book'
+passphrase = 'cv'
 variant_id = find_variant_id(passphrase)
 print(f"The variant ID corresponding to '{passphrase}' is: {variant_id}")

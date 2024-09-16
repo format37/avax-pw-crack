@@ -228,7 +228,7 @@ __device__ void hexStringTo33ByteArray(
             else hexValues[i] = 0xFF;  // Invalid character
         }
     }
-    __syncthreads();
+    // __syncthreads();
 
     for (int i = 0; i < PUBLIC_KEY_SIZE; ++i) {
         unsigned char highNibble = hexValues[(unsigned char)hexString[2 * i]];

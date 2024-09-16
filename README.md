@@ -64,3 +64,31 @@ Having unique test_passphrase and mnemonic, each thread need to:
 * Compare each avaxp address with the target address.  
 * If avaxp and target are matches, then put avaxp address to the target fariable and set stop_brute_forcing flag to true.  
 * If stop_brute_forcing is true then exit from the searching loop.  
+
+# Profiling with Nsight Compute in linux:
+* (Optional) install dbus if required:
+```
+sudo apt install dbus
+dbus-launch
+```
+* Disable the Watchdog Timer:
+```
+sudo nano /etc/X11/xorg.conf
+```
+Find the section and do the following changes:
+```
+Section "Device"
+    Identifier "Device0"
+    Driver     "nvidia"
+    Option     "Interactive" "0"
+EndSection
+```
+* Restart the system.
+* Run profiler from cmd:
+```
+/opt/nvidia/nsight-compute/2024.1.1/ncu --verbose ./program
+```
+or from GUI:
+```
+/opt/nvidia/nsight-compute/2024.1.1/ncu-ui
+```

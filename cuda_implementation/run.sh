@@ -8,7 +8,11 @@ start_time=$(date +%s.%N)
 # Print the current date
 echo Start: $(date)
 
-./program >> run.log
+# cuda-memcheck ./program >> run.log # OK
+# sudo nvvp ./program >> run.log
+# ncu --set full ./program >> run.log
+nsys profile ./program >> run.log # OK
+# nsys analyze -r gpu_time_util report1.sqlite # OK
 
 # Get the end time
 end_time=$(date +%s.%N)

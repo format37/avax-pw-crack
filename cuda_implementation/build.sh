@@ -15,9 +15,13 @@ echo Start building: $(date)
 # -g \ # Generate host code debug information
 # -G \ # Generate device code debug information
 # -O0 \ # Disable optimizations
+# -O3 \ # Enable optimizations
 nvcc \
     --threads 8 \
-    -O3 \
+    -g -O0 \
+    --ptxas-options=-v \
+    -maxrregcount=64 \
+    -lineinfo \
     main.cu \
     -arch=sm_86 \
     -I/home/alex/projects/avax-pw-crack/public/openssl_cuda_local/include/ \

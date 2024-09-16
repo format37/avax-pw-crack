@@ -5,12 +5,13 @@
 #include <stdio.h>
 #include <cuda.h>
 #include "bignum.h"
-#define MAX_PASSPHRASE_LENGTH 5 // book + null terminator
+#define MAX_PASSPHRASE_LENGTH 5 // "book" test word + null terminator. DON'T FORGET TO INCREASE
 #include "p_chain.h"
 #include "nlohmann/json.hpp"
 #include <cstring>
 #include <string.h>
 #include <limits.h>
+#include <nvtx3/nvToolsExt.h>
 
 #define P_CHAIN_ADDRESS_LENGTH 45  // Assuming the p-chain address is 45 characters long
 
@@ -19,6 +20,13 @@ __device__ char d_address_value[P_CHAIN_ADDRESS_LENGTH + 1];
 __device__ char d_passphrase_value[MAX_PASSPHRASE_LENGTH];
 
 #define OVERFLOW_FLAG ULLONG_MAX
+
+struct ThreadTiming {
+    int blockIdx;
+    int threadIdx;
+    long long startTime;
+    long long endTime;
+};
 
 unsigned long long find_variant_id(const char* s) {
     const char* alphabet = "abcdefghijklmnopqrstuvwxyz";
@@ -108,20 +116,28 @@ __global__ void variant_kernel(
     unsigned long long start_variant_id,
     unsigned long long end_variant_id, 
     const char *expected_value, 
-    const char *mnemonic
+    const char *mnemonic,
+    ThreadTiming *timings
 ) {
-    unsigned long long total_threads = gridDim.x * blockDim.x;
-    unsigned long long idx = blockIdx.x * blockDim.x + threadIdx.x;
-    unsigned long long global_idx = start_variant_id + idx;
+    int blockId = blockIdx.x;
+    int threadId = threadIdx.x;
+    int globalIdx = blockId * blockDim.x + threadId;
+    unsigned long long variant_id = start_variant_id + globalIdx;
     
-    while (global_idx <= end_variant_id && !d_address_found) {
+    // Record start time
+    long long start_time = clock64();
+    timings[globalIdx].blockIdx = blockId;
+    timings[globalIdx].threadIdx = threadId;
+    timings[globalIdx].startTime = start_time;
+    
+    while (variant_id <= end_variant_id && !d_address_found) {
         char local_passphrase_value[MAX_PASSPHRASE_LENGTH] = {0};
-        find_letter_variant(global_idx, local_passphrase_value);
+        find_letter_variant(variant_id, local_passphrase_value);
         
         // Calculate p-chain address
         P_CHAIN_ADDRESS_STRUCT p_chain_address = restore_p_chain_address((uint8_t*)mnemonic, local_passphrase_value);
         
-        if (my_strncmp(p_chain_address.data, expected_value, P_CHAIN_ADDRESS_LENGTH+1) == 0) {
+         if (my_strncmp(p_chain_address.data, expected_value, P_CHAIN_ADDRESS_LENGTH+1) == 0) {
             d_address_found = true;
             for (int i = 0; i < P_CHAIN_ADDRESS_LENGTH; i++) {
                 d_address_value[i] = p_chain_address.data[i];
@@ -133,16 +149,35 @@ __global__ void variant_kernel(
             d_address_value[P_CHAIN_ADDRESS_LENGTH] = '\0';
         }
         // Early exit if address is found
-        if (d_address_found) {
-            break;
-        }
-        if (global_idx == 45693) { // book
-            printf("# [%llu] %llu: %s\n", idx, global_idx, local_passphrase_value);
-            printf("# p_chain_address: %s\n", p_chain_address.data);
-        }
-        // Move to the next variant ID assigned to this thread
-        global_idx += total_threads;
+        if (d_address_found) break;
+        
+        variant_id += gridDim.x * blockDim.x;
     }
+    
+    // Record end time
+    long long end_time = clock64();
+    timings[globalIdx].endTime = end_time;
+}
+
+void write_timing_to_csv(const char* filename, ThreadTiming* timings, int num_threads) {
+    std::ofstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "Error opening file: " << filename << std::endl;
+        return;
+    }
+    
+    file << "BlockIdx,ThreadIdx,StartTime,EndTime,Duration" << std::endl;
+    
+    for (int i = 0; i < num_threads; i++) {
+        file << timings[i].blockIdx << ","
+             << timings[i].threadIdx << ","
+             << timings[i].startTime << ","
+             << timings[i].endTime << ","
+             << (timings[i].endTime - timings[i].startTime) << std::endl;
+    }
+    
+    file.close();
+    std::cout << "Timing data saved to " << filename << std::endl;
 }
 
 unsigned long long calculate_iterations(unsigned long long start_variant_id, unsigned long long end_variant_id, int h_max_threads) {
@@ -151,8 +186,15 @@ unsigned long long calculate_iterations(unsigned long long start_variant_id, uns
 }
 
 int main() {
-    int threadsPerBlock = 256;
-    int blocksPerGrid = 512;
+    // int threadsPerBlock = 256;
+    int threadsPerBlock = 1;
+    int blocksPerGrid = 1;
+    int totalThreads = threadsPerBlock * blocksPerGrid;
+
+    // Allocate memory for timing data
+    ThreadTiming *h_timings = new ThreadTiming[totalThreads];
+    ThreadTiming *d_timings;
+    cudaMalloc(&d_timings, totalThreads * sizeof(ThreadTiming));
 
     bool h_address_found = false;
     char h_address_value[P_CHAIN_ADDRESS_LENGTH + 1];
@@ -204,18 +246,22 @@ int main() {
     cudaMalloc((void**)&d_mnemonic, mnemonic.length() + 1);
     cudaMemcpy(d_mnemonic, mnemonic.c_str(), mnemonic.length() + 1, cudaMemcpyHostToDevice);
 
-    // Calculate total number of threads available
-    unsigned long long total_threads = blocksPerGrid * threadsPerBlock;
-    
     std::cout << "Launching kernel with " << blocksPerGrid << " blocks and " << threadsPerBlock << " threads per block" << std::endl;
     
+    // Start NVTX range
+    nvtxRangePush("KernelExecution");
+
     // Launch kernel
     variant_kernel<<<blocksPerGrid, threadsPerBlock>>>(
         start_variant_id, 
         end_variant_id, 
         d_expected_value, 
-        d_mnemonic
+        d_mnemonic,
+        d_timings
     );
+
+    // End NVTX range
+    nvtxRangePop();
 
     cudaError_t err = cudaGetLastError();
     if (err != cudaSuccess) {
@@ -232,6 +278,12 @@ int main() {
         cudaDeviceReset();
         return -1;
     }
+
+    // Copy timing data back to host
+    cudaMemcpy(h_timings, d_timings, totalThreads * sizeof(ThreadTiming), cudaMemcpyDeviceToHost);
+
+    // Write timing data to CSV
+    write_timing_to_csv("thread_timing.csv", h_timings, totalThreads);
 
     // Check if address was found
     cudaMemcpyFromSymbol(&h_address_found, d_address_found, sizeof(bool));
@@ -259,6 +311,9 @@ int main() {
     cudaFree(d_expected_value);
     cudaFree(d_mnemonic);
     cudaDeviceReset();
+
+    delete[] h_timings;
+    cudaFree(d_timings);
 
     return 0;
 }
