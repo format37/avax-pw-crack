@@ -91,22 +91,14 @@ __device__ void print_performance_report() {
 typedef struct bignum_st {
   BN_ULONG d[MAX_BIGNUM_SIZE];
   unsigned char top;
-  unsigned char dmax;
   bool neg;
 } BIGNUM;
-// typedef struct bignum_st {
-//     BN_ULONG *d; // Pointer to array of words
-//     int top;
-//     int dmax;
-//     int neg;
-// } BIGNUM;
 
 // Global zero-initialized BIGNUM
 __device__ const BN_ULONG ZERO_ARRAY[MAX_BIGNUM_SIZE] = {0};
 __device__ const BIGNUM ZERO_BIGNUM = {
     {0},                  // d (will be properly initialized in init_zero)
     1,                    // top (unsigned char)
-    MAX_BIGNUM_SIZE,      // dmax (unsigned char)
     0                    // neg (bool)
 };
 
@@ -114,13 +106,6 @@ __device__ const BIGNUM ZERO_BIGNUM = {
 __device__ void init_zero(BIGNUM *bn) {
     *bn = ZERO_BIGNUM;
 }
-// __device__ void init_zero(BIGNUM *bn) {
-//     bn->d = (BN_ULONG *)malloc(sizeof(BN_ULONG) * MAX_BIGNUM_SIZE);
-//     bn->top = 0;
-//     bn->dmax = MAX_BIGNUM_SIZE;
-//     bn->neg = 0;
-// }
-
 __device__ unsigned char find_top(const BIGNUM *bn) {
     for (int i = MAX_BIGNUM_SIZE - 1; i >= 0; i--) {
         if (bn->d[i] != 0) {
@@ -130,9 +115,8 @@ __device__ unsigned char find_top(const BIGNUM *bn) {
     return 1;
 }
 
-__device__ unsigned char find_top_optimized(const BIGNUM *bn, unsigned char start_index) {
-    // unsigned char start = max(start_index, (unsigned char)MAX_BIGNUM_SIZE);
-    unsigned char start = start_index > MAX_BIGNUM_SIZE ? MAX_BIGNUM_SIZE : start_index;
+__device__ unsigned char find_top_optimized(const BIGNUM *bn, const char start_index) {
+    const char start = start_index > MAX_BIGNUM_SIZE ? MAX_BIGNUM_SIZE : start_index;
     for (char i = start - 1; i >= 0; i--) {
         if (bn->d[i] != 0) {
             return i + 1;
@@ -141,31 +125,9 @@ __device__ unsigned char find_top_optimized(const BIGNUM *bn, unsigned char star
     return 1;
 }
 
-// __device__ __noinline__ int find_top(const BIGNUM *bn) {
-//     int top = bn->top;
-//     BN_ULONG *d = bn->d;
-//     while (top > 0 && d[top - 1] == 0) {
-//         top--;
-//     }
-//     return (top > 0) ? top : 1;
-// }
-// __device__ __noinline__ int find_top(const BIGNUM *bn) {
-//     int top = bn->top;
-//     while (top > 0 && bn->d[top - 1] == 0) {
-//         top--;
-//     }
-//     return (top > 0) ? top : 1;
-// }
-
-
 __device__ void free_bignum(BIGNUM *bn) {
     delete[] bn->d;
 }
-
-// Free BIGNUM
-// __device__ void free_bignum(BIGNUM *bn) {
-//     free(bn->d);
-// }
 
 __device__ void bn_print(const char* msg, BIGNUM* a) {
     if (!debug_print) return;
@@ -230,78 +192,6 @@ __device__ void bn_strcpy(char *dest, const char *src) {
     dest[i] = '\0';
 }
 
-__device__ void hexStringToByteArray_v0(const char *hexString, unsigned char *byteArray, int *byteArrayLength) {
-    *byteArrayLength = bn_strlen(hexString) / 2;
-    
-    for (int i = 0; i < *byteArrayLength; ++i) {
-        unsigned char byte = 0;
-        for (int j = 0; j < 2; ++j) {
-            char c = hexString[2 * i + j];
-            if (c >= '0' && c <= '9') {
-                byte = (byte << 4) | (c - '0');
-            } else if (c >= 'a' && c <= 'f') {
-                byte = (byte << 4) | (c - 'a' + 10);
-            } else if (c >= 'A' && c <= 'F') {
-                byte = (byte << 4) | (c - 'A' + 10);
-            }
-        }
-        byteArray[i] = byte;
-    }
-}
-
-__device__ void hexStringTo33ByteArray_0(
-    char hexString[PUBLIC_KEY_SIZE * 2 + 1], 
-    unsigned char *byteArray
-    ) {
-    
-    for (int i = 0; i < 33; ++i) {
-        unsigned char byte = 0;
-        for (int j = 0; j < 2; ++j) {
-            char c = hexString[2 * i + j];
-            if (c >= '0' && c <= '9') {
-                byte = (byte << 4) | (c - '0');
-            } else if (c >= 'a' && c <= 'f') {
-                byte = (byte << 4) | (c - 'a' + 10);
-            } else if (c >= 'A' && c <= 'F') {
-                byte = (byte << 4) | (c - 'A' + 10);
-            } else {
-                printf("Invalid character in hex string: %c\n", c);
-            }
-        }
-        byteArray[i] = byte;
-    }
-}
-
-__device__ void hexStringTo33ByteArray(
-        const char hexString[PUBLIC_KEY_SIZE * 2],
-        unsigned char byteArray[PUBLIC_KEY_SIZE]
-    ) {
-    __shared__ unsigned char hexValues[256];
-    
-    // Initialize the lookup table
-    if (threadIdx.x == 0) {
-        for (int i = 0; i < 256; i++) {
-            if (i >= '0' && i <= '9') hexValues[i] = i - '0';
-            else if (i >= 'a' && i <= 'f') hexValues[i] = i - 'a' + 10;
-            else if (i >= 'A' && i <= 'F') hexValues[i] = i - 'A' + 10;
-            else hexValues[i] = 0xFF;  // Invalid character
-        }
-    }
-    // __syncthreads();
-
-    for (int i = 0; i < PUBLIC_KEY_SIZE; ++i) {
-        unsigned char highNibble = hexValues[(unsigned char)hexString[2 * i]];
-        unsigned char lowNibble = hexValues[(unsigned char)hexString[2 * i + 1]];
-        
-        if (highNibble == 0xFF || lowNibble == 0xFF) {
-            printf("Invalid character in hex string at position %d\n", 2 * i);
-            return;
-        }
-        
-        byteArray[i] = (highNibble << 4) | lowNibble;
-    }
-}
-
 __device__ void print_as_hex_char(unsigned char *data, int len) {
     if (debug_print) {
         for (int i = 0; i < len; i++) {
@@ -343,8 +233,6 @@ __device__ void bn_print_reversed(const char* msg, BIGNUM* a) {
         printf("-");  // Handle the case where BIGNUM is negative
     }
     for (int i = 0; i < a->top; i++) {
-    //for (int i = 0; i < MAX_BIGNUM_WORDS; i++) {
-        // Print words up to top - 1 with appropriate formatting
         if (i == 0) {
             printf("%llx", a->d[i]);
         } else {
@@ -360,7 +248,7 @@ __device__ void debug_printf(const char *fmt, ...) {
     }
 }
 
-__device__ BN_ULONG bn_sub_words(BN_ULONG* r, BN_ULONG* a, BN_ULONG* b, int n) {
+__device__ BN_ULONG bn_sub_words(BN_ULONG* r, const BN_ULONG* a, const BN_ULONG* b, const int n) {
   
   BN_ULONG borrow = 0;
   for (int i = 0; i < n; i++) {
@@ -401,7 +289,7 @@ __device__ int bn_cmp(BIGNUM* a, BIGNUM* b) {
     if (a->neg != b->neg) {
         return a->neg ? -1 : 1;
     }
-    a->top = find_top(a);
+    // a->top = find_top(a);
     b->top = find_top(b);
     if (a->top != b->top) {
         return a->top > b->top ? 1 : -1;
@@ -466,28 +354,22 @@ __device__ void bn_copy(BIGNUM *dest, BIGNUM *src) {
         return;
     }
 
-    src->top = find_top(src);
-
     // Copy the neg and top fields
     dest->neg = src->neg;
     dest->top = src->top;
 
+    int i;
+
     // Copy the array of BN_ULONG digits.
-    for (int i = 0; i < src->top; i++) {
+    for (i = 0; i < src->top; i++) {
         dest->d[i] = src->d[i];
     }
 
     // Set the rest of the words in dest to 0 if dest's top is larger
-    for (int i = src->top; i < MAX_BIGNUM_SIZE; i++) {
+    for (i = src->top; i < MAX_BIGNUM_SIZE; i++) {
         dest->d[i] = 0;
     }
-
-    // Check dst top
-    int top = find_top(dest);
-    dest->top = top;
-
-    dest->dmax = src->dmax;
-    
+   
     // End the clock
     end = clock64();
     // Calculate the elapsed time
@@ -499,13 +381,15 @@ __device__ void absolute_add(BIGNUM *result, const BIGNUM *a, const BIGNUM *b) {
     unsigned char max_top = max(a->top, b->top);
     BN_ULONG carry = 0;
 
+    unsigned char i;
+
     // Initialize result
-    for (unsigned char i = 0; i <= max_top; ++i) {
+    for (i = 0; i <= max_top; ++i) {
         result->d[i] = 0;
     }
     result->top = max_top;
 
-    for (unsigned char i = 0; i <= max_top; ++i) {
+    for (i = 0; i <= max_top; ++i) {
         // Extract current words or zero if one bignum is shorter
         BN_ULONG ai = (i < a->top) ? a->d[i] : 0;
         BN_ULONG bi = (i < b->top) ? b->d[i] : 0;
@@ -532,17 +416,16 @@ __device__ void absolute_add(BIGNUM *result, const BIGNUM *a, const BIGNUM *b) {
     }
 
     // Find the real top after addition (no leading zeroes)
-    // result->top = find_top(result);
     result->top = find_top_optimized(result, max_top+1);
 }
 
 __device__ void absolute_subtract(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
 
-    int max_top = max(a->top, b->top);
+    unsigned char max_top = max(a->top, b->top);
     BN_ULONG borrow = 0;
     result->top = max_top;
 
-    for (int i = 0; i < max_top; ++i) {
+    for (unsigned char i = 0; i < max_top; ++i) {
         BN_ULONG ai = (i < a->top) ? a->d[i] : 0;
         BN_ULONG bi = (i < b->top) ? b->d[i] : 0;
 
@@ -569,7 +452,6 @@ __device__ void absolute_subtract(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
         result->top = 1;
         result->d[0] = 0;
     }
-
 }
 
 __device__ bool bn_subtract(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
@@ -594,9 +476,6 @@ __device__ bool bn_subtract(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
         result->neg = !a->neg;
         absolute_subtract(result, b, a);
     }
-
-    // Update result.top based on the actual data in result.
-    result->top = find_top(result);
 
     // Perform additional logic if underflow has been detected in absolute_subtract.
     if (result->top == 0) { 
@@ -686,10 +565,6 @@ __device__ bool bn_add(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
             result->d[0] = 0;
         }
     }
-
-    // Lastly, normalize the result to remove any leading zeros that could have appeared.
-    // find_top(result);
-    // find_top_optimized(result, max_top); // Don't need. Top was calculated before.
 
     record_function(FN_BN_ADD, start);
     return true;
@@ -833,7 +708,7 @@ __device__ void set_bn(BIGNUM *dest, const BIGNUM *src) {
     debug_printf("set_bn 0\n");
 
     // Check if dest has enough space to copy from src
-    if (dest->dmax < src->top) {
+    if (MAX_BIGNUM_SIZE < src->top) {    
         // Handle the situation appropriately
         // Depending on how memory is managed, this could be an error or resize operation
         return;
@@ -846,7 +721,7 @@ __device__ void set_bn(BIGNUM *dest, const BIGNUM *src) {
     }
 
     // Zero out any remaining entries in the array if the source 'top' is less than the dest 'dmax'
-    for (int i = src->top; i < dest->dmax; ++i) {
+    for (int i = src->top; i < MAX_BIGNUM_SIZE; ++i) {
         debug_printf("set_bn 2.%d\n", i);
         dest->d[i] = 0;
     }
@@ -880,6 +755,7 @@ __device__ int extended_gcd(BIGNUM *a, BIGNUM *mod, BIGNUM *x, BIGNUM *y) {
     BIGNUM zero;
     init_zero(&zero);
     BIGNUM temp_remainder;
+    init_zero(&temp_remainder);
 
     while (bn_cmp(&remainder, &zero) != 0) {
         bn_div(&last_remainder, &remainder, &quotient, &temp_remainder);
@@ -1167,12 +1043,6 @@ __device__ void point_double(EC_POINT *P, EC_POINT *R, BIGNUM *p) {
 }
 
 __device__ bool bn_is_zero(BIGNUM *a) {
-    // Check a top
-    int top = find_top(a);
-    if (top != a->top) {
-        // Set the top to the correct value
-        a->top = top;
-    }
     for (int i = 0; i < a->top; ++i) {
         if (a->d[i] != 0) {
             return false;
@@ -1286,10 +1156,10 @@ __device__ void bn_init_for_shift(BIGNUM *result, BIGNUM *a, int shift) {
 
     // Ensure result has enough space to hold the new value.
     // It should at least match the new_top or be the maximum allowed by MAX_BIGNUM_SIZE.
-    result->dmax = min(new_top, MAX_BIGNUM_SIZE);
+    unsigned char result_dmax = min(new_top, MAX_BIGNUM_SIZE);
 
     // Initialize the 'result' words to zero.
-    for (int i = 0; i < result->dmax; i++) {
+    for (int i = 0; i < result_dmax; i++) {
         result->d[i] = 0;
     }
 
@@ -1327,7 +1197,7 @@ __device__ void bn_lshift_res(BIGNUM *result, BIGNUM *a, int shift) {
 
     // Initialize any remaining higher-order words to zero if necessary
     // This depends on the internals of your BIGNUM structure.
-    for (int i = result->top; i < result->dmax; ++i) {
+    for (int i = result->top; i < MAX_BIGNUM_SIZE; ++i) {
         result->d[i] = 0;
     }
 }
@@ -1423,7 +1293,7 @@ __device__ void bn_rshift(BIGNUM *result, BIGNUM *a, int shift) {
     }
 
     // Initialize remaining higher-order words to zero
-    for (int i = result->top; i < result->dmax; ++i) {
+    for (int i = result->top; i < MAX_BIGNUM_SIZE; ++i) {
         result->d[i] = 0;
     }
 }
@@ -1693,8 +1563,10 @@ __device__ void left_shift(BIGNUM *a, int shift) {
         }
     }
 
-    // Update top
-    a->top = find_top(a);
+    // Calculate new top
+    unsigned char potential_new_top = a->top + (shift + BN_ULONG_NUM_BITS - 1) / BN_ULONG_NUM_BITS;
+    a->top = find_top_optimized(a, potential_new_top);
+
     record_function(FN_LEFT_SHIFT, start);
 }
 
@@ -1733,6 +1605,8 @@ __device__ int bn_div(BIGNUM *bn_quotient, BIGNUM *bn_remainder, BIGNUM *bn_divi
     }
     abs_dividend.neg = 0;
     abs_divisor.neg = 0;
+    abs_dividend.top = bn_dividend->top;
+    abs_divisor.top = bn_divisor->top;
 
     // Initialize quotient and remainder
     init_zero(bn_quotient);
@@ -1750,7 +1624,7 @@ __device__ int bn_div(BIGNUM *bn_quotient, BIGNUM *bn_remainder, BIGNUM *bn_divi
     // Perform long division
     BIGNUM current_dividend;
     init_zero(&current_dividend);
-    int dividend_size = find_top(&abs_dividend);
+    char dividend_size = abs_dividend.top;
 
     #if bn_mul_caching
         // Initialize cache arrays
@@ -1837,7 +1711,8 @@ __device__ int bn_div(BIGNUM *bn_quotient, BIGNUM *bn_remainder, BIGNUM *bn_divi
     }
 
     // Set remainder
-    for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
+    // for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
+    for (int i = 0; i < current_dividend.top; i++) {
         bn_remainder->d[i] = current_dividend.d[i];
     }
 
@@ -1846,8 +1721,8 @@ __device__ int bn_div(BIGNUM *bn_quotient, BIGNUM *bn_remainder, BIGNUM *bn_divi
     bn_remainder->neg = dividend_neg;
 
     // Normalize results
-    bn_quotient->top = find_top(bn_quotient);
-    bn_remainder->top = find_top(bn_remainder);
+    bn_quotient->top = find_top_optimized(bn_quotient, divs_max_top);
+    bn_remainder->top = find_top_optimized(bn_remainder, divs_max_top);
 
     record_function(FN_BN_DIV, start);
     return 1;
@@ -2094,8 +1969,6 @@ __device__ bool bn_mod_inverse(BIGNUM *result, BIGNUM *a, BIGNUM *n) {
     while (!bn_is_zero(&nr)) {
         bn_div(&q, &tmp, &r, &nr); // Compute quotient and remainder
         bn_copy(&tmp, &nt);
-        nt.top = find_top(&nt);
-        q.top = find_top(&q);
         bn_mul(&q, &nt, &tmp2); // tmp2 = q * nt
         init_zero(&tmp3);
         bn_subtract(&tmp3, &t, &tmp2); // tmp3 = t - tmp2
@@ -2435,7 +2308,6 @@ __device__ EC_POINT ec_point_scalar_mul(
     
     // Convert scalar BIGNUM to an array of integers that's easy to iterate bit-wise
     unsigned int bits[256];                          // Assuming a 256-bit scalar
-    scalar->top = find_top(scalar);
     bignum_to_bit_array(scalar, bits);    
     for (int i = 0; i < 256; i++) {                 // Assuming 256-bit scalars        
 
@@ -2508,6 +2380,7 @@ __device__ void GetPublicKey(uint8_t* buffer, uint8_t* key)
                             ((BN_ULONG)key[8*i + 6] << 8) | 
                             ((BN_ULONG)key[8*i + 7]);
     }
+    newKey.top = 4;
     
     // Initialize constants //TODO: Move it outside of each THREAD. Call once before instead and then sync
     init_zero(&CURVE_A);
@@ -2549,9 +2422,8 @@ __device__ void GetPublicKey(uint8_t* buffer, uint8_t* key)
     // reverse
     reverse_order(&G.x, TEST_BIGNUM_WORDS);
     reverse_order(&G.y, TEST_BIGNUM_WORDS);
-    // find top
-    G.x.top = find_top(&G.x);
-    G.y.top = find_top(&G.y);
+    G.x.top = TEST_BIGNUM_WORDS;
+    G.y.top = TEST_BIGNUM_WORDS;
 
     init_zero(&CURVE_P);
     // Init curve prime
@@ -2568,12 +2440,11 @@ __device__ void GetPublicKey(uint8_t* buffer, uint8_t* key)
         }
     // reverse
     reverse_order(&CURVE_P, TEST_BIGNUM_WORDS);
-    // find top
-    CURVE_P.top = find_top(&CURVE_P);
+    CURVE_P.top = TEST_BIGNUM_WORDS;
     // TODO: Check do we need to define curves, G and do reversing
     EC_POINT publicKey = ec_point_scalar_mul(&G, &newKey, &CURVE_P, &CURVE_A);    
     // Copy the public key to buffer
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < TEST_BIGNUM_WORDS; i++) {
         buffer[8*i] = (publicKey.x.d[3 - i] >> 56) & 0xFF;
         buffer[8*i + 1] = (publicKey.x.d[3 - i] >> 48) & 0xFF;
         buffer[8*i + 2] = (publicKey.x.d[3 - i] >> 40) & 0xFF;

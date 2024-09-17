@@ -63,7 +63,8 @@ unsigned long long find_variant_id(const char* s) {
     return result;
 }
 
-__device__ __forceinline__ void find_letter_variant(int variant_id, char* passphrase_value) {
+// __device__ __forceinline__ void find_letter_variant(int variant_id, char* passphrase_value) {
+__device__ void find_letter_variant(int variant_id, char* passphrase_value) {
     // Define alphabet as a constant array
     const char alphabet[] = "abcdefghijklmnopqrstuvwxyz";
     const int alphabet_length = 26;
