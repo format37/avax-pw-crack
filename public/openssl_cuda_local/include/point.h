@@ -100,6 +100,7 @@ __device__ void set_point_at_infinity(EC_POINT *point) {
     init_zero(&point->y);// Ensure that this logic matches how you identify point at infinity elsewhere
 }
 
+// TODO: Reuse temp variables as much as possible to reduce registers usage
 __device__ int point_add(
     EC_POINT *result, 
     EC_POINT *p1, 
