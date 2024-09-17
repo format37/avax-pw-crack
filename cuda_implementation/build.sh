@@ -16,11 +16,12 @@ echo Start building: $(date)
 # -G \ # Generate device code debug information
 # -O0 \ # Disable optimizations
 # -O3 \ # Enable optimizations
+# -maxrregcount=64 \
 nvcc \
     --threads 8 \
-    -g -O0 \
+    --fmad=false \
+    -Xptxas -O3 \
     --ptxas-options=-v \
-    -maxrregcount=64 \
     -lineinfo \
     main.cu \
     -arch=sm_86 \

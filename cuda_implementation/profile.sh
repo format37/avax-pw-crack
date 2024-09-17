@@ -12,7 +12,16 @@ echo Start profiling: $(date)
 # - basic
 # - pmsampling
 # - nvlink
-/opt/nvidia/nsight-compute/2024.1.1/ncu --nvtx --verbose --export report --force-overwrite --set full --target-processes all ./program >> profiler.log
+# --metrics sm__sass_average_data_live_registers,sm__sass_maximum_data_live_registers \
+/opt/nvidia/nsight-compute/2024.1.1/ncu \
+    --nvtx \
+    --verbose \
+    --export report \
+    --force-overwrite \
+    --set full \
+    --metrics live_registers \
+    --target-processes all \
+    ./program >> profiler.log
 # /opt/nvidia/nsight-compute/2024.1.1/ncu --nvtx --verbose --export report --force-overwrite --target-processes all ./program >> profiler.log
 
 # Get the end time

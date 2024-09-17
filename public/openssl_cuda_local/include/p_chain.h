@@ -3,6 +3,8 @@
 #include "ripmd160.h"
 #include "bech32.h"
 #include "bip32.h"
+#include "point.h"
+#include "public_key.h"
 #include "child_key.h"
 
 __device__ void strcpy_cuda(char *dest, const char *src) {
@@ -49,7 +51,6 @@ __device__ void generate_salt(const char* prefix, const char* passphrase, char* 
     salt[i] = '\0';
 }
 
-// __device__ P_CHAIN_ADDRESS_STRUCT restore_p_chain_address(uint8_t *m_mnemonic, char *passphrase) {
 __device__ P_CHAIN_ADDRESS_STRUCT restore_p_chain_address(uint8_t *m_mnemonic, char *passphrase) {
     P_CHAIN_ADDRESS_STRUCT completeAddress;
 
@@ -73,30 +74,6 @@ __device__ P_CHAIN_ADDRESS_STRUCT restore_p_chain_address(uint8_t *m_mnemonic, c
         salt[prefix_len + i] = passphrase[i];
     }
     salt[prefix_len + passphrase_len] = '\0'; // Null-terminate the salt
-    
-    // P_CHAIN_ADDRESS_STRUCT completeAddress;
-    // // Calculate the length of the passphrase
-    // int passphrase_len = 0;
-    // while (passphrase[passphrase_len] != '\0') {
-    //     passphrase_len++;
-    // }
-    
-    // // Calculate the total length of the salt
-    // const char *prefix = "mnemonic";
-    // int prefix_len = 8; // length of "mnemonic" including null terminator
-    // int salt_len = prefix_len + passphrase_len; // -1 to avoid double null terminator
-    
-    // // Allocate memory for the salt
-    // char *salt = (char*)malloc(salt_len);
-    
-    // // Copy the prefix and passphrase into the salt
-    // for (int i = 0; i < prefix_len; i++) {
-    //     salt[i] = prefix[i];
-    // }
-    // for (int i = 0; i < passphrase_len; i++) {
-    //     salt[prefix_len + i] = passphrase[i];
-    // }
-
     
     unsigned char bip39seed[64];  // This will hold the generated seed
     // Initialize bip39seed to zeros
@@ -145,9 +122,6 @@ __device__ P_CHAIN_ADDRESS_STRUCT restore_p_chain_address(uint8_t *m_mnemonic, c
     for (int i = 0; i < 33; i++) {
         publicKeyBytes[i] = buffer[i];
     }
-
-    // Ensure all threads have completed their work before proceeding
-    // __syncthreads(); // Don't need it for now
 
     // Compute SHA256
     uint8_t sha256Hash[SHA256_DIGEST_SIZE];

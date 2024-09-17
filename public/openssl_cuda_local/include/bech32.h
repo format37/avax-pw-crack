@@ -10,6 +10,7 @@
 #define MAX_RESULT_LEN 90
 #define MAX_HRP_LEN 20
 #define MAX_VALUES_LEN (MAX_HRP_LEN * 2 + 1 + RIPEMD160_DIGEST_LENGTH + CHECKSUM_LENGTH)
+__constant__ uint32_t poly_mod_generator[] = {0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3};
 
 __device__ void ConvertBytesTo5BitGroups(uint8_t *data, size_t len, uint8_t *result, size_t *result_len) {
     uint32_t buffer = 0;
@@ -46,12 +47,13 @@ __device__ void ExpandHrp(const char *hrp, uint8_t *ret) {
 
 __device__ uint32_t PolyMod(uint8_t *values, size_t len) {
     uint32_t chk = 1;
-    uint32_t generator[] = {0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3};
+    // uint32_t generator[] = {0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3};
     for (size_t i = 0; i < len; ++i) {
         uint8_t top = (chk >> 25);
         chk = (chk & 0x1ffffff) << 5 ^ values[i];
         for (int j = 0; j < 5; ++j) {
-            chk ^= ((top >> j) & 1) ? generator[j] : 0;
+            // chk ^= ((top >> j) & 1) ? generator[j] : 0;
+            chk ^= ((top >> j) & 1) ? poly_mod_generator[j] : 0;
         }
     }
     return chk;

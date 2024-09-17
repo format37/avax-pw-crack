@@ -12,7 +12,7 @@
 #define SHA256_BLOCK_SIZE 64
 #define SHA256_DIGEST_SIZE 32
 
-__constant__ uint32_t d_K[64] = {
+__device__ __constant__ uint32_t d_K[64] = {
     0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
     0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
     0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
@@ -29,17 +29,23 @@ struct SHA256_CTX {
     uint8_t buffer[SHA256_BLOCK_SIZE];
 };
 
-__device__ void sha256_init(SHA256_CTX *ctx) {
-    ctx->state[0] = 0x6a09e667;
-    ctx->state[1] = 0xbb67ae85;
-    ctx->state[2] = 0x3c6ef372;
-    ctx->state[3] = 0xa54ff53a;
-    ctx->state[4] = 0x510e527f;
-    ctx->state[5] = 0x9b05688c;
-    ctx->state[6] = 0x1f83d9ab;
-    ctx->state[7] = 0x5be0cd19;
-    ctx->count = 0;
-}
+// __device__ void sha256_init(SHA256_CTX *ctx) {
+//     ctx->state[0] = 0x6a09e667;
+//     ctx->state[1] = 0xbb67ae85;
+//     ctx->state[2] = 0x3c6ef372;
+//     ctx->state[3] = 0xa54ff53a;
+//     ctx->state[4] = 0x510e527f;
+//     ctx->state[5] = 0x9b05688c;
+//     ctx->state[6] = 0x1f83d9ab;
+//     ctx->state[7] = 0x5be0cd19;
+//     ctx->count = 0;
+// }
+// Global constant SHA256_CTX
+__device__ __constant__ SHA256_CTX global_ctx = {
+    {0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19},
+    0,
+    {0}
+};
 
 __device__ void sha256_transform(SHA256_CTX *ctx, const uint8_t *data) {
     uint32_t a, b, c, d, e, f, g, h, i, j, t1, t2, m[64];
@@ -133,8 +139,9 @@ __device__ void sha256_final(SHA256_CTX *ctx, uint8_t *hash) {
 }
 
 __device__ void compute_sha256(const uint8_t *msg, uint32_t mlen, uint8_t *outputHash) {
-    SHA256_CTX ctx;
-    sha256_init(&ctx);
+    // SHA256_CTX ctx;
+    // sha256_init(&ctx);
+    SHA256_CTX ctx = global_ctx;
     sha256_update(&ctx, msg, mlen);
     sha256_final(&ctx, outputHash);
 }
