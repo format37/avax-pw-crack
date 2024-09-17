@@ -5,8 +5,15 @@
 start_time=$(date +%s.%N)
 # Print the current date
 echo Start profiling: $(date)
-/opt/nvidia/nsight-compute/2024.1.1/ncu --nvtx --verbose --export report --force-overwrite --set full ./program >> profiler.log
-# /opt/nvidia/nsight-compute/2024.1.1/ncu --nvtx --verbose --export report --force-overwrite ./program >> profiler.log
+# set: 
+# - full: 5256 seconds
+# - detailed
+# - roofline
+# - basic
+# - pmsampling
+# - nvlink
+/opt/nvidia/nsight-compute/2024.1.1/ncu --nvtx --verbose --export report --force-overwrite --set full --target-processes all ./program >> profiler.log
+# /opt/nvidia/nsight-compute/2024.1.1/ncu --nvtx --verbose --export report --force-overwrite --target-processes all ./program >> profiler.log
 
 # Get the end time
 end_time=$(date +%s.%N)

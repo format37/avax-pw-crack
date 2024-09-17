@@ -166,9 +166,15 @@ __device__ static void sha512_transform(SHA512_CTX *s, const uint8_t *buf)
                ((uint64_t)buf[j + 4] << 24) | ((uint64_t)buf[j + 5] << 16) |
                ((uint64_t)buf[j + 6] << 8) | ((uint64_t)buf[j + 7]);
     }
+	uint64_t temp1, temp2, temp3, temp4;
     for (; i < 80; i++)
     {
-        m[i] = R1_64(m[i - 2]) + m[i - 7] + R0_64(m[i - 15]) + m[i - 16];
+        // m[i] = R1_64(m[i - 2]) + m[i - 7] + R0_64(m[i - 15]) + m[i - 16];
+		// Split into multiple operations:
+		m[i] = R1_64(m[i - 2]);
+		m[i] += m[i - 7];
+		m[i] += R0_64(m[i - 15]);
+		m[i] += m[i - 16];
     }
 
     a = s->h[0];
@@ -182,8 +188,16 @@ __device__ static void sha512_transform(SHA512_CTX *s, const uint8_t *buf)
 
     for (i = 0; i < 80; i++) // Increase loop limit to 80
     {
-        t1 = h + S1_64(e) + CH(e, f, g) + K[i] + m[i];
-        t2 = S0_64(a) + MAJ(a, b, c);
+        // t1 = h + S1_64(e) + CH(e, f, g) + K[i] + m[i];
+		t1 = h + S1_64(e);
+		t1 += CH(e, f, g);
+		t1 += K[i];
+		t1 += m[i];
+
+        // t2 = S0_64(a) + MAJ(a, b, c);
+		t2 = S0_64(a);
+		t2 += MAJ(a, b, c);
+		
         h = g;
         g = f;
         f = e;

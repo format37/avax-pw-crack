@@ -94,6 +94,78 @@ typedef struct bignum_st {
   unsigned char dmax;
   bool neg;
 } BIGNUM;
+// typedef struct bignum_st {
+//     BN_ULONG *d; // Pointer to array of words
+//     int top;
+//     int dmax;
+//     int neg;
+// } BIGNUM;
+
+// Global zero-initialized BIGNUM
+__device__ const BN_ULONG ZERO_ARRAY[MAX_BIGNUM_SIZE] = {0};
+__device__ const BIGNUM ZERO_BIGNUM = {
+    {0},                  // d (will be properly initialized in init_zero)
+    1,                    // top (unsigned char)
+    MAX_BIGNUM_SIZE,      // dmax (unsigned char)
+    0                    // neg (bool)
+};
+
+// // Initialize BIGNUM
+__device__ void init_zero(BIGNUM *bn) {
+    *bn = ZERO_BIGNUM;
+}
+// __device__ void init_zero(BIGNUM *bn) {
+//     bn->d = (BN_ULONG *)malloc(sizeof(BN_ULONG) * MAX_BIGNUM_SIZE);
+//     bn->top = 0;
+//     bn->dmax = MAX_BIGNUM_SIZE;
+//     bn->neg = 0;
+// }
+
+__device__ unsigned char find_top(const BIGNUM *bn) {
+    for (int i = MAX_BIGNUM_SIZE - 1; i >= 0; i--) {
+        if (bn->d[i] != 0) {
+            return i + 1;
+        }
+    }
+    return 1;
+}
+
+__device__ unsigned char find_top_optimized(const BIGNUM *bn, unsigned char start_index) {
+    // unsigned char start = max(start_index, (unsigned char)MAX_BIGNUM_SIZE);
+    unsigned char start = start_index > MAX_BIGNUM_SIZE ? MAX_BIGNUM_SIZE : start_index;
+    for (char i = start - 1; i >= 0; i--) {
+        if (bn->d[i] != 0) {
+            return i + 1;
+        }
+    }
+    return 1;
+}
+
+// __device__ __noinline__ int find_top(const BIGNUM *bn) {
+//     int top = bn->top;
+//     BN_ULONG *d = bn->d;
+//     while (top > 0 && d[top - 1] == 0) {
+//         top--;
+//     }
+//     return (top > 0) ? top : 1;
+// }
+// __device__ __noinline__ int find_top(const BIGNUM *bn) {
+//     int top = bn->top;
+//     while (top > 0 && bn->d[top - 1] == 0) {
+//         top--;
+//     }
+//     return (top > 0) ? top : 1;
+// }
+
+
+__device__ void free_bignum(BIGNUM *bn) {
+    delete[] bn->d;
+}
+
+// Free BIGNUM
+// __device__ void free_bignum(BIGNUM *bn) {
+//     free(bn->d);
+// }
 
 __device__ void bn_print(const char* msg, BIGNUM* a) {
     if (!debug_print) return;
@@ -134,19 +206,6 @@ __device__ void print_as_hex(const uint8_t *data, const uint32_t len) {
         printf("%02x", data[i]);
     }
     printf("\n");
-}
-
-// Global zero-initialized BIGNUM
-__device__ const BN_ULONG ZERO_ARRAY[MAX_BIGNUM_SIZE] = {0};
-__device__ const BIGNUM ZERO_BIGNUM = {
-    {0},                  // d (will be properly initialized in init_zero)
-    1,                    // top (unsigned char)
-    MAX_BIGNUM_SIZE,      // dmax (unsigned char)
-    0                    // neg (bool)
-};
-
-__device__ void init_zero(BIGNUM *bn) {
-    *bn = ZERO_BIGNUM;
 }
 
 __device__ bool bn_add(BIGNUM *result, BIGNUM *a, BIGNUM *b);
@@ -295,19 +354,6 @@ __device__ void bn_print_reversed(const char* msg, BIGNUM* a) {
     printf("\n");
 }
 
-__device__ int find_top(const BIGNUM *bn) {
-    for (int i = MAX_BIGNUM_SIZE - 1; i >= 0; i--) {
-        if (bn->d[i] != 0) {
-            return i + 1;
-        }
-    }
-    return 1;
-}
-
-__device__ void free_bignum(BIGNUM *bn) {
-    delete[] bn->d;
-}
-
 __device__ void debug_printf(const char *fmt, ...) {
     if (debug_print) {
         printf(fmt);
@@ -450,16 +496,16 @@ __device__ void bn_copy(BIGNUM *dest, BIGNUM *src) {
 
 __device__ void absolute_add(BIGNUM *result, const BIGNUM *a, const BIGNUM *b) {
     // Determine the maximum size to iterate over
-    int max_top = max(a->top, b->top);
+    unsigned char max_top = max(a->top, b->top);
     BN_ULONG carry = 0;
 
     // Initialize result
-    for (int i = 0; i <= max_top; ++i) {
+    for (unsigned char i = 0; i <= max_top; ++i) {
         result->d[i] = 0;
     }
     result->top = max_top;
 
-    for (int i = 0; i <= max_top; ++i) {
+    for (unsigned char i = 0; i <= max_top; ++i) {
         // Extract current words or zero if one bignum is shorter
         BN_ULONG ai = (i < a->top) ? a->d[i] : 0;
         BN_ULONG bi = (i < b->top) ? b->d[i] : 0;
@@ -486,7 +532,8 @@ __device__ void absolute_add(BIGNUM *result, const BIGNUM *a, const BIGNUM *b) {
     }
 
     // Find the real top after addition (no leading zeroes)
-    result->top = find_top(result);
+    // result->top = find_top(result);
+    result->top = find_top_optimized(result, max_top+1);
 }
 
 __device__ void absolute_subtract(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
@@ -614,6 +661,7 @@ __device__ void bn_add_private(BIGNUM* a, BIGNUM* b, BIGNUM* r) {
 __device__ bool bn_add(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
     clock_t start = clock64();
     init_zero(result);
+    unsigned char max_top = max(a->top, b->top);
 
     if (a->neg == b->neg) {
         // Both numbers have the same sign, so we can directly add them.
@@ -640,7 +688,9 @@ __device__ bool bn_add(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
     }
 
     // Lastly, normalize the result to remove any leading zeros that could have appeared.
-    find_top(result);
+    // find_top(result);
+    // find_top_optimized(result, max_top); // Don't need. Top was calculated before.
+
     record_function(FN_BN_ADD, start);
     return true;
 }
