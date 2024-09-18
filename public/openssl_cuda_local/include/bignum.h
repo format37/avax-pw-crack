@@ -3,10 +3,10 @@
 #include <stdio.h>
 #include <stdint.h>
 
-// #define BN_128
+#define BN_128
 
 #ifdef BN_128
-    #define BN_ULONG __int128
+    #define BN_ULONG unsigned __int128
     #define BN_ULONG_MAX ((BN_ULONG)-1)
     #define MAX_BIGNUM_SIZE 5     // Reduced from 10 to 5 due to __int128
 #else
