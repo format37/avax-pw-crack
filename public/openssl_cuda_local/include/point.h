@@ -3,6 +3,97 @@ struct EC_POINT {
   BIGNUM y;
 };
 
+__device__ bool bn_mod_inverse(BIGNUM *result, BIGNUM *a, BIGNUM *n) {
+    bool debug = 0;
+    if (bn_is_one(n)) {
+        return false;  // No modular inverse exists
+    }
+
+    BIGNUM r;
+    BIGNUM nr;
+    BIGNUM t;
+    BIGNUM nt;
+    BIGNUM q;
+    BIGNUM tmp;
+    BIGNUM tmp2;
+    BIGNUM tmp3;
+
+    init_zero(&r);
+    init_zero(&nr);
+    init_zero(&t);
+    init_one(&nt);
+    init_zero(&q);
+    init_zero(&tmp);
+    init_zero(&tmp2);
+    init_zero(&tmp3);
+
+    bn_copy(&r, n);
+    bn_mod(&nr, a, n); // Compute non-negative remainder of 'a' modulo 'n'
+    unsigned int counter = 0;
+    while (!bn_is_zero(&nr)) {
+        bn_div(&q, &tmp, &r, &nr); // Compute quotient and remainder
+        bn_copy(&tmp, &nt);
+        bn_mul(&q, &nt, &tmp2); // tmp2 = q * nt
+        init_zero(&tmp3);
+        bn_subtract(&tmp3, &t, &tmp2); // tmp3 = t - tmp2
+        bn_copy(&nt, &tmp3); // dst << src
+        bn_copy(&t, &tmp);
+        bn_copy(&tmp, &nr);
+        bn_mul(&q, &nr, &tmp2);
+        init_zero(&tmp3);
+        bn_subtract(&tmp3, &r, &tmp2); // tmp3 = r - tmp2
+        bn_copy(&nr, &tmp3);
+        bn_copy(&r, &tmp);
+        if (debug) counter++;
+    }
+
+    if (!bn_is_one(&r)) {
+        init_zero(result);
+        delete &r;
+        delete &nr;
+        delete &t;
+        delete &nt;
+        delete &q;
+        delete &tmp;
+        delete &tmp2;
+        return false; // No modular inverse exists
+    }
+
+    if (t.neg != 0) {
+        bn_add(&tmp2, &t, n); // tmp2 = t + n
+        bn_copy(&t, &tmp2);
+    }
+
+    bn_copy(result, &t);
+
+    delete &r;
+    delete &nr;
+    delete &t;
+    delete &nt;
+    delete &q;
+    delete &tmp;
+    delete &tmp2;
+    return true;
+}
+
+__device__ void bignum_to_bit_array(BIGNUM *n, unsigned int *bits) {
+    int index = 0;
+    
+    // Iterate through the words in reverse order
+    for (int i = 0; i < n->top; ++i) {
+        BN_ULONG word = n->d[i];
+        // For each word, iterate through bits from most significant to least significant
+        for (int j = 0; j < BN_ULONG_NUM_BITS; ++j) {
+            bits[index++] = (word >> j) & 1;
+        }
+    }
+
+    // If n->top < 4, fill the remaining bits with zeros
+    while (index < 256) {
+        bits[index++] = 0;
+    }
+}
+
 // In the current structure, we might use a specific value (e.g., 0 or -1) 
 // to represent the components of the point at infinity.
 // A version that uses 0 to signify the point at infinity could be:

@@ -1,15 +1,15 @@
 #define CURVE_P_VALUES_MAX_SIZE 4
 __device__ __constant__ BN_ULONG CURVE_GX_values[CURVE_P_VALUES_MAX_SIZE] = {
-        0x79BE667EF9DCBBAC,
-        0x55A06295CE870B07,
+        0x59F2815B16F81798,
         0x029BFCDB2DCE28D9,
-        0x59F2815B16F81798
+        0x55A06295CE870B07,
+        0x79BE667EF9DCBBAC
         };
 __device__ __constant__ BN_ULONG CURVE_GY_values[CURVE_P_VALUES_MAX_SIZE] = {
-        0x483ADA7726A3C465,
-        0x5DA4FBFC0E1108A8,
+        0x9C47D08FFB10D4B8,
         0xFD17B448A6855419,
-        0x9C47D08FFB10D4B8
+        0x5DA4FBFC0E1108A8,
+        0x483ADA7726A3C465
         };
 __device__ __constant__ BIGNUM CURVE_A = {0};
 __device__ __constant__ BIGNUM CURVE_P = {
@@ -47,13 +47,10 @@ __device__ void GetPublicKey(uint8_t* buffer, uint8_t* key)
             G.x.d[j] = CURVE_GX_values[j];
             G.y.d[j] = CURVE_GY_values[j];
         }
-    // reverse
-    reverse_order(&G.x, CURVE_P_VALUES_MAX_SIZE);
-    reverse_order(&G.y, CURVE_P_VALUES_MAX_SIZE);
     G.x.top = CURVE_P_VALUES_MAX_SIZE;
     G.y.top = CURVE_P_VALUES_MAX_SIZE;
 
-    // TODO: Check do we need to define curves, G and do reversing
+    // TODO: Check do we need to define extra G. Or we are able to use __constant__ CURVE_GX_values and CURVE_GY_values as new EC_POINT instead
     EC_POINT publicKey = ec_point_scalar_mul(&G, &newKey, &CURVE_P, &CURVE_A);    
     // Copy the public key to buffer
     for (int i = 0; i < CURVE_P_VALUES_MAX_SIZE; i++) {

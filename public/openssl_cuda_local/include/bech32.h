@@ -1,9 +1,3 @@
-// #include <stdio.h>
-// #include <string.h>
-// #include <stdlib.h>
-// #include <stdint.h>
-// #include "bignum.h"
-
 #define RIPEMD160_DIGEST_LENGTH 20
 #define CHECKSUM_LENGTH 6
 #define CHARSET "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
@@ -11,6 +5,24 @@
 #define MAX_HRP_LEN 20
 #define MAX_VALUES_LEN (MAX_HRP_LEN * 2 + 1 + RIPEMD160_DIGEST_LENGTH + CHECKSUM_LENGTH)
 __constant__ uint32_t poly_mod_generator[] = {0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3};
+
+__device__ size_t bn_strlen(const char *str) {
+    size_t len = 0;
+    while (*str != '\0') {
+        ++len;
+        ++str;
+    }
+    return len;
+}
+
+__device__ void bn_strcpy(char *dest, const char *src) {
+    size_t i = 0;
+    while (src[i] != '\0') {
+        dest[i] = src[i];
+        ++i;
+    }
+    dest[i] = '\0';
+}
 
 __device__ void ConvertBytesTo5BitGroups(uint8_t *data, size_t len, uint8_t *result, size_t *result_len) {
     uint32_t buffer = 0;

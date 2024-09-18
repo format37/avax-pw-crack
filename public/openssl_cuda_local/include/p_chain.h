@@ -7,6 +7,22 @@
 #include "public_key.h"
 #include "child_key.h"
 
+__device__ void bufferToHex(const uint8_t *buffer, char *output) {
+    // Init output
+    for (size_t i = 0; i < PUBLIC_KEY_SIZE * 2 + 1; i++) {
+        output[i] = '\0';
+        if (i > 66) {
+            printf("Error: bufferToHex output buffer overflow\n");
+        }
+    }
+    const char hex_chars[] = "0123456789abcdef";
+    for (size_t i = 0; i < PUBLIC_KEY_SIZE; i++) {
+        output[i * 2] = hex_chars[buffer[i] >> 4];
+        output[i * 2 + 1] = hex_chars[buffer[i] & 0xF];
+    }
+    output[PUBLIC_KEY_SIZE * 2] = '\0';
+}
+
 __device__ void strcpy_cuda(char *dest, const char *src) {
     while (*src) {
         *dest = *src;
