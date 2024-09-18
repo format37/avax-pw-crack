@@ -19,7 +19,6 @@ echo Start profiling: $(date)
     --export report \
     --force-overwrite \
     --set full \
-    --metrics live_registers \
     --target-processes all \
     ./program >> profiler.log
 # /opt/nvidia/nsight-compute/2024.1.1/ncu --nvtx --verbose --export report --force-overwrite --target-processes all ./program >> profiler.log

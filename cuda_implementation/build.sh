@@ -20,14 +20,15 @@ echo Start building: $(date)
 nvcc \
     --threads 8 \
     --fmad=false \
+    -maxrregcount 64 \
     -Xptxas -O3 \
     --ptxas-options=-v \
     -lineinfo \
-    main.cu \
     -arch=sm_86 \
     -I/home/alex/projects/avax-pw-crack/public/openssl_cuda_local/include/ \
     -lineinfo \
     -use_fast_math \
+    main.cu \
     -o program 2> build.log
 
 cat build.log
