@@ -922,7 +922,8 @@ __device__ void bn_mul_basecase(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
 }
 
 // Karatsuba multiplication
-__device__ void bn_mul_stack_overflow(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
+// Need to increase "error = cudaDeviceSetLimit(cudaLimitStackSize, 1024 * 64);" in main.cu to prevent overflow    
+__device__ void bn_mul_2(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
     init_zero(product);
 
     // Determine the size

@@ -188,9 +188,26 @@ unsigned long long calculate_iterations(unsigned long long start_variant_id, uns
 
 int main() {
     // int threadsPerBlock = 256;
-    int threadsPerBlock = 1;
+    int threadsPerBlock = 1024;
     int blocksPerGrid = 1;
     int totalThreads = threadsPerBlock * blocksPerGrid;
+
+    // Get the current stack size limit
+    size_t currentLimit;
+    cudaError_t error = cudaDeviceGetLimit(&currentLimit, cudaLimitStackSize);
+    if (error != cudaSuccess) {
+        printf("Error getting current stack size limit: %s\n", cudaGetErrorString(error));
+        return 1;
+    }
+    printf("Current stack size limit: %zu bytes\n", currentLimit);
+    size_t newLimit = 1024 * 64;
+    error = cudaDeviceSetLimit(cudaLimitStackSize, newLimit);
+    if (error == cudaSuccess) {
+        printf("Successfully set stack size limit to %zu bytes\n", newLimit);
+    } else {
+        printf("Failed to set stack size limit to %zu bytes. Error: %s\n", 
+               newLimit, cudaGetErrorString(error));
+    }
 
     // Allocate memory for timing data
     ThreadTiming *h_timings = new ThreadTiming[totalThreads];
