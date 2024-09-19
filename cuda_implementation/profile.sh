@@ -1,6 +1,9 @@
 # sudo apt install dbus
 # dbus-launch
 
+# remove old log
+rm -f profiler.log
+
 # Get the start time
 start_time=$(date +%s.%N)
 # Print the current date

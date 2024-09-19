@@ -188,8 +188,8 @@ unsigned long long calculate_iterations(unsigned long long start_variant_id, uns
 
 int main() {
     // int threadsPerBlock = 256;
-    int threadsPerBlock = 1;
-    int blocksPerGrid = 1;
+    int threadsPerBlock = 1024;
+    int blocksPerGrid = 4;
     int totalThreads = threadsPerBlock * blocksPerGrid;
 
     // Get the current stack size limit
