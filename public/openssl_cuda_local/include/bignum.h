@@ -15,7 +15,7 @@
     #define MAX_BIGNUM_SIZE 10
 #endif
 
-#define debug_print true
+#define debug_print false
 #define BN_ULONG_NUM_BITS (sizeof(BN_ULONG) * 8)
 #define PUBLIC_KEY_SIZE 33  // Assuming a 33-byte public key (compressed format)
 #define DEVICE_CLOCK_RATE 1708500
@@ -251,7 +251,7 @@ __device__ void absolute_add(BIGNUM *result, const BIGNUM *a, const BIGNUM *b) {
     result->top = find_top_optimized(result, max_top+1);
 }
 
-__device__ void absolute_subtract(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
+__device__ void absolute_subtract(BIGNUM *result, const BIGNUM *a, const BIGNUM *b) {
 
     unsigned char max_top = max(a->top, b->top);
     BN_ULONG borrow = 0;
@@ -887,7 +887,7 @@ __device__ void left_shift(BIGNUM *a, int shift) {
     a->top = find_top_optimized(a, potential_new_top);
 }
 
-__device__ int bn_div_x(BIGNUM *bn_quotient, BIGNUM *bn_remainder, BIGNUM *bn_dividend, BIGNUM *bn_divisor)
+__device__ int bn_div_deprecated(BIGNUM *bn_quotient, BIGNUM *bn_remainder, BIGNUM *bn_dividend, BIGNUM *bn_divisor)
 {
     // Store signs and work with absolute values
     int dividend_neg = bn_dividend->neg;
@@ -1101,7 +1101,7 @@ __device__ int bn_div_word(BIGNUM *bn_quotient, BN_ULONG *remainder, BIGNUM *bn_
     return 1;
 }
 
-__device__ int bn_div_y(BIGNUM *bn_quotient, BIGNUM *bn_remainder, BIGNUM *bn_dividend, BIGNUM *bn_divisor) {
+__device__ int bn_div_64(BIGNUM *bn_quotient, BIGNUM *bn_remainder, BIGNUM *bn_dividend, BIGNUM *bn_divisor) {
     // Handle signs and take absolute values
     int dividend_neg = bn_dividend->neg;
     int divisor_neg = bn_divisor->neg;
