@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <stdint.h>
 
-// #define BN_128
+#define BN_128
 
 #ifdef BN_128
     #define BN_ULONG unsigned __int128
@@ -454,7 +454,7 @@ __device__ void mod_inv(BIGNUM *value, BIGNUM *mod, BIGNUM *inv) {
     }
 }
 
-__device__ void bn_mul_version_0(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
+__device__ void bn_mul_64_version_0(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
     init_zero(product);
     
     // Perform multiplication of each word of a with each word of b
@@ -500,7 +500,7 @@ __device__ void bn_mul_version_0(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
     product->neg = (a->neg != b->neg) ? 1 : 0;
 }
 
-__device__ void bn_mul_version_1(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
+__device__ void bn_mul_64_version_1(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
     init_zero(product);
     
     for (int i = 0; i < a->top; ++i) {
@@ -598,7 +598,7 @@ __device__ void bn_mul_basecase(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
 
 // Karatsuba multiplication
 // Need to increase "error = cudaDeviceSetLimit(cudaLimitStackSize, 1024 * 64);" in main.cu to prevent overflow    
-__device__ void bn_mul_Karatsuba(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
+__device__ void bn_mul_Karatsuba_64(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
     init_zero(product);
 
     // Determine the size
@@ -674,16 +674,55 @@ __device__ void bn_mul_Karatsuba(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
 __device__ void bn_mul(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
     init_zero(product);
 
-    // Unroll loops if possible
-    for (int i = 0; i < a->top; i++) {
-        BN_ULONG carry = 0;
-        for (int j = 0; j < b->top; j++) {
-            unsigned __int128 temp = (unsigned __int128)a->d[i] * b->d[j] + product->d[i + j] + carry;
-            product->d[i + j] = (BN_ULONG)temp;
-            carry = (BN_ULONG)(temp >> 64);
+    #ifdef BN_128
+        for (int i = 0; i < a->top; ++i) {
+            uint64_t a_lo = (uint64_t)a->d[i];
+            uint64_t a_hi = (uint64_t)(a->d[i] >> 64);
+            BN_ULONG carry = 0;
+
+            for (int j = 0; j < b->top; ++j) {
+                uint64_t b_lo = (uint64_t)b->d[j];
+                uint64_t b_hi = (uint64_t)(b->d[j] >> 64);
+
+                // Multiply parts
+                unsigned __int128 lo_lo = (unsigned __int128)a_lo * b_lo;
+                unsigned __int128 lo_hi = (unsigned __int128)a_lo * b_hi;
+                unsigned __int128 hi_lo = (unsigned __int128)a_hi * b_lo;
+                unsigned __int128 hi_hi = (unsigned __int128)a_hi * b_hi;
+
+                // Cross terms
+                unsigned __int128 cross = lo_hi + hi_lo;
+                unsigned int cross_carry = (cross < lo_hi) ? 1 : 0;
+
+                // Combine lower 128 bits
+                unsigned __int128 temp_low = lo_lo + (cross << 64);
+                unsigned int low_carry = (temp_low < lo_lo) ? 1 : 0;
+
+                // Combine higher bits
+                unsigned __int128 temp_high = hi_hi + (cross >> 64) + cross_carry + low_carry;
+
+                // Add to product
+                unsigned __int128 sum = product->d[i + j] + temp_low + carry;
+                unsigned int sum_carry = (sum < product->d[i + j]) ? 1 : 0;
+                sum_carry += (sum < temp_low) ? 1 : 0;
+
+                product->d[i + j] = sum;
+                carry = temp_high + sum_carry;
+            }
+            product->d[i + b->top] = carry;
         }
-        product->d[i + b->top] = carry;
-    }
+    #else
+        // Unroll loops if possible
+        for (int i = 0; i < a->top; i++) {
+            BN_ULONG carry = 0;
+            for (int j = 0; j < b->top; j++) {
+                unsigned __int128 temp = (unsigned __int128)a->d[i] * b->d[j] + product->d[i + j] + carry;
+                product->d[i + j] = (BN_ULONG)temp;
+                carry = (BN_ULONG)(temp >> 64);
+            }
+            product->d[i + b->top] = carry;
+        }
+    #endif
 
     // Update the top
     product->top = a->top + b->top;

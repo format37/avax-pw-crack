@@ -4,6 +4,7 @@ rm -f program
 # nvcc -I/path/to/openssl/include -L/path/to/openssl/lib -lcrypto your_program.cu -o your_program
 nvcc \
     --ptxas-options=-v \
+    -lineinfo \
     -lcrypto \
     test.cu \
     -arch=sm_86 \

@@ -21,15 +21,15 @@ __global__ void kernel_test_mul(BN_ULONG_HOST *A, BN_ULONG_HOST *B, int *sign_a,
     a.neg = sign_a[0];
     b.neg = sign_b[0];
 
-    printf("\n");
-    for (int i = 0; i < MAX_BIGNUM_SIZE_HOST; ++i) {
-        printf("A[%d]: %llx\n", i, A[i]);
-    }
-    printf("\n");
-    for (int i = 0; i < MAX_BIGNUM_SIZE_HOST; ++i) {
-        printf("B[%d]: %llx\n", i, B[i]);
-    }
-    printf("\n");
+    // printf("\n");
+    // for (int i = 0; i < MAX_BIGNUM_SIZE_HOST; ++i) {
+    //     printf("A[%d]: %llx\n", i, A[i]);
+    // }
+    // printf("\n");
+    // for (int i = 0; i < MAX_BIGNUM_SIZE_HOST; ++i) {
+    //     printf("B[%d]: %llx\n", i, B[i]);
+    // }
+    // printf("\n");
 
     #ifdef BN_128
         for (int i = 0; i < MAX_BIGNUM_SIZE_HOST; i += 2) {
@@ -46,8 +46,8 @@ __global__ void kernel_test_mul(BN_ULONG_HOST *A, BN_ULONG_HOST *B, int *sign_a,
     a.top = find_top(&a);
     b.top = find_top(&b);
 
-    bn_print("# a : ", &a);
-    bn_print("# b : ", &b);
+    // bn_print("# CUDA a : ", &a);
+    // bn_print("# CUDA b : ", &b);
 
     bn_mul(&a, &b, &result);
 
@@ -64,7 +64,7 @@ __global__ void kernel_test_mul(BN_ULONG_HOST *A, BN_ULONG_HOST *B, int *sign_a,
     *Result_sign = result.neg;
     result.top = find_top(&result);
     // Print results
-    bn_print("# result: ", &result);
+    // bn_print("# CUDA result: ", &result);
 }
 
 void print_bn(const char* label, const BIGNUM* bn) {
@@ -182,14 +182,19 @@ int main() {
             printf("Test PASSED: CUDA and OpenSSL results match.\n");
         } else {
             printf("### Test FAILED: CUDA and OpenSSL results DO NOT MATCH. ###\n");
-            printf("CUDA result sign: %d\n", cuda_result_sign);
-            print_bn("OpenSSL result", result);
+            // Print a and b
+            print_bn("a", a);
+            print_bn("b", b);
+            printf("\nCUDA result: ");
+            for (int j = MAX_BIGNUM_SIZE_HOST - 1; j >= 0; --j) {
+                printf("%llx", cuda_result[j]);
+            }
+            print_bn("\nOpenSSL result", result);
         }
 
         BN_free(a);
         BN_free(b);
         BN_free(result);
-        // break;
     }
 
     cudaFree(d_A);
