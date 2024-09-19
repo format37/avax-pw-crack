@@ -983,7 +983,7 @@ __device__ int bn_div_deprecated(BIGNUM *bn_quotient, BIGNUM *bn_remainder, BIGN
     return 1;
 }
 
-__device__ int bn_div(BIGNUM *bn_quotient, BIGNUM *bn_remainder, BIGNUM *bn_dividend, BIGNUM *bn_divisor)
+__device__ int bn_div(BIGNUM *bn_quotient, BIGNUM *bn_remainder, __restrict__ BIGNUM *bn_dividend, __restrict__ BIGNUM *bn_divisor)
 {
     // Store signs and work with absolute values
     int dividend_neg = bn_dividend->neg;
@@ -1101,7 +1101,7 @@ __device__ int bn_div_word(BIGNUM *bn_quotient, BN_ULONG *remainder, BIGNUM *bn_
     return 1;
 }
 
-__device__ int bn_div_64(BIGNUM *bn_quotient, BIGNUM *bn_remainder, BIGNUM *bn_dividend, BIGNUM *bn_divisor) {
+__device__ int bn_div_64_prototype(BIGNUM *bn_quotient, BIGNUM *bn_remainder, BIGNUM *bn_dividend, BIGNUM *bn_divisor) {
     // Handle signs and take absolute values
     int dividend_neg = bn_dividend->neg;
     int divisor_neg = bn_divisor->neg;

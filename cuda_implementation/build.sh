@@ -8,10 +8,10 @@ rm -f program
 # nvcc public_openssl_cuda_local.cu -arch=sm_86 -I/home/alex/projects/avax-pw-crack/public/openssl_cuda_local/include/ -o program  -lbignum -lcrypto
 # nvcc -I/path/to/openssl/include -L/path/to/openssl/lib -lcrypto your_program.cu -o your_program
 # -lcrypto \
+# -maxrregcount 64 \
 nvcc \
     --ptxas-options=-v \
     -lineinfo \
-    -maxrregcount 64 \
     main.cu \
     -arch=sm_86 \
     -I/home/alex/projects/avax-pw-crack/public/openssl_cuda_local/include/ \
