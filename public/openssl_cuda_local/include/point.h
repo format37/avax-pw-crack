@@ -35,13 +35,13 @@ __device__ bool bn_mod_inverse(BIGNUM *result, BIGNUM *a, BIGNUM *n) {
         bn_copy(&tmp, &nt);
         bn_mul(&q, &nt, &tmp2); // tmp2 = q * nt
         init_zero(&tmp3);
-        bn_subtract(&tmp3, &t, &tmp2); // tmp3 = t - tmp2
+        bn_sub(&tmp3, &t, &tmp2); // tmp3 = t - tmp2
         bn_copy(&nt, &tmp3); // dst << src
         bn_copy(&t, &tmp);
         bn_copy(&tmp, &nr);
         bn_mul(&q, &nr, &tmp2);
         init_zero(&tmp3);
-        bn_subtract(&tmp3, &r, &tmp2); // tmp3 = r - tmp2
+        bn_sub(&tmp3, &r, &tmp2); // tmp3 = r - tmp2
         bn_copy(&nr, &tmp3);
         bn_copy(&r, &tmp);
         if (debug) counter++;
@@ -144,13 +144,13 @@ __device__ void point_double(EC_POINT *P, EC_POINT *R, BIGNUM *p) {
     set_bn(&m, &P->x);              // m = x
     
     bn_add(&m, &m, &m);             // m = 2x
-    bn_subtract(&xR, &m, &xR);           // xR = s^2 - 2x
+    bn_sub(&xR, &m, &xR);           // xR = s^2 - 2x
     bn_mod(&xR, p, &xR);            // Modulo operation
 
     // Compute yR = s * (x - xR) - y mod p
-    bn_subtract(&P->x, &xR, &yR);        // yR = x - xR
+    bn_sub(&P->x, &xR, &yR);        // yR = x - xR
     mod_mul(&s, &yR, p, &yR);       // yR = s * (x - xR)
-    bn_subtract(&yR, &P->y, &yR);        // yR = s * (x - xR) - y
+    bn_sub(&yR, &P->y, &yR);        // yR = s * (x - xR) - y
     bn_mod(&yR, p, &yR);            // Modulo operation
 
     // Copy results to R only after all calculations are complete to allow in-place doubling (P == R)
@@ -324,32 +324,32 @@ __device__ int point_add(
         init_zero(&tmp3);
         bn_copy(&tmp3, &s); // dst << src
         bn_mul(&tmp3, &tmp3, &x3);  // x3 = s^2
-        bn_subtract(&x3, &x3, &p1->x);  // x3 = x3 - p1.x
-        bn_subtract(&x3, &x3, &p1->x);  // x3 = x3 - p1.x
+        bn_sub(&x3, &x3, &p1->x);  // x3 = x3 - p1.x
+        bn_sub(&x3, &x3, &p1->x);  // x3 = x3 - p1.x
         init_zero(&tmp3);
         bn_copy(&tmp3, &x3); // dst << src
         bn_mod(&x3, &tmp3, p);  // x3 = x3 mod p
         init_zero(&tmp1);
-        bn_subtract(&tmp1, &p1->x, &x3);  // tmp1 = p1.x - x3
+        bn_sub(&tmp1, &p1->x, &x3);  // tmp1 = p1.x - x3
         init_zero(&tmp3);
         bn_copy(&tmp3, &s); // dst << src
         bn_mul(&tmp3, &tmp1, &y3);  // y3 = s * tmp1
         init_zero(&tmp3);
         bn_copy(&tmp3, &y3); // dst << src
-        bn_subtract(&y3, &tmp3, &p1->y);  // y3 = y3 - p1.y
+        bn_sub(&y3, &tmp3, &p1->y);  // y3 = y3 - p1.y
         init_zero(&tmp3);
         bn_copy(&tmp3, &y3); // dst << src
         bn_mod(&y3, &tmp3, p);  // y3 = y3 mod p
     } else {
         // Case 2: p1 != p2
         // Regular point addition
-        bn_subtract(&tmp1, &p2->y, &p1->y);
+        bn_sub(&tmp1, &p2->y, &p1->y);
         init_zero(&tmp3);
         bn_copy(&tmp3, &tmp1); // dst << src
         init_zero(&tmp1);
         bn_mod(&tmp1, &tmp3, p);           // tmp1 = (p2.y - p1.y) mod p 
         init_zero(&tmp2);
-        bn_subtract(&tmp2, &p2->x, &p1->x);
+        bn_sub(&tmp2, &p2->x, &p1->x);
         init_zero(&tmp3);
         bn_copy(&tmp3, &tmp2);
         bn_mod(&tmp2, &tmp3, p);           // tmp2 = (p2.x - p1.x) mod p
@@ -368,16 +368,16 @@ __device__ int point_add(
         bn_mul(&s, &tmp2, &x3); // a * b = product // x3 = s^2
         init_zero(&tmp2);
         bn_copy(&tmp2, &x3);
-        bn_subtract(&x3, &tmp2, &p1->x); // result = a - b
-        bn_subtract(&x3, &x3, &p2->x);          // x3 = s^2 - p1.x - p2.x
+        bn_sub(&x3, &tmp2, &p1->x); // result = a - b
+        bn_sub(&x3, &x3, &p2->x);          // x3 = s^2 - p1.x - p2.x
         init_zero(&tmp2);
         bn_copy(&tmp2, &x3);
         bn_mod(&x3, &tmp2, p); // x3 = tmp2 mod p
-        bn_subtract(&tmp1, &p1->x, &x3);
+        bn_sub(&tmp1, &p1->x, &x3);
         bn_mul(&s, &tmp1, &y3); // a * b = product
         init_zero(&tmp2);
         bn_copy(&tmp2, &y3);
-        bn_subtract(&y3, &tmp2, &p1->y);          // y3 = s * (p1.x - x3) - p1.y
+        bn_sub(&y3, &tmp2, &p1->y);          // y3 = s * (p1.x - x3) - p1.y
         init_zero(&tmp2);
         bn_copy(&tmp2, &y3);
         bn_mod(&y3, &tmp2, p);               // y3 = tmp2 mod p

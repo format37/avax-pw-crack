@@ -2,7 +2,7 @@
 # dbus-launch
 
 # remove old log
-rm -f profiler.log
+rm -f run.log
 
 # Get the start time
 start_time=$(date +%s.%N)
@@ -23,7 +23,7 @@ echo Start profiling: $(date)
     --force-overwrite \
     --set full \
     --target-processes all \
-    ./program >> profiler.log
+    ./program >> run.log
 # /opt/nvidia/nsight-compute/2024.1.1/ncu --nvtx --verbose --export report --force-overwrite --target-processes all ./program >> profiler.log
 
 # Get the end time

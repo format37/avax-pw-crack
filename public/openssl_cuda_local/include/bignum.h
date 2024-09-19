@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <stdint.h>
 
-#define BN_128
+// #define BN_128
 
 #ifdef BN_128
     #define BN_ULONG unsigned __int128
@@ -27,14 +27,32 @@ typedef struct bignum_st {
 } BIGNUM;
 
 // Initialize BIGNUM to zero
-__device__ const BIGNUM ZERO_BIGNUM = {
-    {0},                  // d (will be properly initialized in init_zero)
-    1,                    // top (unsigned char)
-    0                    // neg (bool)
-};
+#ifdef BN_128
+    __device__ const BIGNUM ZERO_BIGNUM = {
+        {0,0,0,0,0},                  // d (will be properly initialized in init_zero)
+        1,                    // top (unsigned char)
+        0                    // neg (bool)
+    };
+#else
+    __device__ const BIGNUM ZERO_BIGNUM = {
+        {0,0,0,0,0,0,0,0,0,0},                  // d (will be properly initialized in init_zero)
+        1,                    // top (unsigned char)
+        0                    // neg (bool)
+    };
+#endif
 
 __device__ void init_zero(BIGNUM *bn) {
     *bn = ZERO_BIGNUM;
+}
+__device__ void init_one(BIGNUM *bn) {
+    // Initialize the BIGNUM to zero
+    *bn = ZERO_BIGNUM;
+    
+    // Set the least significant word to 1
+    bn->d[0] = 1;
+    
+    // Set the top to 1 (as there is one significant digit)
+    bn->top = 1;
 }
 
 __device__ bool bn_add(BIGNUM *result, BIGNUM *a, BIGNUM *b);
@@ -101,17 +119,6 @@ __device__ void debug_printf(const char *fmt, ...) {
     if (debug_print) {
         printf(fmt);
     }
-}
-
-__device__ void init_one(BIGNUM *bn) {
-    // Initialize the BIGNUM to zero
-    *bn = ZERO_BIGNUM;
-    
-    // Set the least significant word to 1
-    bn->d[0] = 1;
-    
-    // Set the top to 1 (as there is one significant digit)
-    bn->top = 1;
 }
 
 __device__ int bn_cmp(BIGNUM* a, BIGNUM* b) {
@@ -279,7 +286,7 @@ __device__ void absolute_subtract(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
     }
 }
 
-__device__ bool bn_subtract(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
+__device__ bool bn_sub(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
     // If one is negative and the other is positive, it's essentially an addition.
     if (a->neg != b->neg) {
         result->neg = a->neg; // The sign will be the same as the sign of 'a'.
@@ -418,9 +425,9 @@ __device__ int extended_gcd(BIGNUM *a, BIGNUM *mod, BIGNUM *x, BIGNUM *y) {
         bn_copy(&temp_remainder, &swap_temp);
 
         bn_mul(&quotient, x, &temp); // temp = quotient*x
-        bn_subtract(&prev_x, &temp, &prev_x); // new prev_x = prev_x - temp
+        bn_sub(&prev_x, &temp, &prev_x); // new prev_x = prev_x - temp
         bn_mul(&quotient, y, &temp); // temp = quotient*y
-        bn_subtract(&last_y, &temp, &last_y); // new last_y = last_y - temp
+        bn_sub(&last_y, &temp, &last_y); // new last_y = last_y - temp
     }
 
     // Clean up
@@ -648,8 +655,8 @@ __device__ void bn_mul_Karatsuba_64(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
     // Compute z1 = (a0 + a1) * (b0 + b1) - z0 - z2
     BIGNUM z1, temp;
     bn_mul(&a0_plus_a1, &b0_plus_b1, &z1);
-    bn_subtract(&temp, &z1, &z0);
-    bn_subtract(&z1, &temp, &z2);
+    bn_sub(&temp, &z1, &z0);
+    bn_sub(&z1, &temp, &z2);
 
     // Shift z2 by 2*m words
     BIGNUM z2_shifted;
@@ -758,7 +765,7 @@ __device__ int bn_mod(BIGNUM *r, BIGNUM *a, BIGNUM *n) {
         // If the remainder is negative, add the absolute value of the divisor
         if (n->neg) {
             if (debug) printf("d is negative\n");
-            result = bn_subtract(&tmp, r, n); // tmp = r - n
+            result = bn_sub(&tmp, r, n); // tmp = r - n
             if (!result) {
                 return 0;
             }
@@ -880,7 +887,7 @@ __device__ void left_shift(BIGNUM *a, int shift) {
     a->top = find_top_optimized(a, potential_new_top);
 }
 
-__device__ int bn_div(BIGNUM *bn_quotient, BIGNUM *bn_remainder, BIGNUM *bn_dividend, BIGNUM *bn_divisor)
+__device__ int bn_div_x(BIGNUM *bn_quotient, BIGNUM *bn_remainder, BIGNUM *bn_dividend, BIGNUM *bn_divisor)
 {
     // Store signs and work with absolute values
     int dividend_neg = bn_dividend->neg;
@@ -957,7 +964,7 @@ __device__ int bn_div(BIGNUM *bn_quotient, BIGNUM *bn_remainder, BIGNUM *bn_divi
 
         bn_mul(&abs_divisor, &temp, &product);
 
-        bn_subtract(&current_dividend, &current_dividend, &product);
+        bn_sub(&current_dividend, &current_dividend, &product);
     }
 
     // Set remainder
@@ -973,5 +980,160 @@ __device__ int bn_div(BIGNUM *bn_quotient, BIGNUM *bn_remainder, BIGNUM *bn_divi
     // Normalize results
     bn_quotient->top = find_top_optimized(bn_quotient, divs_max_top);
     bn_remainder->top = find_top_optimized(bn_remainder, divs_max_top);
+    return 1;
+}
+
+__device__ int bn_div(BIGNUM *bn_quotient, BIGNUM *bn_remainder, BIGNUM *bn_dividend, BIGNUM *bn_divisor)
+{
+    // Store signs and work with absolute values
+    int dividend_neg = bn_dividend->neg;
+    int divisor_neg = bn_divisor->neg;
+    BIGNUM abs_dividend, abs_divisor;
+    init_zero(&abs_dividend);
+    init_zero(&abs_divisor);
+
+    unsigned char divs_max_top = (bn_dividend->top > bn_divisor->top) ? bn_dividend->top : bn_divisor->top;
+
+    // Copy absolute values
+    for (int i = 0; i < divs_max_top; i++) {
+        abs_dividend.d[i] = bn_dividend->d[i];
+        abs_divisor.d[i] = bn_divisor->d[i];
+    }
+    abs_dividend.neg = 0;
+    abs_divisor.neg = 0;
+    abs_dividend.top = bn_dividend->top;
+    abs_divisor.top = bn_divisor->top;
+
+    // Initialize quotient and remainder
+    init_zero(bn_quotient);
+    init_zero(bn_remainder);
+
+    // Handle special cases
+    if (bn_cmp(&abs_dividend, &abs_divisor) == 0) {
+        bn_quotient->d[0] = 1;
+        bn_quotient->top = 1;
+        bn_quotient->neg = (dividend_neg != divisor_neg);
+        printf("abs_dividend == abs_divisor. Quotient = 1\n");
+        return 1;
+    }
+    // Perform long division
+    BIGNUM current_dividend;
+    init_zero(&current_dividend);
+    char dividend_size = abs_dividend.top;
+
+    for (int i = dividend_size - 1; i >= 0; i--) {
+        // Shift current_dividend left by one word and add next word of dividend
+        left_shift(&current_dividend, BN_ULONG_NUM_BITS);
+        current_dividend.d[0] = abs_dividend.d[i];
+
+        // Find quotient digit
+        BN_ULONG q = 0;
+        BN_ULONG left = 0, right = BN_ULONG_MAX;
+        while (left <= right) {
+            BN_ULONG mid = left + (right - left) / 2;
+            BIGNUM temp, product;
+            init_zero(&temp);
+            init_zero(&product);
+            temp.d[0] = mid;
+            temp.top = 1;
+
+            bn_mul(&abs_divisor, &temp, &product);
+
+            if (bn_cmp(&product, &current_dividend) <= 0) {
+                q = mid;
+                left = mid + 1;
+            } else {
+                right = mid - 1;
+            }
+        }
+
+        // Add quotient digit to result
+        left_shift(bn_quotient, 64);
+        bn_quotient->d[0] |= q;
+
+        // Subtract q * divisor from current_dividend
+        BIGNUM temp, product;
+        init_zero(&temp);
+        init_zero(&product);
+        temp.d[0] = q;
+        temp.top = 1;
+
+        bn_mul(&abs_divisor, &temp, &product);
+
+        bn_sub(&current_dividend, &current_dividend, &product);
+    }
+
+    // Set remainder
+    // for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
+    for (int i = 0; i < current_dividend.top; i++) {
+        bn_remainder->d[i] = current_dividend.d[i];
+    }
+
+    // Apply correct signs
+    bn_quotient->neg = (dividend_neg != divisor_neg);
+    bn_remainder->neg = dividend_neg;
+
+    // Normalize results
+    bn_quotient->top = find_top_optimized(bn_quotient, divs_max_top);
+    bn_remainder->top = find_top_optimized(bn_remainder, divs_max_top);
+    return 1;
+}
+
+__device__ int bn_div_word(BIGNUM *bn_quotient, BN_ULONG *remainder, BIGNUM *bn_dividend, BN_ULONG bn_divisor) {
+    init_zero(bn_quotient);
+    BN_ULONG rem = 0;
+
+    for (int i = bn_dividend->top - 1; i >= 0; i--) {
+        __uint128_t dividend_part = ((__uint128_t)rem << BN_ULONG_NUM_BITS) | bn_dividend->d[i];
+        BN_ULONG qword = dividend_part / bn_divisor;
+        rem = dividend_part % bn_divisor;
+
+        bn_quotient->d[i] = qword;
+    }
+    bn_quotient->top = bn_dividend->top;
+    *remainder = rem;
+
+    // Adjust top
+    while (bn_quotient->top > 0 && bn_quotient->d[bn_quotient->top - 1] == 0) {
+        bn_quotient->top--;
+    }
+
+    return 1;
+}
+
+__device__ int bn_div_y(BIGNUM *bn_quotient, BIGNUM *bn_remainder, BIGNUM *bn_dividend, BIGNUM *bn_divisor) {
+    // Handle signs and take absolute values
+    int dividend_neg = bn_dividend->neg;
+    int divisor_neg = bn_divisor->neg;
+    BIGNUM abs_dividend, abs_divisor;
+    bn_copy(&abs_dividend, bn_dividend);
+    bn_copy(&abs_divisor, bn_divisor);
+    abs_dividend.neg = 0;
+    abs_divisor.neg = 0;
+
+    init_zero(bn_quotient);
+    init_zero(bn_remainder);
+
+    // If divisor is zero, return error
+    if (bn_is_zero(&abs_divisor)) {
+        printf("Division by zero error\n");
+        return 0;
+    }
+
+    // If divisor is single-word, use bn_div_word
+    if (abs_divisor.top == 1) {
+        BN_ULONG rem;
+        bn_div_word(bn_quotient, &rem, &abs_dividend, abs_divisor.d[0]);
+        bn_remainder->d[0] = rem;
+        bn_remainder->top = (rem == 0) ? 0 : 1;
+    } else {
+        // Implement multi-word division algorithm here
+        // This requires more complex logic
+    }
+
+    // Set signs
+    bn_quotient->neg = (dividend_neg != divisor_neg);
+    bn_remainder->neg = dividend_neg;
+
     return 1;
 }
