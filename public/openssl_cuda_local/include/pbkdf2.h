@@ -383,28 +383,6 @@ __device__ PBKDF2_SHA512_DEF void pbkdf2_sha512(HMAC_SHA512_CTX *hmac,
 	}	
 }
 
-__device__ void compute_sha(const uint8_t *msg, uint32_t mlen)
-{
-	uint8_t md[SHA512_DIGESTLEN] = {0};  // Initialize to zero
-    SHA512_CTX sha;
-    sha512_init(&sha);
-    sha512_update(&sha, msg, mlen);
-    sha512_final(&sha, md);
-    printf("SHA-512: ");
-    print_as_hex(md, sizeof md);
-}
-
-__device__ void compute_hmac(const uint8_t *key, uint32_t klen, const uint8_t *msg, uint32_t mlen)
-{
-	uint8_t md[SHA512_DIGESTLEN];
-	HMAC_SHA512_CTX hmac;
-	hmac_sha512_init(&hmac, key, klen);
-	hmac_sha512_update(&hmac, msg, mlen);
-	hmac_sha512_final(&hmac, md);
-    printf("HMAC: ");
-	print_as_hex(md, sizeof md);
-}
-
 __device__ void compute_pbkdf2(
     const uint8_t *key,
     uint32_t klen,

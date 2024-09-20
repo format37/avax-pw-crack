@@ -6,16 +6,6 @@ __device__ void my_cuda_memcpy_uint32_t(uint32_t *dst, const uint32_t *src, unsi
     }
 }
 
-__device__ void my_cuda_memcpy_uint32_t_to_unsigned_char(unsigned char *dst, const uint32_t *src, unsigned int n) {
-    for (unsigned int i = 0; i < n / sizeof(uint32_t); ++i) {
-        uint32_t val = src[i];
-        dst[4 * i] = (val) & 0xFF;
-        dst[4 * i + 1] = (val >> 8) & 0xFF;
-        dst[4 * i + 2] = (val >> 16) & 0xFF;
-        dst[4 * i + 3] = (val >> 24) & 0xFF;
-    }
-}
-
 __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uint32_t index) {
 	// printf("++ GetChildKeyDerivation ++\n");
     // printf(">> key: ");

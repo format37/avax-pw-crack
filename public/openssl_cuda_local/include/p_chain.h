@@ -46,27 +46,6 @@ struct P_CHAIN_ADDRESS_STRUCT {
     char data[MAX_RESULT_LEN + 2];
 };
 
-__device__ void generate_salt(const char* prefix, const char* passphrase, char* salt, int max_salt_len) {
-    int i = 0;
-    int j = 0;
-
-    // Copy prefix
-    while (prefix[i] != '\0' && i < max_salt_len - 1) {
-        salt[i] = prefix[i];
-        i++;
-    }
-
-    // Copy passphrase
-    while (passphrase[j] != '\0' && i < max_salt_len - 1) {
-        salt[i] = passphrase[j];
-        i++;
-        j++;
-    }
-
-    // Null-terminate the salt
-    salt[i] = '\0';
-}
-
 __device__ P_CHAIN_ADDRESS_STRUCT restore_p_chain_address(uint8_t *m_mnemonic, char *passphrase) {
     P_CHAIN_ADDRESS_STRUCT completeAddress;
 
