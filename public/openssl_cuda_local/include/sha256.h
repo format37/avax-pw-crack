@@ -3,6 +3,14 @@
 
 // #define CH(x,y,z)  ((z) ^ ((x) & ((y) ^ (z)))) // SHA256 version
 // #define MAJ(x,y,z) (((x) & (y)) | ((z) & ((x) | (y)))) // SHA256 version
+
+// o1 suggestion:
+// #define CH(x,y,z)  (((x) & (y)) ^ (~(x) & (z)))
+// #define MAJ(x,y,z) (((x) & (y)) ^ ((x) & (z)) ^ ((y) & (z)))
+
+#define CH(x,y,z)  (z ^ (x & (y ^ z))) // pbkdf2 version
+#define MAJ(x,y,z) ((x & y) | (z & (x | y))) // pbkdf2 version
+
 #define ROTR(x,n)  (((x) >> (n)) | ((x) << (32 - (n))))
 #define S0(x)      (ROTR(x, 2) ^ ROTR(x,13) ^ ROTR(x,22))
 #define S1(x)      (ROTR(x, 6) ^ ROTR(x,11) ^ ROTR(x,25))
@@ -23,31 +31,19 @@ __device__ __constant__ uint32_t d_K[64] = {
     0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
 };
 
-struct SHA256_CTX {
+struct SHA256_CTX_CUDA {
     uint32_t state[8];
     uint64_t count;
     uint8_t buffer[SHA256_BLOCK_SIZE];
 };
 
-// __device__ void sha256_init(SHA256_CTX *ctx) {
-//     ctx->state[0] = 0x6a09e667;
-//     ctx->state[1] = 0xbb67ae85;
-//     ctx->state[2] = 0x3c6ef372;
-//     ctx->state[3] = 0xa54ff53a;
-//     ctx->state[4] = 0x510e527f;
-//     ctx->state[5] = 0x9b05688c;
-//     ctx->state[6] = 0x1f83d9ab;
-//     ctx->state[7] = 0x5be0cd19;
-//     ctx->count = 0;
-// }
-// Global constant SHA256_CTX
-__device__ __constant__ SHA256_CTX global_ctx = {
+__device__ __constant__ SHA256_CTX_CUDA global_ctx = {
     {0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19},
     0,
     {0}
 };
 
-__device__ void sha256_transform(SHA256_CTX *ctx, const uint8_t *data) {
+__device__ void sha256_transform(SHA256_CTX_CUDA *ctx, const uint8_t *data) {
     uint32_t a, b, c, d, e, f, g, h, i, j, t1, t2, m[64];
 
     for (i = 0, j = 0; i < 16; ++i, j += 4)
@@ -87,7 +83,7 @@ __device__ void sha256_transform(SHA256_CTX *ctx, const uint8_t *data) {
     ctx->state[7] += h;
 }
 
-__device__ void sha256_update(SHA256_CTX *ctx, const uint8_t *data, size_t len) {
+__device__ void sha256_update(SHA256_CTX_CUDA *ctx, const uint8_t *data, size_t len) {
     size_t i;
 
     for (i = 0; i < len; ++i) {
@@ -99,7 +95,7 @@ __device__ void sha256_update(SHA256_CTX *ctx, const uint8_t *data, size_t len) 
     }
 }
 
-__device__ void sha256_final(SHA256_CTX *ctx, uint8_t *hash) {
+__device__ void sha256_final(SHA256_CTX_CUDA *ctx, uint8_t *hash) {
     uint32_t i;
     uint64_t bits_count = ctx->count * 8;
 
@@ -139,16 +135,7 @@ __device__ void sha256_final(SHA256_CTX *ctx, uint8_t *hash) {
 }
 
 __device__ void compute_sha256(const uint8_t *msg, uint32_t mlen, uint8_t *outputHash) {
-    // SHA256_CTX ctx;
-    // sha256_init(&ctx);
-    SHA256_CTX ctx = global_ctx;
+    SHA256_CTX_CUDA ctx = global_ctx;
     sha256_update(&ctx, msg, mlen);
     sha256_final(&ctx, outputHash);
 }
-
-// __device__ void print_as_hex(const uint8_t *data, const uint32_t len) {
-//     for (uint32_t i = 0; i < len; i++) {
-//         printf("%02x", data[i]);
-//     }
-//     printf("\n");
-// }
