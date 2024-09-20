@@ -60,26 +60,11 @@ __device__ int bn_mod(BIGNUM *r, BIGNUM *m, BIGNUM *d);
 __device__ bool bn_is_zero(BIGNUM *a);
 
 __device__ unsigned char find_top(const BIGNUM *bn) {
-    #ifdef BN_128
-        for (int i = MAX_BIGNUM_SIZE - 1; i >= 0; i--) {
-            if (bn->d[i] != 0) {
-                // For 128-bit, we need to check both high and low 64-bit parts
-                uint64_t high = (uint64_t)(bn->d[i] >> 64);
-                uint64_t low = (uint64_t)(bn->d[i]);
-                if (high != 0) {
-                    return i * 2 + 2;
-                } else {
-                    return i * 2 + 1;
-                }
-            }
+    for (int i = MAX_BIGNUM_SIZE - 1; i >= 0; i--) {
+        if (bn->d[i] != 0) {
+            return i + 1;
         }
-    #else
-        for (int i = MAX_BIGNUM_SIZE - 1; i >= 0; i--) {
-            if (bn->d[i] != 0) {
-                return i + 1;
-            }
-        }
-    #endif
+    }
     return 1;
 }
 
@@ -1094,6 +1079,106 @@ __device__ int bn_div(BIGNUM *bn_quotient, BIGNUM *bn_remainder, __restrict__ BI
     return 1;
 }
 
+__device__ void bn_mul_word(BIGNUM *bn, BN_ULONG w, BIGNUM *result) {
+    init_zero(result);
+    BN_ULONG carry = 0;
+    for (int i = 0; i < bn->top; ++i) {
+        __uint128_t temp = (__uint128_t)bn->d[i] * w + carry;
+        result->d[i] = (BN_ULONG)temp;
+        carry = (BN_ULONG)(temp >> BN_ULONG_NUM_BITS);
+    }
+    if (carry != 0) {
+        result->d[bn->top] = carry;
+        result->top = bn->top + 1;
+    } else {
+        result->top = bn->top;
+    }
+}
+
+__device__ int bn_div_prototype_01(BIGNUM *bn_quotient, BIGNUM *bn_remainder, __restrict__ BIGNUM *bn_dividend, __restrict__ BIGNUM *bn_divisor) {
+    // Store signs and work with absolute values
+    int dividend_neg = bn_dividend->neg;
+    int divisor_neg = bn_divisor->neg;
+    BIGNUM abs_dividend, abs_divisor;
+    bn_copy(&abs_dividend, bn_dividend);
+    bn_copy(&abs_divisor, bn_divisor);
+    abs_dividend.neg = 0;
+    abs_divisor.neg = 0;
+
+    init_zero(bn_quotient);
+    init_zero(bn_remainder);
+
+    // If divisor is zero, return error
+    if (bn_is_zero(&abs_divisor)) {
+        printf("Division by zero error\n");
+        return 0;
+    }
+
+    // Initialize quotient size
+    bn_quotient->top = abs_dividend.top;
+
+    // Initialize current_dividend
+    BIGNUM current_dividend;
+    init_zero(&current_dividend);
+
+    // Main division loop
+    for (int i = abs_dividend.top - 1; i >= 0; i--) {
+        // Shift current_dividend left by BN_ULONG_NUM_BITS bits
+        left_shift(&current_dividend, BN_ULONG_NUM_BITS);
+
+        // Add next word from dividend
+        current_dividend.d[0] = abs_dividend.d[i];
+        current_dividend.top = find_top_optimized(&current_dividend, current_dividend.top + 1);
+
+        // Estimate quotient digit
+        BN_ULONG q = 0;
+        if (current_dividend.top >= abs_divisor.top) {
+            BN_ULONG u1 = current_dividend.d[current_dividend.top - 1];
+            BN_ULONG v1 = abs_divisor.d[abs_divisor.top - 1];
+
+            if (current_dividend.top > abs_divisor.top) {
+                q = BN_ULONG_MAX;
+            } else {
+                q = u1 / v1;
+                if (q == 0) q = 1;
+            }
+        } else {
+            q = 0;
+        }
+
+        // Multiply q * abs_divisor
+        BIGNUM temp_product;
+        bn_mul_word(&abs_divisor, q, &temp_product);
+
+        // Adjust q if necessary
+        while (bn_cmp(&temp_product, &current_dividend) > 0) {
+            q--;
+            bn_mul_word(&abs_divisor, q, &temp_product);
+        }
+
+        // Subtract temp_product from current_dividend
+        bn_sub(&current_dividend, &current_dividend, &temp_product);
+
+        // Store q in bn_quotient
+        bn_quotient->d[i] = q;
+    }
+
+    // Copy current_dividend to bn_remainder
+    bn_copy(bn_remainder, &current_dividend);
+
+    // Adjust quotient top
+    bn_quotient->top = abs_dividend.top;
+    while (bn_quotient->top > 0 && bn_quotient->d[bn_quotient->top - 1] == 0) {
+        bn_quotient->top--;
+    }
+
+    // Set signs
+    bn_quotient->neg = (dividend_neg != divisor_neg);
+    bn_remainder->neg = dividend_neg;
+
+    return 1;
+}
+
 __device__ int bn_div_word(BIGNUM *bn_quotient, BN_ULONG *remainder, BIGNUM *bn_dividend, BN_ULONG bn_divisor) {
     init_zero(bn_quotient);
     BN_ULONG rem = 0;
@@ -1149,6 +1234,241 @@ __device__ int bn_div_64_prototype(BIGNUM *bn_quotient, BIGNUM *bn_remainder, BI
     // Set signs
     bn_quotient->neg = (dividend_neg != divisor_neg);
     bn_remainder->neg = dividend_neg;
+
+    return 1;
+}
+
+__device__ void bn_barrett_reduce(BIGNUM *a, BIGNUM *n, BIGNUM *mu, BIGNUM *r) {
+    int k = n->top; // Number of words in modulus n
+
+    // Step 1: q1 = floor(a / b^(k - 1))
+    BIGNUM q1;
+    init_zero(&q1);
+    if (a->top <= k - 1) {
+        init_zero(r);
+        bn_copy(r, a);
+        return;
+    }
+    for (int i = a->top - 1; i >= k - 1; i--) {
+        q1.d[i - (k - 1)] = a->d[i];
+    }
+    q1.top = a->top - (k - 1);
+
+    // Step 2: q2 = q1 * mu
+    BIGNUM q2;
+    init_zero(&q2);
+    bn_mul(&q1, mu, &q2);
+
+    // Step 3: q3 = floor(q2 / b^(k + 1))
+    BIGNUM q3;
+    init_zero(&q3);
+    if (q2.top > k + 1) {
+        for (int i = q2.top - 1; i >= k + 1; i--) {
+            q3.d[i - (k + 1)] = q2.d[i];
+        }
+        q3.top = q2.top - (k + 1);
+    } else {
+        init_zero(&q3);
+    }
+
+    // Step 4: r1 = a mod b^(k + 1)
+    BIGNUM r1;
+    init_zero(&r1);
+    int r1_size = min(a->top, k + 1);
+    for (int i = 0; i < r1_size; i++) {
+        r1.d[i] = a->d[i];
+    }
+    r1.top = r1_size;
+
+    // Step 5: r2 = (q3 * n) mod b^(k + 1)
+    BIGNUM q3n;
+    init_zero(&q3n);
+    bn_mul(&q3, n, &q3n);
+
+    BIGNUM r2;
+    init_zero(&r2);
+    int r2_size = min(q3n.top, k + 1);
+    for (int i = 0; i < r2_size; i++) {
+        r2.d[i] = q3n.d[i];
+    }
+    r2.top = r2_size;
+
+    // Step 6: r = r1 - r2
+    bn_sub(r, &r1, &r2);
+
+    // Step 7: If r negative, add b^(k + 1) to r
+    if (r->neg) {
+        BIGNUM bk1;
+        init_zero(&bk1);
+        bk1.d[k + 1] = 1;
+        bk1.top = k + 2;
+        bn_add(r, r, &bk1);
+    }
+
+    // Step 8: While r >= n, subtract n from r
+    while (bn_cmp(r, n) >= 0) {
+        bn_sub(r, r, n);
+    }
+}
+
+__device__ int bn_mod_prototype_02(BIGNUM *a, BIGNUM *n, BIGNUM *r) {
+    // fails 128-bit tests partially
+    // Precompute mu = floor(b^{2k} / n)
+    BIGNUM mu;
+    init_zero(&mu);
+
+    int k = n->top; // Number of words in modulus n
+
+    BIGNUM b2k;
+    init_zero(&b2k);
+    b2k.d[2 * k] = 1; // b^{2k}
+    b2k.top = 2 * k + 1;
+
+    // Compute mu = floor(b^{2k} / n)
+    BIGNUM temp_q, temp_r;
+    init_zero(&temp_q);
+    init_zero(&temp_r);
+
+    bn_div(&temp_q, &temp_r, &b2k, n);
+    bn_copy(&mu, &temp_q);
+
+    // Now perform Barrett Reduction
+    bn_barrett_reduce(a, n, &mu, r);
+
+    r->neg = 0; // Result is always non-negative
+    return 1;
+}
+
+__device__ void right_shift(BIGNUM *a, int shift) {
+    if (shift == 0) return;
+
+    int word_shift = shift / BN_ULONG_NUM_BITS;
+    int bit_shift = shift % BN_ULONG_NUM_BITS;
+
+    // Shift words
+    if (word_shift > 0) {
+        for (int i = 0; i < a->top - word_shift; i++) {
+            a->d[i] = a->d[i + word_shift];
+        }
+        for (int i = a->top - word_shift; i < a->top; i++) {
+            a->d[i] = 0;
+        }
+        a->top -= word_shift;
+    }
+
+    // Shift bits
+    if (bit_shift > 0) {
+        BN_ULONG carry = 0;
+        for (int i = a->top - 1; i >= 0; i--) {
+            BN_ULONG new_carry = a->d[i] << (BN_ULONG_NUM_BITS - bit_shift);
+            a->d[i] = (a->d[i] >> bit_shift) | carry;
+            carry = new_carry;
+        }
+    }
+
+    // Adjust top
+    while (a->top > 0 && a->d[a->top - 1] == 0) {
+        a->top--;
+    }
+}
+
+__device__ int bn_div_prototype_02(BIGNUM *bn_quotient, BIGNUM *bn_remainder, BIGNUM *bn_dividend, BIGNUM *bn_divisor) {
+    // fails with 128-bit tests
+    // Handle signs and take absolute values
+    int dividend_neg = bn_dividend->neg;
+    int divisor_neg = bn_divisor->neg;
+    BIGNUM abs_dividend, abs_divisor;
+    bn_copy(&abs_dividend, bn_dividend);
+    bn_copy(&abs_divisor, bn_divisor);
+    abs_dividend.neg = 0;
+    abs_divisor.neg = 0;
+
+    init_zero(bn_quotient);
+    init_zero(bn_remainder);
+
+    // If divisor is zero, return error
+    if (bn_is_zero(&abs_divisor)) {
+        printf("Division by zero error\n");
+        return 0;
+    }
+
+    // If divisor is single-word, use bn_div_word
+    if (abs_divisor.top == 1) {
+        BN_ULONG rem;
+        bn_div_word(bn_quotient, &rem, &abs_dividend, abs_divisor.d[0]);
+        bn_remainder->d[0] = rem;
+        bn_remainder->top = (rem == 0) ? 0 : 1;
+    } else if (abs_divisor.top > abs_dividend.top) {
+        // If divisor > dividend, quotient = 0, remainder = dividend
+        bn_copy(bn_remainder, &abs_dividend);
+        bn_quotient->top = 1;
+        bn_quotient->d[0] = 0;
+    } else {
+        // Implement simplified division algorithm for multi-word divisors
+        // For this example, we assume the divisor is smaller than or equal to the dividend
+
+        // Normalize divisor and dividend
+        int shift = BN_ULONG_NUM_BITS - __clz(abs_divisor.d[abs_divisor.top - 1]);
+        BIGNUM norm_dividend, norm_divisor;
+        bn_copy(&norm_dividend, &abs_dividend);
+        bn_copy(&norm_divisor, &abs_divisor);
+        left_shift(&norm_dividend, shift);
+        left_shift(&norm_divisor, shift);
+
+        int n = norm_dividend.top;
+        int t = norm_divisor.top;
+
+        bn_quotient->top = n - t + 1;
+        init_zero(bn_quotient);
+
+        BIGNUM temp;
+        init_zero(&temp);
+
+        for (int i = n - 1; i >= t - 1; i--) {
+            // Estimate q_hat
+            __uint128_t numerator = ((__uint128_t)norm_dividend.d[i] << BN_ULONG_NUM_BITS) + norm_dividend.d[i - 1];
+            BN_ULONG q_hat = numerator / norm_divisor.d[t - 1];
+            if (q_hat > BN_ULONG_MAX) q_hat = BN_ULONG_MAX;
+
+            // Multiply and subtract
+            bn_mul_word(&norm_divisor, q_hat, &temp);
+            temp.top += i - t + 1;
+            for (int j = temp.top - 1; j >= i - t + 1; j--) {
+                temp.d[j] = temp.d[j - (i - t + 1)];
+            }
+            for (int j = 0; j < i - t + 1; j++) {
+                temp.d[j] = 0;
+            }
+
+            if (bn_cmp(&temp, &norm_dividend) > 0) {
+                q_hat--;
+                bn_mul_word(&norm_divisor, q_hat, &temp);
+                temp.top += i - t + 1;
+                for (int j = temp.top - 1; j >= i - t + 1; j--) {
+                    temp.d[j] = temp.d[j - (i - t + 1)];
+                }
+                for (int j = 0; j < i - t + 1; j++) {
+                    temp.d[j] = 0;
+                }
+            }
+
+            bn_sub(&norm_dividend, &norm_dividend, &temp);
+            bn_quotient->d[i - t + 1] = q_hat;
+        }
+
+        // Denormalize remainder
+        right_shift(&norm_dividend, shift);
+        bn_copy(bn_remainder, &norm_dividend);
+    }
+
+    // Set signs
+    bn_quotient->neg = (dividend_neg != divisor_neg);
+    bn_remainder->neg = dividend_neg;
+
+    // Adjust quotient top
+    while (bn_quotient->top > 0 && bn_quotient->d[bn_quotient->top - 1] == 0) {
+        bn_quotient->top--;
+    }
 
     return 1;
 }

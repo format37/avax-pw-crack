@@ -78,21 +78,25 @@ int main() {
         cudaMemcpy(&cuda_result, d_Result, sizeof(int), cudaMemcpyDeviceToHost);
 
         // Calculate expected result
-        int expected_result = 0;
-        for (int j = MAX_BIGNUM_SIZE_HOST - 1; j >= 0; j--) {
-            if (test_values[i][j] != 0) {
-                #ifdef BN_128
-                    expected_result = j + 1;
-                #else
-                    expected_result = j + 1;
-                #endif
-                break;
+        int expected_result = 1;
+        #ifdef BN_128
+            for (int idx = MAX_BIGNUM_SIZE - 1; idx >= 0; idx--) {
+                BN_ULONG_HOST high = test_values[i][idx * 2 + 1];
+                BN_ULONG_HOST low = test_values[i][idx * 2];
+                __int128 bn_di = ((__int128)high << 64) | low;
+                if (bn_di != 0) {
+                    expected_result = idx + 1;
+                    break;
+                }
             }
-        }
-
-        // Make sure to use the correct size when allocating and copying memory:
-        // cudaMalloc((void**)&d_A, MAX_BIGNUM_SIZE_HOST * sizeof(BN_ULONG_HOST));
-        // cudaMemcpy(d_A, test_values[i], MAX_BIGNUM_SIZE_HOST * sizeof(BN_ULONG_HOST), cudaMemcpyHostToDevice);
+        #else
+            for (int j = MAX_BIGNUM_SIZE_HOST - 1; j >= 0; j--) {
+                if (test_values[i][j] != 0) {
+                    expected_result = j + 1;
+                    break;
+                }
+            }
+        #endif
 
         // Compare results
         if (cuda_result == expected_result) {
