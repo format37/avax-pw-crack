@@ -60,11 +60,26 @@ __device__ int bn_mod(BIGNUM *r, BIGNUM *m, BIGNUM *d);
 __device__ bool bn_is_zero(BIGNUM *a);
 
 __device__ unsigned char find_top(const BIGNUM *bn) {
-    for (int i = MAX_BIGNUM_SIZE - 1; i >= 0; i--) {
-        if (bn->d[i] != 0) {
-            return i + 1;
+    #ifdef BN_128
+        for (int i = MAX_BIGNUM_SIZE - 1; i >= 0; i--) {
+            if (bn->d[i] != 0) {
+                // For 128-bit, we need to check both high and low 64-bit parts
+                uint64_t high = (uint64_t)(bn->d[i] >> 64);
+                uint64_t low = (uint64_t)(bn->d[i]);
+                if (high != 0) {
+                    return i * 2 + 2;
+                } else {
+                    return i * 2 + 1;
+                }
+            }
         }
-    }
+    #else
+        for (int i = MAX_BIGNUM_SIZE - 1; i >= 0; i--) {
+            if (bn->d[i] != 0) {
+                return i + 1;
+            }
+        }
+    #endif
     return 1;
 }
 
