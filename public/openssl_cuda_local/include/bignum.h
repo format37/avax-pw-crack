@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <stdint.h>
 
-#define BN_128
+// #define BN_128
 
 #ifdef BN_128
     #define BN_ULONG unsigned __int128
@@ -375,7 +375,8 @@ __device__ void bn_mul(BIGNUM *a, BIGNUM *b, BIGNUM *product);
 
 __device__ void set_bn(BIGNUM *dest, const BIGNUM *src) {
     debug_printf("set_bn 0\n");
-
+    // update src->top
+    // src->top = find_top(src);
     // Check if dest has enough space to copy from src
     if (MAX_BIGNUM_SIZE < src->top) {    
         // Handle the situation appropriately
@@ -400,147 +401,6 @@ __device__ void set_bn(BIGNUM *dest, const BIGNUM *src) {
     // Set the 'top' and 'neg' flags after zeroing
     dest->top = src->top;
     dest->neg = src->neg;
-}
-
-
-
-// Assuming 'a' and 'mod' are coprime, output 'x' such that: a*x ≡ 1 (mod 'mod')
-// Pseudo code for Extended Euclidean Algorithm in CUDA
-__device__ int extended_gcd(BIGNUM *a, BIGNUM *mod, BIGNUM *x, BIGNUM *y) {
-    // Initialization of prev_x, x, last_y, and y is omitted here but important.
-    BIGNUM prev_x, last_y, last_remainder, remainder, quotient, temp;
-    // Initialize prev_x = 1, x = 0, last_y = 0, y = 1 
-    // Initialize last_remainder = mod, remainder = a
-
-    // Initialize a BIGNUM for zero.
-    BIGNUM zero;
-    init_zero(&zero);
-    BIGNUM temp_remainder;
-    init_zero(&temp_remainder);
-
-    while (bn_cmp(&remainder, &zero) != 0) {
-        bn_div(&last_remainder, &remainder, &quotient, &temp_remainder);
-        BIGNUM swap_temp = last_remainder; // Temporary storage for the swap
-        bn_copy(&last_remainder, &temp_remainder);
-        bn_copy(&temp_remainder, &swap_temp);
-
-        bn_mul(&quotient, x, &temp); // temp = quotient*x
-        bn_sub(&prev_x, &temp, &prev_x); // new prev_x = prev_x - temp
-        bn_mul(&quotient, y, &temp); // temp = quotient*y
-        bn_sub(&last_y, &temp, &last_y); // new last_y = last_y - temp
-    }
-
-    // Clean up
-    delete &temp_remainder; // Only if dynamic memory is allowed - if you statically allocated, this is unnecessary
-    
-    set_bn(x, &prev_x);
-    set_bn(y, &last_y);
-
-    return 1; // In this simplified version, we'd return the gcd, but we're presuming a==1
-}
-
-__device__ void mod_inv(BIGNUM *value, BIGNUM *mod, BIGNUM *inv) {
-    debug_printf("mod_inv 0\n");
-    BIGNUM x, y;
-    // You need to make sure that BIGNUM x, y are initialized properly with minted memory
-    // You also need a proper gcd implementation on GPU here.
-    int g = extended_gcd(value, mod, &x, &y);
-    
-    // In case x is negative, we add mod to it, assuming mod>0
-    if (x.neg) {
-        debug_printf("mod_inv a.0\n");
-        // BN_ULONG zero = 0;
-        bn_add(&x, mod, inv);
-        debug_printf("mod_inv a.1\n");
-        bn_mod(inv, mod, inv);
-        debug_printf("mod_inv a.2\n");
-    } else {
-        debug_printf("mod_inv b.0\n");
-        bn_mod(&x, mod, inv);
-        debug_printf("mod_inv b.1\n");
-    }
-}
-
-__device__ void bn_mul_64_version_0(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
-    init_zero(product);
-    
-    // Perform multiplication of each word of a with each word of b
-    for (int i = 0; i < a->top; ++i) {
-        unsigned long long carry = 0;
-        for (int j = 0; j < b->top || carry != 0; ++j) {
-            unsigned long long alow = a->d[i];
-            unsigned long long blow = (j < b->top) ? b->d[j] : 0;
-            unsigned long long lolo = alow * blow;
-            unsigned long long lohi = __umul64hi(alow, blow);
-            // Corrected handling: 
-            unsigned long long sumLow = product->d[i + j] + lolo;
-            unsigned long long carryLow = (sumLow < product->d[i + j]) ? 1 : 0; // overflowed?
-
-            unsigned long long sumHigh = sumLow + carry;
-            unsigned long long carryHigh = (sumHigh < sumLow) ? 1 : 0; // overflowed?
-
-            product->d[i + j] = sumHigh;
-
-            // Aggregate carry: contributions from high multiplication and overflows
-            carry = lohi + carryLow + carryHigh;
-        }
-        // Store final carry if it exists
-        if (carry != 0) {
-            product->d[i + b->top] = carry;
-        }
-    }
-
-    // Update the top to reflect the number of significant words in the product
-    product->top = 0;
-    for(int i = a->top + b->top - 1; i >= 0; --i) {
-        if(product->d[i] != 0) {
-            product->top = i + 1;
-            break;
-        }
-    }
-
-    // If the result has no significant words, ensure that top is at least 1
-    if(product->top == 0)
-        product->top = 1;
-    
-    // Determine if the result should be negative
-    product->neg = (a->neg != b->neg) ? 1 : 0;
-}
-
-__device__ void bn_mul_64_version_1(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
-    init_zero(product);
-    
-    for (int i = 0; i < a->top; ++i) {
-        unsigned int a_lo = (unsigned int)(a->d[i]);
-        unsigned int a_hi = (unsigned int)(a->d[i] >> 32);
-        unsigned long long carry = 0;
-        for (int j = 0; j < b->top || carry != 0; ++j) {
-            unsigned int b_lo = (unsigned int)((j < b->top) ? b->d[j] : 0);
-            unsigned int b_hi = (unsigned int)(((j < b->top) ? b->d[j] : 0) >> 32);
-
-            // Perform multiplication using 32-bit halves
-            unsigned long long lo_lo = (unsigned long long)a_lo * b_lo;
-            unsigned long long lo_hi = (unsigned long long)a_lo * b_hi;
-            unsigned long long hi_lo = (unsigned long long)a_hi * b_lo;
-            unsigned long long hi_hi = (unsigned long long)a_hi * b_hi;
-
-            // Combine the results
-            unsigned long long temp = product->d[i + j] + (lo_lo & 0xFFFFFFFF) + (carry & 0xFFFFFFFF);
-            unsigned long long new_carry = (temp >> 32) + (lo_lo >> 32) + (lo_hi & 0xFFFFFFFF) + (hi_lo & 0xFFFFFFFF) + (carry >> 32);
-            product->d[i + j] = (temp & 0xFFFFFFFF) | (new_carry << 32);
-            carry = (new_carry >> 32) + (lo_hi >> 32) + (hi_lo >> 32) + hi_hi;
-        }
-        if (carry != 0) {
-            product->d[i + b->top] = carry;
-        }
-    }
-    
-    // Update the top
-    product->top = a->top + b->top;
-    while (product->top > 1 && product->d[product->top - 1] == 0) {
-        --product->top;
-    }
-    product->neg = a->neg ^ b->neg;
 }
 
 // Helper function to split a BIGNUM into two halves

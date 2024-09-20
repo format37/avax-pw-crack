@@ -104,60 +104,6 @@ __device__ int point_is_at_infinity(EC_POINT *P) {
     return 0; // P is not the point at infinity
 }
 
-__device__ void point_double(EC_POINT *P, EC_POINT *R, BIGNUM *p) {
-    // Temporary storage for the calculations
-    BIGNUM s, xR, yR, m;
-    debug_printf("point_double 0\n");
-    if (point_is_at_infinity(P)) {
-        debug_printf("point_double 1\n");
-        // Point doubling at infinity remains at infinity
-        set_bn(&R->x, &P->x);  // Copying P->x to R->x, assuming these are in the proper zeroed state
-        set_bn(&R->y, &P->y);  // Copying P->y to R->y
-        debug_printf("# 2\n");
-        return;
-    }
-    debug_printf("point_double 3\n");
-
-    // Calculate m = 3x^2 + a (a is zero for secp256k1)
-    mod_mul(&P->x, &P->x, p, &m);  // m = x^2 mod p
-    debug_printf("point_double 4\n");
-    set_bn(&s, &m);                 // s = x^2 (Since we use a=0 in secp256k1, skip adding 'a')
-    bn_add(&m, &m, &s);             // s = 2x^2
-    bn_add(&s, &m, &s);             // s = 3x^2
-    
-    // Calculate s = (3x^2 + a) / (2y) = (s) / (2y)
-    // First, compute the modular inverse of (2y)
-    BIGNUM two_y;
-    debug_printf("point_double 5\n");
-    set_bn(&two_y, &P->y);         // Assuming set_bn simply duplicates P->y
-    debug_printf("point_double 6\n");
-    bn_add(&two_y, &two_y, &two_y); // two_y = 2y
-    BIGNUM inv_two_y;
-    debug_printf("point_double 7\n");
-    mod_inv(&two_y, p, &inv_two_y);  // Compute the inverse of 2y
-    debug_printf("point_double 8\n");
-
-    mod_mul(&s, &inv_two_y, p, &s);  // Finally, s = (3x^2 + a) / (2y) mod p
-    
-    // Compute xR = s^2 - 2x mod p
-    mod_mul(&s, &s, p, &xR);        // xR = s^2 mod p    
-    set_bn(&m, &P->x);              // m = x
-    
-    bn_add(&m, &m, &m);             // m = 2x
-    bn_sub(&xR, &m, &xR);           // xR = s^2 - 2x
-    bn_mod(&xR, p, &xR);            // Modulo operation
-
-    // Compute yR = s * (x - xR) - y mod p
-    bn_sub(&P->x, &xR, &yR);        // yR = x - xR
-    mod_mul(&s, &yR, p, &yR);       // yR = s * (x - xR)
-    bn_sub(&yR, &P->y, &yR);        // yR = s * (x - xR) - y
-    bn_mod(&yR, p, &yR);            // Modulo operation
-
-    // Copy results to R only after all calculations are complete to allow in-place doubling (P == R)
-    set_bn(&R->x, &xR);
-    set_bn(&R->y, &yR);
-}
-
 __device__ void copy_point(EC_POINT *dest, EC_POINT *src) {
     // Assuming EC_POINT contains BIGNUM structures for x and y,
     // and that BIGNUM is a structure that contains an array of BN_ULONG for the digits,
