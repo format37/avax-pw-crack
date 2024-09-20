@@ -40,7 +40,7 @@ __device__ void GetPublicKey(uint8_t* buffer, uint8_t* key)
     newKey.top = CURVE_P_VALUES_MAX_SIZE;
 
     // Initialize generator
-    EC_POINT G;
+    EC_POINT_CUDA G;
     init_zero(&G.x);
     init_zero(&G.y);
     for (int j = 0; j < MAX_BIGNUM_SIZE; ++j) {
@@ -50,8 +50,8 @@ __device__ void GetPublicKey(uint8_t* buffer, uint8_t* key)
     G.x.top = CURVE_P_VALUES_MAX_SIZE;
     G.y.top = CURVE_P_VALUES_MAX_SIZE;
 
-    // TODO: Check do we need to define extra G. Or we are able to use __constant__ CURVE_GX_values and CURVE_GY_values as new EC_POINT instead
-    EC_POINT publicKey = ec_point_scalar_mul(&G, &newKey, &CURVE_P, &CURVE_A);    
+    // TODO: Check do we need to define extra G. Or we are able to use __constant__ CURVE_GX_values and CURVE_GY_values as new EC_POINT_CUDA instead
+    EC_POINT_CUDA publicKey = ec_point_scalar_mul(&G, &newKey, &CURVE_P, &CURVE_A);    
     // Copy the public key to buffer
     for (int i = 0; i < CURVE_P_VALUES_MAX_SIZE; i++) {
         buffer[8*i] = (publicKey.x.d[3 - i] >> 56) & 0xFF;

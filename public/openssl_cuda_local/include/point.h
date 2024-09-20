@@ -1,4 +1,4 @@
-struct EC_POINT {
+struct EC_POINT_CUDA {
   BIGNUM x; 
   BIGNUM y;
 };
@@ -76,6 +76,28 @@ __device__ bool bn_mod_inverse(BIGNUM *result, BIGNUM *a, BIGNUM *n) {
     return true;
 }
 
+// __device__ bool bn_mod_inverse_prototype(BIGNUM *result, BIGNUM *a, BIGNUM *n) {
+//     // Check if 'n' is one
+//     if (bn_is_one(n)) {
+//         return false;  // No modular inverse exists
+//     }
+
+//     BIGNUM exponent;
+//     init_zero(&exponent);
+//     bn_copy(&exponent, n);
+
+//     // Subtract 2 from the modulus to get exponent = n - 2
+//     BIGNUM two;
+//     init_one(&two);
+//     bn_add(&two, &two, &two); // two = 2
+//     bn_sub(&exponent, &exponent, &two);
+
+//     // Compute result = a^(n-2) mod n
+//     bn_mod_exp(result, a, &exponent, n);
+
+//     return true;
+// }
+
 __device__ void bignum_to_bit_array(BIGNUM *n, unsigned int *bits) {
     int index = 0;
     
@@ -97,15 +119,15 @@ __device__ void bignum_to_bit_array(BIGNUM *n, unsigned int *bits) {
 // In the current structure, we might use a specific value (e.g., 0 or -1) 
 // to represent the components of the point at infinity.
 // A version that uses 0 to signify the point at infinity could be:
-__device__ int point_is_at_infinity(EC_POINT *P) {    
+__device__ int point_is_at_infinity(EC_POINT_CUDA *P) {    
     if (bn_is_zero(&P->x) || bn_is_zero(&P->y)) {
         return 1; // P is the point at infinity
     }
     return 0; // P is not the point at infinity
 }
 
-__device__ void copy_point(EC_POINT *dest, EC_POINT *src) {
-    // Assuming EC_POINT contains BIGNUM structures for x and y,
+__device__ void copy_point(EC_POINT_CUDA *dest, EC_POINT_CUDA *src) {
+    // Assuming EC_POINT_CUDA contains BIGNUM structures for x and y,
     // and that BIGNUM is a structure that contains an array of BN_ULONG for the digits,
     // along with other metadata (like size, top, neg, etc.)
 
@@ -120,8 +142,8 @@ __device__ void copy_point(EC_POINT *dest, EC_POINT *src) {
     bn_copy(&dest->y, &src->y);
 }
 
-__device__ void set_point_at_infinity(EC_POINT *point) {
-    // Assuming EC_POINT is a structure containing BIGNUM x and y
+__device__ void set_point_at_infinity(EC_POINT_CUDA *point) {
+    // Assuming EC_POINT_CUDA is a structure containing BIGNUM x and y
     // and that a BIGNUM value of NULL or {0} represents the point at infinity
 
     // To set the point at infinity, one straightforward way is to assign
@@ -139,9 +161,9 @@ __device__ void set_point_at_infinity(EC_POINT *point) {
 
 // TODO: Reuse temp variables as much as possible to reduce registers usage
 __device__ int point_add(
-    EC_POINT *result, 
-    EC_POINT *p1, 
-    EC_POINT *p2, 
+    EC_POINT_CUDA *result, 
+    EC_POINT_CUDA *p1, 
+    EC_POINT_CUDA *p2, 
     BIGNUM *p, 
     BIGNUM *a
 ) {
@@ -346,7 +368,7 @@ __device__ int point_add(
     return 0;
 }
 
-__device__ void init_point_at_infinity(EC_POINT *P) {
+__device__ void init_point_at_infinity(EC_POINT_CUDA *P) {
     // For the x and y coordinates of P, we'll set the 'top' to 0,
     // which is our chosen convention for representing the point at infinity.
 
@@ -362,8 +384,8 @@ __device__ void init_point_at_infinity(EC_POINT *P) {
     // set them accordingly here.
 }
 
-__device__ EC_POINT ec_point_scalar_mul(
-    EC_POINT *point, 
+__device__ EC_POINT_CUDA ec_point_scalar_mul(
+    EC_POINT_CUDA *point, 
     BIGNUM *scalar, 
     BIGNUM *curve_prime, 
     BIGNUM *curve_a
@@ -375,11 +397,11 @@ __device__ EC_POINT ec_point_scalar_mul(
     bn_print(">> curve_prime: ", curve_prime);
     bn_print(">> curve_a: ", curve_a);
     
-    EC_POINT current = *point; // This initializes the current point with the input point
-    EC_POINT result; // Initialize the result variable, which accumulates the result
-    EC_POINT tmp_result;
-    EC_POINT tmp_a;
-    EC_POINT tmp_b;                                     
+    EC_POINT_CUDA current = *point; // This initializes the current point with the input point
+    EC_POINT_CUDA result; // Initialize the result variable, which accumulates the result
+    EC_POINT_CUDA tmp_result;
+    EC_POINT_CUDA tmp_a;
+    EC_POINT_CUDA tmp_b;                                     
     
     init_point_at_infinity(&result);                 // Initialize it to the point at infinity
     init_point_at_infinity(&tmp_result);                 // Initialize it to the point at infinity

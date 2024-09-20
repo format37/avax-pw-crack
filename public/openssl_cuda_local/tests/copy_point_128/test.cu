@@ -36,7 +36,7 @@ __global__ void test_copy_point_kernel(
     BN_ULONG_HOST *dest_x_d, BN_ULONG_HOST *dest_y_d, int *dest_neg_x, int *dest_neg_y
 ) {
     // Initialize src EC_POINT
-    EC_POINT src;
+    EC_POINT_CUDA src;
     init_zero(&src.x);
     init_zero(&src.y);
 
@@ -58,7 +58,7 @@ __global__ void test_copy_point_kernel(
     src.y.top = find_top(&src.y);
 
     // Initialize dest EC_POINT
-    EC_POINT dest;
+    EC_POINT_CUDA dest;
     init_zero(&dest.x);
     init_zero(&dest.y);
 
