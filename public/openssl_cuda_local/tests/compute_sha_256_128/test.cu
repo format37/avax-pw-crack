@@ -35,6 +35,11 @@ __global__ void kernel_compute_sha256(uint8_t *d_messages, uint32_t *d_message_l
 }
 
 int main() {
+    #ifdef BN_128
+        printf("\nBN_128\n");
+    #else
+        printf("\nBN_64\n");
+    #endif
     // Define test vectors
     TestVector test_vectors[] = {
         {"", 0, {0}}, // Empty string
