@@ -8,13 +8,13 @@ __device__ void ripemd160(const uint8_t* data, uint32_t data_len, uint8_t* diges
 
 /* Constants etc. taken directly from https://homes.esat.kuleuven.be/~bosselae/ripemd160/pdf/AB-9601/AB-9601.pdf */
 
-__device__ uint32_t ripemd160_initial_digest[5] =
+__device__ __constant__ uint32_t ripemd160_initial_digest[5] =
     { 0x67452301UL, 0xefcdab89UL, 0x98badcfeUL, 0x10325476UL, 0xc3d2e1f0UL };
 
-__device__ uint8_t ripemd160_rho[16] =
+__device__ __constant__ uint8_t ripemd160_rho[16] =
     { 0x7, 0x4, 0xd, 0x1, 0xa, 0x6, 0xf, 0x3, 0xc, 0x0, 0x9, 0x5, 0x2, 0xe, 0xb, 0x8 };
 
-__device__ uint8_t ripemd160_shifts[80] =
+__device__ __constant__ uint8_t ripemd160_shifts[80] =
     { 11, 14, 15, 12, 5, 8, 7, 9, 11, 13, 14, 15, 6, 7, 9, 8
     , 12, 13, 11, 15, 6, 9, 9, 7, 12, 15, 11, 13, 7, 8, 7, 7
     , 13, 15, 14, 11, 7, 7, 6, 8, 13, 14, 13, 12, 5, 5, 6, 9
@@ -22,15 +22,15 @@ __device__ uint8_t ripemd160_shifts[80] =
     , 15, 12, 13, 13, 9, 5, 8, 6, 14, 11, 12, 11, 8, 6, 5, 5
     };
 
-__device__ uint32_t ripemd160_constants_left[5] =
+__device__ __constant__ uint32_t ripemd160_constants_left[5] =
     { 0x00000000UL, 0x5a827999UL, 0x6ed9eba1UL, 0x8f1bbcdcUL, 0xa953fd4eUL };
 
-__device__ uint32_t ripemd160_constants_right[5] =
+__device__ __constant__ uint32_t ripemd160_constants_right[5] =
     { 0x50a28be6UL, 0x5c4dd124UL, 0x6d703ef3UL, 0x7a6d76e9UL, 0x00000000UL };
 
-__device__ uint8_t ripemd160_fns_left[5]  = { 1, 2, 3, 4, 5 };
+__device__ __constant__ uint8_t ripemd160_fns_left[5]  = { 1, 2, 3, 4, 5 };
 
-__device__ uint8_t ripemd160_fns_right[5] = { 5, 4, 3, 2, 1 };
+__device__ __constant__ uint8_t ripemd160_fns_right[5] = { 5, 4, 3, 2, 1 };
 
 #define ROL(x, n) (((x) << (n)) | ((x) >> (32 - (n))))
 

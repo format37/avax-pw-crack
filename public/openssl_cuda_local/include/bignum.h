@@ -35,7 +35,8 @@ typedef struct bignum_st {
     };
 #else
     __device__ const BIGNUM ZERO_BIGNUM = {
-        {0,0,0,0,0,0,0,0,0,0},                  // d (will be properly initialized in init_zero)
+        // {0,0,0,0,0,0,0,0,0,0},                  // d (will be properly initialized in init_zero)
+        {0},                  // d (will be properly initialized in init_zero)
         1,                    // top (unsigned char)
         0                    // neg (bool)
     };

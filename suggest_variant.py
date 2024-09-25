@@ -28,7 +28,7 @@ def find_letter_variant(n):
 # variant_number = 131071
 # variant_number = 262143
 # variant_number = 140737488355328
-variant_number = 4096
+variant_number = 262146
 result = find_letter_variant(variant_number)
 print(f"The letter variant corresponding to {variant_number} is: {result}")
 

@@ -4,7 +4,7 @@
 #define MAX_RESULT_LEN 90
 #define MAX_HRP_LEN 20
 #define MAX_VALUES_LEN (MAX_HRP_LEN * 2 + 1 + RIPEMD160_DIGEST_LENGTH + CHECKSUM_LENGTH)
-__constant__ uint32_t poly_mod_generator[] = {0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3};
+__device__ __constant__ uint32_t poly_mod_generator[] = {0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3};
 
 __device__ size_t bn_strlen(const char *str) {
     size_t len = 0;
