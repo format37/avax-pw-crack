@@ -157,12 +157,13 @@ __device__ int point_add(
         bn_print(">> p2.x: ", &p2->x);
         bn_print(">> p2.y: ", &p2->y);
         bn_print(">> p: ", p);
-        printf(">> p.top: %d\n", p->top);
-        printf(">> p.neg: %d\n", p->neg);
+        // printf(">> p.top: %d\n", p->top);
+        // printf(">> p.neg: %d\n", p->neg);
         bn_print(">> a: ", a);
-        printf(">> a.top: %d\n", a->top);
-        printf(">> a.neg: %d\n", a->neg);
+        // printf(">> a.top: %d\n", a->top);
+        // printf(">> a.neg: %d\n", a->neg);
     }
+    debug = 0;
     // return 0; // TODO: Remove this line
     // Handle the point at infinity cases
     if (point_is_at_infinity(p1)) {
@@ -339,7 +340,7 @@ __device__ int point_add(
         init_zero(&tmp2);
         bn_copy(&tmp2, &x3);
         if (debug) printf("# 16\n");
-        bn_mod(&x3, &tmp2, p); // x3 = tmp2 mod p
+        bn_mod(&x3, &tmp2, p); // x3 = tmp2 mod p // OK
         if (debug) printf("# 17\n");
         bn_sub(&tmp1, &p1->x, &x3);
         if (debug) printf("# 18\n");
@@ -363,7 +364,7 @@ __device__ int point_add(
     // Assign the computed coordinates to the result
     bn_copy(&result->x, &x3);
     bn_copy(&result->y, &y3);
-
+    debug = 1;
     if (debug) {
         bn_print("<< x3: ", &x3);
         bn_print("<< y3: ", &y3);

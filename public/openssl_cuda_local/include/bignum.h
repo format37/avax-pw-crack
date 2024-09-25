@@ -16,7 +16,7 @@
 #endif
 
 #define MAX_BIT_ARRAY_SIZE 256 // Limit to 256 bits to match the function's design
-#define debug_print true
+#define debug_print
 #define BN_ULONG_NUM_BITS (sizeof(BN_ULONG) * 8)
 #define PUBLIC_KEY_SIZE 33  // Assuming a 33-byte public key (compressed format)
 #define DEVICE_CLOCK_RATE 1708500
@@ -42,7 +42,7 @@ typedef struct bignum_st {
     };
 #endif
 
-__device__ void init_zero(BIGNUM *bn) {
+__host__ __device__ void init_zero(BIGNUM *bn) {
     *bn = ZERO_BIGNUM;
 }
 __device__ void init_one(BIGNUM *bn) {
@@ -60,7 +60,7 @@ __device__ bool bn_add(BIGNUM *result, BIGNUM *a, BIGNUM *b);
 __device__ int bn_mod(BIGNUM *r, BIGNUM *m, BIGNUM *d);
 __device__ bool bn_is_zero(BIGNUM *a);
 
-__device__ unsigned char find_top(const BIGNUM *bn) {
+__host__ __device__ unsigned char find_top(const BIGNUM *bn) {
     for (int i = MAX_BIGNUM_SIZE - 1; i >= 0; i--) {
         if (bn->d[i] != 0) {
             return i + 1;
@@ -84,7 +84,10 @@ __device__ void free_bignum(BIGNUM *bn) {
 }
 
 __device__ void bn_print(const char* msg, BIGNUM* a) {
-    if (!debug_print) return;
+    // if (!debug_print) return;
+    #ifndef debug_print
+        return;
+    #endif
     
     printf("%s", msg);
     if (a->neg) {
@@ -117,9 +120,11 @@ __device__ void print_as_hex(const uint8_t *data, const uint32_t len) {
 }
 
 __device__ void debug_printf(const char *fmt, ...) {
-    if (debug_print) {
+    // if (debug_print) {
+    #ifdef debug_print
         printf(fmt);
-    }
+    #endif
+    // }
 }
 
 __device__ int bn_cmp(BIGNUM* a, BIGNUM* b) {
@@ -404,78 +409,13 @@ __device__ void set_bn(BIGNUM *dest, const BIGNUM *src) {
     dest->neg = src->neg;
 }
 
-__device__ void bn_mul_x(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
-    init_zero(product);
-    printf("++ bn_mul ++\n");
-    bn_print(">> a: ", a);
-    bn_print(">> b: ", b);
-
-    #ifdef BN_128
-        for (int i = 0; i < a->top; ++i) {
-            uint64_t a_lo = (uint64_t)a->d[i];
-            uint64_t a_hi = (uint64_t)(a->d[i] >> 64);
-            BN_ULONG carry = 0;
-
-            for (int j = 0; j < b->top; ++j) {
-                uint64_t b_lo = (uint64_t)b->d[j];
-                uint64_t b_hi = (uint64_t)(b->d[j] >> 64);
-
-                // Multiply parts
-                unsigned __int128 lo_lo = (unsigned __int128)a_lo * b_lo;
-                unsigned __int128 lo_hi = (unsigned __int128)a_lo * b_hi;
-                unsigned __int128 hi_lo = (unsigned __int128)a_hi * b_lo;
-                unsigned __int128 hi_hi = (unsigned __int128)a_hi * b_hi;
-
-                // Cross terms
-                unsigned __int128 cross = lo_hi + hi_lo;
-                unsigned int cross_carry = (cross < lo_hi) ? 1 : 0;
-
-                // Combine lower 128 bits
-                unsigned __int128 temp_low = lo_lo + (cross << 64);
-                unsigned int low_carry = (temp_low < lo_lo) ? 1 : 0;
-
-                // Combine higher bits
-                unsigned __int128 temp_high = hi_hi + (cross >> 64) + cross_carry + low_carry;
-
-                // Add to product
-                unsigned __int128 sum = product->d[i + j] + temp_low + carry;
-                unsigned int sum_carry = (sum < product->d[i + j]) ? 1 : 0;
-                sum_carry += (sum < temp_low) ? 1 : 0;
-
-                product->d[i + j] = sum;
-                carry = temp_high + sum_carry;
-            }
-            product->d[i + b->top] = carry;
-        }
-    #else
-        // Unroll loops if possible
-        for (int i = 0; i < a->top; i++) {
-            BN_ULONG carry = 0;
-            for (int j = 0; j < b->top; j++) {
-                unsigned __int128 temp = (unsigned __int128)a->d[i] * b->d[j] + product->d[i + j] + carry;
-                product->d[i + j] = (BN_ULONG)temp;
-                carry = (BN_ULONG)(temp >> 64);
-            }
-            product->d[i + b->top] = carry;
-        }
-    #endif
-
-    // Update the top
-    product->top = a->top + b->top;
-    while (product->top > 1 && product->d[product->top - 1] == 0) {
-        product->top--;
-    }
-
-    product->neg = a->neg ^ b->neg;
-    bn_print("<< product: ", product);
-    printf("-- bn_mul --\n");
-}
-
 __device__ void bn_mul(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
     init_zero(product);
-    printf("++ bn_mul ++\n");
-    bn_print(">> a: ", a);
-    bn_print(">> b: ", b);
+    // #ifdef debug_print
+    //     printf("++ bn_mul ++\n");
+    //     bn_print(">> a: ", a);
+    //     bn_print(">> b: ", b);
+    // #endif
 
     #ifdef BN_128
         // Multiply the numbers treating them as arrays of 64-bit words
@@ -542,15 +482,17 @@ __device__ void bn_mul(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
 
     // Set the sign
     product->neg = a->neg ^ b->neg;
-    bn_print("<< product: ", product);
-    printf("-- bn_mul --\n");
+    // #ifdef debug_print
+    //     bn_print("<< product: ", product);
+    //     printf("-- bn_mul --\n");
+    // #endif
 }
 
 __device__ int bn_mod(BIGNUM *r, BIGNUM *a, BIGNUM *n) {
     // r: Remainder (updated)
     // a: Dividend
     // n: Modulus
-    bool debug = 1;
+    bool debug = 0;
     if (debug) {
         printf("++ bn_mod ++\n");
         bn_print(">> r: ", r);
