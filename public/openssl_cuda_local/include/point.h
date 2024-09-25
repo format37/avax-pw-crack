@@ -142,7 +142,6 @@ __device__ void set_point_at_infinity(EC_POINT_CUDA *point) {
     init_zero(&point->y);// Ensure that this logic matches how you identify point at infinity elsewhere
 }
 
-// TODO: Reuse temp variables as much as possible to reduce registers usage
 __device__ int point_add(
     EC_POINT_CUDA *result, 
     EC_POINT_CUDA *p1, 
@@ -150,7 +149,7 @@ __device__ int point_add(
     BIGNUM *p, 
     BIGNUM *a
 ) {
-    bool debug = 0;
+    bool debug = 1;
     if (debug) {
         printf("++ point_add ++\n");    
         bn_print(">> p1.x: ", &p1->x);
@@ -164,7 +163,7 @@ __device__ int point_add(
         printf(">> a.top: %d\n", a->top);
         printf(">> a.neg: %d\n", a->neg);
     }
-
+    // return 0; // TODO: Remove this line
     // Handle the point at infinity cases
     if (point_is_at_infinity(p1)) {
         copy_point(result, p2);
@@ -177,8 +176,6 @@ __device__ int point_add(
         if (debug) printf("p2 point at infinity\n");
         return 0;
     }
-
-    
 
     // Initialize temporary BIGNUMs for calculation
     BIGNUM s, x3, y3, tmp1, tmp2, tmp3, two, tmp1_squared;
@@ -293,50 +290,85 @@ __device__ int point_add(
         bn_mod(&y3, &tmp3, p);  // y3 = y3 mod p
     } else {
         // Case 2: p1 != p2
+        if (debug) printf("p1 != p2\n");
         // Regular point addition
         bn_sub(&tmp1, &p2->y, &p1->y);
+        if (debug) printf("# 0\n");
         init_zero(&tmp3);
         bn_copy(&tmp3, &tmp1); // dst << src
+        if (debug) printf("# 1\n");
         init_zero(&tmp1);
         bn_mod(&tmp1, &tmp3, p);           // tmp1 = (p2.y - p1.y) mod p 
+        if (debug) printf("# 2\n");
         init_zero(&tmp2);
         bn_sub(&tmp2, &p2->x, &p1->x);
+        if (debug) printf("# 3\n");
         init_zero(&tmp3);
         bn_copy(&tmp3, &tmp2);
+        if (debug) printf("# 4\n");
         bn_mod(&tmp2, &tmp3, p);           // tmp2 = (p2.x - p1.x) mod p
+        if (debug) printf("# 5\n");
         init_zero(&tmp3);
         bn_copy(&tmp3, &tmp2);
+        if (debug) printf("# 6\n");
         init_zero(&tmp2);
-        bn_mod_inverse(&tmp2, &tmp3, p);
+        bn_mod_inverse(&tmp2, &tmp3, p); // OK
+        if (debug) printf("# 7\n");
         init_zero(&s);
         bn_mul(&tmp1, &tmp2, &s);
+        bn_print("### s:", &s); // Debug FAIL
+        return 0; // TODO: Remove this line
+        if (debug) printf("# 8\n");
         init_zero(&tmp2);
         bn_copy(&tmp2, &s);
+        if (debug) printf("# 9\n"); // tmp2 ERR
         init_zero(&s);
         bn_mod(&s, &tmp2, p);                 // s = (p2.y - p1.y) / (p2.x - p1.x) mod p
+        if (debug) printf("# 10\n");
         init_zero(&tmp2);
         bn_copy(&tmp2, &s);
+        if (debug) printf("# 11\n");
         bn_mul(&s, &tmp2, &x3); // a * b = product // x3 = s^2
+        if (debug) printf("# 12\n");
         init_zero(&tmp2);
         bn_copy(&tmp2, &x3);
+        if (debug) printf("# 13\n");
         bn_sub(&x3, &tmp2, &p1->x); // result = a - b
+        if (debug) printf("# 14\n");
         bn_sub(&x3, &x3, &p2->x);          // x3 = s^2 - p1.x - p2.x
+        if (debug) printf("# 15\n");
         init_zero(&tmp2);
         bn_copy(&tmp2, &x3);
+        if (debug) printf("# 16\n");
         bn_mod(&x3, &tmp2, p); // x3 = tmp2 mod p
+        if (debug) printf("# 17\n");
         bn_sub(&tmp1, &p1->x, &x3);
+        if (debug) printf("# 18\n");
         bn_mul(&s, &tmp1, &y3); // a * b = product
+        if (debug) printf("# 19\n");
         init_zero(&tmp2);
         bn_copy(&tmp2, &y3);
+        if (debug) printf("# 20\n");
         bn_sub(&y3, &tmp2, &p1->y);          // y3 = s * (p1.x - x3) - p1.y
+        if (debug) printf("# 21\n");
         init_zero(&tmp2);
         bn_copy(&tmp2, &y3);
+        if (debug) printf("# 22\n");
         bn_mod(&y3, &tmp2, p);               // y3 = tmp2 mod p
+        if (debug) printf("# 23\n");
     }
 
+    if (debug) {
+        printf("copy result to x3\n");
+    }
     // Assign the computed coordinates to the result
     bn_copy(&result->x, &x3);
     bn_copy(&result->y, &y3);
+
+    if (debug) {
+        bn_print("<< x3: ", &x3);
+        bn_print("<< y3: ", &y3);
+    }
 
     // Free the dynamically allocated memory
     free_bignum(&s);

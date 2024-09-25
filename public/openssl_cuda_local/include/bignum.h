@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <stdint.h>
 
-// #define BN_128
+#define BN_128
 
 #ifdef BN_128
     #define BN_ULONG unsigned __int128
@@ -16,7 +16,7 @@
 #endif
 
 #define MAX_BIT_ARRAY_SIZE 256 // Limit to 256 bits to match the function's design
-#define debug_print false
+#define debug_print true
 #define BN_ULONG_NUM_BITS (sizeof(BN_ULONG) * 8)
 #define PUBLIC_KEY_SIZE 33  // Assuming a 33-byte public key (compressed format)
 #define DEVICE_CLOCK_RATE 1708500
@@ -130,7 +130,7 @@ __device__ int bn_cmp(BIGNUM* a, BIGNUM* b) {
         return a->neg ? -1 : 1;
     }
     // a->top = find_top(a);
-    b->top = find_top(b);
+    b->top = find_top(b); // TODO: (optimization) Find a place where do we call find_top for b with uninicialized top by adding consition there and mark source function before each find_top call
     if (a->top != b->top) {
         return a->top > b->top ? 1 : -1;
     }
@@ -404,8 +404,11 @@ __device__ void set_bn(BIGNUM *dest, const BIGNUM *src) {
     dest->neg = src->neg;
 }
 
-__device__ void bn_mul(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
+__device__ void bn_mul_x(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
     init_zero(product);
+    printf("++ bn_mul ++\n");
+    bn_print(">> a: ", a);
+    bn_print(">> b: ", b);
 
     #ifdef BN_128
         for (int i = 0; i < a->top; ++i) {
@@ -464,13 +467,97 @@ __device__ void bn_mul(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
     }
 
     product->neg = a->neg ^ b->neg;
+    bn_print("<< product: ", product);
+    printf("-- bn_mul --\n");
+}
+
+__device__ void bn_mul(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
+    init_zero(product);
+    printf("++ bn_mul ++\n");
+    bn_print(">> a: ", a);
+    bn_print(">> b: ", b);
+
+    #ifdef BN_128
+        // Multiply the numbers treating them as arrays of 64-bit words
+        const int a_words = a->top * 2; // Since each BN_ULONG is 128 bits (2 * 64 bits)
+        const int b_words = b->top * 2;
+        uint64_t a_array[MAX_BIGNUM_SIZE * 2] = {0};
+        uint64_t b_array[MAX_BIGNUM_SIZE * 2] = {0};
+        uint64_t result_array[MAX_BIGNUM_SIZE * 4] = {0};
+
+        // Expand a into a_array
+        for (int i = 0; i < a->top; ++i) {
+            a_array[i * 2] = (uint64_t)(a->d[i]);
+            a_array[i * 2 + 1] = (uint64_t)(a->d[i] >> 64);
+        }
+
+        // Expand b into b_array
+        for (int i = 0; i < b->top; ++i) {
+            b_array[i * 2] = (uint64_t)(b->d[i]);
+            b_array[i * 2 + 1] = (uint64_t)(b->d[i] >> 64);
+        }
+
+        // Multiply the arrays
+        for (int i = 0; i < a_words; ++i) {
+            uint64_t carry = 0;
+            for (int j = 0; j < b_words; ++j) {
+                unsigned __int128 temp = (unsigned __int128)a_array[i] * b_array[j] + result_array[i + j] + carry;
+                result_array[i + j] = (uint64_t)temp;
+                carry = (uint64_t)(temp >> 64);
+            }
+            result_array[i + b_words] += carry;
+        }
+
+        // Convert result_array back into product->d
+        int product_words = a_words + b_words;
+        int product_top = (product_words + 1) / 2;
+        for (int i = 0; i < product_top; ++i) {
+            uint64_t lo = result_array[i * 2];
+            uint64_t hi = result_array[i * 2 + 1];
+            product->d[i] = ((unsigned __int128)hi << 64) | lo;
+        }
+        // Update the top
+        product->top = product_top;
+        while (product->top > 1 && product->d[product->top - 1] == 0) {
+            product->top--;
+        }
+    #else
+        // Unroll loops if possible
+        for (int i = 0; i < a->top; i++) {
+            BN_ULONG carry = 0;
+            for (int j = 0; j < b->top; j++) {
+                unsigned __int128 temp = (unsigned __int128)a->d[i] * b->d[j] + product->d[i + j] + carry;
+                product->d[i + j] = (BN_ULONG)temp;
+                carry = (BN_ULONG)(temp >> 64);
+            }
+            product->d[i + b->top] = carry;
+        }
+        // Update the top
+        product->top = a->top + b->top;
+        while (product->top > 1 && product->d[product->top - 1] == 0) {
+            product->top--;
+        }
+    #endif
+    
+
+    // Set the sign
+    product->neg = a->neg ^ b->neg;
+    bn_print("<< product: ", product);
+    printf("-- bn_mul --\n");
 }
 
 __device__ int bn_mod(BIGNUM *r, BIGNUM *a, BIGNUM *n) {
     // r: Remainder (updated)
     // a: Dividend
     // n: Modulus
-    bool debug = 0;
+    bool debug = 1;
+    if (debug) {
+        printf("++ bn_mod ++\n");
+        bn_print(">> r: ", r);
+        bn_print(">> a: ", a);
+        bn_print(">> n: ", n);
+    }
+
     BIGNUM q;
     init_zero(&q);
 
@@ -528,6 +615,9 @@ __device__ void mod_mul(BIGNUM *a, BIGNUM *b, BIGNUM *mod, BIGNUM *result) {
 }
 
 __device__ bool bn_is_zero(BIGNUM *a) {
+    if (a->top != find_top(a)) {
+        printf("bn_is_zero: Invalid top value\n"); // TODO: Remove this debug check        
+    }
     for (int i = 0; i < a->top; ++i) {
         if (a->d[i] != 0) {
             return false;
@@ -564,6 +654,10 @@ __device__ void bn_set_word(BIGNUM *bn, BN_ULONG word) {
     // Assuming d is a pointer to an array where the BIGNUM's value is stored
     // and top is an integer representing the index of the most significant word + 1
     // Setting a BIGNUM to a single-word value means that all other words are zero.
+
+    if (bn->top != find_top(bn)) {
+        printf("bn_set_word: Invalid top value\n"); // TODO: Remove this debug check
+    }
 
     // Clear all words in the BIGNUM
     for (int i = 0; i < MAX_BIGNUM_SIZE; ++i) {

@@ -105,6 +105,8 @@ int main() {
         {0xffffffffffffffff, 0xffffffffffffffff, 0, 0, 0, 0, 0, 0, 0, 0},
         {0x1234567890abcdef, 0, 0, 0, 0, 0, 0, 0, 0, 0},
         {0x405000A0CA2248E1, 0xB788A1C84F4C756C, 0xAB7087E3F0C50175, 0xC17747B1566D9FE8, 0, 0, 0, 0, 0, 0},
+        {0xd2a68e877f99fed4, 0x4620881d385be245, 0xfade7e1c8be17cc7, 0x871c611855bf0ca1, 0, 0, 0, 0, 0, 0},
+        {0x871c611855bf0ca1, 0xfade7e1c8be17cc7, 0x4620881d385be245, 0xd2a68e877f99fed4, 0, 0, 0, 0, 0, 0},
     };
 
     BN_ULONG_HOST test_values_b[][MAX_BIGNUM_SIZE_HOST] = {
@@ -114,10 +116,12 @@ int main() {
         {0x2, 0, 0, 0, 0, 0, 0, 0, 0, 0},
         {0xfedcba0987654321, 0, 0, 0, 0, 0, 0, 0, 0, 0},
         {0x158A7E6564F93CDF, 0xD204BB99DD677993, 0xA7596D16B56D2AEF, 0x6C91CEA9CF0CAC55, 0, 0, 0, 0, 0, 0},
+        {0xac946f7cd9ccebb8, 0xd59803e73c7d12aa, 0x395b2eb7e59a8ba1, 0x19742df442fc6604, 0, 0, 0, 0, 0, 0},
+        {0x19742df442fc6604, 0x395b2eb7e59a8ba1, 0xd59803e73c7d12aa, 0xac946f7cd9ccebb8, 0, 0, 0, 0, 0, 0},
     };
 
-    int sign_a[] = {0, 1, 0, 1, 0, 0};
-    int sign_b[] = {0, 0, 1, 1, 0, 0};
+    int sign_a[] = {0, 1, 0, 1, 0, 0, 0, 0};
+    int sign_b[] = {0, 0, 1, 1, 0, 0, 0, 0};
 
     int num_tests = sizeof(test_values_a) / sizeof(test_values_a[0]);
 
