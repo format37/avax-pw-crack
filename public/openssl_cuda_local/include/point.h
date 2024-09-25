@@ -76,42 +76,25 @@ __device__ bool bn_mod_inverse(BIGNUM *result, BIGNUM *a, BIGNUM *n) {
     return true;
 }
 
-// __device__ bool bn_mod_inverse_prototype(BIGNUM *result, BIGNUM *a, BIGNUM *n) {
-//     // Check if 'n' is one
-//     if (bn_is_one(n)) {
-//         return false;  // No modular inverse exists
-//     }
-
-//     BIGNUM exponent;
-//     init_zero(&exponent);
-//     bn_copy(&exponent, n);
-
-//     // Subtract 2 from the modulus to get exponent = n - 2
-//     BIGNUM two;
-//     init_one(&two);
-//     bn_add(&two, &two, &two); // two = 2
-//     bn_sub(&exponent, &exponent, &two);
-
-//     // Compute result = a^(n-2) mod n
-//     bn_mod_exp(result, a, &exponent, n);
-
-//     return true;
-// }
-
+// limit to 256 bits
 __device__ void bignum_to_bit_array(BIGNUM *n, unsigned int *bits) {
     int index = 0;
-    
-    // Iterate through the words in reverse order
-    for (int i = 0; i < n->top; ++i) {
+    int total_bits = n->top * BN_ULONG_NUM_BITS;
+
+    if (total_bits > MAX_BIT_ARRAY_SIZE) {
+        total_bits = MAX_BIT_ARRAY_SIZE;
+    }
+
+    // Iterate through the words
+    for (int i = 0; i < n->top && index < total_bits; ++i) {
         BN_ULONG word = n->d[i];
-        // For each word, iterate through bits from most significant to least significant
-        for (int j = 0; j < BN_ULONG_NUM_BITS; ++j) {
+        for (int j = 0; j < BN_ULONG_NUM_BITS && index < total_bits; ++j) {
             bits[index++] = (word >> j) & 1;
         }
     }
 
-    // If n->top < 4, fill the remaining bits with zeros
-    while (index < 256) {
+    // Fill the remaining bits with zeros
+    while (index < MAX_BIT_ARRAY_SIZE) {
         bits[index++] = 0;
     }
 }

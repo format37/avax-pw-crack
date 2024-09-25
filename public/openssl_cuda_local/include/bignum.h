@@ -15,6 +15,7 @@
     #define MAX_BIGNUM_SIZE 10
 #endif
 
+#define MAX_BIT_ARRAY_SIZE 256 // Limit to 256 bits to match the function's design
 #define debug_print false
 #define BN_ULONG_NUM_BITS (sizeof(BN_ULONG) * 8)
 #define PUBLIC_KEY_SIZE 33  // Assuming a 33-byte public key (compressed format)
@@ -35,8 +36,7 @@ typedef struct bignum_st {
     };
 #else
     __device__ const BIGNUM ZERO_BIGNUM = {
-        // {0,0,0,0,0,0,0,0,0,0},                  // d (will be properly initialized in init_zero)
-        {0},                  // d (will be properly initialized in init_zero)
+        {0,0,0,0,0,0,0,0,0,0},                  // d (will be properly initialized in init_zero)
         1,                    // top (unsigned char)
         0                    // neg (bool)
     };
@@ -708,56 +708,3 @@ __device__ int bn_div(BIGNUM *bn_quotient, BIGNUM *bn_remainder, __restrict__ BI
     bn_remainder->top = find_top_optimized(bn_remainder, divs_max_top);
     return 1;
 }
-
-// __device__ void bignum_to_bit_array(const BIGNUM *n, unsigned int *bits) {
-//     int index = 0;
-//     for (int i = 0; i < n->top; ++i) {
-//         BN_ULONG word = n->d[i];
-//         //for (int j = 0; j < 32; ++j) {  // Assuming BN_ULONG is 32 bits
-//         for (int j = 0; j < BN_ULONG_NUM_BITS; ++j) {  // Assuming BN_ULONG is 32 bits
-//             bits[index++] = (word >> j) & 1;
-//         }
-//     }
-// }
-
-// __device__ void bn_mod_exp(BIGNUM *result, BIGNUM *a, BIGNUM *e, BIGNUM *n) {
-//     init_one(result);
-//     BIGNUM base;
-//     init_zero(&base);
-//     bn_copy(&base, a);
-
-//     unsigned int bits[256]; // Adjust size according to the exponent size
-//     bignum_to_bit_array(e, bits);
-
-//     for (int i = 255; i >= 0; i--) {
-//         // Square result
-//         BIGNUM temp;
-//         init_zero(&temp);
-//         bn_mul(result, result, &temp);
-//         bn_mod(result, &temp, n);
-
-//         if (bits[i]) {
-//             // Multiply by base
-//             bn_mul(result, &base, &temp);
-//             bn_mod(result, &temp, n);
-//         }
-//     }
-// }
-
-// __device__ void bn_sub_word(BIGNUM *bn, BN_ULONG w) {
-//     // Subtract a word from BIGNUM
-//     BN_ULONG borrow = w;
-//     for (int i = 0; i < bn->top && borrow > 0; ++i) {
-//         if (bn->d[i] >= borrow) {
-//             bn->d[i] -= borrow;
-//             borrow = 0;
-//         } else {
-//             bn->d[i] = BN_ULONG_MAX - (borrow - bn->d[i] - 1);
-//             borrow = 1;
-//         }
-//     }
-//     // Adjust the top
-//     while (bn->top > 1 && bn->d[bn->top - 1] == 0) {
-//         bn->top--;
-//     }
-// }
