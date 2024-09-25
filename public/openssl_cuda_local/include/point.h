@@ -316,12 +316,11 @@ __device__ int point_add(
         if (debug) printf("# 7\n");
         init_zero(&s);
         bn_mul(&tmp1, &tmp2, &s);
-        bn_print("### s:", &s); // Debug FAIL
-        return 0; // TODO: Remove this line
+        bn_print("### s:", &s); // Debug OK
         if (debug) printf("# 8\n");
         init_zero(&tmp2);
         bn_copy(&tmp2, &s);
-        if (debug) printf("# 9\n"); // tmp2 ERR
+        if (debug) printf("# 9\n"); // tmp2 OK
         init_zero(&s);
         bn_mod(&s, &tmp2, p);                 // s = (p2.y - p1.y) / (p2.x - p1.x) mod p
         if (debug) printf("# 10\n");
