@@ -149,9 +149,9 @@ __device__ int point_add(
     BIGNUM *p, 
     BIGNUM *a
 ) {
-    bool debug = 1;
+    bool debug = 0;
     if (debug) {
-        printf("++ point_add ++\n");    
+        // printf("++ point_add ++\n");    
         bn_print(">> p1.x: ", &p1->x);
         bn_print(">> p1.y: ", &p1->y);
         bn_print(">> p2.x: ", &p2->x);

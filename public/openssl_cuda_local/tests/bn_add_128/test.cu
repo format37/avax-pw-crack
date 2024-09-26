@@ -115,6 +115,8 @@ int main() {
         {0x1234567890abcdef, 0, 0, 0, 0, 0, 0, 0, 0, 0},
         {0x1234567890abcdef, 0, 0, 0, 0, 0, 0, 0, 0, 0},
         {0x405000A0CA2248E1, 0xB788A1C84F4C756C, 0xAB7087E3F0C50175, 0xC17747B1566D9FE8, 0, 0, 0, 0, 0, 0},
+        // 9601bb470508fcb1 bbced282c4080ff9 d24bdbb06b798777 e2cf13dc1b824fdf
+        {0xe2cf13dc1b824fdf, 0xd24bdbb06b798777, 0xbbced282c4080ff9, 0x9601bb470508fcb1, 0, 0, 0, 0, 0, 0},
     };
 
     BN_ULONG_HOST test_values_b[][MAX_BIGNUM_SIZE_HOST] = {
@@ -130,11 +132,13 @@ int main() {
         {0xfedcba0987654321, 0, 0, 0, 0, 0, 0, 0, 0, 0},
         {0xfedcba0987654321, 0, 0, 0, 0, 0, 0, 0, 0, 0},
         {0x158A7E6564F93CDF, 0xD204BB99DD677993, 0xA7596D16B56D2AEF, 0x6C91CEA9CF0CAC55, 0, 0, 0, 0, 0, 0},
+        // c9c27e3a97941d6d 4a53139dd6784a1c f309e971e26ad610 0b8e351037a6a8be
+        {0x0b8e351037a6a8be, 0xf309e971e26ad610, 0x4a53139dd6784a1c, 0xc9c27e3a97941d6d, 0, 0, 0, 0, 0, 0},
     };
 
     // Set sign to 0 for positive numbers, 1 for negative numbers
-    int sign_a[] = {0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0};
-    int sign_b[] = {0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0};
+    int sign_a[] = {0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0};
+    int sign_b[] = {0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0};
 
     int num_tests = sizeof(test_values_a) / sizeof(test_values_a[0]);
 
@@ -211,6 +215,11 @@ int main() {
 
         // Compare CUDA and OpenSSL results
         if (compare_results(cuda_result, cuda_result_sign, result, MAX_BIGNUM_SIZE_HOST)) {
+            // print cuda_result
+            printf("\nCUDA results:\n");
+            for (int i = MAX_BIGNUM_SIZE_HOST - 1; i >= 0; --i) {
+                printf("cuda_result[%d]: %llx\n", i, cuda_result[i]);
+            }
             printf("Test PASSED: CUDA and OpenSSL results match.\n");
         } else {
             printf("### Test FAILED: CUDA and OpenSSL results DO NOT MATCH. ###\n");

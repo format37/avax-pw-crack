@@ -42,7 +42,7 @@ typedef struct bignum_st {
     };
 #endif
 
-__host__ __device__ void init_zero(BIGNUM *bn) {
+__device__ void init_zero(BIGNUM *bn) {
     *bn = ZERO_BIGNUM;
 }
 __device__ void init_one(BIGNUM *bn) {
@@ -56,11 +56,11 @@ __device__ void init_one(BIGNUM *bn) {
     bn->top = 1;
 }
 
-__device__ bool bn_add(BIGNUM *result, BIGNUM *a, BIGNUM *b);
+__device__ bool bn_add(BIGNUM *result, const BIGNUM *a, const BIGNUM *b);
 __device__ int bn_mod(BIGNUM *r, BIGNUM *m, BIGNUM *d);
 __device__ bool bn_is_zero(BIGNUM *a);
 
-__host__ __device__ unsigned char find_top(const BIGNUM *bn) {
+__device__ unsigned char find_top(const BIGNUM *bn) {
     for (int i = MAX_BIGNUM_SIZE - 1; i >= 0; i--) {
         if (bn->d[i] != 0) {
             return i + 1;
@@ -83,7 +83,7 @@ __device__ void free_bignum(BIGNUM *bn) {
     delete[] bn->d;
 }
 
-__device__ void bn_print(const char* msg, BIGNUM* a) {
+__device__ void bn_print(const char* msg, const BIGNUM* a) {
     // if (!debug_print) return;
     #ifndef debug_print
         return;
@@ -190,46 +190,59 @@ __device__ void bn_copy(BIGNUM *dest, BIGNUM *src) {
     }
 }
 
-__device__ void absolute_add(BIGNUM *result, const BIGNUM *a, const BIGNUM *b) {
-    // Determine the maximum size to iterate over
-    unsigned char max_top = max(a->top, b->top);
-    BN_ULONG carry = 0;
+#ifdef BN_128
+    __device__ void absolute_add(BIGNUM *result, const BIGNUM *a, const BIGNUM *b) {
+        unsigned char max_top = max(a->top, b->top);
+        volatile BN_ULONG carry = 0;
 
-    unsigned char i;
+        for (int i = 0; i <= max_top; ++i) {
+            volatile BN_ULONG ai = (i < a->top) ? a->d[i] : 0;
+            volatile BN_ULONG bi = (i < b->top) ? b->d[i] : 0;
+            volatile BN_ULONG sum;
 
-    // Initialize result
-    for (i = 0; i <= max_top; ++i) {
-        result->d[i] = 0;
-    }
-    result->top = max_top;
-
-    for (i = 0; i <= max_top; ++i) {
-        // Extract current words or zero if one bignum is shorter
-        BN_ULONG ai = (i < a->top) ? a->d[i] : 0;
-        BN_ULONG bi = (i < b->top) ? b->d[i] : 0;
-
-        #ifdef BN_128
-            // Split the 128-bit numbers into high and low 64-bit parts
             uint64_t ai_lo = (uint64_t)ai;
             uint64_t ai_hi = (uint64_t)(ai >> 64);
             uint64_t bi_lo = (uint64_t)bi;
             uint64_t bi_hi = (uint64_t)(bi >> 64);
 
-            // Perform addition on low parts
             uint64_t sum_lo = ai_lo + bi_lo + (uint64_t)carry;
             uint64_t carry_lo = (sum_lo < ai_lo) || (carry && sum_lo == ai_lo);
 
-            // Perform addition on high parts
             uint64_t sum_hi = ai_hi + bi_hi + carry_lo;
-            uint64_t carry_hi = (sum_hi < ai_hi) || (carry_lo && sum_hi == ai_hi);
+            carry = (sum_hi < ai_hi) || (carry_lo && sum_hi == ai_hi) ? 1 : 0;
 
-            // Combine high and low parts back into 128-bit word
-            BN_ULONG sum = ((BN_ULONG)sum_hi << 64) | sum_lo;
+            sum = ((BN_ULONG)sum_hi << 64) | sum_lo;
             result->d[i] = sum;
+            __threadfence();  // Ensure global visibility of each word
+        }
 
-            // Update carry
-            carry = carry_hi;
-        #else
+        if (carry > 0 && max_top < MAX_BIGNUM_SIZE - 1) {
+            result->d[max_top + 1] = carry;
+            max_top++;
+        }
+
+        result->top = max_top + 1;
+        __threadfence();  // Final memory barrier
+    }
+#else
+    __device__ void absolute_add(BIGNUM *result, const BIGNUM *a, const BIGNUM *b) {
+        // Determine the maximum size to iterate over
+        unsigned char max_top = max(a->top, b->top);
+        BN_ULONG carry = 0;
+
+        unsigned char i;
+
+        // Initialize result
+        for (i = 0; i <= max_top; ++i) {
+            result->d[i] = 0;
+        }
+        result->top = max_top;
+
+        for (i = 0; i <= max_top; ++i) {
+            // Extract current words or zero if one bignum is shorter
+            BN_ULONG ai = (i < a->top) ? a->d[i] : 0;
+            BN_ULONG bi = (i < b->top) ? b->d[i] : 0;
+            
             // Calculate sum and carry
             BN_ULONG sum = ai + bi + carry;
 
@@ -238,24 +251,22 @@ __device__ void absolute_add(BIGNUM *result, const BIGNUM *a, const BIGNUM *b) {
 
             // Calculate carry
             carry = (sum < ai) || (carry > 0 && sum == ai) ? 1 : 0;
-        #endif
-    }
-
-    // Handle carry out, expand result if necessary
-    if (carry > 0) {
-        if (result->top < MAX_BIGNUM_SIZE - 1) {
-            result->d[result->top] = carry;
-            result->top++;
-        } else {
-            // Handle error: Result BIGNUM doesn't have space for an additional word.
-            // This should potentially be reported back to the caller.
-            printf("absolute_add: Result BIGNUM doesn't have space for an additional word.\n");
         }
-    }
 
-    // Find the real top after addition (no leading zeroes)
-    result->top = find_top_optimized(result, max_top+1);
-}
+        // Handle carry out, expand result if necessary
+        if (carry > 0) {
+            if (result->top < MAX_BIGNUM_SIZE - 1) {
+                result->d[result->top] = carry;
+                result->top++;
+            } else {
+                // Handle error: Result BIGNUM doesn't have space for an additional word.
+                // This should potentially be reported back to the caller.
+                printf("absolute_add: Result BIGNUM doesn't have space for an additional word.\n");
+            }
+        }
+        result->top = find_top_optimized(result, max_top+1);
+    }
+#endif
 
 __device__ void absolute_subtract(BIGNUM *result, const BIGNUM *a, const BIGNUM *b) {
 
@@ -346,13 +357,22 @@ __device__ int absolute_compare(const BIGNUM* a, const BIGNUM* b) {
     return 0; // |a| and |b| are equal in absolute value
 }
 
-__device__ bool bn_add(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
+__device__ bool bn_add(BIGNUM *result, const BIGNUM *a, const BIGNUM *b) {
+    // printf("++ bn_add ++\n");
+    // bn_print(">> a: ", a);
+    // printf(">> a->top: %d\n", a->top);
+    // printf(">> a->neg: %d\n", a->neg);
+    // bn_print(">> b: ", b);
+    // printf(">> b->top: %d\n", b->top);
+    // printf(">> b->neg: %d\n", b->neg);
+    // bn_print(">> result: ", result);
     init_zero(result);
     unsigned char max_top = max(a->top, b->top);
 
     if (a->neg == b->neg) {
         // Both numbers have the same sign, so we can directly add them.
         absolute_add(result, a, b);
+        // bn_print("absolute_add >> result: ", result); // <<== printing this result DOES NOT leads to correct answer
         result->neg = a->neg; // The sign will be the same as both operands.
     } else {
         // The numbers have different signs, so we need to compare their absolute values to decide on the operation.
@@ -373,6 +393,10 @@ __device__ bool bn_add(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
             result->d[0] = 0;
         }
     }
+    // result->top = find_top_optimized(result, max_top + 1);
+    // printf(">> result: ");
+    // bn_print("", result);
+    // printf("-- bn_add --\n");
     return true;
 }
 
