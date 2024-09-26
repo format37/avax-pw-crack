@@ -7,12 +7,12 @@ __device__ void my_cuda_memcpy_uint32_t(uint32_t *dst, const uint32_t *src, unsi
 }
 
 __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uint32_t index) {
-	// printf("++ GetChildKeyDerivation ++\n");
-    // printf(">> key: ");
-    // print_as_hex(key, 32);
+	printf("++ GetChildKeyDerivation ++\n");
+    printf(">> key: ");
+    print_as_hex(key, 32);
     // printf(">> chainCode: ");
     // print_as_hex(chainCode, 32);
-    // printf(">> index: %u\n", index);
+    printf(">> index: %u\n", index);
     // printf("\n* step 0 index: %u\n", index);
     BIP32Info info;
 
@@ -22,9 +22,13 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
     uint8_t hash[64];
     // unsigned int len = 64;
 
+    // printf("\n[1] Master private key: ");
+    // for (int i = 0; i < 32; i++) {
+    //     printf("%02x", key[i]);
+    // }
     // Fill buffer according to index
     if (index == 0) {
-		// printf("    * INDEX is 0\n");
+		printf("child_key.h => GetPublicKey\n");
         GetPublicKey(buffer, key);
 
     } else {

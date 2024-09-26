@@ -1,42 +1,98 @@
-#define CURVE_P_VALUES_MAX_SIZE 4
-__device__ __constant__ BN_ULONG CURVE_GX_values[CURVE_P_VALUES_MAX_SIZE] = {
-        0x59F2815B16F81798,
-        0x029BFCDB2DCE28D9,
-        0x55A06295CE870B07,
-        0x79BE667EF9DCBBAC
-        };
-__device__ __constant__ BN_ULONG CURVE_GY_values[CURVE_P_VALUES_MAX_SIZE] = {
-        0x9C47D08FFB10D4B8,
-        0xFD17B448A6855419,
-        0x5DA4FBFC0E1108A8,
-        0x483ADA7726A3C465
-        };
-__device__ __constant__ BIGNUM CURVE_A = {0};
-__device__ __constant__ BIGNUM CURVE_P = {
-    {
-        0xFFFFFFFEFFFFFC2F,
-        0xFFFFFFFFFFFFFFFF,
-        0xFFFFFFFFFFFFFFFF,
-        0xFFFFFFFFFFFFFFFF
-    },
-    CURVE_P_VALUES_MAX_SIZE,
-    false
-};
+#ifdef BN_128
+    #define CURVE_P_VALUES_MAX_SIZE 2
+
+    __device__ __constant__ BN_ULONG CURVE_GX_values[CURVE_P_VALUES_MAX_SIZE] = {
+        0x029BFCDB2DCE28D959F2815B16F81798,
+        0x79BE667EF9DCBBAC55A06295CE870B07
+    };
+
+    __device__ __constant__ BN_ULONG CURVE_GY_values[CURVE_P_VALUES_MAX_SIZE] = {
+        0xFD17B448A68554199C47D08FFB10D4B8,
+        0x483ADA7726A3C4655DA4FBFC0E1108A8
+    };
+
+    __device__ __constant__ BIGNUM CURVE_A = {0};
+
+    __device__ __constant__ BIGNUM CURVE_P = {
+        {
+            0xfffffffffffffffffffffffefffffc2f,
+            0xffffffffffffffffffffffffffffffff
+        },
+        CURVE_P_VALUES_MAX_SIZE,
+        false
+    };
+#else
+    #define CURVE_P_VALUES_MAX_SIZE 4
+    __device__ __constant__ BN_ULONG CURVE_GX_values[CURVE_P_VALUES_MAX_SIZE] = {
+            0x59F2815B16F81798,
+            0x029BFCDB2DCE28D9,
+            0x55A06295CE870B07,
+            0x79BE667EF9DCBBAC
+            };
+    __device__ __constant__ BN_ULONG CURVE_GY_values[CURVE_P_VALUES_MAX_SIZE] = {
+            0x9C47D08FFB10D4B8,
+            0xFD17B448A6855419,
+            0x5DA4FBFC0E1108A8,
+            0x483ADA7726A3C465
+            };
+    __device__ __constant__ BIGNUM CURVE_A = {0};
+    __device__ __constant__ BIGNUM CURVE_P = {
+        {
+            0xFFFFFFFEFFFFFC2F,
+            0xFFFFFFFFFFFFFFFF,
+            0xFFFFFFFFFFFFFFFF,
+            0xFFFFFFFFFFFFFFFF
+        },
+        CURVE_P_VALUES_MAX_SIZE,
+        false
+    };
+#endif
 
 __device__ void GetPublicKey(uint8_t* buffer, uint8_t* key)
 {
+    printf("++ GetPublicKey ++\n");
+    // print key
+    printf(">> key: ");
+    for (int i = 0; i < 32; i++) {
+        printf("%02x", key[i]);
+    }
+    printf("\n");
     BIGNUM newKey;
     init_zero(&newKey);
-    for (int i = 0; i < CURVE_P_VALUES_MAX_SIZE; ++i) {
-        newKey.d[3 - i] = ((BN_ULONG)key[8*i] << 56) | 
-                            ((BN_ULONG)key[8*i + 1] << 48) | 
-                            ((BN_ULONG)key[8*i + 2] << 40) | 
-                            ((BN_ULONG)key[8*i + 3] << 32) |
-                            ((BN_ULONG)key[8*i + 4] << 24) | 
-                            ((BN_ULONG)key[8*i + 5] << 16) | 
-                            ((BN_ULONG)key[8*i + 6] << 8) | 
-                            ((BN_ULONG)key[8*i + 7]);
-    }
+    #ifdef BN_128
+        for (int i = 0; i < CURVE_P_VALUES_MAX_SIZE; ++i) {
+            BN_ULONG low = ((BN_ULONG)key[16*i] << 56) | 
+                        ((BN_ULONG)key[16*i + 1] << 48) | 
+                        ((BN_ULONG)key[16*i + 2] << 40) | 
+                        ((BN_ULONG)key[16*i + 3] << 32) |
+                        ((BN_ULONG)key[16*i + 4] << 24) | 
+                        ((BN_ULONG)key[16*i + 5] << 16) | 
+                        ((BN_ULONG)key[16*i + 6] << 8) | 
+                        ((BN_ULONG)key[16*i + 7]);
+
+            BN_ULONG high = ((BN_ULONG)key[16*i + 8] << 56) | 
+                            ((BN_ULONG)key[16*i + 9] << 48) | 
+                            ((BN_ULONG)key[16*i + 10] << 40) | 
+                            ((BN_ULONG)key[16*i + 11] << 32) |
+                            ((BN_ULONG)key[16*i + 12] << 24) | 
+                            ((BN_ULONG)key[16*i + 13] << 16) | 
+                            ((BN_ULONG)key[16*i + 14] << 8) | 
+                            ((BN_ULONG)key[16*i + 15]);
+
+            newKey.d[CURVE_P_VALUES_MAX_SIZE - 1 - i] = (((unsigned __int128)high) << 64) | low;
+        }
+    #else
+        for (int i = 0; i < CURVE_P_VALUES_MAX_SIZE; ++i) {
+            newKey.d[3 - i] = ((BN_ULONG)key[8*i] << 56) | 
+                                ((BN_ULONG)key[8*i + 1] << 48) | 
+                                ((BN_ULONG)key[8*i + 2] << 40) | 
+                                ((BN_ULONG)key[8*i + 3] << 32) |
+                                ((BN_ULONG)key[8*i + 4] << 24) | 
+                                ((BN_ULONG)key[8*i + 5] << 16) | 
+                                ((BN_ULONG)key[8*i + 6] << 8) | 
+                                ((BN_ULONG)key[8*i + 7]);
+        }
+    #endif
     newKey.top = CURVE_P_VALUES_MAX_SIZE;
 
     // Initialize generator

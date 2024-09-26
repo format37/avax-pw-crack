@@ -730,7 +730,6 @@ __device__ int bn_div(BIGNUM *bn_quotient, BIGNUM *bn_remainder, __restrict__ BI
     }
 
     // Set remainder
-    // for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
     for (int i = 0; i < current_dividend.top; i++) {
         bn_remainder->d[i] = current_dividend.d[i];
     }
