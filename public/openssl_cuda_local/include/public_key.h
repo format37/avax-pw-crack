@@ -61,25 +61,22 @@ __device__ void GetPublicKey(uint8_t* buffer, uint8_t* key)
     init_zero(&newKey);
     #ifdef BN_128
         for (int i = 0; i < CURVE_P_VALUES_MAX_SIZE; ++i) {
-            BN_ULONG low = ((BN_ULONG)key[16*i] << 56) | 
-                        ((BN_ULONG)key[16*i + 1] << 48) | 
-                        ((BN_ULONG)key[16*i + 2] << 40) | 
-                        ((BN_ULONG)key[16*i + 3] << 32) |
-                        ((BN_ULONG)key[16*i + 4] << 24) | 
-                        ((BN_ULONG)key[16*i + 5] << 16) | 
-                        ((BN_ULONG)key[16*i + 6] << 8) | 
-                        ((BN_ULONG)key[16*i + 7]);
-
-            BN_ULONG high = ((BN_ULONG)key[16*i + 8] << 56) | 
-                            ((BN_ULONG)key[16*i + 9] << 48) | 
-                            ((BN_ULONG)key[16*i + 10] << 40) | 
-                            ((BN_ULONG)key[16*i + 11] << 32) |
-                            ((BN_ULONG)key[16*i + 12] << 24) | 
-                            ((BN_ULONG)key[16*i + 13] << 16) | 
-                            ((BN_ULONG)key[16*i + 14] << 8) | 
-                            ((BN_ULONG)key[16*i + 15]);
-
-            newKey.d[CURVE_P_VALUES_MAX_SIZE - 1 - i] = (((unsigned __int128)high) << 64) | low;
+            newKey.d[CURVE_P_VALUES_MAX_SIZE - 1 - i] = ((BN_ULONG)key[16*i] << 120) |
+                                                        ((BN_ULONG)key[16*i + 1] << 112) |
+                                                        ((BN_ULONG)key[16*i + 2] << 104) |
+                                                        ((BN_ULONG)key[16*i + 3] << 96) |
+                                                        ((BN_ULONG)key[16*i + 4] << 88) |
+                                                        ((BN_ULONG)key[16*i + 5] << 80) |
+                                                        ((BN_ULONG)key[16*i + 6] << 72) |
+                                                        ((BN_ULONG)key[16*i + 7] << 64) |
+                                                        ((BN_ULONG)key[16*i + 8] << 56) |
+                                                        ((BN_ULONG)key[16*i + 9] << 48) |
+                                                        ((BN_ULONG)key[16*i + 10] << 40) |
+                                                        ((BN_ULONG)key[16*i + 11] << 32) |
+                                                        ((BN_ULONG)key[16*i + 12] << 24) |
+                                                        ((BN_ULONG)key[16*i + 13] << 16) |
+                                                        ((BN_ULONG)key[16*i + 14] << 8) |
+                                                        (BN_ULONG)key[16*i + 15];
         }
     #else
         for (int i = 0; i < CURVE_P_VALUES_MAX_SIZE; ++i) {
@@ -95,6 +92,9 @@ __device__ void GetPublicKey(uint8_t* buffer, uint8_t* key)
     #endif
     newKey.top = CURVE_P_VALUES_MAX_SIZE;
 
+    // Print newKey
+    bn_print("[#] newKey: ", &newKey);
+
     // Initialize generator
     EC_POINT_CUDA G;
     init_zero(&G.x);
@@ -107,7 +107,7 @@ __device__ void GetPublicKey(uint8_t* buffer, uint8_t* key)
     G.y.top = CURVE_P_VALUES_MAX_SIZE;
 
     // TODO: Check do we need to define extra G. Or we are able to use __constant__ CURVE_GX_values and CURVE_GY_values as new EC_POINT_CUDA instead
-    EC_POINT_CUDA publicKey = ec_point_scalar_mul(&G, &newKey, &CURVE_P, &CURVE_A);    
+    EC_POINT_CUDA publicKey = ec_point_scalar_mul(&G, &newKey, &CURVE_P, &CURVE_A); // FAIL with index 0. CHECK newKey.
     // Copy the public key to buffer
     for (int i = 0; i < CURVE_P_VALUES_MAX_SIZE; i++) {
         buffer[8*i] = (publicKey.x.d[3 - i] >> 56) & 0xFF;

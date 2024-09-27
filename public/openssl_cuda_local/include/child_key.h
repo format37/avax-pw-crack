@@ -272,16 +272,31 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
     bn_print("Debug Cuda newKey (After mod): ", &newKey);
 
     // Copy newKey to info.master_private_key
-    for (int i = 0; i < 4; i++) {
-        info.master_private_key[8*i] = (newKey.d[3 - i] >> 56) & 0xFF;
-        info.master_private_key[8*i + 1] = (newKey.d[3 - i] >> 48) & 0xFF;
-        info.master_private_key[8*i + 2] = (newKey.d[3 - i] >> 40) & 0xFF;
-        info.master_private_key[8*i + 3] = (newKey.d[3 - i] >> 32) & 0xFF;
-        info.master_private_key[8*i + 4] = (newKey.d[3 - i] >> 24) & 0xFF;
-        info.master_private_key[8*i + 5] = (newKey.d[3 - i] >> 16) & 0xFF;
-        info.master_private_key[8*i + 6] = (newKey.d[3 - i] >> 8) & 0xFF;
-        info.master_private_key[8*i + 7] = newKey.d[3 - i] & 0xFF;
-    }
+    // for (int i = 0; i < 4; i++) {
+    //     info.master_private_key[8*i] = (newKey.d[3 - i] >> 56) & 0xFF;
+    //     info.master_private_key[8*i + 1] = (newKey.d[3 - i] >> 48) & 0xFF;
+    //     info.master_private_key[8*i + 2] = (newKey.d[3 - i] >> 40) & 0xFF;
+    //     info.master_private_key[8*i + 3] = (newKey.d[3 - i] >> 32) & 0xFF;
+    //     info.master_private_key[8*i + 4] = (newKey.d[3 - i] >> 24) & 0xFF;
+    //     info.master_private_key[8*i + 5] = (newKey.d[3 - i] >> 16) & 0xFF;
+    //     info.master_private_key[8*i + 6] = (newKey.d[3 - i] >> 8) & 0xFF;
+    //     info.master_private_key[8*i + 7] = newKey.d[3 - i] & 0xFF;
+    // }
+    #ifdef BN_128
+        // 128-bit case
+        for (int i = 0; i < 2; i++) {
+            for (int j = 0; j < 16; j++) {
+                info.master_private_key[16*i + j] = (newKey.d[1 - i] >> (120 - 8*j)) & 0xFF;
+            }
+        }
+    #else
+        // 64-bit case
+        for (int i = 0; i < 4; i++) {
+            for (int j = 0; j < 8; j++) {
+                info.master_private_key[8*i + j] = (newKey.d[3 - i] >> (56 - 8*j)) & 0xFF;
+            }
+        }
+    #endif
 	
     // Print master private key
     printf("<< info.master_private_key: ");
