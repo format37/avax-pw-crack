@@ -1,3 +1,29 @@
+// Initialize curveOrder_d for secp256k1
+// FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
+#ifdef BN_128
+    #define CURVE_ORDER_SIZE 2
+    __device__ __constant__ BIGNUM CURVE_ORDER = {
+        {
+            0xBAAEDCE6AF48A03BBFD25E8CD0364141,
+            0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE
+        },
+        CURVE_ORDER_SIZE,
+        false
+    };
+#else
+    #define CURVE_ORDER_SIZE 4
+    __device__ __constant__ BIGNUM CURVE_ORDER = {
+        {
+            0xBFD25E8CD0364141,
+            0xBAAEDCE6AF48A03B,
+            0xFFFFFFFFFFFFFFFE,
+            0xFFFFFFFFFFFFFFFF
+        },
+        CURVE_ORDER_SIZE,
+        false
+    };
+#endif
+
 // Child key derivation ++
 __device__ void my_cuda_memcpy_uint32_t(uint32_t *dst, const uint32_t *src, unsigned int n) {
     for (unsigned int i = 0; i < n / sizeof(uint32_t); ++i) {
@@ -139,28 +165,25 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
 	// Addition
 	BIGNUM a;
 	BIGNUM b;
-	BIGNUM curveOrder;
+	// BIGNUM curveOrder;
 	BIGNUM newKey;
 	BIGNUM publicKey;
 
     init_zero(&a);
     init_zero(&b);
-    init_zero(&curveOrder);
+    // init_zero(&curveOrder);
     init_zero(&newKey);
     init_zero(&publicKey);
 
-	// BN_ULONG a_d[8];
-  	// BN_ULONG b_d[8];
-	// BN_ULONG newKey_d[8];
 	// Initialize curveOrder_d for secp256k1
 	// FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
     // 
-    curveOrder.d[0] = 0xBFD25E8CD0364141;
-    curveOrder.d[1] = 0xBAAEDCE6AF48A03B;
-    curveOrder.d[2] = 0xFFFFFFFFFFFFFFFE;
-    curveOrder.d[3] = 0xFFFFFFFFFFFFFFFF;
-    curveOrder.neg = 0;
-    curveOrder.top = 4;
+    // curveOrder.d[0] = 0xBFD25E8CD0364141;
+    // curveOrder.d[1] = 0xBAAEDCE6AF48A03B;
+    // curveOrder.d[2] = 0xFFFFFFFFFFFFFFFE;
+    // curveOrder.d[3] = 0xFFFFFFFFFFFFFFFF;
+    // curveOrder.neg = 0;
+    // curveOrder.top = 4;
     
     // hash: uint8_t[64]
     // il: uint32_t il[8]
@@ -240,10 +263,10 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
     bn_print("Debug Cuda newKey (After add): ", &newKey);
 
     // // Print curve order
-    bn_print("Debug Cuda curveOrder: ", &curveOrder);
+    bn_print("Debug Cuda curveOrder: ", &CURVE_ORDER);
 
     printf("Calling bn_mod\n");
-    bn_mod(&newKey, &newKey, &curveOrder);
+    bn_mod(&newKey, &newKey, &CURVE_ORDER);
 
     printf("After bn_mod\n");
     bn_print("Debug Cuda newKey (After mod): ", &newKey);

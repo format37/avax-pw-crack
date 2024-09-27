@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <stdint.h>
 
-#define BN_128
+// #define BN_128
 
 #ifdef BN_128
     #define BN_ULONG unsigned __int128
