@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <stdint.h>
 
-#define BN_128
+// #define BN_128
 
 #ifdef BN_128
     #define BN_ULONG unsigned __int128
@@ -56,8 +56,10 @@ __device__ void init_one(BIGNUM *bn) {
     bn->top = 1;
 }
 
+// __device__ bool bn_add(BIGNUM *result, BIGNUM *a, BIGNUM *b);
 __device__ bool bn_add(BIGNUM *result, const BIGNUM *a, const BIGNUM *b);
-__device__ int bn_mod(BIGNUM *r, BIGNUM *m, BIGNUM *d);
+// __device__ int bn_mod(BIGNUM *r, BIGNUM *m, BIGNUM *d);
+__device__ int bn_mod(BIGNUM *r, const BIGNUM *a, const BIGNUM *n);
 __device__ bool bn_is_zero(BIGNUM *a);
 
 __device__ unsigned char find_top(const BIGNUM *bn) {
@@ -149,7 +151,7 @@ __device__ int bn_cmp(BIGNUM* a, BIGNUM* b) {
     return 0;
 }
 
-__device__ int bn_cmp_abs(BIGNUM *a, BIGNUM *b) {
+__device__ int bn_cmp_abs(const BIGNUM *a, const BIGNUM *b) {
     if (a->top > b->top)
         return 1;
     if (b->top > a->top)
@@ -165,7 +167,7 @@ __device__ int bn_cmp_abs(BIGNUM *a, BIGNUM *b) {
 }
 
 // Helper function to perform a deep copy of BIGNUM
-__device__ void bn_copy(BIGNUM *dest, BIGNUM *src) {
+__device__ void bn_copy(BIGNUM *dest, const BIGNUM *src) {
     // Init dst as zero
     init_zero(dest);
 
@@ -226,6 +228,8 @@ __device__ void bn_copy(BIGNUM *dest, BIGNUM *src) {
     }
 #else
     __device__ void absolute_add(BIGNUM *result, const BIGNUM *a, const BIGNUM *b) {
+        // if (a->top != find_top(a)) printf("err: absolute_add: a->top != find_top(a)\n"); // no errors has been found
+        // if (b->top != find_top(b)) printf("err: absolute_add: b->top != find_top(b)\n");
         // Determine the maximum size to iterate over
         unsigned char max_top = max(a->top, b->top);
         BN_ULONG carry = 0;
@@ -303,7 +307,7 @@ __device__ void absolute_subtract(BIGNUM *result, const BIGNUM *a, const BIGNUM 
     }
 }
 
-__device__ bool bn_sub(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
+__device__ bool bn_sub(BIGNUM *result, const BIGNUM *a, const BIGNUM *b) {
     // If one is negative and the other is positive, it's essentially an addition.
     if (a->neg != b->neg) {
         result->neg = a->neg; // The sign will be the same as the sign of 'a'.
@@ -358,6 +362,7 @@ __device__ int absolute_compare(const BIGNUM* a, const BIGNUM* b) {
 }
 
 __device__ bool bn_add(BIGNUM *result, const BIGNUM *a, const BIGNUM *b) {
+//__device__ bool bn_add(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
     // printf("++ bn_add ++\n");
     // bn_print(">> a: ", a);
     // printf(">> a->top: %d\n", a->top);
@@ -400,7 +405,7 @@ __device__ bool bn_add(BIGNUM *result, const BIGNUM *a, const BIGNUM *b) {
     return true;
 }
 
-__device__ int bn_div(BIGNUM *a, BIGNUM *b, BIGNUM *q, BIGNUM *r);
+__device__ int bn_div(BIGNUM *a, BIGNUM *b, const BIGNUM *q, const BIGNUM *r);
 __device__ void bn_mul(BIGNUM *a, BIGNUM *b, BIGNUM *product);
 
 __device__ void set_bn(BIGNUM *dest, const BIGNUM *src) {
@@ -512,7 +517,7 @@ __device__ void bn_mul(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
     // #endif
 }
 
-__device__ int bn_mod(BIGNUM *r, BIGNUM *a, BIGNUM *n) {
+__device__ int bn_mod(BIGNUM *r, const BIGNUM *a, const BIGNUM *n) {
     // r: Remainder (updated)
     // a: Dividend
     // n: Modulus
@@ -592,7 +597,7 @@ __device__ bool bn_is_zero(BIGNUM *a) {
     return true;
 }
 
-__device__ bool bn_is_one(BIGNUM *a) {
+__device__ bool bn_is_one(const BIGNUM *a) {
     // Assuming that BIGNUM stores the number in an array 'd' of integers
     // and 'top' indicates the number of chunks being used.
     // We also assume that 'd' is big-endian and 'top' is the index of the highest non-zero digit.
@@ -673,7 +678,7 @@ __device__ void left_shift(BIGNUM *a, int shift) {
     a->top = find_top_optimized(a, potential_new_top);
 }
 
-__device__ int bn_div(BIGNUM *bn_quotient, BIGNUM *bn_remainder, __restrict__ BIGNUM *bn_dividend, __restrict__ BIGNUM *bn_divisor)
+__device__ int bn_div(BIGNUM *bn_quotient, BIGNUM *bn_remainder, const BIGNUM *bn_dividend, const BIGNUM *bn_divisor)
 {
     // Store signs and work with absolute values
     int dividend_neg = bn_dividend->neg;

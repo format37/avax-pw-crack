@@ -3,7 +3,7 @@ struct EC_POINT_CUDA {
   BIGNUM y;
 };
 
-__device__ bool bn_mod_inverse(BIGNUM *result, BIGNUM *a, BIGNUM *n) {
+__device__ bool bn_mod_inverse(BIGNUM *result, const BIGNUM *a, const BIGNUM *n) {
     bool debug = 0;
     if (bn_is_one(n)) {
         return false;  // No modular inverse exists
@@ -405,12 +405,15 @@ __device__ EC_POINT_CUDA ec_point_scalar_mul(
     BIGNUM *curve_prime, 
     BIGNUM *curve_a
     ) {
-    debug_printf("++ ec_point_scalar_mul ++\n");
-    bn_print(">> point x: ", &point->x);
-    bn_print(">> point y: ", &point->y);
-    bn_print(">> scalar: ", scalar);
-    bn_print(">> curve_prime: ", curve_prime);
-    bn_print(">> curve_a: ", curve_a);
+    bool debug = 0;
+    if (debug) {
+        debug_printf("++ ec_point_scalar_mul ++\n");
+        bn_print(">> point x: ", &point->x);
+        bn_print(">> point y: ", &point->y);
+        bn_print(">> scalar: ", scalar);
+        bn_print(">> curve_prime: ", curve_prime);
+        bn_print(">> curve_a: ", curve_a);
+    }
     
     EC_POINT_CUDA current = *point; // This initializes the current point with the input point
     EC_POINT_CUDA result; // Initialize the result variable, which accumulates the result
@@ -426,35 +429,51 @@ __device__ EC_POINT_CUDA ec_point_scalar_mul(
     // Convert scalar BIGNUM to an array of integers that's easy to iterate bit-wise
     unsigned int bits[256];                          // Assuming a 256-bit scalar
     bignum_to_bit_array(scalar, bits);    
+    if (debug) printf("[D] Starting scalar multiplication loop\n");
     for (int i = 0; i < 256; i++) {                 // Assuming 256-bit scalars        
-
+        if (debug) printf("[%d] step 0\n", i);
         if (bits[i]) {// If the i-th bit is set
+            if (debug) printf("[%d] step 1\n", i);
             init_point_at_infinity(&tmp_result);
+            if (debug) printf("[%d] step 2\n", i);
             point_add(&tmp_result, &result, &current, curve_prime, curve_a);  // Add current to the result
-
+            if (debug) printf("[%d] step 3\n", i);
             init_point_at_infinity(&result); // Reset result
+            if (debug) printf("[%d] step 4\n", i);
             bn_copy(&result.x, &tmp_result.x);
+            if (debug) printf("[%d] step 5\n", i);
             bn_copy(&result.y, &tmp_result.y);            
         }
+        if (debug) printf("[%d] step 6\n", i);
         // init tmp_result
         init_point_at_infinity(&tmp_result);
+        if (debug) printf("[%d] step 7\n", i);
         // init tmp_a
         init_point_at_infinity(&tmp_a);
+        if (debug) printf("[%d] step 8\n", i);
         // init tmp_b
         init_point_at_infinity(&tmp_b);
+        if (debug) printf("[%d] step 9\n", i);
         // Copy current to tmp_a
         bn_copy(&tmp_a.x, &current.x);
+        if (debug) printf("[%d] step 10\n", i);
         bn_copy(&tmp_a.y, &current.y);
+        if (debug) printf("[%d] step 11\n", i);
         // Copy current to tmp_b
         bn_copy(&tmp_b.x, &current.x);
+        if (debug) printf("[%d] step 12\n", i);
         bn_copy(&tmp_b.y, &current.y);
+        if (debug) printf("[%d] step 13\n", i);
         point_add(&tmp_result, &tmp_a, &tmp_b, curve_prime, curve_a);  // Double current by adding to itself
+        if (debug) printf("[%d] step 14\n", i);
         // Copy tmp_result to current
         bn_copy(&current.x, &tmp_result.x);
+        if (debug) printf("[%d] step 15\n", i);
         bn_copy(&current.y, &tmp_result.y);
+        if (debug) printf("[%d] passed\n", i);
     }    
     // Copy current to result
-    bn_print("3 result.x: ", &result.x);
-    bn_print("3 result.y: ", &result.y);
+    if (debug) bn_print("3 result.x: ", &result.x);
+    if (debug) bn_print("3 result.y: ", &result.y);
     return result;
 }
