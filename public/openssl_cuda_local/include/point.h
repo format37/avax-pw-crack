@@ -49,13 +49,13 @@ __device__ bool bn_mod_inverse(BIGNUM *result, const BIGNUM *a, const BIGNUM *n)
 
     if (!bn_is_one(&r)) {
         init_zero(result);
-        delete &r;
-        delete &nr;
-        delete &t;
-        delete &nt;
-        delete &q;
-        delete &tmp;
-        delete &tmp2;
+        // delete &r;
+        // delete &nr;
+        // delete &t;
+        // delete &nt;
+        // delete &q;
+        // delete &tmp;
+        // delete &tmp2;
         return false; // No modular inverse exists
     }
 
@@ -66,13 +66,13 @@ __device__ bool bn_mod_inverse(BIGNUM *result, const BIGNUM *a, const BIGNUM *n)
 
     bn_copy(result, &t);
 
-    delete &r;
-    delete &nr;
-    delete &t;
-    delete &nt;
-    delete &q;
-    delete &tmp;
-    delete &tmp2;
+    // delete &r;
+    // delete &nr;
+    // delete &t;
+    // delete &nt;
+    // delete &q;
+    // delete &tmp;
+    // delete &tmp2;
     return true;
 }
 
@@ -371,14 +371,14 @@ __device__ int point_add(
     }
 
     // Free the dynamically allocated memory
-    free_bignum(&s);
-    free_bignum(&x3);
-    free_bignum(&y3);
-    free_bignum(&tmp1);
-    free_bignum(&tmp2);
-    free_bignum(&tmp3);
-    free_bignum(&two);
-    free_bignum(&tmp1_squared);
+    // free_bignum(&s);
+    // free_bignum(&x3);
+    // free_bignum(&y3);
+    // free_bignum(&tmp1);
+    // free_bignum(&tmp2);
+    // free_bignum(&tmp3);
+    // free_bignum(&two);
+    // free_bignum(&tmp1_squared);
 
     return 0;
 }

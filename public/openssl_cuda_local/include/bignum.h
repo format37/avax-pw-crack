@@ -81,9 +81,9 @@ __device__ unsigned char find_top_optimized(const BIGNUM *bn, const char start_i
     return 1;
 }
 
-__device__ void free_bignum(BIGNUM *bn) {
-    delete[] bn->d;
-}
+// __device__ void free_bignum(BIGNUM *bn) {
+//     delete[] bn->d;
+// }
 
 __device__ void bn_print(const char* msg, const BIGNUM* a) {
     // if (!debug_print) return;
