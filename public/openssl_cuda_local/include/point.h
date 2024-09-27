@@ -146,10 +146,10 @@ __device__ int point_add(
     EC_POINT_CUDA *result, 
     EC_POINT_CUDA *p1, 
     EC_POINT_CUDA *p2, 
-    BIGNUM *p, 
-    BIGNUM *a
+    const BIGNUM *p, 
+    const BIGNUM *a
 ) {
-    bool debug = 0;
+    bool debug = 1;
     if (debug) {
         // printf("++ point_add ++\n");    
         bn_print(">> p1.x: ", &p1->x);
@@ -405,7 +405,7 @@ __device__ EC_POINT_CUDA ec_point_scalar_mul(
     BIGNUM *curve_prime, 
     BIGNUM *curve_a
     ) {
-    bool debug = 0;
+    bool debug = 1;
     if (debug) {
         debug_printf("++ ec_point_scalar_mul ++\n");
         bn_print(">> point x: ", &point->x);

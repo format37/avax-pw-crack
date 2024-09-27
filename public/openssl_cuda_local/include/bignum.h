@@ -363,11 +363,11 @@ __device__ int absolute_compare(const BIGNUM* a, const BIGNUM* b) {
 
 __device__ bool bn_add(BIGNUM *result, const BIGNUM *a, const BIGNUM *b) {
 //__device__ bool bn_add(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
-    // printf("++ bn_add ++\n");
-    // bn_print(">> a: ", a);
+    printf("++ bn_add ++\n");
+    bn_print(">> a: ", a);
     // printf(">> a->top: %d\n", a->top);
     // printf(">> a->neg: %d\n", a->neg);
-    // bn_print(">> b: ", b);
+    bn_print(">> b: ", b);
     // printf(">> b->top: %d\n", b->top);
     // printf(">> b->neg: %d\n", b->neg);
     // bn_print(">> result: ", result);
@@ -399,9 +399,9 @@ __device__ bool bn_add(BIGNUM *result, const BIGNUM *a, const BIGNUM *b) {
         }
     }
     // result->top = find_top_optimized(result, max_top + 1);
-    // printf(">> result: ");
-    // bn_print("", result);
-    // printf("-- bn_add --\n");
+    printf(">> result: ");
+    bn_print("", result);
+    printf("-- bn_add --\n");
     return true;
 }
 
