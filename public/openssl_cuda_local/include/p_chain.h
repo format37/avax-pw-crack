@@ -89,8 +89,9 @@ __device__ P_CHAIN_ADDRESS_STRUCT restore_p_chain_address(uint8_t *m_mnemonic, c
 
     // Bip32FromSeed
     BIP32Info master_key = bip32_from_seed_kernel(bip39seed, 64);
-
-    printf("[0] Master private key: ");
+    #ifdef debug_print
+        printf("[0] Master private key: ");
+    #endif
     for (int i = 0; i < 32; i++) {
         printf("%02x", master_key.master_private_key[i]);
     }
@@ -112,7 +113,9 @@ __device__ P_CHAIN_ADDRESS_STRUCT restore_p_chain_address(uint8_t *m_mnemonic, c
     // Final public key derivation
     // Buffer for the public key
     unsigned char buffer[33];
-    printf("p_chain.h => GetPublicKey\n");
+    #ifdef debug_print
+        printf("p_chain.h => GetPublicKey\n");
+    #endif
     GetPublicKey(buffer, child_key.master_private_key);
 
     // Convert buffer to hex string

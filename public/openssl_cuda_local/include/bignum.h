@@ -4,6 +4,8 @@
 #include <stdint.h>
 
 // #define BN_128
+// #define debug_print
+// #define debug_bn_copy
 
 #ifdef BN_128
     #define BN_ULONG unsigned __int128
@@ -16,7 +18,6 @@
 #endif
 
 #define MAX_BIT_ARRAY_SIZE 256 // Limit to 256 bits to match the function's design
-// #define debug_print
 #define BN_ULONG_NUM_BITS (sizeof(BN_ULONG) * 8)
 #define PUBLIC_KEY_SIZE 33  // Assuming a 33-byte public key (compressed format)
 #define DEVICE_CLOCK_RATE 1708500
@@ -60,7 +61,7 @@ __device__ void init_one(BIGNUM *bn) {
 __device__ bool bn_add(BIGNUM *result, const BIGNUM *a, const BIGNUM *b);
 // __device__ int bn_mod(BIGNUM *r, BIGNUM *m, BIGNUM *d);
 __device__ int bn_mod(BIGNUM *r, const BIGNUM *a, const BIGNUM *n);
-__device__ bool bn_is_zero(BIGNUM *a);
+__device__ bool bn_is_zero(const BIGNUM *a);
 
 __device__ unsigned char find_top(const BIGNUM *bn) {
     for (int i = MAX_BIGNUM_SIZE - 1; i >= 0; i--) {
@@ -87,25 +88,31 @@ __device__ void bn_print(const char* msg, const BIGNUM* a) {
         return;
     #endif
     
+    if (a->top != find_top(a)) printf("### ERROR: bn_print: a->top (%d) != find_top(a) (%d)\n", a->top, find_top(a)); // TODO: Remove this line after debugging
+    printf("[top%d*%d] ", a->top, a->neg);
+    
     printf("%s", msg);
     if (a->neg) {
         printf("-");  // Handle the case where BIGNUM is negative
     }
-    for (int i = MAX_BIGNUM_SIZE - 1; i >= 0; i--) {
+    // for (int i = MAX_BIGNUM_SIZE - 1; i >= 0; i--) {
+    for (int i = a->top - 1; i >= 0; i--) {
         // Print words up to top - 1 with appropriate formatting
-        if (i == MAX_BIGNUM_SIZE - 1) {
+        // if (i == MAX_BIGNUM_SIZE - 1) {
+        if (i == a->top - 1) {
             #ifdef BN_128
-                printf("%016llx%016llx", (unsigned long long)(a->d[i] >> 64), (unsigned long long)(a->d[i] & 0xFFFFFFFFFFFFFFFFULL));
+                printf("%016llx%016llx ", (unsigned long long)(a->d[i] >> 64), (unsigned long long)(a->d[i] & 0xFFFFFFFFFFFFFFFFULL));
             #else
-                printf("%llx", a->d[i]);
+                printf("%llx ", a->d[i]);
             #endif
         } else {
             #ifdef BN_128
-                printf("%016llx%016llx", (unsigned long long)(a->d[i] >> 64), (unsigned long long)(a->d[i] & 0xFFFFFFFFFFFFFFFFULL));
+                printf("%016llx%016llx ", (unsigned long long)(a->d[i] >> 64), (unsigned long long)(a->d[i] & 0xFFFFFFFFFFFFFFFFULL));
             #else
-                printf("%016llx", a->d[i]);
+                printf("%016llx ", a->d[i]);
             #endif
         }
+        // return;
     }
     printf("\n");
 }
@@ -125,25 +132,43 @@ __device__ void debug_printf(const char *fmt, ...) {
     // }
 }
 
-__device__ int bn_cmp(BIGNUM* a, BIGNUM* b) {
+__device__ int bn_cmp(const BIGNUM* a, const BIGNUM* b) {
     // -1: a < b
     // 0: a == b
     // 1: a > b
+    #ifdef debug_print
+        printf("++ bn_cmp ++\n");
+        bn_print(">> a: ", a);
+        bn_print(">> b: ", b);
+    #endif
     if (a->neg != b->neg) {
+        #ifdef debug_print
+            printf("a->neg != b->neg\n-- bn_cmp --\n");
+        #endif
         return a->neg ? -1 : 1;
     }
     // a->top = find_top(a);
-    b->top = find_top(b); // TODO: (optimization) Find a place where do we call find_top for b with uninicialized top by adding consition there and mark source function before each find_top call
+    // b->top = find_top(b); // TODO: (optimization) Find a place where do we call find_top for b with uninicialized top by adding consition there and mark source function before each find_top call
+    if (a->top != find_top(a)) printf("### ERROR: bn_cmp: a->top != find_top(a)\n"); // TODO: Remove this line after debugging
+    if (b->top != find_top(b)) printf("### ERROR: bn_cmp: b->top != find_top(b)\n"); // TODO: Remove this line after debugging
     if (a->top != b->top) {
+        #ifdef debug_print
+            printf("a->top != b->top\n-- bn_cmp --\n");
+        #endif
         return a->top > b->top ? 1 : -1;
     }
 
     for (int i = a->top - 1; i >= 0; i--) {
         if (a->d[i] != b->d[i]) {
+            #ifdef debug_print
+                printf("a->d[i] != b->d[i]\n-- bn_cmp --\n");
+            #endif
             return a->d[i] > b->d[i] ? 1 : -1;
         }
     }
-
+    #ifdef debug_print
+        printf("default case\n-- bn_cmp --\n");
+    #endif
     return 0;
 }
 
@@ -164,11 +189,20 @@ __device__ int bn_cmp_abs(const BIGNUM *a, const BIGNUM *b) {
 
 // Helper function to perform a deep copy of BIGNUM
 __device__ void bn_copy(BIGNUM *dest, const BIGNUM *src) {
+    #ifdef debug_print
+        printf("++ bn_copy ++\n");
+        // bn_print(">> src: ", src);
+        // bn_print(">> dest: ", dest);
+    #endif
     // Init dst as zero
     init_zero(dest);
 
     if (dest == nullptr || src == nullptr) {
         return;
+    }
+    if (src->top != find_top(src)) printf("### ERROR: bn_copy: src->top (%d) != find_top(src) (%d)\n", src->top, find_top(src)); // TODO: Remove this line after debugging
+    if (src->top > MAX_BIGNUM_SIZE) {
+        printf("### bn_copy ERROR: src->top > MAX_BIGNUM_SIZE\n");
     }
 
     // Copy the neg and top fields
@@ -186,6 +220,10 @@ __device__ void bn_copy(BIGNUM *dest, const BIGNUM *src) {
     for (i = src->top; i < MAX_BIGNUM_SIZE; i++) {
         dest->d[i] = 0;
     }
+    #ifdef debug_print
+        // bn_print("<< dest: ", dest);
+        printf("-- bn_copy --\n");
+    #endif
 }
 
 #ifdef BN_128
@@ -219,7 +257,8 @@ __device__ void bn_copy(BIGNUM *dest, const BIGNUM *src) {
             max_top++;
         }
 
-        result->top = max_top + 1;
+        // result->top = max_top + 1;
+        result->top = find_top_optimized(result, max_top+1);
         __threadfence();  // Final memory barrier
     }
 #else
@@ -291,16 +330,17 @@ __device__ void absolute_subtract(BIGNUM *result, const BIGNUM *a, const BIGNUM 
         result->d[i] = diff;
     }
 
-    // Normalize the result (remove leading zeros)
-    while (result->top > 0 && result->d[result->top - 1] == 0) {
-        result->top--;
-    }
+    // // Normalize the result (remove leading zeros)
+    // while (result->top > 0 && result->d[result->top - 1] == 0) {
+    //     result->top--;
+    // }
 
-    // If the result is zero, ensure top is set to 1 and d[0] is 0
-    if (result->top == 0) {
-        result->top = 1;
-        result->d[0] = 0;
-    }
+    // // If the result is zero, ensure top is set to 1 and d[0] is 0
+    // if (result->top == 0) {
+    //     result->top = 1;
+    //     result->d[0] = 0;
+    // }
+    result->top = find_top_optimized(result, max_top);
 }
 
 __device__ bool bn_sub(BIGNUM *result, const BIGNUM *a, const BIGNUM *b) {
@@ -409,9 +449,10 @@ __device__ int bn_div(BIGNUM *a, BIGNUM *b, const BIGNUM *q, const BIGNUM *r);
 __device__ void bn_mul(BIGNUM *a, BIGNUM *b, BIGNUM *product);
 
 __device__ void set_bn(BIGNUM *dest, const BIGNUM *src) {
-    debug_printf("set_bn 0\n");
+    // debug_printf("set_bn 0\n");
     // update src->top
     // src->top = find_top(src);
+    if (src->top != find_top(src)) printf("### ERROR: set_bn: src->top != find_top(src)\n"); // TODO: Remove this line after debugging
     // Check if dest has enough space to copy from src
     if (MAX_BIGNUM_SIZE < src->top) {    
         // Handle the situation appropriately
@@ -486,9 +527,13 @@ __device__ void bn_mul(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
             product->d[i] = ((unsigned __int128)hi << 64) | lo;
         }
         // Update the top
-        product->top = product_top;
-        while (product->top > 1 && product->d[product->top - 1] == 0) {
-            product->top--;
+        // product->top = product_top;
+        // while (product->top > 1 && product->d[product->top - 1] == 0) {
+        //     product->top--;
+        // }
+        product->top = find_top_optimized(product, product_top);
+        if (product->top > MAX_BIGNUM_SIZE) {
+            printf("### bn_mul ERROR: product->top > MAX_BIGNUM_SIZE\n");
         }
     #else
         // Unroll loops if possible
@@ -553,6 +598,9 @@ __device__ int bn_mod(BIGNUM *r, const BIGNUM *a, const BIGNUM *n) {
             if (!result) {
                 return 0;
             }
+            #ifdef debug_bn_copy
+                printf("bn_mod: bn_copy(tmp, r)\n");
+            #endif
             // copy tmp to r
             bn_copy(r, &tmp);
         } else {
@@ -561,6 +609,9 @@ __device__ int bn_mod(BIGNUM *r, const BIGNUM *a, const BIGNUM *n) {
             if (!result) {
                 return 0;
             }
+            #ifdef debug_bn_copy
+                printf("bn_mod: bn_copy(tmp, r)\n");
+            #endif
             // copy tmp to r
             bn_copy(r, &tmp);
         }
@@ -585,7 +636,7 @@ __device__ void mod_mul(BIGNUM *a, BIGNUM *b, BIGNUM *mod, BIGNUM *result) {
     debug_printf("mod_mul 3\n");
 }
 
-__device__ bool bn_is_zero(BIGNUM *a) {
+__device__ bool bn_is_zero(const BIGNUM *a) {
     if (a->top != find_top(a)) {
         printf("bn_is_zero: Invalid top value\n"); // TODO: Remove this debug check        
     }
@@ -680,6 +731,11 @@ __device__ void left_shift(BIGNUM *a, int shift) {
 
 __device__ int bn_div(BIGNUM *bn_quotient, BIGNUM *bn_remainder, const BIGNUM *bn_dividend, const BIGNUM *bn_divisor)
 {
+    #ifdef debug_print
+        printf("++ bn_div ++\n");
+        bn_print(">> bn_dividend: ", bn_dividend);
+        bn_print(">> bn_divisor: ", bn_divisor);
+    #endif
     // Store signs and work with absolute values
     int dividend_neg = bn_dividend->neg;
     int divisor_neg = bn_divisor->neg;
@@ -770,5 +826,10 @@ __device__ int bn_div(BIGNUM *bn_quotient, BIGNUM *bn_remainder, const BIGNUM *b
     // Normalize results
     bn_quotient->top = find_top_optimized(bn_quotient, divs_max_top);
     bn_remainder->top = find_top_optimized(bn_remainder, divs_max_top);
+    #ifdef debug_print
+        bn_print("<< bn_quotient: ", bn_quotient);
+        bn_print("<< bn_remainder: ", bn_remainder);
+        printf("-- bn_div --\n");
+    #endif
     return 1;
 }
