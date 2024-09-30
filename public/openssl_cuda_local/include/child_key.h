@@ -33,12 +33,14 @@ __device__ void my_cuda_memcpy_uint32_t(uint32_t *dst, const uint32_t *src, unsi
 }
 
 __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uint32_t index) {
-	printf("++ GetChildKeyDerivation ++\n");
-    printf(">> key: ");
-    print_as_hex(key, 32);
-    printf(">> chainCode: ");
-    print_as_hex(chainCode, 32);
-    printf(">> index: %u\n", index);
+	#ifdef debug_print
+        printf("++ GetChildKeyDerivation ++\n");
+        printf(">> key: ");
+        print_as_hex(key, 32);
+        printf(">> chainCode: ");
+        print_as_hex(chainCode, 32);
+        printf(">> index: %u\n", index);
+    #endif
     BIP32Info info;
 
     // Compute HMAC-SHA512
@@ -48,7 +50,9 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
 
     // Fill buffer according to index
     if (index == 0) {
-		printf("child_key.h => GetPublicKey\n");
+        #ifdef debug_print
+		    printf("child_key.h => GetPublicKey\n");
+        #endif
         GetPublicKey(buffer, key);
 
     } else {
@@ -67,23 +71,25 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
     hmac_sha512_final(&hmac, hash);
 
 	// Print the pre-HMAC values
-    printf("      * Cuda Pre-HMAC variable key:");
-    for (int i = 0; i < 32; i++) {
-        printf("%02x", key[i]);
-    }
-    printf("\n");
+    #ifdef debug_print
+        printf("      * Cuda Pre-HMAC variable key:");
+        for (int i = 0; i < 32; i++) {
+            printf("%02x", key[i]);
+        }
+        printf("\n");
 
-    printf("      * Cuda Pre-HMAC Buffer:");
-    for (int i = 0; i < 37; i++) { // Assuming the buffer length up to the index is 37
-        printf("%02x", buffer[i]);
-    }
-    printf("\n");
+        printf("      * Cuda Pre-HMAC Buffer:");
+        for (int i = 0; i < 37; i++) { // Assuming the buffer length up to the index is 37
+            printf("%02x", buffer[i]);
+        }
+        printf("\n");
 
-    printf("      * Cuda Pre-HMAC Key:");
-    for (int i = 0; i < 32; i++) {
-        printf("%02x", chainCode[i]);
-    }
-    printf("\n");   
+        printf("      * Cuda Pre-HMAC Key:");
+        for (int i = 0; i < 32; i++) {
+            printf("%02x", chainCode[i]);
+        }
+        printf("\n");   
+    #endif
 
 	uint32_t il[8], ir[8];
 	
@@ -91,44 +97,50 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
 	my_cuda_memcpy_uint32_t(il, (uint32_t*)hash, 8 * sizeof(uint32_t)); // Using uint32_t version for il
 	my_cuda_memcpy_uint32_t(ir, (uint32_t*)(hash + 32), 8 * sizeof(uint32_t)); // Using uint32_t version for ir
 
-    // Print the hash from 32 to 64
-    printf("      * Cuda hash from 32 to 64:");
-    for (int i = 32; i < 64; i++) {
-        printf("%02x", hash[i]);
-    }
-    printf("\n");
+    #ifdef debug_print
+        // Print the hash from 32 to 64
+        printf("      * Cuda hash from 32 to 64:");
+        for (int i = 32; i < 64; i++) {
+            printf("%02x", hash[i]);
+        }
+        printf("\n");
+    #endif
 
     // Copy the hash (from 32 to 64) to chain_code
     my_cuda_memcpy_unsigned_char(info.chain_code, hash + 32, 32);
 
 	// After HMAC-SHA512
-	printf("      * Cuda Post-HMAC hash:");
-	for (int i = 0; i < 64; i++) {
-		printf("%02x", hash[i]);
-	}
-	printf("\n");
+    #ifdef debug_print
+        printf("      * Cuda Post-HMAC hash:");
+        for (int i = 0; i < 64; i++) {
+            printf("%02x", hash[i]);
+        }
+        printf("\n");
 
-	printf("      * Cuda il as uint32_t: ");
-	for (int i = 0; i < 8; ++i) {
-		printf("%08x", il[i]);
-	}
-	printf("\n");
+        printf("      * Cuda il as uint32_t: ");
+        for (int i = 0; i < 8; ++i) {
+            printf("%08x", il[i]);
+        }
+        printf("\n");
 
-	printf("      * Cuda ir as uint32_t: ");
-	for (int i = 0; i < 8; ++i) {
-		printf("%08x", ir[i]);
-	}
-	printf("\n");
+        printf("      * Cuda ir as uint32_t: ");
+        for (int i = 0; i < 8; ++i) {
+            printf("%08x", ir[i]);
+        }
+        printf("\n");
 
-    printf("      * Cuda ir as uint64_t: ");
+        printf("      * Cuda ir as uint64_t: ");
+    #endif
     uint64_t ir_64[4];
     for (int i = 0; i < 8; ++i) {
         ir_64[i] = ((uint64_t)ir[2*i] << 32) | (uint64_t)ir[2*i + 1];
     }
-    for (int i = 0; i < 4; ++i) {
-        printf("%016lx", ir_64[i]);
-    }
-    printf("\n");
+    #ifdef debug_print
+        for (int i = 0; i < 4; ++i) {
+            printf("%016lx", ir_64[i]);
+        }
+        printf("\n");
+    #endif
 
 	// Perform the copy
     // Copy ir_64 to chain_code
@@ -143,24 +155,26 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
         info.chain_code[8*i + 7] = ir_64[i] & 0xFF;
     }
 
-	// Print individual bytes of chain_code after copying
-	printf("      * Individual bytes of Cuda chain_code after copying: ");
-	for (int i = 0; i < 32; ++i) {
-		printf("%02x", info.chain_code[i]);
-	}
-	printf("\n");
+	#ifdef debug_print
+        // Print individual bytes of chain_code after copying
+        printf("      * Individual bytes of Cuda chain_code after copying: ");
+        for (int i = 0; i < 32; ++i) {
+            printf("%02x", info.chain_code[i]);
+        }
+        printf("\n");
 
-	// After populating il and ir
-	printf("    * il: ");
-	for (int i = 0; i < 8; i++) {
-		printf("%08x", il[i]);
-	}
-	printf("\n");
-	printf("    * ir: ");
-	for (int i = 0; i < 8; i++) {
-		printf("%08x", ir[i]);
-	}
-	printf("\n");
+        // After populating il and ir
+        printf("    * il: ");
+        for (int i = 0; i < 8; i++) {
+            printf("%08x", il[i]);
+        }
+        printf("\n");
+        printf("    * ir: ");
+        for (int i = 0; i < 8; i++) {
+            printf("%08x", ir[i]);
+        }
+        printf("\n");
+    #endif
 	
 	// Addition
 	BIGNUM a;
@@ -265,10 +279,14 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
     // // Print curve order
     bn_print("Debug Cuda curveOrder: ", &CURVE_ORDER);
 
-    printf("Calling bn_mod\n");
+    #ifdef debug_print
+        printf("Calling bn_mod\n");
+    #endif
     bn_mod(&newKey, &newKey, &CURVE_ORDER);
 
-    printf("After bn_mod\n");
+    #ifdef debug_print
+        printf("After bn_mod\n");
+    #endif
     bn_print("Debug Cuda newKey (After mod): ", &newKey);
 
     // Copy newKey to info.master_private_key
@@ -299,11 +317,13 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
     #endif
 	
     // Print master private key
-    printf("<< info.master_private_key: ");
-    for (int i = 0; i < 32; i++) {
-        printf("%02x", info.master_private_key[i]);
-    }
-    printf("\n");
-    printf("-- GetChildKeyDerivation --\n");    
+    #ifdef debug_print
+        printf("<< info.master_private_key: ");
+        for (int i = 0; i < 32; i++) {
+            printf("%02x", info.master_private_key[i]);
+        }
+        printf("\n");
+        printf("-- GetChildKeyDerivation --\n");    
+    #endif
     return info;
 }

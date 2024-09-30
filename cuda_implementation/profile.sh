@@ -16,14 +16,33 @@ echo Start profiling: $(date)
 # - pmsampling
 # - nvlink
 # --metrics sm__sass_average_data_live_registers,sm__sass_maximum_data_live_registers \
+
+# /opt/nvidia/nsight-compute/2024.1.1/ncu \
+#     --nvtx \
+#     --verbose \
+#     --export report \
+#     --force-overwrite \
+#     --set full \
+#     --target-processes all \
+#     ./program >> run.log
+
 /opt/nvidia/nsight-compute/2024.1.1/ncu \
     --nvtx \
     --verbose \
     --export report \
     --force-overwrite \
     --set full \
+    --section ComputeWorkloadAnalysis \
+    --section InstructionStats \
+    --section LaunchStats \
+    --section MemoryWorkloadAnalysis \
+    --section MemoryWorkloadAnalysis_Chart \
+    --section MemoryWorkloadAnalysis_Tables \
+    --section SpeedOfLight \
+    --section WarpStateStats \
     --target-processes all \
     ./program >> run.log
+
 # /opt/nvidia/nsight-compute/2024.1.1/ncu --nvtx --verbose --export report --force-overwrite --target-processes all ./program >> profiler.log
 
 # Get the end time

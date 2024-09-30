@@ -16,7 +16,7 @@
 #endif
 
 #define MAX_BIT_ARRAY_SIZE 256 // Limit to 256 bits to match the function's design
-#define debug_print
+// #define debug_print
 #define BN_ULONG_NUM_BITS (sizeof(BN_ULONG) * 8)
 #define PUBLIC_KEY_SIZE 33  // Assuming a 33-byte public key (compressed format)
 #define DEVICE_CLOCK_RATE 1708500
@@ -80,10 +80,6 @@ __device__ unsigned char find_top_optimized(const BIGNUM *bn, const char start_i
     }
     return 1;
 }
-
-// __device__ void free_bignum(BIGNUM *bn) {
-//     delete[] bn->d;
-// }
 
 __device__ void bn_print(const char* msg, const BIGNUM* a) {
     // if (!debug_print) return;
@@ -363,14 +359,16 @@ __device__ int absolute_compare(const BIGNUM* a, const BIGNUM* b) {
 
 __device__ bool bn_add(BIGNUM *result, const BIGNUM *a, const BIGNUM *b) {
 //__device__ bool bn_add(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
-    printf("++ bn_add ++\n");
-    bn_print(">> a: ", a);
-    // printf(">> a->top: %d\n", a->top);
-    // printf(">> a->neg: %d\n", a->neg);
-    bn_print(">> b: ", b);
-    // printf(">> b->top: %d\n", b->top);
-    // printf(">> b->neg: %d\n", b->neg);
-    // bn_print(">> result: ", result);
+    #ifdef debug_print
+        printf("++ bn_add ++\n");
+        bn_print(">> a: ", a);
+        // printf(">> a->top: %d\n", a->top);
+        // printf(">> a->neg: %d\n", a->neg);
+        bn_print(">> b: ", b);
+        // printf(">> b->top: %d\n", b->top);
+        // printf(">> b->neg: %d\n", b->neg);
+        // bn_print(">> result: ", result);
+    #endif
     init_zero(result);
     unsigned char max_top = max(a->top, b->top);
 
@@ -399,9 +397,11 @@ __device__ bool bn_add(BIGNUM *result, const BIGNUM *a, const BIGNUM *b) {
         }
     }
     // result->top = find_top_optimized(result, max_top + 1);
-    printf(">> result: ");
-    bn_print("", result);
-    printf("-- bn_add --\n");
+    #ifdef debug_print
+        printf(">> result: ");
+        bn_print("", result);
+        printf("-- bn_add --\n");
+    #endif
     return true;
 }
 

@@ -50,13 +50,15 @@
 
 __device__ void GetPublicKey(uint8_t* buffer, uint8_t* key)
 {
-    printf("++ GetPublicKey ++\n");
-    // print key
-    printf(">> key: ");
-    for (int i = 0; i < 32; i++) {
-        printf("%02x", key[i]);
-    }
-    printf("\n");
+    #ifdef debug_print
+        printf("++ GetPublicKey ++\n");
+        // print key
+        printf(">> key: ");
+        for (int i = 0; i < 32; i++) {
+            printf("%02x", key[i]);
+        }
+        printf("\n");
+    #endif
     BIGNUM newKey;
     init_zero(&newKey);
     #ifdef BN_128
@@ -92,8 +94,10 @@ __device__ void GetPublicKey(uint8_t* buffer, uint8_t* key)
     #endif
     newKey.top = CURVE_P_VALUES_MAX_SIZE;
 
-    // Print newKey
-    bn_print("[#] newKey: ", &newKey);
+    #ifdef debug_print
+        // Print newKey
+        bn_print("[#] newKey: ", &newKey);
+    #endif
 
     // Initialize generator
     EC_POINT_CUDA G;

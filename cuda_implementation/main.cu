@@ -12,6 +12,7 @@
 #include <string.h>
 #include <limits.h>
 // #include <nvtx3/nvToolsExt.h>
+#include <cuda_profiler_api.h>
 
 #define P_CHAIN_ADDRESS_LENGTH 45  // Assuming the p-chain address is 45 characters long
 
@@ -231,6 +232,9 @@ int main() {
     // Start NVTX range
     // nvtxRangePush("KernelExecution");
 
+    // Start profiling
+    cudaProfilerStart();
+
     // Launch kernel
     variant_kernel<<<blocksPerGrid, threadsPerBlock>>>();
 
@@ -245,6 +249,9 @@ int main() {
     }
 
     cudaDeviceSynchronize();
+
+    // Stop profiling
+    cudaProfilerStop();
 
     err = cudaGetLastError();
     if (err != cudaSuccess) {

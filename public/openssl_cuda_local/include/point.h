@@ -3,8 +3,14 @@ struct EC_POINT_CUDA {
   BIGNUM y;
 };
 
-__device__ bool bn_mod_inverse(BIGNUM *result, const BIGNUM *a, const BIGNUM *n) {
-    bool debug = 0;
+// __device__ bool bn_mod_inverse(BIGNUM *result, const BIGNUM *a, const BIGNUM *n) {
+__device__ bool bn_mod_inverse(BIGNUM *result, BIGNUM *a, const BIGNUM *n) {
+    #ifdef debug_print
+        printf("++ bn_mod_inverse ++\n");
+        bn_print(">> a: ", a);
+        bn_print(">> n: ", n);
+    #endif
+    
     if (bn_is_one(n)) {
         return false;  // No modular inverse exists
     }
@@ -29,7 +35,7 @@ __device__ bool bn_mod_inverse(BIGNUM *result, const BIGNUM *a, const BIGNUM *n)
 
     bn_copy(&r, n);
     bn_mod(&nr, a, n); // Compute non-negative remainder of 'a' modulo 'n'
-    unsigned int counter = 0;
+    // unsigned int counter = 0;
     while (!bn_is_zero(&nr)) {
         bn_div(&q, &tmp, &r, &nr); // Compute quotient and remainder
         bn_copy(&tmp, &nt);
@@ -43,19 +49,12 @@ __device__ bool bn_mod_inverse(BIGNUM *result, const BIGNUM *a, const BIGNUM *n)
         init_zero(&tmp3);
         bn_sub(&tmp3, &r, &tmp2); // tmp3 = r - tmp2
         bn_copy(&nr, &tmp3);
-        bn_copy(&r, &tmp);
-        if (debug) counter++;
+        bn_copy(&r, &tmp);        
+        // if (debug) counter++;
     }
 
     if (!bn_is_one(&r)) {
         init_zero(result);
-        // delete &r;
-        // delete &nr;
-        // delete &t;
-        // delete &nt;
-        // delete &q;
-        // delete &tmp;
-        // delete &tmp2;
         return false; // No modular inverse exists
     }
 
@@ -65,14 +64,10 @@ __device__ bool bn_mod_inverse(BIGNUM *result, const BIGNUM *a, const BIGNUM *n)
     }
 
     bn_copy(result, &t);
-
-    // delete &r;
-    // delete &nr;
-    // delete &t;
-    // delete &nt;
-    // delete &q;
-    // delete &tmp;
-    // delete &tmp2;
+    #ifdef debug_print
+        bn_print("<< result: ", result);
+        printf("-- bn_mod_inverse --\n");
+    #endif
     return true;
 }
 
@@ -149,9 +144,9 @@ __device__ int point_add(
     const BIGNUM *p, 
     const BIGNUM *a
 ) {
-    bool debug = 1;
+    bool debug = 0;
     if (debug) {
-        // printf("++ point_add ++\n");    
+        printf("++ point_add ++\n");    
         bn_print(">> p1.x: ", &p1->x);
         bn_print(">> p1.y: ", &p1->y);
         bn_print(">> p2.x: ", &p2->x);
@@ -405,7 +400,7 @@ __device__ EC_POINT_CUDA ec_point_scalar_mul(
     BIGNUM *curve_prime, 
     BIGNUM *curve_a
     ) {
-    bool debug = 1;
+    bool debug = 0;
     if (debug) {
         debug_printf("++ ec_point_scalar_mul ++\n");
         bn_print(">> point x: ", &point->x);
