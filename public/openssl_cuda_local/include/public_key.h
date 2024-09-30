@@ -117,17 +117,34 @@ __device__ void GetPublicKey(uint8_t* buffer, uint8_t* key)
 
     // TODO: Check do we need to define extra G. Or we are able to use __constant__ CURVE_GX_values and CURVE_GY_values as new EC_POINT_CUDA instead
     EC_POINT_CUDA publicKey = ec_point_scalar_mul(&G, &newKey, &CURVE_P, &CURVE_A); // FAIL with index 0. CHECK newKey.
+    #ifdef debug_print
+        // Print the public key
+        bn_print("[*] publicKey.x: ", &publicKey.x);
+        bn_print("[*] publicKey.y: ", &publicKey.y);
+    #endif
+
+    
     // Copy the public key to buffer
-    for (int i = 0; i < CURVE_P_VALUES_MAX_SIZE; i++) {
-        buffer[8*i] = (publicKey.x.d[3 - i] >> 56) & 0xFF;
-        buffer[8*i + 1] = (publicKey.x.d[3 - i] >> 48) & 0xFF;
-        buffer[8*i + 2] = (publicKey.x.d[3 - i] >> 40) & 0xFF;
-        buffer[8*i + 3] = (publicKey.x.d[3 - i] >> 32) & 0xFF;
-        buffer[8*i + 4] = (publicKey.x.d[3 - i] >> 24) & 0xFF;
-        buffer[8*i + 5] = (publicKey.x.d[3 - i] >> 16) & 0xFF;
-        buffer[8*i + 6] = (publicKey.x.d[3 - i] >> 8) & 0xFF;
-        buffer[8*i + 7] = publicKey.x.d[3 - i] & 0xFF;
-    }
+    #ifdef BN_128
+        // Copy the public key to buffer for 128-bit
+        for (int i = 0; i < CURVE_P_VALUES_MAX_SIZE; i++) {
+            BN_ULONG word = publicKey.x.d[CURVE_P_VALUES_MAX_SIZE - 1 - i];
+            for (int j = 0; j < 16; j++) {
+                buffer[16*i + j] = (word >> (120 - 8*j)) & 0xFF;
+            }
+        }
+    #else
+        for (int i = 0; i < CURVE_P_VALUES_MAX_SIZE; i++) {
+            buffer[8*i] = (publicKey.x.d[3 - i] >> 56) & 0xFF;
+            buffer[8*i + 1] = (publicKey.x.d[3 - i] >> 48) & 0xFF;
+            buffer[8*i + 2] = (publicKey.x.d[3 - i] >> 40) & 0xFF;
+            buffer[8*i + 3] = (publicKey.x.d[3 - i] >> 32) & 0xFF;
+            buffer[8*i + 4] = (publicKey.x.d[3 - i] >> 24) & 0xFF;
+            buffer[8*i + 5] = (publicKey.x.d[3 - i] >> 16) & 0xFF;
+            buffer[8*i + 6] = (publicKey.x.d[3 - i] >> 8) & 0xFF;
+            buffer[8*i + 7] = publicKey.x.d[3 - i] & 0xFF;
+        }
+    #endif
     // Shift the buffer by 1 byte
     for (int i = 33; i > 0; i--) {
         buffer[i] = buffer[i - 1];
@@ -144,4 +161,12 @@ __device__ void GetPublicKey(uint8_t* buffer, uint8_t* key)
     uint8_t prefix = bn_is_zero(&remainder) ? 0x02 : 0x03;
     // Add prefix before the buffer
     buffer[0] = prefix;
+    #ifdef debug_print
+        // Print the public key
+        printf(">> buffer: ");
+        for (int i = 0; i < 33; i++) {
+            printf("%02x", buffer[i]);
+        }
+        printf("\n-- GetPublicKey --\n");
+    #endif
 }

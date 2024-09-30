@@ -91,11 +91,12 @@ __device__ P_CHAIN_ADDRESS_STRUCT restore_p_chain_address(uint8_t *m_mnemonic, c
     BIP32Info master_key = bip32_from_seed_kernel(bip39seed, 64);
     #ifdef debug_print
         printf("[0] Master private key: ");
+        for (int i = 0; i < 32; i++) {
+            printf("%02x", master_key.master_private_key[i]);
+        }
+        printf("\n");
     #endif
-    for (int i = 0; i < 32; i++) {
-        printf("%02x", master_key.master_private_key[i]);
-    }
-    printf("\n");
+    
 
     // Child key derivation
 	uint32_t index44 = 0x8000002C;

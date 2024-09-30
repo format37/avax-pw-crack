@@ -101,15 +101,15 @@ __device__ void bn_print(const char* msg, const BIGNUM* a) {
         // if (i == MAX_BIGNUM_SIZE - 1) {
         if (i == a->top - 1) {
             #ifdef BN_128
-                printf("%016llx%016llx ", (unsigned long long)(a->d[i] >> 64), (unsigned long long)(a->d[i] & 0xFFFFFFFFFFFFFFFFULL));
+                printf("%016llx%016llx", (unsigned long long)(a->d[i] >> 64), (unsigned long long)(a->d[i] & 0xFFFFFFFFFFFFFFFFULL));
             #else
-                printf("%llx ", a->d[i]);
+                printf("%llx", a->d[i]);
             #endif
         } else {
             #ifdef BN_128
-                printf("%016llx%016llx ", (unsigned long long)(a->d[i] >> 64), (unsigned long long)(a->d[i] & 0xFFFFFFFFFFFFFFFFULL));
+                printf("%016llx%016llx", (unsigned long long)(a->d[i] >> 64), (unsigned long long)(a->d[i] & 0xFFFFFFFFFFFFFFFFULL));
             #else
-                printf("%016llx ", a->d[i]);
+                printf("%016llx", a->d[i]);
             #endif
         }
         // return;
@@ -137,13 +137,13 @@ __device__ int bn_cmp(const BIGNUM* a, const BIGNUM* b) {
     // 0: a == b
     // 1: a > b
     #ifdef debug_print
-        printf("++ bn_cmp ++\n");
-        bn_print(">> a: ", a);
-        bn_print(">> b: ", b);
+        // printf("++ bn_cmp ++\n");
+        // bn_print(">> a: ", a);
+        // bn_print(">> b: ", b);
     #endif
     if (a->neg != b->neg) {
         #ifdef debug_print
-            printf("a->neg != b->neg\n-- bn_cmp --\n");
+            // printf("a->neg != b->neg\n-- bn_cmp --\n");
         #endif
         return a->neg ? -1 : 1;
     }
@@ -153,7 +153,7 @@ __device__ int bn_cmp(const BIGNUM* a, const BIGNUM* b) {
     if (b->top != find_top(b)) printf("### ERROR: bn_cmp: b->top != find_top(b)\n"); // TODO: Remove this line after debugging
     if (a->top != b->top) {
         #ifdef debug_print
-            printf("a->top != b->top\n-- bn_cmp --\n");
+            // printf("a->top != b->top\n-- bn_cmp --\n");
         #endif
         return a->top > b->top ? 1 : -1;
     }
@@ -161,13 +161,13 @@ __device__ int bn_cmp(const BIGNUM* a, const BIGNUM* b) {
     for (int i = a->top - 1; i >= 0; i--) {
         if (a->d[i] != b->d[i]) {
             #ifdef debug_print
-                printf("a->d[i] != b->d[i]\n-- bn_cmp --\n");
+                // printf("a->d[i] != b->d[i]\n-- bn_cmp --\n");
             #endif
             return a->d[i] > b->d[i] ? 1 : -1;
         }
     }
     #ifdef debug_print
-        printf("default case\n-- bn_cmp --\n");
+        // printf("default case\n-- bn_cmp --\n");
     #endif
     return 0;
 }
@@ -190,7 +190,7 @@ __device__ int bn_cmp_abs(const BIGNUM *a, const BIGNUM *b) {
 // Helper function to perform a deep copy of BIGNUM
 __device__ void bn_copy(BIGNUM *dest, const BIGNUM *src) {
     #ifdef debug_print
-        printf("++ bn_copy ++\n");
+        // printf("++ bn_copy ++\n");
         // bn_print(">> src: ", src);
         // bn_print(">> dest: ", dest);
     #endif
@@ -222,7 +222,7 @@ __device__ void bn_copy(BIGNUM *dest, const BIGNUM *src) {
     }
     #ifdef debug_print
         // bn_print("<< dest: ", dest);
-        printf("-- bn_copy --\n");
+        // printf("-- bn_copy --\n");
     #endif
 }
 
@@ -732,9 +732,9 @@ __device__ void left_shift(BIGNUM *a, int shift) {
 __device__ int bn_div(BIGNUM *bn_quotient, BIGNUM *bn_remainder, const BIGNUM *bn_dividend, const BIGNUM *bn_divisor)
 {
     #ifdef debug_print
-        printf("++ bn_div ++\n");
-        bn_print(">> bn_dividend: ", bn_dividend);
-        bn_print(">> bn_divisor: ", bn_divisor);
+        // printf("++ bn_div ++\n");
+        // bn_print(">> bn_dividend: ", bn_dividend);
+        // bn_print(">> bn_divisor: ", bn_divisor);
     #endif
     // Store signs and work with absolute values
     int dividend_neg = bn_dividend->neg;
@@ -764,7 +764,7 @@ __device__ int bn_div(BIGNUM *bn_quotient, BIGNUM *bn_remainder, const BIGNUM *b
         bn_quotient->d[0] = 1;
         bn_quotient->top = 1;
         bn_quotient->neg = (dividend_neg != divisor_neg);
-        printf("abs_dividend == abs_divisor. Quotient = 1\n");
+        // printf("abs_dividend == abs_divisor. Quotient = 1\n");
         return 1;
     }
     // Perform long division
@@ -827,9 +827,9 @@ __device__ int bn_div(BIGNUM *bn_quotient, BIGNUM *bn_remainder, const BIGNUM *b
     bn_quotient->top = find_top_optimized(bn_quotient, divs_max_top);
     bn_remainder->top = find_top_optimized(bn_remainder, divs_max_top);
     #ifdef debug_print
-        bn_print("<< bn_quotient: ", bn_quotient);
-        bn_print("<< bn_remainder: ", bn_remainder);
-        printf("-- bn_div --\n");
+        // bn_print("<< bn_quotient: ", bn_quotient);
+        // bn_print("<< bn_remainder: ", bn_remainder);
+        // printf("-- bn_div --\n");
     #endif
     return 1;
 }
