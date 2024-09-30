@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <stdint.h>
 
-// #define BN_128
+#define BN_128
 // #define debug_print
 // #define debug_bn_copy
 
@@ -478,6 +478,64 @@ __device__ void set_bn(BIGNUM *dest, const BIGNUM *src) {
     dest->top = src->top;
     dest->neg = src->neg;
 }
+
+__device__ void mul128x128(BN_ULONG a, BN_ULONG b, BN_ULONG *high, BN_ULONG *low) {
+    // Split the 128-bit numbers into high and low 64-bit parts
+    uint64_t a_hi = a >> 64;
+    uint64_t a_lo = (uint64_t)a;
+    uint64_t b_hi = b >> 64;
+    uint64_t b_lo = (uint64_t)b;
+
+    // Compute partial products
+    unsigned __int128 p0 = (unsigned __int128)a_lo * b_lo; // 128-bit result
+    unsigned __int128 p1 = (unsigned __int128)a_lo * b_hi; // 128-bit result
+    unsigned __int128 p2 = (unsigned __int128)a_hi * b_lo; // 128-bit result
+    unsigned __int128 p3 = (unsigned __int128)a_hi * b_hi; // 128-bit result
+
+    // Compute the intermediate sums with carry management
+    unsigned __int128 mid1 = p1 + p2;
+    uint64_t carry_mid1 = (mid1 < p1) ? 1 : 0; // Detect overflow
+
+    // Calculate low part
+    *low = p0 + (mid1 << 64);
+    uint64_t carry_low = (*low < p0) ? 1 : 0; // Detect overflow
+
+    // Calculate high part
+    *high = p3 + (mid1 >> 64) + carry_mid1 + carry_low;
+}
+
+__device__ void bn_mul_wrong(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
+    init_zero(product);
+
+    // Multiply the numbers directly as arrays of 128-bit words
+    for (int i = 0; i < a->top; i++) {
+        BN_ULONG carry = 0;
+        for (int j = 0; j < b->top; j++) {
+            BN_ULONG high, low;
+            // Corrected mul128x128 function
+            mul128x128(a->d[i], b->d[j], &high, &low);
+
+            // Add low to product->d[i + j] along with carry
+            unsigned __int128 temp = (unsigned __int128)product->d[i + j] + low + carry;
+            product->d[i + j] = (BN_ULONG)temp;
+
+            // Update carry
+            carry = high + (BN_ULONG)(temp < low ? 1 : 0);
+        }
+        product->d[i + b->top] = carry;
+    }
+
+    // // Update the top
+    // product->top = a->top + b->top;
+    // while (product->top > 1 && product->d[product->top - 1] == 0) {
+    //     product->top--;
+    // }
+    product->top = find_top_optimized(product, a->top + b->top);
+
+    // Set the sign
+    product->neg = a->neg ^ b->neg;
+}
+
 
 __device__ void bn_mul(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
     init_zero(product);

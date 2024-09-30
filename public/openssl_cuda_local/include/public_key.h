@@ -159,6 +159,18 @@ __device__ void GetPublicKey(uint8_t* buffer, uint8_t* key)
     bn_set_word(&two, 2);
     bn_div(&quotient, &remainder, &publicKey.y, &two);
     uint8_t prefix = bn_is_zero(&remainder) ? 0x02 : 0x03;
+    
+    // Alternate solution of copying the public key to buffer
+    // Is not so clear as the previous one but works for both 64-bit and 128-bit
+    // // Copy the public key to buffer
+    // size_t limb_size_bytes = sizeof(BN_ULONG);
+    // for (int i = 0; i < CURVE_P_VALUES_MAX_SIZE; i++) {
+    //     BN_ULONG limb = publicKey.x.d[CURVE_P_VALUES_MAX_SIZE - 1 - i];
+    //     for (int j = 0; j < limb_size_bytes; j++) {
+    //         buffer[limb_size_bytes * i + j + 1] = (limb >> (8 * (limb_size_bytes - 1 - j))) & 0xFF;
+    //     }
+    // }
+    
     // Add prefix before the buffer
     buffer[0] = prefix;
     #ifdef debug_print
