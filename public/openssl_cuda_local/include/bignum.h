@@ -2,13 +2,17 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdint.h>
+#include "function_profiling.h"
 
 #define BN_128
 // #define debug_print
 // #define debug_bn_copy
+// #define debug_top
+#define function_profiler
 
 #ifdef BN_128
     #define BN_ULONG unsigned __int128
+    #define uint128_t unsigned __int128
     #define BN_ULONG_MAX ((BN_ULONG)-1)
     #define MAX_BIGNUM_SIZE 5     // Reduced from 10 to 5 due to __int128
 #else
@@ -31,13 +35,13 @@ typedef struct bignum_st {
 // Initialize BIGNUM to zero
 #ifdef BN_128
     __device__ const BIGNUM ZERO_BIGNUM = {
-        {0,0,0,0,0},                  // d (will be properly initialized in init_zero)
+        {0},                  // d (will be properly initialized in init_zero)
         1,                    // top (unsigned char)
         0                    // neg (bool)
     };
 #else
     __device__ const BIGNUM ZERO_BIGNUM = {
-        {0,0,0,0,0,0,0,0,0,0},                  // d (will be properly initialized in init_zero)
+        {0},                  // d (will be properly initialized in init_zero)
         1,                    // top (unsigned char)
         0                    // neg (bool)
     };
@@ -88,10 +92,48 @@ __device__ void bn_print(const char* msg, const BIGNUM* a) {
         return;
     #endif
     
-    if (a->top != find_top(a)) printf("### ERROR: bn_print: a->top (%d) != find_top(a) (%d)\n", a->top, find_top(a)); // TODO: Remove this line after debugging
-    printf("[top%d*%d] ", a->top, a->neg);
-    
+    #ifdef debug_top
+        if (a->top != find_top(a)) printf("### ERROR: bn_print: a->top (%d) != find_top(a) (%d)\n", a->top, find_top(a));
+    #endif
     printf("%s", msg);
+    printf("[");
+    if (a->neg) printf("-");
+    else printf("+");
+    printf("%d] ", a->top);
+    if (a->neg) {
+        printf("-");  // Handle the case where BIGNUM is negative
+    }
+    // for (int i = MAX_BIGNUM_SIZE - 1; i >= 0; i--) {
+    for (int i = a->top - 1; i >= 0; i--) {
+        // Print words up to top - 1 with appropriate formatting
+        // if (i == MAX_BIGNUM_SIZE - 1) {
+        if (i == a->top - 1) {
+            #ifdef BN_128
+                printf("%016llx%016llx", (unsigned long long)(a->d[i] >> 64), (unsigned long long)(a->d[i] & 0xFFFFFFFFFFFFFFFFULL));
+            #else
+                printf("%llx", a->d[i]);
+            #endif
+        } else {
+            #ifdef BN_128
+                printf("%016llx%016llx", (unsigned long long)(a->d[i] >> 64), (unsigned long long)(a->d[i] & 0xFFFFFFFFFFFFFFFFULL));
+            #else
+                printf("%016llx", a->d[i]);
+            #endif
+        }
+        // return;
+    }
+    printf("\n");
+}
+
+__device__ void bn_print_no_fuse(const char* msg, const BIGNUM* a) {   
+    #ifdef debug_top
+        if (a->top != find_top(a)) printf("### ERROR: bn_print: a->top (%d) != find_top(a) (%d)\n", a->top, find_top(a));
+    #endif
+    printf("%s", msg);
+    printf("[");
+    if (a->neg) printf("-");
+    else printf("+");
+    printf("%d] ", a->top);
     if (a->neg) {
         printf("-");  // Handle the case where BIGNUM is negative
     }
@@ -147,10 +189,10 @@ __device__ int bn_cmp(const BIGNUM* a, const BIGNUM* b) {
         #endif
         return a->neg ? -1 : 1;
     }
-    // a->top = find_top(a);
-    // b->top = find_top(b); // TODO: (optimization) Find a place where do we call find_top for b with uninicialized top by adding consition there and mark source function before each find_top call
-    if (a->top != find_top(a)) printf("### ERROR: bn_cmp: a->top != find_top(a)\n"); // TODO: Remove this line after debugging
-    if (b->top != find_top(b)) printf("### ERROR: bn_cmp: b->top != find_top(b)\n"); // TODO: Remove this line after debugging
+    #ifdef debug_top
+        if (a->top != find_top(a)) printf("### ERROR: bn_cmp: a->top != find_top(a)\n");
+        if (b->top != find_top(b)) printf("### ERROR: bn_cmp: b->top != find_top(b)\n");
+    #endif
     if (a->top != b->top) {
         #ifdef debug_print
             // printf("a->top != b->top\n-- bn_cmp --\n");
@@ -200,10 +242,12 @@ __device__ void bn_copy(BIGNUM *dest, const BIGNUM *src) {
     if (dest == nullptr || src == nullptr) {
         return;
     }
-    if (src->top != find_top(src)) printf("### ERROR: bn_copy: src->top (%d) != find_top(src) (%d)\n", src->top, find_top(src)); // TODO: Remove this line after debugging
-    if (src->top > MAX_BIGNUM_SIZE) {
-        printf("### bn_copy ERROR: src->top > MAX_BIGNUM_SIZE\n");
-    }
+    #ifdef debug_top
+        if (src->top != find_top(src)) printf("### ERROR: bn_copy: src->top (%d) != find_top(src) (%d)\n", src->top, find_top(src));
+        if (src->top > MAX_BIGNUM_SIZE) {
+            printf("### bn_copy ERROR: src->top > MAX_BIGNUM_SIZE\n");
+        }
+    #endif
 
     // Copy the neg and top fields
     dest->neg = src->neg;
@@ -344,10 +388,16 @@ __device__ void absolute_subtract(BIGNUM *result, const BIGNUM *a, const BIGNUM 
 }
 
 __device__ bool bn_sub(BIGNUM *result, const BIGNUM *a, const BIGNUM *b) {
+    #ifdef function_profiler
+        unsigned long long start_time = clock64();
+    #endif
     // If one is negative and the other is positive, it's essentially an addition.
     if (a->neg != b->neg) {
         result->neg = a->neg; // The sign will be the same as the sign of 'a'.
         absolute_add(result, a, b); // Perform the addition of magnitudes here because signs are different.
+        #ifdef function_profiler
+            record_function(FN_BN_SUB, start_time);
+        #endif
         return true;
     }
 
@@ -368,6 +418,46 @@ __device__ bool bn_sub(BIGNUM *result, const BIGNUM *a, const BIGNUM *b) {
     if (result->top == 0) { 
         // Handle underflow if needed. 
     }
+    #ifdef function_profiler
+        record_function(FN_BN_SUB, start_time);
+    #endif
+    return true;
+}
+
+__device__ bool bn_sub_from_div(BIGNUM *result, const BIGNUM *a, const BIGNUM *b) {
+    #ifdef function_profiler
+        unsigned long long start_time = clock64();
+    #endif
+    // If one is negative and the other is positive, it's essentially an addition.
+    if (a->neg != b->neg) {
+        result->neg = a->neg; // The sign will be the same as the sign of 'a'.
+        absolute_add(result, a, b); // Perform the addition of magnitudes here because signs are different.
+        #ifdef function_profiler
+            record_function(FN_BN_SUB_FROM_DIV, start_time);
+        #endif
+        return true;
+    }
+
+    // Compare the absolute values to decide the order of subtraction and sign of the result.
+    int cmp_res = bn_cmp_abs(a, b); // This function should compare the absolute values of 'a' and 'b'.
+    
+    if (cmp_res >= 0) {
+        // |a| >= |b|, perform a - b, result takes sign from 'a'.
+        result->neg = a->neg;
+        absolute_subtract(result, a, b);
+    } else {
+        // |b| > |a|, perform b - a instead, result takes opposite sign from 'a'.
+        result->neg = !a->neg;
+        absolute_subtract(result, b, a);
+    }
+
+    // Perform additional logic if underflow has been detected in absolute_subtract.
+    if (result->top == 0) { 
+        // Handle underflow if needed. 
+    }
+    #ifdef function_profiler
+        record_function(FN_BN_SUB_FROM_DIV, start_time);
+    #endif
     return true;
 }
 
@@ -398,7 +488,9 @@ __device__ int absolute_compare(const BIGNUM* a, const BIGNUM* b) {
 }
 
 __device__ bool bn_add(BIGNUM *result, const BIGNUM *a, const BIGNUM *b) {
-//__device__ bool bn_add(BIGNUM *result, BIGNUM *a, BIGNUM *b) {
+    #ifdef function_profiler
+        unsigned long long start_time = clock64();
+    #endif
     #ifdef debug_print
         printf("++ bn_add ++\n");
         bn_print(">> a: ", a);
@@ -442,17 +534,22 @@ __device__ bool bn_add(BIGNUM *result, const BIGNUM *a, const BIGNUM *b) {
         bn_print("", result);
         printf("-- bn_add --\n");
     #endif
+    #ifdef function_profiler
+        record_function(FN_BN_ADD, start_time);
+    #endif
     return true;
 }
 
 __device__ int bn_div(BIGNUM *a, BIGNUM *b, const BIGNUM *q, const BIGNUM *r);
-__device__ void bn_mul(BIGNUM *a, BIGNUM *b, BIGNUM *product);
+__device__ void bn_mul(const BIGNUM *a, const BIGNUM *b, BIGNUM *product);
 
 __device__ void set_bn(BIGNUM *dest, const BIGNUM *src) {
     // debug_printf("set_bn 0\n");
     // update src->top
     // src->top = find_top(src);
-    if (src->top != find_top(src)) printf("### ERROR: set_bn: src->top != find_top(src)\n"); // TODO: Remove this line after debugging
+    #ifdef debug_top
+        if (src->top != find_top(src)) printf("### ERROR: set_bn: src->top != find_top(src)\n");
+    #endif
     // Check if dest has enough space to copy from src
     if (MAX_BIGNUM_SIZE < src->top) {    
         // Handle the situation appropriately
@@ -479,97 +576,209 @@ __device__ void set_bn(BIGNUM *dest, const BIGNUM *src) {
     dest->neg = src->neg;
 }
 
-__device__ void mul128x128(BN_ULONG a, BN_ULONG b, BN_ULONG *high, BN_ULONG *low) {
-    // Split the 128-bit numbers into high and low 64-bit parts
-    uint64_t a_hi = a >> 64;
-    uint64_t a_lo = (uint64_t)a;
-    uint64_t b_hi = b >> 64;
-    uint64_t b_lo = (uint64_t)b;
-
-    // Compute partial products
-    unsigned __int128 p0 = (unsigned __int128)a_lo * b_lo; // 128-bit result
-    unsigned __int128 p1 = (unsigned __int128)a_lo * b_hi; // 128-bit result
-    unsigned __int128 p2 = (unsigned __int128)a_hi * b_lo; // 128-bit result
-    unsigned __int128 p3 = (unsigned __int128)a_hi * b_hi; // 128-bit result
-
-    // Compute the intermediate sums with carry management
-    unsigned __int128 mid1 = p1 + p2;
-    uint64_t carry_mid1 = (mid1 < p1) ? 1 : 0; // Detect overflow
-
-    // Calculate low part
-    *low = p0 + (mid1 << 64);
-    uint64_t carry_low = (*low < p0) ? 1 : 0; // Detect overflow
-
-    // Calculate high part
-    *high = p3 + (mid1 >> 64) + carry_mid1 + carry_low;
-}
-
-__device__ void bn_mul_wrong(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
+__device__ void bn_mul_128_fail(const BIGNUM *a, const BIGNUM *b, BIGNUM *product) {
+    bn_print(">> a: ", a);
+    bn_print(">> b: ", b);
     init_zero(product);
-
-    // Multiply the numbers directly as arrays of 128-bit words
-    for (int i = 0; i < a->top; i++) {
-        BN_ULONG carry = 0;
-        for (int j = 0; j < b->top; j++) {
-            BN_ULONG high, low;
-            // Corrected mul128x128 function
-            mul128x128(a->d[i], b->d[j], &high, &low);
-
-            // Add low to product->d[i + j] along with carry
-            unsigned __int128 temp = (unsigned __int128)product->d[i + j] + low + carry;
-            product->d[i + j] = (BN_ULONG)temp;
-
-            // Update carry
-            carry = high + (BN_ULONG)(temp < low ? 1 : 0);
+    #ifdef BN_128
+        for (int i = 0; i < a->top; ++i) {
+            BN_ULONG carry = 0;
+            for (int j = 0; j < b->top; ++j) {
+                printf("\n[%d:%d] a->d[%d]: %016llx\n",i ,j , i, a->d[i]);
+                printf("[%d:%d] b->d[%d]: %016llx\n",i ,j , j, b->d[j]);
+                printf("[%d:%d] product->d[%d]: %016llx\n",i ,j , i + j, product->d[i + j]);
+                printf("[%d:%d] carry: %016llx\n",i ,j , carry);
+                unsigned __int128 temp = (unsigned __int128)a->d[i] * b->d[j] + product->d[i + j] + carry;
+                product->d[i + j] = temp;
+                carry = temp >> BN_ULONG_NUM_BITS; // Directly shift the 128-bit value
+            }
+            product->d[i + b->top] = carry;
         }
-        product->d[i + b->top] = carry;
-    }
+        product->top = a->top + b->top;
 
-    // // Update the top
-    // product->top = a->top + b->top;
-    // while (product->top > 1 && product->d[product->top - 1] == 0) {
-    //     product->top--;
-    // }
-    product->top = find_top_optimized(product, a->top + b->top);
+        // Normalize top
+        while (product->top > 1 && product->d[product->top - 1] == 0) {
+            product->top--;
+        }
 
-    // Set the sign
+    #else
+        // Existing BN_64 code remains unchanged
+    #endif
     product->neg = a->neg ^ b->neg;
+    bn_print("<< product: ", product);
 }
 
+__device__ void mul64x64(uint64_t a, uint64_t b, uint64_t *hi, uint64_t *lo) {
+    uint64_t a_low = (uint32_t)a;
+    uint64_t a_high = a >> 32;
+    uint64_t b_low = (uint32_t)b;
+    uint64_t b_high = b >> 32;
 
-__device__ void bn_mul(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
+    uint64_t res_low = a_low * b_low;
+    uint64_t res_mid1 = a_low * b_high;
+    uint64_t res_mid2 = a_high * b_low;
+    uint64_t res_high = a_high * b_high;
+
+    uint64_t carry = (res_low >> 32) + (uint32_t)res_mid1 + (uint32_t)res_mid2;
+    uint64_t mid_high = (res_mid1 >> 32) + (res_mid2 >> 32) + (carry >> 32);
+
+    *lo = (res_low & 0xFFFFFFFFULL) | ((carry & 0xFFFFFFFFULL) << 32);
+    *hi = res_high + mid_high;
+}
+
+__device__ void bn_mul_64_ok(const BIGNUM *a, const BIGNUM *b, BIGNUM *product) {
+    // Initialize product
     init_zero(product);
-    // #ifdef debug_print
-    //     printf("++ bn_mul ++\n");
-    //     bn_print(">> a: ", a);
-    //     bn_print(">> b: ", b);
-    // #endif
 
     #ifdef BN_128
-        // Multiply the numbers treating them as arrays of 64-bit words
-        const int a_words = a->top * 2; // Since each BN_ULONG is 128 bits (2 * 64 bits)
+        // Convert 128-bit BN_ULONGs to arrays of 64-bit words
+        const int a_words = a->top * 2; // Since each BN_ULONG is 128 bits
         const int b_words = b->top * 2;
         uint64_t a_array[MAX_BIGNUM_SIZE * 2] = {0};
         uint64_t b_array[MAX_BIGNUM_SIZE * 2] = {0};
         uint64_t result_array[MAX_BIGNUM_SIZE * 4] = {0};
 
-        // Expand a into a_array
+        // Expand 'a' into 'a_array'
         for (int i = 0; i < a->top; ++i) {
+            a_array[2 * i] = (uint64_t)(a->d[i] & 0xFFFFFFFFFFFFFFFFULL); // Lower 64 bits
+            a_array[2 * i + 1] = (uint64_t)(a->d[i] >> 64);               // Upper 64 bits
+        }
+
+        // Expand 'b' into 'b_array'
+        for (int i = 0; i < b->top; ++i) {
+            b_array[2 * i] = (uint64_t)(b->d[i] & 0xFFFFFFFFFFFFFFFFULL); // Lower 64 bits
+            b_array[2 * i + 1] = (uint64_t)(b->d[i] >> 64);               // Upper 64 bits
+        }
+
+        // Perform multiplication using 64-bit arithmetic
+        for (int i = 0; i < a_words; ++i) {
+            uint64_t ai = a_array[i];
+            uint64_t carry = 0;
+            for (int j = 0; j < b_words; ++j) {
+                uint64_t bj = b_array[j];
+                uint64_t hi, lo;
+                mul64x64(ai, bj, &hi, &lo);
+
+                // Add lo to result_array[i + j] with carry
+                uint64_t sum = result_array[i + j];
+                uint64_t carry_out = 0;
+
+                sum += lo;
+                if (sum < lo) carry_out += 1;
+
+                sum += carry;
+                if (sum < carry) carry_out += 1;
+
+                result_array[i + j] = sum;
+
+                carry = hi + carry_out;
+            }
+            // Add remaining carry
+            result_array[i + b_words] += carry;
+        }
+
+        // Convert result_array back to 128-bit BN_ULONGs
+        int product_words = a_words + b_words;
+        int product_top = (product_words + 1) / 2; // Ceiling division
+
+        for (int i = 0; i < product_top; ++i) {
+            uint64_t lo = result_array[2 * i];
+            uint64_t hi = (2 * i + 1 < product_words) ? result_array[2 * i + 1] : 0;
+            product->d[i] = ((BN_ULONG)hi << 64) | lo;
+        }
+
+        // Update 'top' and 'neg' fields
+        product->top = find_top_optimized(product, product_top);
+        product->neg = a->neg ^ b->neg;
+    #else
+        // Existing BN_64 implementation remains unchanged
+    #endif
+
+    // Optionally print the product
+    bn_print("<< product: ", product);
+}
+
+__device__ int bn_bit_length(const BIGNUM *a) {
+    if (a->top == 0) return 0;
+    
+    int bit_length = (a->top - 1) * BN_ULONG_NUM_BITS;
+    BN_ULONG top_word = a->d[a->top - 1];
+    
+    while (top_word) {
+        top_word >>= 1;
+        bit_length++;
+    }
+    
+    return bit_length;
+}
+
+__device__ void bn_mul(const BIGNUM *a, const BIGNUM *b, BIGNUM *product) {
+    #ifdef function_profiler
+        unsigned long long start_time = clock64();
+    #endif
+    #ifdef debug_print
+        printf("++ bn_mul ++\n");
+        printf("BN_ULONG_NUM_BITS: %d\n", BN_ULONG_NUM_BITS);
+        bn_print(">> a: ", a);
+        bn_print(">> b: ", b);
+    #endif
+    init_zero(product);
+    #ifdef BN_128
+        // Not efficient for my case
+        // if (a->top == 1 and b->top == 1) {
+        //     int a_bit_len = bn_bit_length(a);
+        //     int b_bit_len = bn_bit_length(b);
+        //     int product_bit_len = a_bit_len + b_bit_len;
+        //     if (product_bit_len <= BN_ULONG_NUM_BITS) {
+        //         // The product can fit in a single word
+        //         product->d[0] = a->d[0] * b->d[0];
+        //         product->top = 1;
+        //         product->neg = a->neg ^ b->neg;
+        //         record_function(FN_BN_MUL, start_time);
+        //         return;
+        //     }
+        // }
+        // Multiply the numbers treating them as arrays of 64-bit words
+        const unsigned char a_words = a->top * 2; // Since each BN_ULONG is 128 bits (2 * 64 bits)
+        const unsigned char b_words = b->top * 2;
+        uint64_t a_array[MAX_BIGNUM_SIZE * 2] = {0};
+        uint64_t b_array[MAX_BIGNUM_SIZE * 2] = {0};
+        uint64_t result_array[MAX_BIGNUM_SIZE * 4] = {0};
+
+        // Expand a into a_array
+        for (unsigned char i = 0; i < a->top; ++i) {
             a_array[i * 2] = (uint64_t)(a->d[i]);
             a_array[i * 2 + 1] = (uint64_t)(a->d[i] >> 64);
         }
 
         // Expand b into b_array
-        for (int i = 0; i < b->top; ++i) {
+        for (unsigned char i = 0; i < b->top; ++i) {
             b_array[i * 2] = (uint64_t)(b->d[i]);
             b_array[i * 2 + 1] = (uint64_t)(b->d[i] >> 64);
         }
+        // char i = (char)max(a->top, b->top);
+        // while (i > 0) {
+        //     --i;
+        //     if (i < a->top) {
+        //         a_array[i * 2] = (uint64_t)(a->d[i]);
+        //         a_array[i * 2 + 1] = (uint64_t)(a->d[i] >> 64);
+        //     }
+        //     if (i < b->top) {
+        //         b_array[i * 2] = (uint64_t)(b->d[i]);
+        //         b_array[i * 2 + 1] = (uint64_t)(b->d[i] >> 64);
+        //     }
+        // }
 
+        unsigned __int128 temp;
+        uint64_t carry;
         // Multiply the arrays
-        for (int i = 0; i < a_words; ++i) {
-            uint64_t carry = 0;
-            for (int j = 0; j < b_words; ++j) {
-                unsigned __int128 temp = (unsigned __int128)a_array[i] * b_array[j] + result_array[i + j] + carry;
+        for (unsigned char i = 0; i < a_words; ++i) {
+            carry = 0;
+            for (unsigned char j = 0; j < b_words; ++j) {
+                // unsigned __int128 temp = (unsigned __int128)a_array[i] * b_array[j] + result_array[i + j] + carry;
+                temp = (unsigned __int128)a_array[i] * b_array[j];
+                temp += result_array[i + j];
+                temp += carry;
                 result_array[i + j] = (uint64_t)temp;
                 carry = (uint64_t)(temp >> 64);
             }
@@ -577,22 +786,19 @@ __device__ void bn_mul(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
         }
 
         // Convert result_array back into product->d
-        int product_words = a_words + b_words;
-        int product_top = (product_words + 1) / 2;
-        for (int i = 0; i < product_top; ++i) {
+        unsigned char product_words = a_words + b_words;
+        unsigned char product_top = (product_words + 1) / 2;
+        for (unsigned char i = 0; i < product_top; ++i) {
             uint64_t lo = result_array[i * 2];
             uint64_t hi = result_array[i * 2 + 1];
             product->d[i] = ((unsigned __int128)hi << 64) | lo;
         }
-        // Update the top
-        // product->top = product_top;
-        // while (product->top > 1 && product->d[product->top - 1] == 0) {
-        //     product->top--;
-        // }
         product->top = find_top_optimized(product, product_top);
-        if (product->top > MAX_BIGNUM_SIZE) {
-            printf("### bn_mul ERROR: product->top > MAX_BIGNUM_SIZE\n");
-        }
+        #ifdef debug_top
+            if (product->top > MAX_BIGNUM_SIZE) {
+                printf("### bn_mul ERROR: product->top > MAX_BIGNUM_SIZE\n");
+            }
+        #endif
     #else
         // Unroll loops if possible
         for (int i = 0; i < a->top; i++) {
@@ -610,14 +816,130 @@ __device__ void bn_mul(BIGNUM *a, BIGNUM *b, BIGNUM *product) {
             product->top--;
         }
     #endif
-    
-
     // Set the sign
     product->neg = a->neg ^ b->neg;
-    // #ifdef debug_print
-    //     bn_print("<< product: ", product);
-    //     printf("-- bn_mul --\n");
-    // #endif
+    #ifdef debug_print
+        bn_print("<< product: ", product);
+        printf("-- bn_mul --\n");
+    #endif
+    #ifdef function_profiler
+        record_function(FN_BN_MUL, start_time);
+    #endif
+}
+
+__device__ void bn_mul_from_div(const BIGNUM *a, const BIGNUM *b, BIGNUM *product, const bool absolute) {
+    #ifdef function_profiler
+        unsigned long long start_time = clock64();
+    #endif
+    #ifdef debug_print
+        printf("++ bn_mul ++\n");
+        printf("BN_ULONG_NUM_BITS: %d\n", BN_ULONG_NUM_BITS);
+        bn_print(">> a: ", a);
+        bn_print(">> b: ", b);
+    #endif
+    init_zero(product);
+    #ifdef BN_128
+        // Not efficient for my case
+        // if (a->top == 1 and b->top == 1) {
+        //     int a_bit_len = bn_bit_length(a);
+        //     int b_bit_len = bn_bit_length(b);
+        //     int product_bit_len = a_bit_len + b_bit_len;
+        //     if (product_bit_len <= BN_ULONG_NUM_BITS) {
+        //         // The product can fit in a single word
+        //         product->d[0] = a->d[0] * b->d[0];
+        //         product->top = 1;
+        //         product->neg = a->neg ^ b->neg;
+        //         record_function(FN_BN_MUL, start_time);
+        //         return;
+        //     }
+        // }
+        // Multiply the numbers treating them as arrays of 64-bit words
+        const unsigned char a_words = a->top * 2; // Since each BN_ULONG is 128 bits (2 * 64 bits)
+        const unsigned char b_words = b->top * 2;
+        uint64_t a_array[MAX_BIGNUM_SIZE * 2] = {0};
+        uint64_t b_array[MAX_BIGNUM_SIZE * 2] = {0};
+        uint64_t result_array[MAX_BIGNUM_SIZE * 4] = {0};
+
+        // Expand a into a_array
+        for (unsigned char i = 0; i < a->top; ++i) {
+            a_array[i * 2] = (uint64_t)(a->d[i]);
+            a_array[i * 2 + 1] = (uint64_t)(a->d[i] >> 64);
+        }
+
+        // Expand b into b_array
+        for (unsigned char i = 0; i < b->top; ++i) {
+            b_array[i * 2] = (uint64_t)(b->d[i]);
+            b_array[i * 2 + 1] = (uint64_t)(b->d[i] >> 64);
+        }
+        // char i = (char)max(a->top, b->top);
+        // while (i > 0) {
+        //     --i;
+        //     if (i < a->top) {
+        //         a_array[i * 2] = (uint64_t)(a->d[i]);
+        //         a_array[i * 2 + 1] = (uint64_t)(a->d[i] >> 64);
+        //     }
+        //     if (i < b->top) {
+        //         b_array[i * 2] = (uint64_t)(b->d[i]);
+        //         b_array[i * 2 + 1] = (uint64_t)(b->d[i] >> 64);
+        //     }
+        // }
+
+        unsigned __int128 temp;
+        uint64_t carry;
+        // Multiply the arrays
+        for (unsigned char i = 0; i < a_words; ++i) {
+            carry = 0;
+            for (unsigned char j = 0; j < b_words; ++j) {
+                // unsigned __int128 temp = (unsigned __int128)a_array[i] * b_array[j] + result_array[i + j] + carry;
+                temp = (unsigned __int128)a_array[i] * b_array[j];
+                temp += result_array[i + j];
+                temp += carry;
+                result_array[i + j] = (uint64_t)temp;
+                carry = (uint64_t)(temp >> 64);
+            }
+            result_array[i + b_words] += carry;
+        }
+
+        // Convert result_array back into product->d
+        unsigned char product_words = a_words + b_words;
+        unsigned char product_top = (product_words + 1) / 2;
+        for (unsigned char i = 0; i < product_top; ++i) {
+            uint64_t lo = result_array[i * 2];
+            uint64_t hi = result_array[i * 2 + 1];
+            product->d[i] = ((unsigned __int128)hi << 64) | lo;
+        }
+        product->top = find_top_optimized(product, product_top);
+        #ifdef debug_top
+            if (product->top > MAX_BIGNUM_SIZE) {
+                printf("### bn_mul ERROR: product->top > MAX_BIGNUM_SIZE\n");
+            }
+        #endif
+    #else
+        // Unroll loops if possible
+        for (int i = 0; i < a->top; i++) {
+            BN_ULONG carry = 0;
+            for (int j = 0; j < b->top; j++) {
+                unsigned __int128 temp = (unsigned __int128)a->d[i] * b->d[j] + product->d[i + j] + carry;
+                product->d[i + j] = (BN_ULONG)temp;
+                carry = (BN_ULONG)(temp >> 64);
+            }
+            product->d[i + b->top] = carry;
+        }
+        // Update the top
+        product->top = a->top + b->top;
+        while (product->top > 1 && product->d[product->top - 1] == 0) {
+            product->top--;
+        }
+    #endif
+    // Set the sign
+    if (!absolute) product->neg = a->neg ^ b->neg;
+    #ifdef debug_print
+        bn_print("<< product: ", product);
+        printf("-- bn_mul --\n");
+    #endif
+    #ifdef function_profiler
+        record_function(FN_BN_MUL_FROM_DIV, start_time);
+    #endif
 }
 
 __device__ int bn_mod(BIGNUM *r, const BIGNUM *a, const BIGNUM *n) {
@@ -695,9 +1017,9 @@ __device__ void mod_mul(BIGNUM *a, BIGNUM *b, BIGNUM *mod, BIGNUM *result) {
 }
 
 __device__ bool bn_is_zero(const BIGNUM *a) {
-    if (a->top != find_top(a)) {
-        printf("bn_is_zero: Invalid top value\n"); // TODO: Remove this debug check        
-    }
+    #ifdef debug_top
+        if (a->top != find_top(a)) printf("### ERROR: bn_is_zero: a->top (%d) != find_top(a) (%d)\n", a->top, find_top(a));
+    #endif
     for (int i = 0; i < a->top; ++i) {
         if (a->d[i] != 0) {
             return false;
@@ -735,9 +1057,11 @@ __device__ void bn_set_word(BIGNUM *bn, BN_ULONG word) {
     // and top is an integer representing the index of the most significant word + 1
     // Setting a BIGNUM to a single-word value means that all other words are zero.
 
-    if (bn->top != find_top(bn)) {
-        printf("bn_set_word: Invalid top value\n"); // TODO: Remove this debug check
-    }
+    #ifdef debug_top
+        if (bn->top != find_top(bn)) {
+            if (bn->top != find_top(bn)) printf("### ERROR: bn_set_word: bn->top (%d) != find_top(bn) (%d)\n", bn->top, find_top(bn));
+        }
+    #endif
 
     // Clear all words in the BIGNUM
     for (int i = 0; i < MAX_BIGNUM_SIZE; ++i) {
@@ -789,42 +1113,67 @@ __device__ void left_shift(BIGNUM *a, int shift) {
 
 __device__ int bn_div(BIGNUM *bn_quotient, BIGNUM *bn_remainder, const BIGNUM *bn_dividend, const BIGNUM *bn_divisor)
 {
+    #ifdef function_profiler
+        unsigned long long start_time = clock64();
+    #endif
     #ifdef debug_print
         // printf("++ bn_div ++\n");
         // bn_print(">> bn_dividend: ", bn_dividend);
         // bn_print(">> bn_divisor: ", bn_divisor);
     #endif
-    // Store signs and work with absolute values
-    int dividend_neg = bn_dividend->neg;
-    int divisor_neg = bn_divisor->neg;
-    BIGNUM abs_dividend, abs_divisor;
-    init_zero(&abs_dividend);
-    init_zero(&abs_divisor);
+    // printf("++ bn_div ++\n");
+    // bn_print_no_fuse(">> bn_dividend: ", bn_dividend);
+    // bn_print_no_fuse(">> bn_divisor: ", bn_divisor);
 
-    unsigned char divs_max_top = (bn_dividend->top > bn_divisor->top) ? bn_dividend->top : bn_divisor->top;
+    
+
+    unsigned char divs_max_top = max(bn_dividend->top, bn_divisor->top);
+    
+    // perform classical div_mod if only single word
+    if (divs_max_top == 1) {
+        // printf("divs_max_top == 1\n");
+        BN_ULONG dividend = bn_dividend->d[0];
+        BN_ULONG divisor = bn_divisor->d[0];
+        BN_ULONG quotient = dividend / divisor;
+        BN_ULONG remainder = dividend % divisor;
+        bn_quotient->d[0] = quotient;
+        bn_remainder->d[0] = remainder;
+        bn_quotient->top = (quotient == 0) ? 0 : 1;
+        bn_remainder->top = (remainder == 0) ? 0 : 1;
+        bn_quotient->neg = bn_dividend->neg ^ bn_divisor->neg;
+        bn_remainder->neg = bn_dividend->neg;
+        #ifdef function_profiler
+            record_function(FN_BN_DIV, start_time);
+        #endif
+        return 1;
+    }
+
+    // Store signs and work with absolute values
+    BIGNUM abs_dividend;
+    init_zero(&abs_dividend);
 
     // Copy absolute values
     for (int i = 0; i < divs_max_top; i++) {
         abs_dividend.d[i] = bn_dividend->d[i];
-        abs_divisor.d[i] = bn_divisor->d[i];
     }
     abs_dividend.neg = 0;
-    abs_divisor.neg = 0;
     abs_dividend.top = bn_dividend->top;
-    abs_divisor.top = bn_divisor->top;
 
     // Initialize quotient and remainder
     init_zero(bn_quotient);
     init_zero(bn_remainder);
 
-    // Handle special cases
-    if (bn_cmp(&abs_dividend, &abs_divisor) == 0) {
-        bn_quotient->d[0] = 1;
-        bn_quotient->top = 1;
-        bn_quotient->neg = (dividend_neg != divisor_neg);
-        // printf("abs_dividend == abs_divisor. Quotient = 1\n");
-        return 1;
-    }
+    // Handle special cases: Disabled for performance reasons
+    // if (bn_cmp(&abs_dividend, &abs_divisor) == 0) {
+    //     bn_quotient->d[0] = 1;
+    //     bn_quotient->top = 1;
+    //     bn_quotient->neg = (dividend_neg != divisor_neg);
+    //     // printf("abs_dividend == abs_divisor. Quotient = 1\n");
+    //     #ifdef function_profiler
+    //         record_function(FN_BN_DIV, start_time);
+    //     #endif
+    //     return 1;
+    // }
     // Perform long division
     BIGNUM current_dividend;
     init_zero(&current_dividend);
@@ -833,7 +1182,13 @@ __device__ int bn_div(BIGNUM *bn_quotient, BIGNUM *bn_remainder, const BIGNUM *b
     for (int i = dividend_size - 1; i >= 0; i--) {
         // Shift current_dividend left by one word and add next word of dividend
         left_shift(&current_dividend, BN_ULONG_NUM_BITS);
+        // if (bn_cmp(&abs_dividend, bn_dividend) != 0) {
+        //     printf("[%d] dividend divergence:\n", i);
+        //     bn_print_no_fuse("abs_dividend: ", &abs_dividend);
+        //     bn_print_no_fuse("bn_dividend: ", bn_dividend);
+        // }
         current_dividend.d[0] = abs_dividend.d[i];
+        // current_dividend.d[0] = bn_dividend->d[i];
 
         // Find quotient digit
         BN_ULONG q = 0;
@@ -846,7 +1201,8 @@ __device__ int bn_div(BIGNUM *bn_quotient, BIGNUM *bn_remainder, const BIGNUM *b
             temp.d[0] = mid;
             temp.top = 1;
 
-            bn_mul(&abs_divisor, &temp, &product);
+            // bn_mul(&abs_divisor, &temp, &product);
+            bn_mul_from_div(bn_divisor, &temp, &product, true);
 
             if (bn_cmp(&product, &current_dividend) <= 0) {
                 q = mid;
@@ -854,6 +1210,8 @@ __device__ int bn_div(BIGNUM *bn_quotient, BIGNUM *bn_remainder, const BIGNUM *b
             } else {
                 right = mid - 1;
             }
+            // printf("[%d] ", i);
+            // bn_print_no_fuse("bn_dividend: ", bn_dividend);
         }
 
         // Add quotient digit to result
@@ -867,9 +1225,11 @@ __device__ int bn_div(BIGNUM *bn_quotient, BIGNUM *bn_remainder, const BIGNUM *b
         temp.d[0] = q;
         temp.top = 1;
 
-        bn_mul(&abs_divisor, &temp, &product);
+        // bn_mul(&abs_divisor, &temp, &product);
+        bn_mul_from_div(bn_divisor, &temp, &product, true);
 
-        bn_sub(&current_dividend, &current_dividend, &product);
+        // bn_sub(&current_dividend, &current_dividend, &product);
+        bn_sub_from_div(&current_dividend, &current_dividend, &product);
     }
 
     // Set remainder
@@ -878,8 +1238,8 @@ __device__ int bn_div(BIGNUM *bn_quotient, BIGNUM *bn_remainder, const BIGNUM *b
     }
 
     // Apply correct signs
-    bn_quotient->neg = (dividend_neg != divisor_neg);
-    bn_remainder->neg = dividend_neg;
+    bn_quotient->neg = bn_dividend->neg ^ bn_divisor->neg;
+    bn_remainder->neg = bn_dividend->neg;
 
     // Normalize results
     bn_quotient->top = find_top_optimized(bn_quotient, divs_max_top);
@@ -888,6 +1248,9 @@ __device__ int bn_div(BIGNUM *bn_quotient, BIGNUM *bn_remainder, const BIGNUM *b
         // bn_print("<< bn_quotient: ", bn_quotient);
         // bn_print("<< bn_remainder: ", bn_remainder);
         // printf("-- bn_div --\n");
+    #endif
+    #ifdef function_profiler
+        record_function(FN_BN_DIV, start_time);
     #endif
     return 1;
 }

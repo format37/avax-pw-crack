@@ -29,13 +29,6 @@ __device__ __constant__ unsigned long long d_end_variant_id;
 
 #define OVERFLOW_FLAG ULLONG_MAX
 
-struct ThreadTiming {
-    int blockIdx;
-    int threadIdx;
-    long long startTime;
-    long long endTime;
-};
-
 unsigned long long find_variant_id(const char* s) {
     const char* alphabet = "abcdefghijklmnopqrstuvwxyz";
     int base = strlen(alphabet);
@@ -71,7 +64,6 @@ unsigned long long find_variant_id(const char* s) {
     return result;
 }
 
-// __device__ __forceinline__ void find_letter_variant(int variant_id, char* passphrase_value) {
 __device__ void find_letter_variant(int variant_id, char* passphrase_value) {
     // Define alphabet as a constant array
     const char alphabet[] = "abcdefghijklmnopqrstuvwxyz";
@@ -121,12 +113,20 @@ __device__ int my_strncmp(const char* s1, const char* s2, size_t n) {
     return 0;
 }
 
-__global__ void variant_kernel() 
+__global__ void variant_kernel(ThreadFunctionProfile *d_threadFunctionProfiles_param) 
 {
+    #ifdef function_profiler
+        unsigned long long start_time = clock64();
+    #endif
     int blockId = blockIdx.x;
     int threadId = threadIdx.x;
     int globalIdx = blockId * blockDim.x + threadId;
     unsigned long long variant_id = d_start_variant_id + globalIdx;
+    
+    #ifdef function_profiler
+        // Set the device global variable
+        d_threadFunctionProfiles = d_threadFunctionProfiles_param;
+    #endif
     
     while (variant_id <= d_end_variant_id && !d_address_found) {
         char local_passphrase_value[MAX_PASSPHRASE_LENGTH] = {0};
@@ -151,6 +151,48 @@ __global__ void variant_kernel()
         
         variant_id += gridDim.x * blockDim.x;
     }
+    #ifdef function_profiler
+        record_function(FN_MAIN, start_time);
+    #endif
+}
+
+void write_function_profile_to_csv(const char* filename, ThreadFunctionProfile* profiles, int totalThreads, int threadsPerBlock) {
+    const char* function_names_host[NUM_FUNCTIONS] = {
+        "bn_mul",
+        "bn_mul_from_div",
+        "bn_add",
+        "bn_sub",
+        "bn_sub_from_div",
+        "bn_div",
+        "main"
+    };
+    
+    std::ofstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "Error opening file: " << filename << std::endl;
+        return;
+    }
+
+    file << "BlockIdx,ThreadIdx,FunctionName,Calls,TotalTime(cycles)\n";
+
+    for (int idx = 0; idx < totalThreads; idx++) {
+        int blockIdx = idx / threadsPerBlock;
+        int threadIdx = idx % threadsPerBlock;
+        ThreadFunctionProfile &profile = profiles[idx];
+
+        for (int fn = 0; fn < NUM_FUNCTIONS; fn++) {
+            const char* functionName = function_names_host[fn];
+            unsigned int calls = profile.function_calls[fn];
+            unsigned long long totalTime = profile.function_times[fn];
+
+            if (calls > 0) {
+                file << blockIdx << "," << threadIdx << "," << functionName << "," << calls << "," << totalTime << "\n";
+            }
+        }
+    }
+
+    file.close();
+    std::cout << "Function profiling data saved to " << filename << std::endl;
 }
 
 int main() {
@@ -235,8 +277,18 @@ int main() {
     // Start profiling
     cudaProfilerStart();
 
+    // #ifdef function_profiler
+        // Function profiling
+        int totalThreads = blocksPerGrid * threadsPerBlock;
+        // Allocate per-thread function profiling data
+        ThreadFunctionProfile *h_threadFunctionProfiles = new ThreadFunctionProfile[totalThreads];
+        ThreadFunctionProfile *d_threadFunctionProfiles;
+        cudaMalloc(&d_threadFunctionProfiles, totalThreads * sizeof(ThreadFunctionProfile));
+        cudaMemset(d_threadFunctionProfiles, 0, totalThreads * sizeof(ThreadFunctionProfile));
+    // #endif
+
     // Launch kernel
-    variant_kernel<<<blocksPerGrid, threadsPerBlock>>>();
+    variant_kernel<<<blocksPerGrid, threadsPerBlock>>>(d_threadFunctionProfiles);
 
     // End NVTX range
     // nvtxRangePop();
@@ -281,6 +333,16 @@ int main() {
     } else {
         printf("\nAddress not found\n");
     }
+
+    #ifdef function_profiler
+        // After kernel execution, copy profiling data back to host
+        cudaMemcpy(h_threadFunctionProfiles, d_threadFunctionProfiles, totalThreads * sizeof(ThreadFunctionProfile), cudaMemcpyDeviceToHost);
+        // After kernel execution and copying profiling data back to host
+        write_function_profile_to_csv("function_profile.csv", h_threadFunctionProfiles, totalThreads, threadsPerBlock);
+    #endif
+    // Clean up
+    delete[] h_threadFunctionProfiles;
+    cudaFree(d_threadFunctionProfiles);
 
     // Clean up
     cudaFree(d_mnemonic);

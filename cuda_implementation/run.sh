@@ -11,8 +11,9 @@ echo Start: $(date)
 # cuda-memcheck ./program >> run.log # OK
 # sudo nvvp ./program >> run.log
 # ncu --set full ./program >> run.log
-nsys profile ./program >> run.log # OK
+# nsys profile ./program >> run.log # OK
 # nsys analyze -r gpu_time_util report1.sqlite # OK
+./program >> run.log
 
 # Get the end time
 end_time=$(date +%s.%N)

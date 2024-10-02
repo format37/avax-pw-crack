@@ -15,6 +15,14 @@ cat build.log
 # print count of 'error' in build.log
 echo "Errors: $(grep -c error build.log)"
 
+start_time=$(date +%s.%N)
+echo Start execution: $(date)
+
 rm -rf run.log
 ./program >> run.log
 cat run.log
+
+end_time=$(date +%s.%N)
+echo End: $(date)
+runtime=$(echo "$end_time - $start_time" | bc)
+echo "Shell runtime: $runtime seconds"

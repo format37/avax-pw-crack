@@ -205,14 +205,9 @@ __device__ int point_add(
         bn_print(">> p2.x: ", &p2->x);
         bn_print(">> p2.y: ", &p2->y);
         bn_print(">> p: ", p);
-        // printf(">> p.top: %d\n", p->top);
-        // printf(">> p.neg: %d\n", p->neg);
         bn_print(">> a: ", a);
-        // printf(">> a.top: %d\n", a->top);
-        // printf(">> a.neg: %d\n", a->neg);
     }
     debug = 0;
-    // return 0; // TODO: Remove this line
     // Handle the point at infinity cases
     if (point_is_at_infinity(p1)) {
         copy_point(result, p2);

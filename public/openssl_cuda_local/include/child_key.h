@@ -260,23 +260,15 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
         b.top = 4;  // We're using 4 64-bit words
     #endif
     bn_print("B: ", &b);
-
-	// Initialize newKey_d
-	// for (int i = 0; i < 8; i++) newKey_d[i] = 0;
-    // for (int j = 0; j < 8; ++j) {
-    //     newKey.d[j] = newKey_d[j]; // TODO: Check do we need to reverse the order
-    // }
-	// newKey.neg = 0;
-    // newKey.top = find_top(&newKey);
     
     bn_print("Debug Cuda newKey (Before add): ", &newKey);
 	
     bn_add(&newKey, &a, &b);
 
-    // // Print A + B
+    // Print A + B
     bn_print("Debug Cuda newKey (After add): ", &newKey);
 
-    // // Print curve order
+    // Print curve order
     bn_print("Debug Cuda curveOrder: ", &CURVE_ORDER);
 
     #ifdef debug_print

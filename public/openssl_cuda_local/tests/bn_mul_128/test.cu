@@ -13,23 +13,16 @@
 #endif
 
 __global__ void kernel_test_mul(BN_ULONG_HOST *A, BN_ULONG_HOST *B, int *sign_a, int *sign_b, BN_ULONG_HOST *Result, int *Result_sign) {
+    // // Set the device global variable
+    // d_threadFunctionProfiles = d_threadFunctionProfiles_param;
+
     BIGNUM a, b, result;
     init_zero(&a);
     init_zero(&b);
-    init_zero(&result);
+    // init_zero(&result);
 
     a.neg = sign_a[0];
     b.neg = sign_b[0];
-
-    // printf("\n");
-    // for (int i = 0; i < MAX_BIGNUM_SIZE_HOST; ++i) {
-    //     printf("A[%d]: %llx\n", i, A[i]);
-    // }
-    // printf("\n");
-    // for (int i = 0; i < MAX_BIGNUM_SIZE_HOST; ++i) {
-    //     printf("B[%d]: %llx\n", i, B[i]);
-    // }
-    // printf("\n");
 
     #ifdef BN_128
         for (int i = 0; i < MAX_BIGNUM_SIZE_HOST; i += 2) {
@@ -46,10 +39,11 @@ __global__ void kernel_test_mul(BN_ULONG_HOST *A, BN_ULONG_HOST *B, int *sign_a,
     a.top = find_top(&a);
     b.top = find_top(&b);
 
-    // bn_print("# CUDA a : ", &a);
-    // bn_print("# CUDA b : ", &b);
-
-    bn_mul(&a, &b, &result);
+    // for (int i = 0; i < 1000000; i++) { // loop for delay calculation
+    for (int i = 0; i < 1; i++) { // loop for delay calculation
+        init_zero(&result);
+        bn_mul(&a, &b, &result);
+    }
 
     #ifdef BN_128
         for (int i = 0; i < MAX_BIGNUM_SIZE_HOST; i += 2) {
@@ -63,8 +57,6 @@ __global__ void kernel_test_mul(BN_ULONG_HOST *A, BN_ULONG_HOST *B, int *sign_a,
     #endif
     *Result_sign = result.neg;
     result.top = find_top(&result);
-    // Print results
-    // bn_print("# CUDA result: ", &result);
 }
 
 void print_bn(const char* label, const BIGNUM* bn) {
@@ -139,6 +131,15 @@ int main() {
     BN_CTX *ctx = BN_CTX_new();
     OPENSSL_assert(ctx != NULL);
 
+    // // Function profiling
+    // // int totalThreads = blocksPerGrid * threadsPerBlock;
+    // int totalThreads = 1;
+    // // Allocate per-thread function profiling data
+    // ThreadFunctionProfile *h_threadFunctionProfiles = new ThreadFunctionProfile[totalThreads];
+    // ThreadFunctionProfile *d_threadFunctionProfiles;
+    // cudaMalloc(&d_threadFunctionProfiles, totalThreads * sizeof(ThreadFunctionProfile));
+    // cudaMemset(d_threadFunctionProfiles, 0, totalThreads * sizeof(ThreadFunctionProfile));
+
     for (int i = 0; i < num_tests; i++) {
         printf("\nTest %d:\n", i);
 
@@ -183,18 +184,18 @@ int main() {
         }
 
         if (compare_results(cuda_result, cuda_result_sign, result, MAX_BIGNUM_SIZE_HOST)) {
-            printf("Test PASSED: CUDA and OpenSSL results match.\n");
+            printf("[V] - Test PASSED: CUDA and OpenSSL results match.\n");
         } else {
-            printf("### Test FAILED: CUDA and OpenSSL results DO NOT MATCH. ###\n");
-            // Print a and b
-            print_bn("a", a);
-            print_bn("b", b);
-            printf("\nCUDA result: ");
-            for (int j = MAX_BIGNUM_SIZE_HOST - 1; j >= 0; --j) {
-                printf("%llx", cuda_result[j]);
-            }
-            print_bn("\nOpenSSL result", result);
+            printf("[X] - Test FAILED: CUDA and OpenSSL results DO NOT MATCH. ###\n");    
         }
+        // Print a and b
+        print_bn("a", a);
+        print_bn("b", b);
+        printf("CUDA result: ");
+        for (int j = MAX_BIGNUM_SIZE_HOST - 1; j >= 0; --j) {
+            printf("%llx", cuda_result[j]);
+        }
+        print_bn("\nOpenSSL result", result);
 
         BN_free(a);
         BN_free(b);

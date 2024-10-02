@@ -26,22 +26,34 @@ echo Start profiling: $(date)
 #     --target-processes all \
 #     ./program >> run.log
 
+# /opt/nvidia/nsight-compute/2024.1.1/ncu \
+#     --nvtx \
+#     --verbose \
+#     --export report \
+#     --force-overwrite \
+#     --set full \
+#     --section ComputeWorkloadAnalysis \
+#     --section InstructionStats \
+#     --section LaunchStats \
+#     --section MemoryWorkloadAnalysis \
+#     --section MemoryWorkloadAnalysis_Chart \
+#     --section MemoryWorkloadAnalysis_Tables \
+#     --section SpeedOfLight \
+#     --section WarpStateStats \
+#     --target-processes all \
+#     ./program >> run.log
+# --kernel-regex-base function \
+# --kernel-id ::regex:(.+) \
+
 /opt/nvidia/nsight-compute/2024.1.1/ncu \
-    --nvtx \
     --verbose \
-    --export report \
-    --force-overwrite \
+    --replay-mode kernel \
     --set full \
-    --section ComputeWorkloadAnalysis \
-    --section InstructionStats \
-    --section LaunchStats \
-    --section MemoryWorkloadAnalysis \
-    --section MemoryWorkloadAnalysis_Chart \
-    --section MemoryWorkloadAnalysis_Tables \
-    --section SpeedOfLight \
-    --section WarpStateStats \
     --target-processes all \
+    --export report.ncu-rep \
+    --force-overwrite \
     ./program >> run.log
+
 
 # /opt/nvidia/nsight-compute/2024.1.1/ncu --nvtx --verbose --export report --force-overwrite --target-processes all ./program >> profiler.log
 

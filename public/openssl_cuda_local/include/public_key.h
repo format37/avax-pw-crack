@@ -110,9 +110,9 @@ __device__ void GetPublicKey(uint8_t* buffer, uint8_t* key)
         }
     G.x.top = CURVE_P_VALUES_MAX_SIZE;
     G.y.top = CURVE_P_VALUES_MAX_SIZE;
-    #ifdef debug_bn_copy
-        if (G.x.top != find_top(&G.x)) printf("### ERROR: GetPublicKey: G.x.top (%d) != find_top(&G.x) (%d)\n", G.x.top, find_top(&G.x)); // TODO: Remove this line after debugging
-        if (G.y.top != find_top(&G.y)) printf("### ERROR: GetPublicKey: G.y.top (%d) != find_top(&G.y) (%d)\n", G.y.top, find_top(&G.y)); // TODO: Remove this line after debugging
+    #ifdef debug_top
+        if (G.x.top != find_top(&G.x)) printf("### ERROR: GetPublicKey: G.x.top (%d) != find_top(&G.x) (%d)\n", G.x.top, find_top(&G.x));
+        if (G.y.top != find_top(&G.y)) printf("### ERROR: GetPublicKey: G.y.top (%d) != find_top(&G.y) (%d)\n", G.y.top, find_top(&G.y));
     #endif
 
     // TODO: Check do we need to define extra G. Or we are able to use __constant__ CURVE_GX_values and CURVE_GY_values as new EC_POINT_CUDA instead
