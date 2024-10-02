@@ -15,6 +15,7 @@ Finally, you need either your p-chain address to match against.
 
 #### Cuda usage
 You need to define the input parameters in the cuda/config.json
+Start from small search space (short threashold between start and end passphrase) to determine the performance and increase it gradually.
 ```
 cd cuda
 sh build_and_run.sh
