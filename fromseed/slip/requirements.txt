@@ -1,5 +1,0 @@
-ed25519
-base58
-ecdsa
-pycryptodome
-bip_utils
