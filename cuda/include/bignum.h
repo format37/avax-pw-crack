@@ -576,38 +576,6 @@ __device__ void set_bn(BIGNUM *dest, const BIGNUM *src) {
     dest->neg = src->neg;
 }
 
-__device__ void bn_mul_128_fail(const BIGNUM *a, const BIGNUM *b, BIGNUM *product) {
-    bn_print(">> a: ", a);
-    bn_print(">> b: ", b);
-    init_zero(product);
-    #ifdef BN_128
-        for (int i = 0; i < a->top; ++i) {
-            BN_ULONG carry = 0;
-            for (int j = 0; j < b->top; ++j) {
-                printf("\n[%d:%d] a->d[%d]: %016llx\n",i ,j , i, a->d[i]);
-                printf("[%d:%d] b->d[%d]: %016llx\n",i ,j , j, b->d[j]);
-                printf("[%d:%d] product->d[%d]: %016llx\n",i ,j , i + j, product->d[i + j]);
-                printf("[%d:%d] carry: %016llx\n",i ,j , carry);
-                unsigned __int128 temp = (unsigned __int128)a->d[i] * b->d[j] + product->d[i + j] + carry;
-                product->d[i + j] = temp;
-                carry = temp >> BN_ULONG_NUM_BITS; // Directly shift the 128-bit value
-            }
-            product->d[i + b->top] = carry;
-        }
-        product->top = a->top + b->top;
-
-        // Normalize top
-        while (product->top > 1 && product->d[product->top - 1] == 0) {
-            product->top--;
-        }
-
-    #else
-        // Existing BN_64 code remains unchanged
-    #endif
-    product->neg = a->neg ^ b->neg;
-    bn_print("<< product: ", product);
-}
-
 __device__ void mul64x64(uint64_t a, uint64_t b, uint64_t *hi, uint64_t *lo) {
     uint64_t a_low = (uint32_t)a;
     uint64_t a_high = a >> 32;

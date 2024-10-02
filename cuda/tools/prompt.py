@@ -1,10 +1,10 @@
 import os
 
 # Define the paths
-include_folder = "/home/alex/projects/avax-pw-crack/public/openssl_cuda_local/include/"
-main_cu_path = "/home/alex/projects/avax-pw-crack/cuda_implementation/main.cu"
+include_folder = "../include/"
+main_cu_path = "../main.cu"
 # main_cu_path = "/home/alex/projects/avax-pw-crack/public/openssl_cuda_local/tests/bn_add_128/test.cu"
-output_path = "/home/alex/Documents/prompts/prompt.md"
+output_path = "./prompt.md"
 
 # Initialize the content variable
 content = ""

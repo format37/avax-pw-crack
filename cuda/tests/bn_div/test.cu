@@ -13,7 +13,22 @@
     #define MAX_BIGNUM_SIZE_HOST MAX_BIGNUM_SIZE
 #endif
 
-__global__ void kernel_test_div(BN_ULONG_HOST *A, BN_ULONG_HOST *B, int *sign_a, int *sign_b, BN_ULONG_HOST *Q, int *Q_sign, BN_ULONG_HOST *R, int *R_sign) {
+__global__ void kernel_test_div(
+    BN_ULONG_HOST *A, 
+    BN_ULONG_HOST *B, 
+    int *sign_a, 
+    int *sign_b, 
+    BN_ULONG_HOST *Q, 
+    int *Q_sign, 
+    BN_ULONG_HOST *R, 
+    int *R_sign,
+    ThreadFunctionProfile *d_threadFunctionProfiles_param
+    ) {
+    #ifdef function_profiler
+        unsigned long long start_time = clock64();
+        // Set the device global variable
+        d_threadFunctionProfiles = d_threadFunctionProfiles_param;
+    #endif
     // Initialize values for each test
     BIGNUM a, b, quotient, remainder;
     init_zero(&a);
@@ -64,6 +79,9 @@ __global__ void kernel_test_div(BN_ULONG_HOST *A, BN_ULONG_HOST *B, int *sign_a,
     #endif
     *Q_sign = quotient.neg;
     *R_sign = remainder.neg;
+    #ifdef function_profiler
+        record_function(FN_MAIN, start_time);
+    #endif
 }
 
 void print_bn(const char* label, const BIGNUM* bn) {
@@ -139,6 +157,16 @@ int main() {
     cudaMalloc((void**)&d_Q_sign, sizeof(int));
     cudaMalloc((void**)&d_R_sign, sizeof(int));
 
+    // Function profiling
+    int threadsPerBlock = 1;
+    int blocksPerGrid = 1;
+    int totalThreads = blocksPerGrid * threadsPerBlock;
+    // Allocate per-thread function profiling data
+    ThreadFunctionProfile *h_threadFunctionProfiles = new ThreadFunctionProfile[totalThreads];
+    ThreadFunctionProfile *d_threadFunctionProfiles;
+    cudaMalloc(&d_threadFunctionProfiles, totalThreads * sizeof(ThreadFunctionProfile));
+    cudaMemset(d_threadFunctionProfiles, 0, totalThreads * sizeof(ThreadFunctionProfile));
+
     BN_CTX *ctx = BN_CTX_new();
     OPENSSL_assert(ctx != NULL);
 
@@ -152,7 +180,7 @@ int main() {
         cudaMemcpy(d_sign_b, &sign_b[i], sizeof(int), cudaMemcpyHostToDevice);
 
         // Run kernel
-        kernel_test_div<<<1, 1>>>(d_A, d_B, d_sign_a, d_sign_b, d_Q, d_Q_sign, d_R, d_R_sign);
+        kernel_test_div<<<1, 1>>>(d_A, d_B, d_sign_a, d_sign_b, d_Q, d_Q_sign, d_R, d_R_sign, d_threadFunctionProfiles);
 
         // Check for errors
         cudaError_t err = cudaGetLastError();
@@ -171,6 +199,13 @@ int main() {
         cudaMemcpy(cuda_R, d_R, MAX_BIGNUM_SIZE_HOST * sizeof(BN_ULONG_HOST), cudaMemcpyDeviceToHost);
         cudaMemcpy(&cuda_Q_sign, d_Q_sign, sizeof(int), cudaMemcpyDeviceToHost);
         cudaMemcpy(&cuda_R_sign, d_R_sign, sizeof(int), cudaMemcpyDeviceToHost);
+
+        #ifdef function_profiler
+            // After kernel execution, copy profiling data back to host
+            cudaMemcpy(h_threadFunctionProfiles, d_threadFunctionProfiles, totalThreads * sizeof(ThreadFunctionProfile), cudaMemcpyDeviceToHost);
+            // After kernel execution and copying profiling data back to host
+            write_function_profile_to_csv("function_profile.csv", h_threadFunctionProfiles, totalThreads, threadsPerBlock);
+        #endif
 
         // OpenSSL computation
         BIGNUM *a = BN_new();
@@ -227,6 +262,9 @@ int main() {
     cudaFree(d_sign_b);
     cudaFree(d_Q_sign);
     cudaFree(d_R_sign);
+    // Clean up
+    delete[] h_threadFunctionProfiles;
+    cudaFree(d_threadFunctionProfiles);
     BN_CTX_free(ctx);
 
     return 0;

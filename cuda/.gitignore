@@ -4,3 +4,5 @@ result.txt
 tests/bn_div/build.log
 tests/bn_div/program
 tests/bn_div/run.log
+tests/bn_div/function_profile.csv
+tools/prompt.md
