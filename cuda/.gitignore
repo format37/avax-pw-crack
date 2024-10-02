@@ -1,3 +1,6 @@
 program
 function_profile.csv
 result.txt
+tests/bn_div/build.log
+tests/bn_div/program
+tests/bn_div/run.log
