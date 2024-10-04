@@ -22,6 +22,7 @@ nvcc \
     -arch=sm_86 \
     -use_fast_math \
     -I ./include \
+    -I ../json \
     -o program 2> build.log
 
 cat build.log

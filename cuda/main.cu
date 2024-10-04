@@ -186,7 +186,7 @@ int main() {
     char h_passphrase_value[MAX_PASSPHRASE_LENGTH];
 
     // Read expected value from JSON file
-    std::ifstream config_file("config.json");
+    std::ifstream config_file("../config.json");
     if (!config_file.is_open()) {
         std::cerr << "Failed to open config.json" << std::endl;
         return -1;
@@ -299,7 +299,7 @@ int main() {
         // After kernel execution, copy profiling data back to host
         cudaMemcpy(h_threadFunctionProfiles, d_threadFunctionProfiles, totalThreads * sizeof(ThreadFunctionProfile), cudaMemcpyDeviceToHost);
         // After kernel execution and copying profiling data back to host
-        write_function_profile_to_csv("function_profile.csv", h_threadFunctionProfiles, totalThreads, threadsPerBlock);
+        write_function_profile_to_csv("performance/functions_data/profile.csv", h_threadFunctionProfiles, totalThreads, threadsPerBlock);
     #endif
     // Clean up
     delete[] h_threadFunctionProfiles;

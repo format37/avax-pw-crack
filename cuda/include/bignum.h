@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include "function_profiling.h"
 
-#define BN_128
+// #define BN_128
 // #define debug_print
 // #define debug_bn_copy
 // #define debug_top
@@ -805,22 +805,27 @@ __device__ void bn_mul_from_div(const BIGNUM *a, const BIGNUM *b, BIGNUM *produc
         bn_print(">> a: ", a);
         bn_print(">> b: ", b);
     #endif
+    // bn_print_no_fuse(">> a: ", a);
+    // bn_print_no_fuse(">> b: ", b);
     init_zero(product);
     #ifdef BN_128
         // Not efficient for my case
-        // if (a->top == 1 and b->top == 1) {
-        //     int a_bit_len = bn_bit_length(a);
-        //     int b_bit_len = bn_bit_length(b);
-        //     int product_bit_len = a_bit_len + b_bit_len;
-        //     if (product_bit_len <= BN_ULONG_NUM_BITS) {
-        //         // The product can fit in a single word
-        //         product->d[0] = a->d[0] * b->d[0];
-        //         product->top = 1;
-        //         product->neg = a->neg ^ b->neg;
-        //         record_function(FN_BN_MUL, start_time);
-        //         return;
-        //     }
-        // }
+        if (a->top == 1 && b->top == 1) {
+            // printf("a->top & b->top are 1\n");
+            int a_bit_len = bn_bit_length(a);
+            int b_bit_len = bn_bit_length(b);
+            int product_bit_len = a_bit_len + b_bit_len;
+            if (product_bit_len <= BN_ULONG_NUM_BITS) {
+                // The product can fit in a single word
+                product->d[0] = (BN_ULONG)a->d[0] * b->d[0];
+                product->top = 1;
+                if (!absolute) product->neg = a->neg ^ b->neg;
+                // printf("[%d x %d] ", a_bit_len, b_bit_len);
+                // bn_print_no_fuse("<< product: ", product);
+                record_function(FN_BN_MUL_FROM_DIV, start_time);
+                return;
+            }
+        }
         // Multiply the numbers treating them as arrays of 64-bit words
         const unsigned char a_words = a->top * 2; // Since each BN_ULONG is 128 bits (2 * 64 bits)
         const unsigned char b_words = b->top * 2;
@@ -908,6 +913,7 @@ __device__ void bn_mul_from_div(const BIGNUM *a, const BIGNUM *b, BIGNUM *produc
     #ifdef function_profiler
         record_function(FN_BN_MUL_FROM_DIV, start_time);
     #endif
+    // bn_print_no_fuse("<< product: ", product);
 }
 
 __device__ int bn_mod(BIGNUM *r, const BIGNUM *a, const BIGNUM *n) {
@@ -1089,17 +1095,10 @@ __device__ int bn_div(BIGNUM *bn_quotient, BIGNUM *bn_remainder, const BIGNUM *b
         // bn_print(">> bn_dividend: ", bn_dividend);
         // bn_print(">> bn_divisor: ", bn_divisor);
     #endif
-    // printf("++ bn_div ++\n");
-    // bn_print_no_fuse(">> bn_dividend: ", bn_dividend);
-    // bn_print_no_fuse(">> bn_divisor: ", bn_divisor);
-
-    
-
     unsigned char divs_max_top = max(bn_dividend->top, bn_divisor->top);
     
     // perform classical div_mod if only single word
     if (divs_max_top == 1) {
-        // printf("divs_max_top == 1\n");
         BN_ULONG dividend = bn_dividend->d[0];
         BN_ULONG divisor = bn_divisor->d[0];
         BN_ULONG quotient = dividend / divisor;
@@ -1115,33 +1114,20 @@ __device__ int bn_div(BIGNUM *bn_quotient, BIGNUM *bn_remainder, const BIGNUM *b
         #endif
         return 1;
     }
-
-    // Store signs and work with absolute values
     BIGNUM abs_dividend;
     init_zero(&abs_dividend);
-
     // Copy absolute values
-    for (int i = 0; i < divs_max_top; i++) {
+    for (int i = 0; i < bn_dividend->top; i++) {
         abs_dividend.d[i] = bn_dividend->d[i];
     }
+    abs_dividend.top = bn_dividend->top;   
+
+    // Store signs and work with absolute values
     abs_dividend.neg = 0;
-    abs_dividend.top = bn_dividend->top;
 
     // Initialize quotient and remainder
     init_zero(bn_quotient);
     init_zero(bn_remainder);
-
-    // Handle special cases: Disabled for performance reasons
-    // if (bn_cmp(&abs_dividend, &abs_divisor) == 0) {
-    //     bn_quotient->d[0] = 1;
-    //     bn_quotient->top = 1;
-    //     bn_quotient->neg = (dividend_neg != divisor_neg);
-    //     // printf("abs_dividend == abs_divisor. Quotient = 1\n");
-    //     #ifdef function_profiler
-    //         record_function(FN_BN_DIV, start_time);
-    //     #endif
-    //     return 1;
-    // }
     // Perform long division
     BIGNUM current_dividend;
     init_zero(&current_dividend);
@@ -1150,17 +1136,12 @@ __device__ int bn_div(BIGNUM *bn_quotient, BIGNUM *bn_remainder, const BIGNUM *b
     for (int i = dividend_size - 1; i >= 0; i--) {
         // Shift current_dividend left by one word and add next word of dividend
         left_shift(&current_dividend, BN_ULONG_NUM_BITS);
-        // if (bn_cmp(&abs_dividend, bn_dividend) != 0) {
-        //     printf("[%d] dividend divergence:\n", i);
-        //     bn_print_no_fuse("abs_dividend: ", &abs_dividend);
-        //     bn_print_no_fuse("bn_dividend: ", bn_dividend);
-        // }
         current_dividend.d[0] = abs_dividend.d[i];
-        // current_dividend.d[0] = bn_dividend->d[i];
-
         // Find quotient digit
         BN_ULONG q = 0;
         BN_ULONG left = 0, right = BN_ULONG_MAX;
+        BN_ULONG prev_mid = 0;
+        unsigned int j = 0;
         while (left <= right) {
             BN_ULONG mid = left + (right - left) / 2;
             BIGNUM temp, product;
@@ -1168,8 +1149,6 @@ __device__ int bn_div(BIGNUM *bn_quotient, BIGNUM *bn_remainder, const BIGNUM *b
             init_zero(&product);
             temp.d[0] = mid;
             temp.top = 1;
-
-            // bn_mul(&abs_divisor, &temp, &product);
             bn_mul_from_div(bn_divisor, &temp, &product, true);
 
             if (bn_cmp(&product, &current_dividend) <= 0) {
@@ -1177,9 +1156,7 @@ __device__ int bn_div(BIGNUM *bn_quotient, BIGNUM *bn_remainder, const BIGNUM *b
                 left = mid + 1;
             } else {
                 right = mid - 1;
-            }
-            // printf("[%d] ", i);
-            // bn_print_no_fuse("bn_dividend: ", bn_dividend);
+            }            
         }
 
         // Add quotient digit to result
@@ -1193,10 +1170,7 @@ __device__ int bn_div(BIGNUM *bn_quotient, BIGNUM *bn_remainder, const BIGNUM *b
         temp.d[0] = q;
         temp.top = 1;
 
-        // bn_mul(&abs_divisor, &temp, &product);
         bn_mul_from_div(bn_divisor, &temp, &product, true);
-
-        // bn_sub(&current_dividend, &current_dividend, &product);
         bn_sub_from_div(&current_dividend, &current_dividend, &product);
     }
 

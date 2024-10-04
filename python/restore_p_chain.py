@@ -11,6 +11,8 @@ def print_child_key_info(child_key, index):
     print('\n')
 
 def restore_p_chain_address(mnemonic, passphrase):
+    print(">> Mnemonic:", mnemonic)
+    print(">> Passphrase: ", passphrase)
     # Generate seed from mnemonic and passphrase
     seed_bytes = Bip39SeedGenerator(mnemonic).Generate(passphrase)
     # Print as hex
@@ -100,12 +102,12 @@ mnemonic = "sell stereo useless course suffer tribe jazz monster fresh excess wi
 # passphrase = "TESTPHRASA"
 # passphrase = "A"
 # passphrase = "passphrase"
-# passphrase = "a"
+passphrase = "a"
 # passphrase = "gkwe" # P-avax1xsxy8fkz6hj7fja29jfamwz4u4hqqjhfds7nxk
 # 2147482623 is: fxshqkm
 # passphrase = "ggvyn" # 3337400
 # passphrase = "gkwe" # 131071
-passphrase = "nwtn" # 262146 # P-avax12vnjy0t5aczr7ar7uj4x8jfs9k3xwcfm9v5xc8
+# passphrase = "nwtn" # 262146 # P-avax12vnjy0t5aczr7ar7uj4x8jfs9k3xwcfm9v5xc8
 # passphrase = "fan" # 1
 
 p_chain_address = restore_p_chain_address(mnemonic, passphrase)

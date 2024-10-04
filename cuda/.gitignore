@@ -6,3 +6,4 @@ tests/bn_div/program
 tests/bn_div/run.log
 tests/bn_div/function_profile.csv
 tools/prompt.md
+performance/functions_data/

@@ -1,8 +1,0 @@
-BlockIdx,ThreadIdx,FunctionName,Calls,TotalTime(cycles)
-0,0,bn_mul,357502,666376743
-0,0,bn_mul_from_div,37079373,46155465056
-0,0,bn_add,1582,3703530
-0,0,bn_sub,357160,579080544
-0,0,bn_sub_from_div,287437,191537365
-0,0,bn_div,182854,59629916681
-0,0,main,1,61565692294
