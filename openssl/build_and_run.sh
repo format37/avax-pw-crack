@@ -22,7 +22,7 @@ cat build.log
 rm -rf run.log
 
 start_time=$(date +%s.%N)
-
+echo Start execution: $(date)
 # valgrind \
 #     --tool=callgrind \
     ./program \
@@ -30,7 +30,13 @@ start_time=$(date +%s.%N)
     "a" \
     >> run.log
 
-# "mnemonica" \
+# Enable core dumps
+ulimit -c unlimited
+# Run the program
+# strace -f  ./program >> run.log 2>&1
+# gdb -ex run --args ./program
+# valgrind --leak-check=full -s ./program >> run.log
+# ./program >> run.log 2>&1
 
 end_time=$(date +%s.%N)
 runtime=$(echo "$end_time - $start_time" | bc)

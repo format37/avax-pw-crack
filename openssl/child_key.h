@@ -128,7 +128,6 @@ void compute_pbkdf2(
     #endif
 	my_cuda_memcpy_unsigned_char(derived_key, dk, dklen);
 	
-	// free(dk);
     delete[] dk;
     #ifdef debug_print
         printf("-- PBKDF2 --\n");
@@ -214,7 +213,9 @@ unsigned char *GetPublicKey(unsigned char *privateKeyBytes, size_t privateKeyLen
     EC_KEY_set_public_key(eckey, pub_key);
 
     *publicKeyLen = EC_POINT_point2oct(EC_KEY_get0_group(eckey), EC_KEY_get0_public_key(eckey), POINT_CONVERSION_COMPRESSED, NULL, 0, NULL);
-    publicKeyBytes = (unsigned char *) malloc((size_t) *publicKeyLen);
+    
+    // Replace by new[]
+    publicKeyBytes = new unsigned char[(size_t) *publicKeyLen];
 
     if (publicKeyBytes == NULL) {
         return NULL;
@@ -231,7 +232,10 @@ unsigned char *GetPublicKey(unsigned char *privateKeyBytes, size_t privateKeyLen
 
 BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uint32_t index) {
 	static int chain_counter = 0;
-    static char path[100] = ""; // Assuming path length won't exceed 100
+    // static char path[100] = ""; // Assuming path length won't exceed 100
+    static std::string path = ""; // Use std::string
+
+
     #ifdef debug_print
         printf("\n* step %d index: %u\n", chain_counter, index);
         // Print the full derivation path
@@ -434,8 +438,10 @@ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uint32_t index
         // Add the current index to the path
         char index_str[12];  // Assuming index won't exceed 10 digits
         sprintf(index_str, "%u", index);
-        strcat(path, "/");
-        strcat(path, index_str);
+        // strcat(path, "/");
+        // strcat(path, index_str);
+        path += "/"; // Use += for string concatenation
+        path += index_str;
 
         #ifdef debug_print
             // Print the full derivation path
@@ -473,7 +479,7 @@ T* safe_realloc(T* ptr, size_t new_size) {
     T* new_ptr = static_cast<T*>(realloc(ptr, new_size * sizeof(T)));
     if (!new_ptr && new_size != 0) {
         // Handle reallocation failure
-        free(ptr);  // Free the original memory
+        delete[] ptr;
         throw std::bad_alloc();  // or handle the error in another way
     }
     return new_ptr;
@@ -483,9 +489,8 @@ void ConvertBytesTo5BitGroups(uint8_t *data, size_t len, int **result, size_t *r
     int buffer = 0;
     int bufferLength = 0;
     *result_len = 0;
-    // *result = malloc(0);
-    *result = new int[0];
-
+    // Don't initialize *result here; it's handled by safe_realloc
+    
     for(size_t i = 0; i < len; i++) {
         uint8_t b = data[i];
         buffer = (buffer << 8) | b;
@@ -501,10 +506,8 @@ void ConvertBytesTo5BitGroups(uint8_t *data, size_t len, int **result, size_t *r
             bufferLength -= 5;
         }
     }
-
     if(bufferLength > 0) {
         *result_len += 1;
-        // *result = realloc(*result, *result_len * sizeof(int));
         *result = safe_realloc(*result, *result_len);
         (*result)[*result_len - 1] = (buffer << (5 - bufferLength)) & 31;
     }
@@ -539,7 +542,6 @@ uint32_t PolyMod(int *values, size_t len) {
 
 void CreateChecksum(const char *hrp, int *data, size_t data_len, int *checksum) {
     size_t hrp_len = strlen(hrp);
-    // int *values = malloc((hrp_len * 2 + 1 + data_len + CHECKSUM_LENGTH) * sizeof(int));
     int *values = new int[hrp_len * 2 + 1 + data_len + CHECKSUM_LENGTH];
     ExpandHrp(hrp, values);
     memcpy(values + hrp_len * 2 + 1, data, data_len * sizeof(int));
@@ -558,20 +560,20 @@ void CreateChecksum(const char *hrp, int *data, size_t data_len, int *checksum) 
         checksum[i] = (polyMod >> 5 * (5 - i)) & 31;
     }
 
-    // free(values);
     delete[] values;
 }
 
 char* Encode(const char *hrp, uint8_t *data, size_t data_len) {
-    int *values, *checksum;
+    int *values = nullptr; // Initialize to nullptr
     size_t values_len;
-    ConvertBytesTo5BitGroups(data, data_len, &values, &values_len);
-    // checksum = malloc(CHECKSUM_LENGTH * sizeof(int));
-    checksum = new int[CHECKSUM_LENGTH];
+    ConvertBytesTo5BitGroups(data, data_len, &values, &values_len); // values is now allocated
+
+    int *checksum = new int[CHECKSUM_LENGTH];
+
+    // checksum = new int[CHECKSUM_LENGTH];
     CreateChecksum(hrp, values, values_len, checksum);
 
     size_t hrp_len = strlen(hrp);
-    // char *result = malloc(hrp_len + 1 + values_len + CHECKSUM_LENGTH + 1);
     char *result = new char[hrp_len + 1 + values_len + CHECKSUM_LENGTH + 1];
     strcpy(result, hrp);
     strcat(result, "1");
@@ -584,7 +586,7 @@ char* Encode(const char *hrp, uint8_t *data, size_t data_len) {
     }
     result[hrp_len + 1 + values_len + CHECKSUM_LENGTH] = '\0';
 
-    free(values);
+    delete[] values;
     delete[] checksum;
 
     return result;
@@ -660,7 +662,7 @@ char* childToAvaxpAddress(const char *publicKeyHex) {
     char *finalAddress = new char[strlen(b32Encoded) + 3];
     sprintf(finalAddress, "P-%s", b32Encoded);
 
-    free(b32Encoded);
+    delete[] b32Encoded;
     return finalAddress;
 }
 // -- ChildToAvaxpAddress --

@@ -33,6 +33,7 @@ result = find_letter_variant(variant_number)
 print(f"The letter variant corresponding to {variant_number} is: {result}")
 
 # passphrase = 'passphrase'
-passphrase = 'cv'
+# passphrase = 'book'
+passphrase = 'czz'
 variant_id = find_variant_id(passphrase)
 print(f"The variant ID corresponding to '{passphrase}' is: {variant_id}")

@@ -20,6 +20,8 @@ nvcc \
     --threads 8 \
     main.cu \
     -arch=sm_86 \
+    -O3 \
+    -maxrregcount 64 \
     -use_fast_math \
     -I ./include \
     -I ../json \
