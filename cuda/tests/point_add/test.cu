@@ -72,19 +72,6 @@ __device__ unsigned long long d_strtoull(const char *str, char **endptr, int bas
 }
 
 // Function to initialize a BIGNUM from a hex string
-__device__ void initBignumFromHex_err(BIGNUM *bn, const char *hex) {
-    init_zero(bn);
-    int len = d_strlen(hex);
-    for (int i = 0; i < len; i += 16) {
-        char chunk[17] = {0};
-        int chunk_len = (len - i < 16) ? (len - i) : 16;
-        d_strncpy(chunk, hex + len - i - chunk_len, chunk_len);
-        BN_ULONG word = d_strtoull(chunk, NULL, 16);
-        bn->d[bn->top++] = word;
-    }
-    bn->top = find_top(bn);
-}
-
 __device__ void initBignumFromHex(BIGNUM *bn, const char *hex) {
     init_zero(bn);
     int len = d_strlen(hex);
@@ -102,9 +89,14 @@ __device__ void initBignumFromHex(BIGNUM *bn, const char *hex) {
 }
 
 // CUDA kernel to perform the tests
-__global__ void testEllipticCurve(TestCase *cases, int numCases) {
+__global__ void testEllipticCurve(TestCase *cases, int numCases, ThreadFunctionProfile *d_threadFunctionProfiles_param) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= numCases) return;
+
+    #ifdef function_profiler
+        unsigned long long start_time = clock64();
+        d_threadFunctionProfiles = d_threadFunctionProfiles_param;
+    #endif
 
     TestCase *tc = &cases[idx];
     EC_POINT_CUDA P, Q, resultAdd, resultDouble;
@@ -148,6 +140,9 @@ __global__ void testEllipticCurve(TestCase *cases, int numCases) {
     printf("Test case %d: Addition %s, Doubling %s\n", idx,
            additionCorrect ? "PASS" : "FAIL",
            doublingCorrect ? "PASS" : "FAIL");
+    #ifdef function_profiler
+        record_function(FN_MAIN, start_time);
+    #endif
 }
 
 // Host function to read test cases from file
@@ -196,17 +191,36 @@ int main() {
     // int threadsPerBlock = 256;
     int threadsPerBlock = 1;
     int blocksPerGrid = (numCases + threadsPerBlock - 1) / threadsPerBlock;
+
+    // Function profiling
+    int totalThreads = blocksPerGrid * threadsPerBlock;
+    // Allocate per-thread function profiling data
+    ThreadFunctionProfile *h_threadFunctionProfiles = new ThreadFunctionProfile[totalThreads];
+    ThreadFunctionProfile *d_threadFunctionProfiles;
+    cudaMalloc(&d_threadFunctionProfiles, totalThreads * sizeof(ThreadFunctionProfile));
+    cudaMemset(d_threadFunctionProfiles, 0, totalThreads * sizeof(ThreadFunctionProfile));
+
     printf("Launching kernel with %d blocks of %d threads\n", blocksPerGrid, threadsPerBlock);
-    testEllipticCurve<<<blocksPerGrid, threadsPerBlock>>>(d_cases, numCases);
+    testEllipticCurve<<<blocksPerGrid, threadsPerBlock>>>(d_cases, numCases, d_threadFunctionProfiles);
 
     // Wait for GPU to finish
     cudaDeviceSynchronize();
 
     printf("Done\n");
 
+    #ifdef function_profiler
+        // After kernel execution, copy profiling data back to host
+        cudaMemcpy(h_threadFunctionProfiles, d_threadFunctionProfiles, totalThreads * sizeof(ThreadFunctionProfile), cudaMemcpyDeviceToHost);
+        // After kernel execution and copying profiling data back to host
+        write_function_profile_to_csv("../../performance/functions_data/profile.csv", h_threadFunctionProfiles, totalThreads, threadsPerBlock);
+    #endif
+    // Clean up
+    delete[] h_threadFunctionProfiles;
+    cudaFree(d_threadFunctionProfiles);
+
     // Free device memory
     cudaFree(d_cases);
-    
+
     // Free host memory
     free(h_cases);
 
