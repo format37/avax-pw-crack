@@ -3,8 +3,7 @@ struct EC_POINT_CUDA {
   BIGNUM y;
 };
 
-// __device__ bool bn_mod_inverse(BIGNUM *result, const BIGNUM *a, const BIGNUM *n) {
-__device__ bool bn_mod_inverse(BIGNUM *result, BIGNUM *a, const BIGNUM *n) {
+__device__ bool bn_mod_inverse(BIGNUM *result, const BIGNUM *a, const BIGNUM *n) {
     #ifdef debug_print
         printf("++ bn_mod_inverse ++\n");
         bn_print(">> a: ", a);
@@ -199,7 +198,7 @@ __device__ int point_add(
 ) {
     bool debug = 0;
     if (debug) {
-        printf("++ point_add ++\n");    
+        printf("++ point_add ++\n");
         bn_print(">> p1.x: ", &p1->x);
         bn_print(">> p1.y: ", &p1->y);
         bn_print(">> p2.x: ", &p2->x);
@@ -207,6 +206,12 @@ __device__ int point_add(
         bn_print(">> p: ", p);
         bn_print(">> a: ", a);
     }
+    // bn_print_no_fuse(">> p1.x: ", &p1->x);
+    // bn_print_no_fuse(">> p1.y: ", &p1->y);
+    // bn_print_no_fuse(">> p2.x: ", &p2->x);
+    // bn_print_no_fuse(">> p2.y: ", &p2->y);
+    // bn_print_no_fuse(">> p: ", p);
+    // bn_print_no_fuse(">> a: ", a);
     debug = 0;
     // Handle the point at infinity cases
     if (point_is_at_infinity(p1)) {

@@ -1,7 +1,7 @@
 clear
 rm -f program
 g++ \
-    main.c \
+    test.c \
     -g \
     -Wno-deprecated-declarations \
     -std=c++11 \

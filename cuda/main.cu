@@ -157,12 +157,12 @@ __global__ void variant_kernel(ThreadFunctionProfile *d_threadFunctionProfiles_p
 }
 
 int main() {
-    // int threadsPerBlock = 256;
-    int threadsPerBlock = 1024;
+    // int threadsPerBlock = 1024;
     // int blocksPerGrid = 4;
     // int blocksPerGrid = 80;
-    int blocksPerGrid = 45;
-    // int threadsPerBlock = 1;
+    // int blocksPerGrid = 45;
+    int blocksPerGrid = 1;
+    int threadsPerBlock = 1;
 
     // Get the current stack size limit
     size_t currentLimit;

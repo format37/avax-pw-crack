@@ -1140,7 +1140,7 @@ __device__ int bn_div(BIGNUM *bn_quotient, BIGNUM *bn_remainder, const BIGNUM *b
         // Find quotient digit
         BN_ULONG q = 0;
         BN_ULONG left = 0, right = BN_ULONG_MAX;
-        BN_ULONG prev_mid = 0;
+        // BN_ULONG prev_mid = 0;
         unsigned int j = 0;
         while (left <= right) {
             BN_ULONG mid = left + (right - left) / 2;
