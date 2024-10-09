@@ -213,6 +213,95 @@ cleanup:
     BN_free(tmp); BN_free(p);
 }
 
+// Perform point doubling in Jacobian coordinates
+void jacobian_point_double(
+    const EC_GROUP *group,
+    EC_POINT_JACOBIAN *result,
+    const EC_POINT_JACOBIAN *P,
+    BN_CTX *ctx
+) {
+    BIGNUM *p = BN_new();
+    EC_GROUP_get_curve_GFp(group, p, NULL, NULL, ctx);
+
+    // Check if P is the point at infinity
+    if (BN_is_zero(P->Z)) {
+        // Result is point at infinity
+        BN_zero(result->X);
+        BN_zero(result->Y);
+        BN_zero(result->Z);
+        BN_free(p);
+        return;
+    }
+
+    // Initialize temporary variables
+    BIGNUM *S = BN_new();
+    BIGNUM *M = BN_new();
+    BIGNUM *tmp = BN_new();
+    BIGNUM *Y1_squared = BN_new();
+    BIGNUM *Y1_fourth = BN_new();
+    BIGNUM *X1_squared = BN_new();
+    BIGNUM *X3 = BN_new();
+    BIGNUM *Y3 = BN_new();
+    BIGNUM *Z3 = BN_new();
+
+    // Compute Y1_squared = Y1^2 mod p
+    BN_mod_sqr(Y1_squared, P->Y, p, ctx);  // Y1^2
+
+    // Compute S = 4 * X1 * Y1_squared mod p
+    BN_mod_mul(S, P->X, Y1_squared, p, ctx);       // S = X1 * Y1^2 mod p
+    BN_mod_lshift(S, S, 2, p, ctx);                // S = 4 * X1 * Y1^2 mod p
+
+    // Compute M = 3 * X1_squared mod p
+    BN_mod_sqr(X1_squared, P->X, p, ctx);          // X1^2 mod p
+    // Compute M = (3 * X1_squared) mod p
+    // Option 1: Use a BIGNUM representing 3
+    BIGNUM *three = BN_new();
+    BN_set_word(three, 3);
+    BN_mod_mul(M, X1_squared, three, p, ctx);      // M = 3 * X1_squared mod p
+    BN_free(three);
+
+    // Compute X3 = M^2 - 2 * S mod p
+    BN_mod_sqr(X3, M, p, ctx);                     // M^2 mod p
+    BN_mod_sub(tmp, X3, S, p, ctx);                // M^2 - S mod p
+    BN_mod_sub(X3, tmp, S, p, ctx);                // X3 = M^2 - 2 * S mod p
+
+    // Compute Y3 = M * (S - X3) - 8 * Y1^4 mod p
+    BN_mod_sub(tmp, S, X3, p, ctx);                // S - X3 mod p
+    BN_mod_mul(tmp, M, tmp, p, ctx);               // M * (S - X3) mod p
+
+    BN_mod_sqr(Y1_fourth, Y1_squared, p, ctx);     // Y1^4 mod p
+    BN_mod_lshift(Y1_fourth, Y1_fourth, 3, p, ctx);// 8 * Y1^4 mod p
+
+    BN_mod_sub(Y3, tmp, Y1_fourth, p, ctx);        // Y3 = M*(S - X3) - 8*Y1^4 mod p
+
+    // Compute Z3 = 2 * Y1 * Z1 mod p
+    BN_mod_mul(Z3, P->Y, P->Z, p, ctx);            // Y1 * Z1 mod p
+    BN_mod_lshift1(Z3, Z3, p, ctx);                // Z3 = 2 * Y1 * Z1 mod p
+
+    // Copy the results to result
+    BN_copy(result->X, X3);
+    BN_copy(result->Y, Y3);
+    BN_copy(result->Z, Z3);
+
+    // Print results (optional)
+    printf("point_double << X: %s\n", BN_bn2hex(result->X));
+    printf("point_double << Y: %s\n", BN_bn2hex(result->Y));
+    printf("point_double << Z: %s\n", BN_bn2hex(result->Z));
+
+    // Free temporary variables
+    BN_free(S);
+    BN_free(M);
+    BN_free(tmp);
+    BN_free(Y1_squared);
+    BN_free(Y1_fourth);
+    BN_free(X1_squared);
+    BN_free(X3);
+    BN_free(Y3);
+    BN_free(Z3);
+    BN_free(p);
+}
+
+
 // Function to compare two EC_POINTs
 int compare_points(EC_GROUP *group, const EC_POINT *a, const EC_POINT *b, BN_CTX *ctx) {
     BIGNUM *ax = BN_new();
@@ -293,6 +382,8 @@ int main() {
         #ifdef use_openssl
             // Point addition
             EC_POINT_add(group, resultAdd, P, Q, ctx);
+            // Perform point doubling using built-in function for comparison
+            EC_POINT_dbl(group, resultDouble, P, ctx);
         #else
             // Perform point addition using Jacobian coordinates
             EC_POINT_JACOBIAN P_jacobian, Q_jacobian, result_jacobian;
@@ -306,13 +397,18 @@ int main() {
             jacobian_point_add(group, &result_jacobian, &P_jacobian, &Q_jacobian, ctx);
             // Convert the result back to affine coordinates
             jacobian_to_affine(group, &result_jacobian, resultAdd, ctx);
-        #endif
 
-        #ifdef use_openssl
-            // Perform point doubling using built-in function for comparison
-            EC_POINT_dbl(group, resultDouble, P, ctx);
-        #else
-            // TODO: Implement own jacobian_point_dbl function
+            // Perform point doubling using Jacobian coordinates
+            // EC_POINT_JACOBIAN P_jacobian, result_jacobian;
+            EC_POINT_Jacobian_new(&P_jacobian);
+            EC_POINT_Jacobian_new(&result_jacobian);
+            // Convert affine point to Jacobian coordinates
+            affine_to_jacobian(group, P, &P_jacobian, ctx);
+            // Perform Jacobian point doubling
+            jacobian_point_double(group, &result_jacobian, &P_jacobian, ctx);
+            // Convert the result back to affine coordinates
+            jacobian_to_affine(group, &result_jacobian, resultDouble, ctx);
+            
         #endif
 
         // Print compared values
