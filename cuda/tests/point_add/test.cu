@@ -100,6 +100,10 @@ __global__ void testEllipticCurve(TestCase *cases, int numCases, ThreadFunctionP
 
     TestCase *tc = &cases[idx];
     EC_POINT_CUDA P, Q, resultAdd, resultDouble;
+    init_point_at_infinity(&P);
+    init_point_at_infinity(&Q);
+    init_point_at_infinity(&resultAdd);
+    init_point_at_infinity(&resultDouble);
 
     // Initialize points P and Q
     initBignumFromHex(&P.x, tc->Px);
