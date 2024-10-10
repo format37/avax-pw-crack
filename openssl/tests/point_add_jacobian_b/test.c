@@ -5,7 +5,7 @@
 #include <openssl/bn.h>
 #include <openssl/obj_mac.h>
 
-// #define use_openssl
+#define use_jacobian_coordinates
 
 #define MAX_LINE_LENGTH 1024
 #define MAX_TEST_CASES 1000
@@ -88,6 +88,14 @@ void jacobian_to_affine(const EC_GROUP *group, const EC_POINT_JACOBIAN *P, EC_PO
     BN_mod_mul(y, P->Y, Z_inv3, p, ctx);
 
     EC_POINT_set_affine_coordinates_GFp(group, R, x, y, ctx);
+
+    // Print affine coordinates
+    char *x_hex = BN_bn2hex(x);
+    char *y_hex = BN_bn2hex(y);
+    printf("jacobian_to_affine << x: %s\n", x_hex);
+    printf("jacobian_to_affine << y: %s\n", y_hex);
+    OPENSSL_free(x_hex);
+    OPENSSL_free(y_hex);
 
     BN_free(Z_inv);
     BN_free(Z_inv2);
@@ -364,6 +372,7 @@ int main() {
     BN_CTX *ctx = BN_CTX_new();
 
     for (int i = 0; i < numCases; i++) {
+        printf("\n[OpenSSL] Test case %d:\n", i);
         TestCase *tc = &cases[i];
 
         EC_POINT *P = EC_POINT_new(group);
@@ -379,12 +388,7 @@ int main() {
         init_point_from_hex(group, expectedAdd, tc->ExpectedAddX, tc->ExpectedAddY, ctx);
         init_point_from_hex(group, expectedDouble, tc->ExpectedDoubleX, tc->ExpectedDoubleY, ctx);
 
-        #ifdef use_openssl
-            // Point addition
-            EC_POINT_add(group, resultAdd, P, Q, ctx);
-            // Perform point doubling using built-in function for comparison
-            EC_POINT_dbl(group, resultDouble, P, ctx);
-        #else
+        #ifdef use_jacobian_coordinates
             // Perform point addition using Jacobian coordinates
             EC_POINT_JACOBIAN P_jacobian, Q_jacobian, result_jacobian;
             EC_POINT_Jacobian_new(&P_jacobian);
@@ -397,9 +401,15 @@ int main() {
             jacobian_point_add(group, &result_jacobian, &P_jacobian, &Q_jacobian, ctx);
             // Convert the result back to affine coordinates
             jacobian_to_affine(group, &result_jacobian, resultAdd, ctx);
+        #else
+            EC_POINT_add(group, resultAdd, P, Q, ctx);
+        #endif
+        printf("ExpectedAddX: %s\n", tc->ExpectedAddX);
+        printf("ExpectedAddY: %s\n", tc->ExpectedAddY);
+        printf("\n");
 
+        #ifdef use_jacobian_coordinates
             // Perform point doubling using Jacobian coordinates
-            // EC_POINT_JACOBIAN P_jacobian, result_jacobian;
             EC_POINT_Jacobian_new(&P_jacobian);
             EC_POINT_Jacobian_new(&result_jacobian);
             // Convert affine point to Jacobian coordinates
@@ -408,26 +418,21 @@ int main() {
             jacobian_point_double(group, &result_jacobian, &P_jacobian, ctx);
             // Convert the result back to affine coordinates
             jacobian_to_affine(group, &result_jacobian, resultDouble, ctx);
-            
+        #else
+            EC_POINT_dbl(group, resultDouble, P, ctx);
         #endif
-
-        // Print compared values
-        printf("\nTest case %d:\n", i + 1);
-        printf("ExpectedAddX: %s\n", tc->ExpectedAddX);
-        // printf("ResultAddY: %s\n", BN_bn2hex(resultAdd->Y));
-        printf("ExpectedAddY: %s\n", tc->ExpectedAddY);
-        // printf("ResultDoubleX: %s\n", BN_bn2hex(resultDouble->X));
         printf("ExpectedDoubleX: %s\n", tc->ExpectedDoubleX);
-        // printf("ResultDoubleY: %s\n", BN_bn2hex(resultDouble->Y));
         printf("ExpectedDoubleY: %s\n", tc->ExpectedDoubleY);
+        printf("\n");
         
         // Compare results
         int additionCorrect = compare_points(group, resultAdd, expectedAdd, ctx);
         int doublingCorrect = compare_points(group, resultDouble, expectedDouble, ctx);
 
-        printf("Test case %d: Addition %s, Doubling %s\n", i + 1,
+        printf("Addition %s, Doubling %s\n",
                additionCorrect ? "PASS" : "FAIL",
                doublingCorrect ? "PASS" : "FAIL");
+        printf("\n");
 
         // Clean up
         EC_POINT_free(P);
@@ -436,11 +441,13 @@ int main() {
         EC_POINT_free(resultDouble);
         EC_POINT_free(expectedAdd);
         EC_POINT_free(expectedDouble);
-        #ifndef use_openssl
+        #ifdef use_jacobian_coordinates
             EC_POINT_Jacobian_free(&P_jacobian);
             EC_POINT_Jacobian_free(&Q_jacobian);
             EC_POINT_Jacobian_free(&result_jacobian);
         #endif
+
+        break; // TODO: Remove this line to test all cases
     }
 
     EC_GROUP_free(group);

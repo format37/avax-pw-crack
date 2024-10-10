@@ -8,7 +8,7 @@
 #include "public_key.h"
 #include "jacobian_point.h"
 
-#define affine_coordinates
+// #define use_jacobian_coordinates
 
 #define MAX_LINE_LENGTH 1024
 #define MAX_TEST_CASES 1000
@@ -104,7 +104,7 @@ __global__ void testEllipticCurve(TestCase *cases, int numCases, ThreadFunctionP
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= numCases) return;
 
-    printf("\nTest case %d\n", idx);
+    printf("\n[CUDA] Test case %d\n", idx);
 
     #ifdef function_profiler
         unsigned long long start_time = clock64();
@@ -138,24 +138,19 @@ __global__ void testEllipticCurve(TestCase *cases, int numCases, ThreadFunctionP
         false
     };
 
-    #ifdef affine_coordinates
-        point_add(&resultAdd, &P, &Q, &CURVE_P_LOCAL, &CURVE_A_LOCAL);
-        point_add(&resultDouble, &P, &P, &CURVE_P_LOCAL, &CURVE_A_LOCAL);
-    #else
-        // Define Jacobian coordinates from affine using affine_to_jacobian(const EC_POINT_CUDA *affine_point, EC_POINT_JACOBIAN *jacobian_point)
+    #ifdef use_jacobian_coordinates
         EC_POINT_JACOBIAN P_jacobian, Q_jacobian, resultAdd_jacobian, resultDouble_jacobian;
         affine_to_jacobian(&P, &P_jacobian);
         affine_to_jacobian(&Q, &Q_jacobian);
-        printf("\nCalling jacobian_point_add\n");
+        
         jacobian_point_add(&resultAdd_jacobian, &P_jacobian, &Q_jacobian, &CURVE_P_LOCAL, &CURVE_A_LOCAL);
-        // Convert resultAdd_jacobian back to affine using __device__ void jacobian_to_affine(const EC_POINT_JACOBIAN *jacobian_point, EC_POINT_CUDA *affine_point, const BIGNUM *p) {
         jacobian_to_affine(&resultAdd_jacobian, &resultAdd, &CURVE_P_LOCAL);
         
-        // Perform point doubling
-        printf("\nCalling jacobian_point_double\n");
         jacobian_point_double(&resultDouble_jacobian, &P_jacobian, &CURVE_P_LOCAL, &CURVE_A_LOCAL);
-        // Convert resultDouble_jacobian back to affine using __device__ void jacobian_to_affine(const EC_POINT_JACOBIAN *jacobian_point, EC_POINT_CUDA *affine_point, const BIGNUM *p) {
         jacobian_to_affine(&resultDouble_jacobian, &resultDouble, &CURVE_P_LOCAL);
+    #else
+        point_add(&resultAdd, &P, &Q, &CURVE_P_LOCAL, &CURVE_A_LOCAL);
+        point_add(&resultDouble, &P, &P, &CURVE_P_LOCAL, &CURVE_A_LOCAL);
     #endif
 
     // Initialize expected results
@@ -166,35 +161,27 @@ __global__ void testEllipticCurve(TestCase *cases, int numCases, ThreadFunctionP
     initBignumFromHex(&expectedDoubleY, tc->ExpectedDoubleY);
 
     // Print resultAdd.x and resultAdd.y
-    bn_print_no_fuse("\nresultAdd.x", &resultAdd.x);
-    bn_print_no_fuse("resultAdd.y", &resultAdd.y);
+    bn_print_no_fuse("point_add << X: ", &resultAdd.x);
+    bn_print_no_fuse("point_add << Y", &resultAdd.y);
     // Print expectedAddX and expectedAddY
     bn_print_no_fuse("expectedAddX", &expectedAddX);
     bn_print_no_fuse("expectedAddY", &expectedAddY);
-    // printf comparison of resultAdd.x and expectedAddX directly
-    printf("\nComparison of resultAdd.x and expectedAddX directly: %d\n", bn_cmp(&resultAdd.x, &expectedAddX));
-    // printf comparison of resultAdd.y and expectedAddY directly
-    printf("Comparison of resultAdd.y and expectedAddY directly: %d\n", bn_cmp(&resultAdd.y, &expectedAddY));
     // Compare results
     bool additionCorrect = (bn_cmp(&resultAdd.x, &expectedAddX) == 0) &&
                            (bn_cmp(&resultAdd.y, &expectedAddY) == 0);
 
     // Print resultDouble.x and resultDouble.y
-    bn_print_no_fuse("\nresultDouble.x", &resultDouble.x);
-    bn_print_no_fuse("resultDouble.y", &resultDouble.y);
+    bn_print_no_fuse("\npoint_double << X: ", &resultDouble.x);
+    bn_print_no_fuse("point_double << Y: ", &resultDouble.y);
     // Print expectedDoubleX and expectedDoubleY
     bn_print_no_fuse("expectedDoubleX", &expectedDoubleX);
     bn_print_no_fuse("expectedDoubleY", &expectedDoubleY);
-    // printf comparison of resultDouble.x and expectedDoubleX directly
-    printf("\nComparison of resultDouble.x and expectedDoubleX directly: %d\n", bn_cmp(&resultDouble.x, &expectedDoubleX));
-    // printf comparison of resultDouble.y and expectedDoubleY directly
-    printf("Comparison of resultDouble.y and expectedDoubleY directly: %d\n", bn_cmp(&resultDouble.y, &expectedDoubleY));
     // compare results
     bool doublingCorrect = (bn_cmp(&resultDouble.x, &expectedDoubleX) == 0) &&
                            (bn_cmp(&resultDouble.y, &expectedDoubleY) == 0);
 
     // Print results
-    printf("\nTest case %d: Addition %s, Doubling %s\n", idx,
+    printf("\nAddition %s, Doubling %s\n",
            additionCorrect ? "PASS" : "FAIL",
            doublingCorrect ? "PASS" : "FAIL");
     #ifdef function_profiler
