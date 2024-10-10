@@ -11,9 +11,9 @@
         0x483ADA7726A3C4655DA4FBFC0E1108A8
     };
 
-    __device__ __constant__ BIGNUM CURVE_A = {0};
+    __device__ __constant__ BIGNUM_CUDA CURVE_A = {0};
 
-    __device__ __constant__ BIGNUM CURVE_P = {
+    __device__ __constant__ BIGNUM_CUDA CURVE_P = {
         {
             0xfffffffffffffffffffffffefffffc2f,
             0xffffffffffffffffffffffffffffffff
@@ -35,8 +35,8 @@
             0x5DA4FBFC0E1108A8,
             0x483ADA7726A3C465
             };
-    __device__ __constant__ BIGNUM CURVE_A = {0};
-    __device__ __constant__ BIGNUM CURVE_P = {
+    __device__ __constant__ BIGNUM_CUDA CURVE_A = {0};
+    __device__ __constant__ BIGNUM_CUDA CURVE_P = {
         {
             0xFFFFFFFEFFFFFC2F,
             0xFFFFFFFFFFFFFFFF,
@@ -59,7 +59,7 @@ __device__ void GetPublicKey(uint8_t* buffer, uint8_t* key)
         }
         printf("\n");
     #endif
-    BIGNUM newKey;
+    BIGNUM_CUDA newKey;
     init_zero(&newKey);
     #ifdef BN_128
         for (int i = 0; i < CURVE_P_VALUES_MAX_SIZE; ++i) {
@@ -151,7 +151,7 @@ __device__ void GetPublicKey(uint8_t* buffer, uint8_t* key)
     }
     
     // Determine the prefix based on the Y coordinate
-    BIGNUM two, quotient, remainder;
+    BIGNUM_CUDA two, quotient, remainder;
     init_zero(&two);
     init_zero(&quotient);
     init_zero(&remainder);

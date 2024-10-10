@@ -2,7 +2,7 @@
 // FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
 #ifdef BN_128
     #define CURVE_ORDER_SIZE 2
-    __device__ __constant__ BIGNUM CURVE_ORDER = {
+    __device__ __constant__ BIGNUM_CUDA CURVE_ORDER = {
         {
             0xBAAEDCE6AF48A03BBFD25E8CD0364141,
             0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE
@@ -12,7 +12,7 @@
     };
 #else
     #define CURVE_ORDER_SIZE 4
-    __device__ __constant__ BIGNUM CURVE_ORDER = {
+    __device__ __constant__ BIGNUM_CUDA CURVE_ORDER = {
         {
             0xBFD25E8CD0364141,
             0xBAAEDCE6AF48A03B,
@@ -177,11 +177,11 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
     #endif
 	
 	// Addition
-	BIGNUM a;
-	BIGNUM b;
-	// BIGNUM curveOrder;
-	BIGNUM newKey;
-	BIGNUM publicKey;
+	BIGNUM_CUDA a;
+	BIGNUM_CUDA b;
+	// BIGNUM_CUDA curveOrder;
+	BIGNUM_CUDA newKey;
+	BIGNUM_CUDA publicKey;
 
     init_zero(&a);
     init_zero(&b);

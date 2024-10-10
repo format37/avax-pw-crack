@@ -8,7 +8,7 @@
 #include "public_key.h"
 #include "jacobian_point.h"
 
-// #define use_jacobian_coordinates
+#define use_jacobian_coordinates
 
 #define MAX_LINE_LENGTH 1024
 #define MAX_TEST_CASES 1000
