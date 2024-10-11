@@ -8,7 +8,7 @@ nvcc \
     -lcrypto \
     test.cu \
     -arch=sm_86 \
-    -I include \
+    -I ../../include \
     -o program 2> build.log
 
 cat build.log
