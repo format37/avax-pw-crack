@@ -228,6 +228,9 @@ void jacobian_point_double(
     const EC_POINT_JACOBIAN *P,
     BN_CTX *ctx
 ) {
+    printf("jacobian_point_double >> P->X: %s\n", BN_bn2hex(P->X));
+    printf("jacobian_point_double >> P->Y: %s\n", BN_bn2hex(P->Y));
+    printf("jacobian_point_double >> P->Z: %s\n", BN_bn2hex(P->Z));
     BIGNUM *p = BN_new();
     EC_GROUP_get_curve_GFp(group, p, NULL, NULL, ctx);
 
