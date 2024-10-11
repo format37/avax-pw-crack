@@ -11,26 +11,6 @@ __device__ void jacobian_point_double(
     const BIGNUM_CUDA *a
 );
 
-__device__ void bn_mod_sub(BIGNUM_CUDA *result, const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, const BIGNUM_CUDA *n) {
-    bn_sub(result, a, b);
-    if (result->neg) {
-        BIGNUM_CUDA tmp;
-        init_zero(&tmp);
-        bn_copy(&tmp, result); // dest << src
-        bn_add(result, &tmp, n); // result = a + b
-        result->neg = 0;
-    }
-}
-
-__device__ void bn_mod_add(BIGNUM_CUDA *result, const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, const BIGNUM_CUDA *n) {
-    bn_add(result, a, b);
-    BIGNUM_CUDA tmp;
-    init_zero(&tmp);
-    bn_copy(&tmp, result); // dest << src
-    bn_mod(result, &tmp, n); // result = a mod n
-}
-
-
 #ifndef BN_128
     #define BN_UMULT_LOHI(h, l, a, b) \
     do { \
@@ -253,31 +233,31 @@ __device__ void jacobian_point_add(
 
     
     // Z3 = H * Z1 * Z2 mod p
-    bn_print_no_fuse("P->Z: ", &P->Z);
-    bn_print_no_fuse("Q->Z: ", &Q->Z);
+    // bn_print_no_fuse("P->Z: ", &P->Z);
+    // bn_print_no_fuse("Q->Z: ", &Q->Z);
     bn_mul(&P->Z, &Q->Z, &result->Z); // a * b = product
-    bn_print_no_fuse("After first mul, result->Z: ", &result->Z);
+    // bn_print_no_fuse("After first mul, result->Z: ", &result->Z);
     
     // init_zero(&temp);
     bn_copy(&temp, &result->Z); // dest << src
     bn_mod(&result->Z, &temp, p); // result = a % m
-    bn_print_no_fuse("After first mod, result->Z: ", &result->Z);
+    // bn_print_no_fuse("After first mod, result->Z: ", &result->Z);
     
     bn_print_no_fuse("H: ", &H);
     // init_zero(&temp);
     bn_copy(&temp, &result->Z); // dest << src
     bn_mul(&temp, &H, &result->Z); // a * b = product
-    bn_print_no_fuse("After second mul, result->Z: ", &result->Z);
+    // bn_print_no_fuse("After second mul, result->Z: ", &result->Z);
 
     bn_copy(&temp, &result->Z); // dest << src
     bn_mod(&result->Z, &temp, p); // result = a % m
-    bn_print_no_fuse("Final result->Z: ", &result->Z);
+    // bn_print_no_fuse("Final result->Z: ", &result->Z);
 
 
     // Print results
-    bn_print_no_fuse("point_add << X: ", &result->X);
-    bn_print_no_fuse("point_add << Y: ", &result->Y);
-    bn_print_no_fuse("point_add << Z: ", &result->Z);
+    // bn_print_no_fuse("point_add << X: ", &result->X);
+    // bn_print_no_fuse("point_add << Y: ", &result->Y);
+    // bn_print_no_fuse("point_add << Z: ", &result->Z);
 }
 
 __device__ void jacobian_point_double(
@@ -286,192 +266,77 @@ __device__ void jacobian_point_double(
     const BIGNUM_CUDA *p,
     const BIGNUM_CUDA *a
 ) {
-    bn_print_no_fuse("point_double >> P->X: ", &P->X);
-    bn_print_no_fuse("point_double >> P->Y: ", &P->Y);
-    bn_print_no_fuse("point_double >> P->Z: ", &P->Z);
-    bn_print_no_fuse("point_double >> p: ", p);
-    bn_print_no_fuse("point_double >> a: ", a);
     if (bn_is_zero(&P->Z) || bn_is_zero(&P->Y)) {
-        // Point at infinity
         init_zero(&result->X);
         init_zero(&result->Y);
         init_zero(&result->Z);
         return;
     }
-
-    BIGNUM_CUDA XX, YY, YYYY, ZZ, S, M, T, temp;
-    init_zero(&XX);
-    init_zero(&YY);
-    init_zero(&YYYY);
-    init_zero(&ZZ);
+    // bn_print_no_fuse("jacobian_point_double >> P->X: ", &P->X);
+    // bn_print_no_fuse("jacobian_point_double >> P->Y: ", &P->Y);
+    // bn_print_no_fuse("jacobian_point_double >> P->Z: ", &P->Z);
+    BIGNUM_CUDA S, M, tmp1, tmp2, tmp3, Y1_squared;
     init_zero(&S);
     init_zero(&M);
-    init_zero(&T);
-    init_zero(&temp);
+    init_zero(&tmp1);
+    init_zero(&tmp2);
+    init_zero(&tmp3);
+    init_zero(&Y1_squared);
 
-    // XX = X1^2 mod p
-    bn_copy(&temp, &P->X);
-    bn_mul(&temp, &P->X, &XX);
-    bn_mod(&XX, &XX, p);
+    // S = 4 * X1 * Y1^2 mod p
+    bn_mod_sqr(&tmp1, &P->Y, p);  // tmp1 = Y1^2
+    bn_copy(&Y1_squared, &tmp1);
+    // bn_print_no_fuse("jacobian_point_double [0] Y1_squared: ", &Y1_squared);
+    bn_mod_mul(&tmp2, &P->X, &tmp1, p);  // tmp2 = X1 * Y1^2
+    // bn_print_no_fuse("jacobian_point_double [1] S: ", &tmp2);
+    bn_mod_lshift(&S, &tmp2, 2, p);  // S = 4 * X1 * Y1^2 mod p
+    // bn_print_no_fuse("jacobian_point_double [2] S: ", &S);
 
-    // YY = Y1^2 mod p
-    bn_copy(&temp, &P->Y);
-    bn_mul(&temp, &P->Y, &YY);
-    bn_mod(&YY, &YY, p);
+    // M = 3 * X1^2 + a * Z1^4 mod p
+    bn_mod_sqr(&tmp1, &P->X, p);  // tmp1 = X1^2
+    // bn_print_no_fuse("jacobian_point_double [3a] X1_squared: ", &tmp1);
+    
+    // bn_mod_lshift(&tmp2, &tmp1, 1, p);  // tmp2 = 2 * X1^2 mod p
+    // bn_print_no_fuse("jacobian_point_double [3b] 2_X1_squared: ", &tmp2);
+    
+    // bn_mod_add(&tmp3, &tmp1, &tmp2, p); // tmp3 = 3 * X1^2 mod p
+    // bn_print_no_fuse("jacobian_point_double [4] 3_X1_squared M: ", &tmp3);
 
-    // YYYY = YY^2 mod p
-    bn_copy(&temp, &YY);
-    bn_mul(&temp, &YY, &YYYY);
-    bn_mod(&YYYY, &YYYY, p);
+    init_zero(&tmp2);
+    // Set 3 to tmp2
+    bn_set_word(&tmp2, 3);
+    bn_mod_mul(&M, &tmp1, &tmp2, p);  // M = 3 * X1^2 mod p
+    // bn_print_no_fuse("jacobian_point_double [4] 3_X1_squared M: ", &M);
 
-    // ZZ = Z1^2 mod p
-    bn_copy(&temp, &P->Z);
-    bn_mul(&temp, &P->Z, &ZZ);
-    bn_mod(&ZZ, &ZZ, p);
+    // Compute X3 = M^2 - 2 * S mod p
+    bn_mod_sqr(&tmp1, &M, p);
+    // bn_print_no_fuse("jacobian_point_double [5a] Z1_squared: ", &tmp1);
+    bn_mod_sub(&tmp2, &tmp1, &S, p);  // tmp2 = M^2 - S mod p
+    // bn_print_no_fuse("jacobian_point_double [5b] M^2 - s: ", &tmp2);
+    bn_mod_sub(&result->X, &tmp2, &S, p);  // X3 = M^2 - 2*S mod p
+    // bn_print_no_fuse("jacobian_point_double [5c] X3: ", &result->X);
 
-    // S = 4 * X1 * YY mod p
-    bn_copy(&temp, &P->X);
-    bn_mul(&temp, &YY, &S);
-    bn_mod(&S, &S, p);
-    bn_mul_word(&S, 4);
-    bn_mod(&S, &S, p);
+    // Compute Y3 = M * (S - X3) - 8 * Y1^4 mod p
+    bn_mod_sub(&tmp1, &S, &result->X, p);  // tmp1 = S - X3 mod p
+    // bn_print_no_fuse("jacobian_point_double [6a] S - X3: ", &tmp1);
+    bn_mod_mul(&tmp2, &M, &tmp1, p);  // tmp2 = M * (S - X3) mod p
+    // bn_print_no_fuse("jacobian_point_double [6b] M * (S - X3): ", &tmp2);
 
-    // M = 3 * XX + a * ZZ^2 mod p
-    BIGNUM_CUDA aZZ_squared;
-    init_zero(&aZZ_squared);
-    bn_copy(&temp, &ZZ);
-    bn_mul(&temp, &ZZ, &aZZ_squared);
-    bn_copy(&temp, &aZZ_squared);
-    bn_mul(&temp, a, &aZZ_squared);
-    bn_mod(&aZZ_squared, &aZZ_squared, p);
+    // tmp1 = Y1^4 mod p
+    bn_mod_sqr(&tmp1, &Y1_squared, p);
+    // bn_print_no_fuse("jacobian_point_double [7a] Y1_fourth: ", &tmp1);
+    bn_mod_lshift(&tmp3, &tmp1, 3, p);  // tmp3 = 8 * Y1^4 mod p
+    // bn_print_no_fuse("jacobian_point_double [7b] 8_Y1_fourth: ", &tmp3);
 
-    bn_mul_word(&XX, 3);
-    bn_mod_add(&M, &XX, &aZZ_squared, p);
+    // Y3 = M*(S - X3) - 8*Y1^4 mod p
+    bn_mod_sub(&result->Y, &tmp2, &tmp3, p);
+    // bn_print_no_fuse("jacobian_point_double [8] Y3: ", &result->Y);
 
-    // X3 = M^2 - 2 * S mod p
-    bn_copy(&temp, &M);
-    bn_mul(&temp, &M, &T);
-    bn_mod(&T, &T, p);
-    BIGNUM_CUDA two_S;
-    init_zero(&two_S);
-    bn_mod_add(&two_S, &S, &S, p);
-    bn_mod_sub(&result->X, &T, &two_S, p);
-
-    // Y3 = M * (S - X3) - 8 * YYYY mod p
-    BIGNUM_CUDA S_minus_X3;
-    init_zero(&S_minus_X3);
-    bn_mod_sub(&S_minus_X3, &S, &result->X, p);
-
-    bn_copy(&temp, &M);
-    bn_mul(&temp, &S_minus_X3, &result->Y);
-    bn_mod(&result->Y, &result->Y, p);
-
-    BIGNUM_CUDA eight_YYYY;
-    init_zero(&eight_YYYY);
-    bn_mul_word(&YYYY, 8);
-    bn_mod(&eight_YYYY, &eight_YYYY, p);
-
-    bn_mod_sub(&result->Y, &result->Y, &eight_YYYY, p);
-
-    // Z3 = 2 * Y1 * Z1 mod p
-    bn_copy(&temp, &P->Y);
-    bn_mul(&temp, &P->Z, &result->Z);
-    bn_mul_word(&result->Z, 2);
-    bn_mod(&result->Z, &result->Z, p);
-
-    // Print results
-    bn_print_no_fuse("point_double << X: ", &result->X);
-    bn_print_no_fuse("point_double << Y: ", &result->Y);
-    bn_print_no_fuse("point_double << Z: ", &result->Z);
-}
-
-__device__ void jacobian_point_double_x(
-    EC_POINT_JACOBIAN *result,
-    const EC_POINT_JACOBIAN *P,
-    const BIGNUM_CUDA *p,
-    const BIGNUM_CUDA *a
-) {
-    if (bn_is_zero(&P->Z) || bn_is_zero(&P->Y)) {
-        // Point at infinity
-        init_zero(&result->X);
-        init_zero(&result->Y);
-        init_zero(&result->Z);
-        return;
-    }
-
-    BIGNUM_CUDA XX, YY, YYYY, ZZ, S, M, T;
-    init_zero(&XX);
-    init_zero(&YY);
-    init_zero(&YYYY);
-    init_zero(&ZZ);
-    init_zero(&S);
-    init_zero(&M);
-    init_zero(&T);
-
-    // XX = X1^2 mod p
-    bn_mul(&P->X, &P->X, &XX);
-    bn_mod(&XX, &XX, p);
-
-    // YY = Y1^2 mod p
-    bn_mul(&P->Y, &P->Y, &YY);
-    bn_mod(&YY, &YY, p);
-
-    // YYYY = YY^2 mod p
-    bn_mul(&YY, &YY, &YYYY);
-    bn_mod(&YYYY, &YYYY, p);
-
-    // ZZ = Z1^2 mod p
-    bn_mul(&P->Z, &P->Z, &ZZ);
-    bn_mod(&ZZ, &ZZ, p);
-
-    // S = 4 * X1 * YY mod p
-    bn_mul(&P->X, &YY, &S);
-    bn_mod(&S, &S, p);
-    bn_mul_word(&S, 4);
-    bn_mod(&S, &S, p);
-
-    // M = 3 * XX + a * ZZ^2 mod p
-    BIGNUM_CUDA aZZ_squared;
-    init_zero(&aZZ_squared);
-    bn_mul(&ZZ, &ZZ, &aZZ_squared);
-    bn_mul(&aZZ_squared, a, &aZZ_squared);
-    bn_mod(&aZZ_squared, &aZZ_squared, p);
-
-    bn_mul_word(&XX, 3);
-    bn_mod_add(&M, &XX, &aZZ_squared, p);
-
-    // X3 = M^2 - 2 * S mod p
-    bn_mul(&M, &M, &T);
-    bn_mod(&T, &T, p);
-    BIGNUM_CUDA two_S;
-    init_zero(&two_S);
-    bn_mod_add(&two_S, &S, &S, p);
-    bn_mod_sub(&result->X, &T, &two_S, p);
-
-    // Y3 = M * (S - X3) - 8 * YYYY mod p
-    BIGNUM_CUDA S_minus_X3;
-    init_zero(&S_minus_X3);
-    bn_mod_sub(&S_minus_X3, &S, &result->X, p);
-
-    bn_mul(&M, &S_minus_X3, &result->Y);
-    bn_mod(&result->Y, &result->Y, p);
-
-    BIGNUM_CUDA eight_YYYY;
-    init_zero(&eight_YYYY);
-    bn_mul_word(&YYYY, 8);
-    bn_mod(&eight_YYYY, &eight_YYYY, p);
-
-    bn_mod_sub(&result->Y, &result->Y, &eight_YYYY, p);
-
-    // Z3 = 2 * Y1 * Z1 mod p
-    bn_mul(&P->Y, &P->Z, &result->Z);
-    bn_mul_word(&result->Z, 2);
-    bn_mod(&result->Z, &result->Z, p);
-
-    // Print results
-    bn_print_no_fuse("point_double << X: ", &result->X);
-    bn_print_no_fuse("point_double << Y: ", &result->Y);
-    bn_print_no_fuse("point_double << Z: ", &result->Z);
+    // Compute Z3 = 2 * Y1 * Z1 mod p
+    bn_mod_mul(&tmp1, &P->Y, &P->Z, p);  // tmp1 = Y1 * Z1 mod p
+    // bn_print_no_fuse("jacobian_point_double [9a] Y1_Z1: ", &tmp1);
+    bn_mod_lshift(&result->Z, &tmp1, 1, p);  // Z3 = 2 * Y1 * Z1 mod p
+    // bn_print_no_fuse("jacobian_point_double [9b] 2_Y1_Z1: ", &result->Z);
 }
 
 __device__ EC_POINT_CUDA ec_point_scalar_mul_jacobian(

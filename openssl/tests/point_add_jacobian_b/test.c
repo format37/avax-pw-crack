@@ -211,9 +211,9 @@ void jacobian_point_add(
     BN_mod_mul(result->Z, tmp, H, p, ctx);
 
     // print results
-    printf("point_add << X: %s\n", BN_bn2hex(result->X));
-    printf("point_add << Y: %s\n", BN_bn2hex(result->Y));
-    printf("point_add << Z: %s\n", BN_bn2hex(result->Z));
+    // printf("point_add << X: %s\n", BN_bn2hex(result->X));
+    // printf("point_add << Y: %s\n", BN_bn2hex(result->Y));
+    // printf("point_add << Z: %s\n", BN_bn2hex(result->Z));
 
 cleanup:
     BN_free(U1); BN_free(U2); BN_free(S1); BN_free(S2); BN_free(H);
@@ -257,37 +257,54 @@ void jacobian_point_double(
 
     // Compute Y1_squared = Y1^2 mod p
     BN_mod_sqr(Y1_squared, P->Y, p, ctx);  // Y1^2
+    // print [0] result
+    printf("jacobian_point_double [0] Y1_squared: %s\n", BN_bn2hex(Y1_squared));
 
     // Compute S = 4 * X1 * Y1_squared mod p
     BN_mod_mul(S, P->X, Y1_squared, p, ctx);       // S = X1 * Y1^2 mod p
+    printf("jacobian_point_double [1] S: %s\n", BN_bn2hex(S));
     BN_mod_lshift(S, S, 2, p, ctx);                // S = 4 * X1 * Y1^2 mod p
+    printf("jacobian_point_double [2] S: %s\n", BN_bn2hex(S));
 
     // Compute M = 3 * X1_squared mod p
     BN_mod_sqr(X1_squared, P->X, p, ctx);          // X1^2 mod p
+    printf("jacobian_point_double [3a] X1_squared: %s\n", BN_bn2hex(X1_squared));
+    
     // Compute M = (3 * X1_squared) mod p
     // Option 1: Use a BIGNUM representing 3
     BIGNUM *three = BN_new();
     BN_set_word(three, 3);
     BN_mod_mul(M, X1_squared, three, p, ctx);      // M = 3 * X1_squared mod p
+    printf("jacobian_point_double [4] 3_X1_squared M: %s\n", BN_bn2hex(M));
     BN_free(three);
 
     // Compute X3 = M^2 - 2 * S mod p
     BN_mod_sqr(X3, M, p, ctx);                     // M^2 mod p
+    printf("jacobian_point_double [5a] M^2: %s\n", BN_bn2hex(X3));
     BN_mod_sub(tmp, X3, S, p, ctx);                // M^2 - S mod p
+    printf("jacobian_point_double [5b] M^2 - S: %s\n", BN_bn2hex(tmp));
     BN_mod_sub(X3, tmp, S, p, ctx);                // X3 = M^2 - 2 * S mod p
+    printf("jacobian_point_double [5c] X3: %s\n", BN_bn2hex(X3));
 
     // Compute Y3 = M * (S - X3) - 8 * Y1^4 mod p
     BN_mod_sub(tmp, S, X3, p, ctx);                // S - X3 mod p
+    printf("jacobian_point_double [6a] S - X3: %s\n", BN_bn2hex(tmp));
     BN_mod_mul(tmp, M, tmp, p, ctx);               // M * (S - X3) mod p
+    printf("jacobian_point_double [6b] M * (S - X3): %s\n", BN_bn2hex(tmp));
 
     BN_mod_sqr(Y1_fourth, Y1_squared, p, ctx);     // Y1^4 mod p
+    printf("jacobian_point_double [7a] Y1_fourth: %s\n", BN_bn2hex(Y1_fourth));
     BN_mod_lshift(Y1_fourth, Y1_fourth, 3, p, ctx);// 8 * Y1^4 mod p
+    printf("jacobian_point_double [7b] 8_Y1_fourth: %s\n", BN_bn2hex(Y1_fourth));
 
     BN_mod_sub(Y3, tmp, Y1_fourth, p, ctx);        // Y3 = M*(S - X3) - 8*Y1^4 mod p
+    printf("jacobian_point_double [8] Y3: %s\n", BN_bn2hex(Y3));
 
     // Compute Z3 = 2 * Y1 * Z1 mod p
     BN_mod_mul(Z3, P->Y, P->Z, p, ctx);            // Y1 * Z1 mod p
+    printf("jacobian_point_double [9a] Y1_Z1: %s\n", BN_bn2hex(Z3));
     BN_mod_lshift1(Z3, Z3, p, ctx);                // Z3 = 2 * Y1 * Z1 mod p
+    printf("jacobian_point_double [9b] 2_Y1_Z1: %s\n", BN_bn2hex(Z3));
 
     // Copy the results to result
     BN_copy(result->X, X3);

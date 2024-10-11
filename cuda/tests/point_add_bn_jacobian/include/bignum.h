@@ -1185,3 +1185,75 @@ __device__ int bn_mod_sqr(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNUM_CUD
     bn_mul(a, a, &tmp); // a * b = product
     return bn_mod(r, &tmp, m); // result = a % m
 }
+
+__device__ int bn_mod_mul(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, const BIGNUM_CUDA *m) {
+    BIGNUM_CUDA tmp;
+    init_zero(&tmp);
+    bn_mul(a, b, &tmp); // a * b = product
+    return bn_mod(r, &tmp, m); // result = product % m
+}
+
+__device__ void left_shift_couple(BIGNUM_CUDA *dest, const BIGNUM_CUDA *src, int shift) {
+    int word_shift = shift / BN_ULONG_NUM_BITS;
+    int bit_shift = shift % BN_ULONG_NUM_BITS;
+
+    // Clear dest
+    init_zero(dest);
+
+    // Shift words
+    for (int i = src->top - 1; i >= 0; i--) {
+        dest->d[i + word_shift] = src->d[i];
+    }
+
+    // Shift bits
+    if (bit_shift > 0) {
+        BN_ULONG carry = 0;
+        for (int i = 0; i < src->top + word_shift + 1; i++) {
+            BN_ULONG temp = dest->d[i];
+            dest->d[i] = (temp << bit_shift) | carry;
+            carry = temp >> (BN_ULONG_NUM_BITS - bit_shift);
+        }
+        if (carry != 0) {
+            dest->d[src->top + word_shift] = carry;
+            dest->top = src->top + word_shift + 1;
+        } else {
+            dest->top = src->top + word_shift;
+        }
+    } else {
+        dest->top = src->top + word_shift;
+    }
+
+    dest->neg = src->neg;
+}
+
+__device__ void bn_mod_lshift(BIGNUM_CUDA *r, BIGNUM_CUDA *a, int shift, const BIGNUM_CUDA *p) {
+    BIGNUM_CUDA temp;
+    init_zero(&temp);
+
+    // Shift 'a' left by 'shift' bits
+    // left_shift_couple(&temp, a, shift);
+    left_shift(a, shift);
+
+    // Reduce modulo p
+    // bn_mod(r, &temp, p);
+    bn_mod(r, a, p);
+}
+
+__device__ void bn_mod_add(BIGNUM_CUDA *result, const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, const BIGNUM_CUDA *n) {
+    bn_add(result, a, b);
+    BIGNUM_CUDA tmp;
+    init_zero(&tmp);
+    bn_copy(&tmp, result); // dest << src
+    bn_mod(result, &tmp, n); // result = a mod n
+}
+
+__device__ void bn_mod_sub(BIGNUM_CUDA *result, const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, const BIGNUM_CUDA *n) {
+    bn_sub(result, a, b);
+    if (result->neg) {
+        BIGNUM_CUDA tmp;
+        init_zero(&tmp);
+        bn_copy(&tmp, result); // dest << src
+        bn_add(result, &tmp, n); // result = a + b
+        result->neg = 0;
+    }
+}
