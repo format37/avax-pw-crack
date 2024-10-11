@@ -667,6 +667,7 @@ __device__ void bn_mul(const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, BIGNUM_CUDA *
         bn_print(">> a: ", a);
         bn_print(">> b: ", b);
     #endif
+
     init_zero(product);
     #ifdef BN_128
         // Not efficient for my case
@@ -767,6 +768,7 @@ __device__ void bn_mul(const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, BIGNUM_CUDA *
         bn_print("<< product: ", product);
         printf("-- bn_mul --\n");
     #endif
+    
     #ifdef function_profiler
         record_function(FN_BN_MUL, start_time);
     #endif

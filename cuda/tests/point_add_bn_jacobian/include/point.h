@@ -1,9 +1,9 @@
 struct EC_POINT_CUDA {
-  BIGNUM x; 
-  BIGNUM y;
+  BIGNUM_CUDA x; 
+  BIGNUM_CUDA y;
 };
 
-__device__ bool bn_mod_inverse(BIGNUM *result, const BIGNUM *a, const BIGNUM *n) {
+__device__ bool bn_mod_inverse(BIGNUM_CUDA *result, const BIGNUM_CUDA *a, const BIGNUM_CUDA *n) {
     #ifdef debug_print
         printf("++ bn_mod_inverse ++\n");
         bn_print(">> a: ", a);
@@ -14,14 +14,14 @@ __device__ bool bn_mod_inverse(BIGNUM *result, const BIGNUM *a, const BIGNUM *n)
         return false;  // No modular inverse exists
     }
 
-    BIGNUM r;
-    BIGNUM nr;
-    BIGNUM t;
-    BIGNUM nt;
-    BIGNUM q;
-    BIGNUM tmp;
-    BIGNUM tmp2;
-    BIGNUM tmp3;
+    BIGNUM_CUDA r;
+    BIGNUM_CUDA nr;
+    BIGNUM_CUDA t;
+    BIGNUM_CUDA nt;
+    BIGNUM_CUDA q;
+    BIGNUM_CUDA tmp;
+    BIGNUM_CUDA tmp2;
+    BIGNUM_CUDA tmp3;
 
     init_zero(&r);
     init_zero(&nr);
@@ -103,7 +103,7 @@ __device__ bool bn_mod_inverse(BIGNUM *result, const BIGNUM *a, const BIGNUM *n)
 }
 
 // limit to 256 bits
-__device__ void bignum_to_bit_array(BIGNUM *n, unsigned int *bits) {
+__device__ void bignum_to_bit_array(BIGNUM_CUDA *n, unsigned int *bits) {
     #ifdef debug_print
         printf("++ bignum_to_bit_array ++\n");
         bn_print(">> n: ", n);
@@ -151,21 +151,21 @@ __device__ int point_is_at_infinity(const EC_POINT_CUDA *P) {
 }
 
 __device__ void copy_point(EC_POINT_CUDA *dest, EC_POINT_CUDA *src) {
-    // Assuming EC_POINT_CUDA contains BIGNUM structures for x and y,
-    // and that BIGNUM is a structure that contains an array of BN_ULONG for the digits,
+    // Assuming EC_POINT_CUDA contains BIGNUM_CUDA structures for x and y,
+    // and that BIGNUM_CUDA is a structure that contains an array of BN_ULONG for the digits,
     // along with other metadata (like size, top, neg, etc.)
 
     // init the dest point
     init_zero(&dest->x);
     init_zero(&dest->y);
 
-    // Copy the BIGNUM x
+    // Copy the BIGNUM_CUDA x
     #ifdef debug_bn_copy
         printf("copy_point: bn_copy(dest->x, src->x)\n");
     #endif
     bn_copy(&dest->x, &src->x);
 
-    // Copy the BIGNUM y
+    // Copy the BIGNUM_CUDA y
     #ifdef debug_bn_copy
         printf("copy_point: bn_copy(dest->y, src->y)\n");
     #endif
@@ -173,15 +173,15 @@ __device__ void copy_point(EC_POINT_CUDA *dest, EC_POINT_CUDA *src) {
 }
 
 __device__ void set_point_at_infinity(EC_POINT_CUDA *point) {
-    // Assuming EC_POINT_CUDA is a structure containing BIGNUM x and y
-    // and that a BIGNUM value of NULL or {0} represents the point at infinity
+    // Assuming EC_POINT_CUDA is a structure containing BIGNUM_CUDA x and y
+    // and that a BIGNUM_CUDA value of NULL or {0} represents the point at infinity
 
     // To set the point at infinity, one straightforward way is to assign
-    // a null pointer to x and y if the BIGNUM structure allows it, or 
+    // a null pointer to x and y if the BIGNUM_CUDA structure allows it, or 
     // set their values to some predetermined sentinel value that indicates
     // the point at infinity.
 
-    // If using the sentinel value approach - ensure BIGNUM is set in a way
+    // If using the sentinel value approach - ensure BIGNUM_CUDA is set in a way
     // that other functions can check for it and treat it as infinity
 
     // To set the point to 0 (as an example sentinel value), do:
@@ -193,8 +193,8 @@ __device__ int point_add(
     EC_POINT_CUDA *result, 
     EC_POINT_CUDA *p1, 
     EC_POINT_CUDA *p2, 
-    const BIGNUM *p, 
-    const BIGNUM *a
+    const BIGNUM_CUDA *p, 
+    const BIGNUM_CUDA *a
 ) {
     bool debug = 0;
     if (debug) {
@@ -227,7 +227,7 @@ __device__ int point_add(
     }
 
     // Initialize temporary BIGNUMs for calculation
-    BIGNUM s, x3, y3, tmp1, tmp2, tmp3, two, tmp1_squared;
+    BIGNUM_CUDA s, x3, y3, tmp1, tmp2, tmp3, two, tmp1_squared;
     init_zero(&s);
     init_zero(&x3);
     init_zero(&y3);
@@ -253,7 +253,7 @@ __device__ int point_add(
         init_zero(&two);
         bn_set_word(&two, 2);
 
-        // BIGNUM tmp1_squared;
+        // BIGNUM_CUDA tmp1_squared;
         init_zero(&tmp1_squared);
         init_zero(&tmp1);
         #ifdef debug_bn_copy
@@ -487,16 +487,6 @@ __device__ int point_add(
         bn_print("<< y3: ", &y3);
     }
 
-    // Free the dynamically allocated memory
-    // free_bignum(&s);
-    // free_bignum(&x3);
-    // free_bignum(&y3);
-    // free_bignum(&tmp1);
-    // free_bignum(&tmp2);
-    // free_bignum(&tmp3);
-    // free_bignum(&two);
-    // free_bignum(&tmp1_squared);
-
     return 0;
 }
 
@@ -507,8 +497,8 @@ __device__ void init_point_at_infinity(EC_POINT_CUDA *P) {
     init_zero(&P->x);
     init_zero(&P->y);
 
-    P->x.top = 1; // No valid 'words' in the BIGNUM representing x
-    P->y.top = 1; // No valid 'words' in the BIGNUM representing y
+    P->x.top = 1; // No valid 'words' in the BIGNUM_CUDA representing x
+    P->y.top = 1; // No valid 'words' in the BIGNUM_CUDA representing y
     
     // If 'd' arrays have been allocated, set them to zero as well.
     // memset could potentially be used for this if available and if 'd' is allocated.
@@ -518,9 +508,9 @@ __device__ void init_point_at_infinity(EC_POINT_CUDA *P) {
 
 __device__ EC_POINT_CUDA ec_point_scalar_mul(
     EC_POINT_CUDA *point, 
-    BIGNUM *scalar, 
-    BIGNUM *curve_prime, 
-    BIGNUM *curve_a
+    BIGNUM_CUDA *scalar, 
+    BIGNUM_CUDA *curve_prime, 
+    BIGNUM_CUDA *curve_a
     ) {
     bool debug = 0;
     if (debug) {
@@ -543,7 +533,7 @@ __device__ EC_POINT_CUDA ec_point_scalar_mul(
     init_point_at_infinity(&tmp_a);                 // Initialize it to the point at infinity
     init_point_at_infinity(&tmp_b);                 // Initialize it to the point at infinity
     
-    // Convert scalar BIGNUM to an array of integers that's easy to iterate bit-wise
+    // Convert scalar BIGNUM_CUDA to an array of integers that's easy to iterate bit-wise
     unsigned int bits[256];                          // Assuming a 256-bit scalar
     bignum_to_bit_array(scalar, bits);    
     if (debug) printf("[D] Starting scalar multiplication loop\n");

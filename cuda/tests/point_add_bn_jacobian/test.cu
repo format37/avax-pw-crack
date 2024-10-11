@@ -9,6 +9,8 @@
 #include "jacobian_point.h"
 
 #define use_jacobian_coordinates
+// #define take_tests_from_host
+#define NUM_TESTS 1
 
 #define MAX_LINE_LENGTH 1024
 #define MAX_TEST_CASES 1000
@@ -83,7 +85,7 @@ __device__ unsigned long long d_strtoull(const char *str, char **endptr, int bas
 }
 
 // Function to initialize a BIGNUM from a hex string
-__device__ void initBignumFromHex(BIGNUM *bn, const char *hex) {
+__device__ void initBignumFromHex(BIGNUM_CUDA *bn, const char *hex) {
     init_zero(bn);
     int len = d_strlen(hex);
     int word_index = 0;
@@ -96,7 +98,7 @@ __device__ void initBignumFromHex(BIGNUM *bn, const char *hex) {
         bn->d[word_index++] = word;
     }
 
-    bn->top = find_top(bn);
+    bn->top = find_top_cuda(bn);
 }
 
 // CUDA kernel to perform the tests
@@ -120,14 +122,41 @@ __global__ void testEllipticCurve(TestCase *cases, int numCases, ThreadFunctionP
     init_point_at_infinity(&resultDouble);
 
     // Initialize points P and Q
-    initBignumFromHex(&P.x, tc->Px);
-    initBignumFromHex(&P.y, tc->Py);
-    initBignumFromHex(&Q.x, tc->Qx);
-    initBignumFromHex(&Q.y, tc->Qy);
+    #ifdef take_tests_from_host
+        initBignumFromHex(&P.x, tc->Px);
+        initBignumFromHex(&P.y, tc->Py);
+        initBignumFromHex(&Q.x, tc->Qx);
+        initBignumFromHex(&Q.y, tc->Qy);
+    #else
+        // 12dcd8c4a394f8761af731d2d1eca6ada6d43e004395b41858aa6a195361271e        
+        P.x.d[0] = 0x58aa6a195361271e;
+        P.x.d[1] = 0xa6d43e004395b418;
+        P.x.d[2] = 0x1af731d2d1eca6ad;
+        P.x.d[3] = 0x12dcd8c4a394f876;
+        P.x.top = 4;
+        // ff50375bd72dd99e2dcb852f1e63e495c4e76c2cad5aa0913f5000481c59f8be
+        P.y.d[0] = 0x3f5000481c59f8be;
+        P.y.d[1] = 0xc4e76c2cad5aa091;
+        P.y.d[2] = 0x2dcb852f1e63e495;
+        P.y.d[3] = 0xff50375bd72dd99e;
+        P.y.top = 4;
+        // 138484aeb7e6916b5435a48448039d75e44e3aab4d764a94a3b8674b1e26299a
+        Q.x.d[0] = 0xa3b8674b1e26299a;
+        Q.x.d[1] = 0xe44e3aab4d764a94;
+        Q.x.d[2] = 0x5435a48448039d75;
+        Q.x.d[3] = 0x138484aeb7e6916b;
+        Q.x.top = 4;
+        // dca814a26dc66a532e1082cad171b7e680a52a8dbb3ba8e295d2c749d18255f3
+        Q.y.d[0] = 0x95d2c749d18255f3;
+        Q.y.d[1] = 0x80a52a8dbb3ba8e2;
+        Q.y.d[2] = 0x2e1082cad171b7e6;
+        Q.y.d[3] = 0xdca814a26dc66a53;
+        Q.y.top = 4;
+    #endif
 
     // Perform point addition
-    const BIGNUM CURVE_A_LOCAL = {0};
-    const BIGNUM CURVE_P_LOCAL = {
+    const BIGNUM_CUDA CURVE_A_LOCAL = {0};
+    const BIGNUM_CUDA CURVE_P_LOCAL = {
         {
             0xFFFFFFFEFFFFFC2F,
             0xFFFFFFFFFFFFFFFF,
@@ -139,6 +168,32 @@ __global__ void testEllipticCurve(TestCase *cases, int numCases, ThreadFunctionP
     };
 
     #ifdef use_jacobian_coordinates
+        // // Debug with local test case initialization ++
+        // BIGNUM_CUDA test_values_px[NUM_TESTS];
+        // BIGNUM_CUDA test_values_py[NUM_TESTS];
+        // BIGNUM_CUDA test_values_qx[NUM_TESTS];
+        // BIGNUM_CUDA test_values_qx[NUM_TESTS];
+        // // Initialize test values
+        // for (int i = 0; i < NUM_TESTS; i++) {
+        //     init_zero(&test_values_a[i]);
+        //     init_zero(&test_values_m[i]);
+        // }
+        // // Test case 0
+        // test_values_px[0].top = 4;
+        // // 12dcd8c4a394f8761af731d2d1eca6ada6d43e004395b41858aa6a195361271e
+        // test_values_px[0].d[0] = 0x58aa6a195361271e;
+        // test_values_px[0].d[1] = 0xa6d43e004395b418;
+        // test_values_px[0].d[2] = 0x1af731d2d1eca6ad;
+        // test_values_px[0].d[3] = 0x12dcd8c4a394f876
+        
+        // test_values_m[1].neg = false; test_values_m[1].top = 1;
+        // test_values_m[1].d[0] = 0xFFFFFFFFFFFFFFFDULL; test_values_m[1].d[1] = 0;
+        bn_print_no_fuse("# P.x", &P.x);
+        bn_print_no_fuse("# P.y", &P.y);
+        bn_print_no_fuse("# Q.x", &Q.x);
+        bn_print_no_fuse("# Q.y", &Q.y);
+        // Debug with local test case initialization --
+
         EC_POINT_JACOBIAN P_jacobian, Q_jacobian, resultAdd_jacobian, resultDouble_jacobian;
         affine_to_jacobian(&P, &P_jacobian);
         affine_to_jacobian(&Q, &Q_jacobian);
@@ -154,7 +209,7 @@ __global__ void testEllipticCurve(TestCase *cases, int numCases, ThreadFunctionP
     #endif
 
     // Initialize expected results
-    BIGNUM expectedAddX, expectedAddY, expectedDoubleX, expectedDoubleY;
+    BIGNUM_CUDA expectedAddX, expectedAddY, expectedDoubleX, expectedDoubleY;
     initBignumFromHex(&expectedAddX, tc->ExpectedAddX);
     initBignumFromHex(&expectedAddY, tc->ExpectedAddY);
     initBignumFromHex(&expectedDoubleX, tc->ExpectedDoubleX);

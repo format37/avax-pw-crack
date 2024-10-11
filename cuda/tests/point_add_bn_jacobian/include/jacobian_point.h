@@ -1,20 +1,20 @@
 struct EC_POINT_JACOBIAN {
-    BIGNUM X;
-    BIGNUM Y;
-    BIGNUM Z;
+    BIGNUM_CUDA X;
+    BIGNUM_CUDA Y;
+    BIGNUM_CUDA Z;
 };
 
 __device__ void jacobian_point_double(
     EC_POINT_JACOBIAN *result,
     const EC_POINT_JACOBIAN *P,
-    const BIGNUM *p,
-    const BIGNUM *a
+    const BIGNUM_CUDA *p,
+    const BIGNUM_CUDA *a
 );
 
-__device__ void bn_mod_sub(BIGNUM *result, const BIGNUM *a, const BIGNUM *b, const BIGNUM *n) {
+__device__ void bn_mod_sub(BIGNUM_CUDA *result, const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, const BIGNUM_CUDA *n) {
     bn_sub(result, a, b);
     if (result->neg) {
-        BIGNUM tmp;
+        BIGNUM_CUDA tmp;
         init_zero(&tmp);
         bn_copy(&tmp, result); // dest << src
         bn_add(result, &tmp, n); // result = a + b
@@ -22,9 +22,9 @@ __device__ void bn_mod_sub(BIGNUM *result, const BIGNUM *a, const BIGNUM *b, con
     }
 }
 
-__device__ void bn_mod_add(BIGNUM *result, const BIGNUM *a, const BIGNUM *b, const BIGNUM *n) {
+__device__ void bn_mod_add(BIGNUM_CUDA *result, const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, const BIGNUM_CUDA *n) {
     bn_add(result, a, b);
-    BIGNUM tmp;
+    BIGNUM_CUDA tmp;
     init_zero(&tmp);
     bn_copy(&tmp, result); // dest << src
     bn_mod(result, &tmp, n); // result = a mod n
@@ -41,7 +41,7 @@ __device__ void bn_mod_add(BIGNUM *result, const BIGNUM *a, const BIGNUM *b, con
     } while(0)
 #endif
 
-__device__ int bn_mul_word(BIGNUM *a, BN_ULONG w)
+__device__ int bn_mul_word(BIGNUM_CUDA *a, BN_ULONG w)
 {
     BN_ULONG carry = 0;
     int i;
@@ -75,7 +75,7 @@ __device__ int bn_mul_word(BIGNUM *a, BN_ULONG w)
         }
     }
 
-    a->top = find_top(a);
+    a->top = find_top_cuda(a);
     return 1;
 }
 
@@ -85,14 +85,14 @@ __device__ void affine_to_jacobian(const EC_POINT_CUDA *affine_point, EC_POINT_J
     init_one(&jacobian_point->Z); // Z = 1
 }
 
-__device__ void jacobian_to_affine(const EC_POINT_JACOBIAN *jacobian_point, EC_POINT_CUDA *affine_point, const BIGNUM *p) {
+__device__ void jacobian_to_affine(const EC_POINT_JACOBIAN *jacobian_point, EC_POINT_CUDA *affine_point, const BIGNUM_CUDA *p) {
     if (bn_is_zero(&jacobian_point->Z)) {
         // Point at infinity
         set_point_at_infinity(affine_point);
         return;
     }
 
-    BIGNUM Z_inv, Z_inv2, Z_inv3;
+    BIGNUM_CUDA Z_inv, Z_inv2, Z_inv3;
 
     init_zero(&Z_inv);
     init_zero(&Z_inv2);
@@ -122,8 +122,8 @@ __device__ void jacobian_point_add(
     EC_POINT_JACOBIAN *result,
     const EC_POINT_JACOBIAN *P,
     const EC_POINT_JACOBIAN *Q,
-    const BIGNUM *p,
-    const BIGNUM *a
+    const BIGNUM_CUDA *p,
+    const BIGNUM_CUDA *a
 ) {
     // Handle special cases
     if (bn_is_zero(&P->Z)) {
@@ -142,7 +142,7 @@ __device__ void jacobian_point_add(
     }
 
     // Compute U1 = X1 * Z2^2 mod p
-    BIGNUM Z2_squared, U1;
+    BIGNUM_CUDA Z2_squared, U1;
     init_zero(&Z2_squared);
     init_zero(&U1);
     bn_mul(&Q->Z, &Q->Z, &Z2_squared); // Z2^2
@@ -151,7 +151,7 @@ __device__ void jacobian_point_add(
     bn_mod(&U1, &U1, p);
 
     // Compute U2 = X2 * Z1^2 mod p
-    BIGNUM Z1_squared, U2;
+    BIGNUM_CUDA Z1_squared, U2;
     init_zero(&Z1_squared);
     init_zero(&U2);
     bn_mul(&P->Z, &P->Z, &Z1_squared); // Z1^2
@@ -160,7 +160,7 @@ __device__ void jacobian_point_add(
     bn_mod(&U2, &U2, p);
 
     // Compute S1 = Y1 * Z2^3 mod p
-    BIGNUM Z2_cubed, S1;
+    BIGNUM_CUDA Z2_cubed, S1;
     init_zero(&Z2_cubed);
     init_zero(&S1);
     bn_mul(&Z2_squared, &Q->Z, &Z2_cubed); // Z2^3
@@ -169,7 +169,7 @@ __device__ void jacobian_point_add(
     bn_mod(&S1, &S1, p);
 
     // Compute S2 = Y2 * Z1^3 mod p
-    BIGNUM Z1_cubed, S2;
+    BIGNUM_CUDA Z1_cubed, S2;
     init_zero(&Z1_cubed);
     init_zero(&S2);
     bn_mul(&Z1_squared, &P->Z, &Z1_cubed); // Z1^3
@@ -178,12 +178,12 @@ __device__ void jacobian_point_add(
     bn_mod(&S2, &S2, p);
 
     // Now compute H = U2 - U1 mod p
-    BIGNUM H;
+    BIGNUM_CUDA H;
     init_zero(&H);
     bn_mod_sub(&H, &U2, &U1, p);
 
     // r = S2 - S1 mod p
-    BIGNUM r;
+    BIGNUM_CUDA r;
     init_zero(&r);
     bn_mod_sub(&r, &S2, &S1, p);
 
@@ -203,7 +203,7 @@ __device__ void jacobian_point_add(
     }
 
     // Compute H^2, H^3, U1*H^2
-    BIGNUM H_squared, H_cubed, U1_H_squared;
+    BIGNUM_CUDA H_squared, H_cubed, U1_H_squared;
     init_zero(&H_squared);
     init_zero(&H_cubed);
     init_zero(&U1_H_squared);
@@ -218,44 +218,61 @@ __device__ void jacobian_point_add(
     bn_mod(&U1_H_squared, &U1_H_squared, p);
 
     // Compute r^2
-    BIGNUM r_squared;
+    BIGNUM_CUDA r_squared;
     init_zero(&r_squared);
     bn_mul(&r, &r, &r_squared);
     bn_mod(&r_squared, &r_squared, p);
 
     // X3 = r^2 - H^3 - 2 * U1_H_squared mod p
-    BIGNUM two_U1_H_squared;
+    BIGNUM_CUDA two_U1_H_squared;
     init_zero(&two_U1_H_squared);
     bn_mod_add(&two_U1_H_squared, &U1_H_squared, &U1_H_squared, p);
 
-    BIGNUM temp;
+    BIGNUM_CUDA temp;
     init_zero(&temp);
     bn_mod_sub(&temp, &r_squared, &H_cubed, p);
     bn_mod_sub(&temp, &temp, &two_U1_H_squared, p);
     bn_copy(&result->X, &temp);
 
     // Y3 = r * (U1_H_squared - X3) - S1 * H^3 mod p
-    BIGNUM U1_H_squared_minus_X3;
+    BIGNUM_CUDA U1_H_squared_minus_X3;
     init_zero(&U1_H_squared_minus_X3);
     bn_mod_sub(&U1_H_squared_minus_X3, &U1_H_squared, &result->X, p);
 
-    BIGNUM r_times_U1_H_squared_minus_X3;
+    BIGNUM_CUDA r_times_U1_H_squared_minus_X3;
     init_zero(&r_times_U1_H_squared_minus_X3);
     bn_mul(&r, &U1_H_squared_minus_X3, &r_times_U1_H_squared_minus_X3);
     bn_mod(&r_times_U1_H_squared_minus_X3, &r_times_U1_H_squared_minus_X3, p);
 
-    BIGNUM S1_H_cubed;
+    BIGNUM_CUDA S1_H_cubed;
     init_zero(&S1_H_cubed);
     bn_mul(&S1, &H_cubed, &S1_H_cubed);
     bn_mod(&S1_H_cubed, &S1_H_cubed, p);
 
     bn_mod_sub(&result->Y, &r_times_U1_H_squared_minus_X3, &S1_H_cubed, p);
 
+    
     // Z3 = H * Z1 * Z2 mod p
-    bn_mul(&P->Z, &Q->Z, &result->Z);
-    bn_mod(&result->Z, &result->Z, p);
-    bn_mul(&result->Z, &H, &result->Z);
-    bn_mod(&result->Z, &result->Z, p);
+    bn_print_no_fuse("P->Z: ", &P->Z);
+    bn_print_no_fuse("Q->Z: ", &Q->Z);
+    bn_mul(&P->Z, &Q->Z, &result->Z); // a * b = product
+    bn_print_no_fuse("After first mul, result->Z: ", &result->Z);
+    
+    // init_zero(&temp);
+    bn_copy(&temp, &result->Z); // dest << src
+    bn_mod(&result->Z, &temp, p); // result = a % m
+    bn_print_no_fuse("After first mod, result->Z: ", &result->Z);
+    
+    bn_print_no_fuse("H: ", &H);
+    // init_zero(&temp);
+    bn_copy(&temp, &result->Z); // dest << src
+    bn_mul(&temp, &H, &result->Z); // a * b = product
+    bn_print_no_fuse("After second mul, result->Z: ", &result->Z);
+
+    bn_copy(&temp, &result->Z); // dest << src
+    bn_mod(&result->Z, &temp, p); // result = a % m
+    bn_print_no_fuse("Final result->Z: ", &result->Z);
+
 
     // Print results
     bn_print_no_fuse("point_add << X: ", &result->X);
@@ -266,8 +283,8 @@ __device__ void jacobian_point_add(
 __device__ void jacobian_point_double(
     EC_POINT_JACOBIAN *result,
     const EC_POINT_JACOBIAN *P,
-    const BIGNUM *p,
-    const BIGNUM *a
+    const BIGNUM_CUDA *p,
+    const BIGNUM_CUDA *a
 ) {
     if (bn_is_zero(&P->Z) || bn_is_zero(&P->Y)) {
         // Point at infinity
@@ -277,7 +294,7 @@ __device__ void jacobian_point_double(
         return;
     }
 
-    BIGNUM XX, YY, YYYY, ZZ, S, M, T;
+    BIGNUM_CUDA XX, YY, YYYY, ZZ, S, M, T;
     init_zero(&XX);
     init_zero(&YY);
     init_zero(&YYYY);
@@ -309,7 +326,7 @@ __device__ void jacobian_point_double(
     bn_mod(&S, &S, p);
 
     // M = 3 * XX + a * ZZ^2 mod p
-    BIGNUM aZZ_squared;
+    BIGNUM_CUDA aZZ_squared;
     init_zero(&aZZ_squared);
     bn_mul(&ZZ, &ZZ, &aZZ_squared);
     bn_mul(&aZZ_squared, a, &aZZ_squared);
@@ -321,20 +338,20 @@ __device__ void jacobian_point_double(
     // X3 = M^2 - 2 * S mod p
     bn_mul(&M, &M, &T);
     bn_mod(&T, &T, p);
-    BIGNUM two_S;
+    BIGNUM_CUDA two_S;
     init_zero(&two_S);
     bn_mod_add(&two_S, &S, &S, p);
     bn_mod_sub(&result->X, &T, &two_S, p);
 
     // Y3 = M * (S - X3) - 8 * YYYY mod p
-    BIGNUM S_minus_X3;
+    BIGNUM_CUDA S_minus_X3;
     init_zero(&S_minus_X3);
     bn_mod_sub(&S_minus_X3, &S, &result->X, p);
 
     bn_mul(&M, &S_minus_X3, &result->Y);
     bn_mod(&result->Y, &result->Y, p);
 
-    BIGNUM eight_YYYY;
+    BIGNUM_CUDA eight_YYYY;
     init_zero(&eight_YYYY);
     bn_mul_word(&YYYY, 8);
     bn_mod(&eight_YYYY, &eight_YYYY, p);
@@ -354,9 +371,9 @@ __device__ void jacobian_point_double(
 
 __device__ EC_POINT_CUDA ec_point_scalar_mul_jacobian(
     EC_POINT_CUDA *point, 
-    BIGNUM *scalar, 
-    BIGNUM *curve_prime, 
-    BIGNUM *curve_a
+    BIGNUM_CUDA *scalar, 
+    BIGNUM_CUDA *curve_prime, 
+    BIGNUM_CUDA *curve_a
 ) {
     EC_POINT_JACOBIAN current, result;
     affine_to_jacobian(point, &current);

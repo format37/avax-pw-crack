@@ -487,16 +487,6 @@ __device__ int point_add(
         bn_print("<< y3: ", &y3);
     }
 
-    // Free the dynamically allocated memory
-    // free_bignum(&s);
-    // free_bignum(&x3);
-    // free_bignum(&y3);
-    // free_bignum(&tmp1);
-    // free_bignum(&tmp2);
-    // free_bignum(&tmp3);
-    // free_bignum(&two);
-    // free_bignum(&tmp1_squared);
-
     return 0;
 }
 
