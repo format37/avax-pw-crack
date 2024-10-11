@@ -1,8 +1,33 @@
+struct EC_POINT_CUDA {
+  BIGNUM_CUDA x; 
+  BIGNUM_CUDA y;
+};
+
 struct EC_POINT_JACOBIAN {
     BIGNUM_CUDA X;
     BIGNUM_CUDA Y;
     BIGNUM_CUDA Z;
 };
+
+__device__ bool bn_mod_inverse(BIGNUM_CUDA *result, const BIGNUM_CUDA *a, const BIGNUM_CUDA *n);
+__device__ void bignum_to_bit_array(BIGNUM_CUDA *n, unsigned int *bits);
+
+__device__ void set_point_at_infinity(EC_POINT_CUDA *point) {
+    // Assuming EC_POINT_CUDA is a structure containing BIGNUM_CUDA x and y
+    // and that a BIGNUM_CUDA value of NULL or {0} represents the point at infinity
+
+    // To set the point at infinity, one straightforward way is to assign
+    // a null pointer to x and y if the BIGNUM_CUDA structure allows it, or 
+    // set their values to some predetermined sentinel value that indicates
+    // the point at infinity.
+
+    // If using the sentinel value approach - ensure BIGNUM_CUDA is set in a way
+    // that other functions can check for it and treat it as infinity
+
+    // To set the point to 0 (as an example sentinel value), do:
+    init_zero(&point->x);
+    init_zero(&point->y);// Ensure that this logic matches how you identify point at infinity elsewhere
+}
 
 __device__ void jacobian_point_double(
     EC_POINT_JACOBIAN *result,
@@ -98,7 +123,7 @@ __device__ void jacobian_to_affine(const EC_POINT_JACOBIAN *jacobian_point, EC_P
     bn_mod(&affine_point->y, &affine_point->y, p);
 }
 
-__device__ void jacobian_point_add(
+__device__ void point_add_jacobian(
     EC_POINT_JACOBIAN *result,
     const EC_POINT_JACOBIAN *P,
     const EC_POINT_JACOBIAN *Q,
@@ -361,7 +386,7 @@ __device__ EC_POINT_CUDA ec_point_scalar_mul_jacobian(
 
         if (bits[i]) {
             // Point addition
-            jacobian_point_add(&result, &result, &current, curve_prime, curve_a);
+            point_add_jacobian(&result, &result, &current, curve_prime, curve_a);
         }
     }
 

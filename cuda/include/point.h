@@ -1,7 +1,4 @@
-struct EC_POINT_CUDA {
-  BIGNUM_CUDA x; 
-  BIGNUM_CUDA y;
-};
+#include "jacobian_point.h"
 
 __device__ bool bn_mod_inverse(BIGNUM_CUDA *result, const BIGNUM_CUDA *a, const BIGNUM_CUDA *n) {
     #ifdef debug_print
@@ -172,24 +169,7 @@ __device__ void copy_point(EC_POINT_CUDA *dest, EC_POINT_CUDA *src) {
     bn_copy(&dest->y, &src->y);
 }
 
-__device__ void set_point_at_infinity(EC_POINT_CUDA *point) {
-    // Assuming EC_POINT_CUDA is a structure containing BIGNUM_CUDA x and y
-    // and that a BIGNUM_CUDA value of NULL or {0} represents the point at infinity
-
-    // To set the point at infinity, one straightforward way is to assign
-    // a null pointer to x and y if the BIGNUM_CUDA structure allows it, or 
-    // set their values to some predetermined sentinel value that indicates
-    // the point at infinity.
-
-    // If using the sentinel value approach - ensure BIGNUM_CUDA is set in a way
-    // that other functions can check for it and treat it as infinity
-
-    // To set the point to 0 (as an example sentinel value), do:
-    init_zero(&point->x);
-    init_zero(&point->y);// Ensure that this logic matches how you identify point at infinity elsewhere
-}
-
-__device__ int point_add(
+__device__ int point_add_affine(
     EC_POINT_CUDA *result, 
     EC_POINT_CUDA *p1, 
     EC_POINT_CUDA *p2, 
@@ -543,7 +523,13 @@ __device__ EC_POINT_CUDA ec_point_scalar_mul(
             if (debug) printf("[%d] step 1\n", i);
             init_point_at_infinity(&tmp_result);
             if (debug) printf("[%d] step 2\n", i);
-            point_add(&tmp_result, &result, &current, curve_prime, curve_a);  // Add current to the result
+            
+            point_add_affine(&tmp_result, &result, &current, curve_prime, curve_a);  // Add current to the result
+            // EC_POINT_JACOBIAN P_jacobian, Q_jacobian, resultAdd_jacobian, resultDouble_jacobian;
+            // affine_to_jacobian(&P, &P_jacobian);
+            // affine_to_jacobian(&Q, &Q_jacobian);
+            // point_add_jacobian(&resultAdd_jacobian, &P_jacobian, &Q_jacobian, curve_prime, curve_a);
+            
             if (debug) printf("[%d] step 3\n", i);
             init_point_at_infinity(&result); // Reset result
             if (debug) printf("[%d] step 4\n", i);

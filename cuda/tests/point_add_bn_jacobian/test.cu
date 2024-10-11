@@ -188,17 +188,17 @@ __global__ void testEllipticCurve(TestCase *cases, int numCases, ThreadFunctionP
         
         // test_values_m[1].neg = false; test_values_m[1].top = 1;
         // test_values_m[1].d[0] = 0xFFFFFFFFFFFFFFFDULL; test_values_m[1].d[1] = 0;
-        // bn_print_no_fuse("# P.x", &P.x);
-        // bn_print_no_fuse("# P.y", &P.y);
-        // bn_print_no_fuse("# Q.x", &Q.x);
-        // bn_print_no_fuse("# Q.y", &Q.y);
+        bn_print_no_fuse("# P.x", &P.x);
+        bn_print_no_fuse("# P.y", &P.y);
+        bn_print_no_fuse("# Q.x", &Q.x);
+        bn_print_no_fuse("# Q.y", &Q.y);
         // Debug with local test case initialization --
 
         EC_POINT_JACOBIAN P_jacobian, Q_jacobian, resultAdd_jacobian, resultDouble_jacobian;
         affine_to_jacobian(&P, &P_jacobian);
         affine_to_jacobian(&Q, &Q_jacobian);
         
-        jacobian_point_add(&resultAdd_jacobian, &P_jacobian, &Q_jacobian, &CURVE_P_LOCAL, &CURVE_A_LOCAL);
+        point_add_jacobian(&resultAdd_jacobian, &P_jacobian, &Q_jacobian, &CURVE_P_LOCAL, &CURVE_A_LOCAL);
         jacobian_to_affine(&resultAdd_jacobian, &resultAdd, &CURVE_P_LOCAL);
         
         jacobian_point_double(&resultDouble_jacobian, &P_jacobian, &CURVE_P_LOCAL, &CURVE_A_LOCAL);
