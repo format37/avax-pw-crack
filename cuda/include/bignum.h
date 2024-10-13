@@ -4,11 +4,11 @@
 #include <stdint.h>
 #include "function_profiling.h"
 
-// #define BN_128
+#define BN_128
 // #define debug_print
 // #define debug_bn_copy
 // #define debug_top
-// #define function_profiler
+#define function_profiler
 #define use_jacobian_coordinates
 
 #ifdef BN_128
