@@ -8,7 +8,13 @@ __device__ bool bn_mod_inverse(BIGNUM_CUDA *result, const BIGNUM_CUDA *a, const 
     #endif
     
     if (bn_is_one(n)) {
-        return false;  // No modular inverse exists
+        return false;  // No modular inverse exists if modulus is 1
+    }
+
+    if (bn_is_one(a)) {
+        // The modular inverse of 1 is 1
+        init_one(result);
+        return true;
     }
 
     BIGNUM_CUDA r;
@@ -517,31 +523,62 @@ __device__ EC_POINT_CUDA ec_point_scalar_mul(
     unsigned int bits[256];                          // Assuming a 256-bit scalar
     bignum_to_bit_array(scalar, bits);    
     if (debug) printf("[D] Starting scalar multiplication loop\n");
+    #ifdef use_jacobian_coordinates
+        EC_POINT_JACOBIAN P_jacobian, Q_jacobian, resultAdd_jacobian;
+    #endif
+
     for (int i = 0; i < 256; i++) {                 // Assuming 256-bit scalars        
-        if (debug) printf("[%d] step 0\n", i);
+        // if (debug) printf("[%d] step 0\n", i);
         if (bits[i]) {// If the i-th bit is set
-            if (debug) printf("[%d] step 1\n", i);
+            // if (debug) printf("[%d] step 1\n", i);
             init_point_at_infinity(&tmp_result);
-            if (debug) printf("[%d] step 2\n", i);
+            // if (debug) printf("[%d] step 2\n", i);
             
-            point_add_affine(&tmp_result, &result, &current, curve_prime, curve_a);  // Add current to the result
-            // EC_POINT_JACOBIAN P_jacobian, Q_jacobian, resultAdd_jacobian, resultDouble_jacobian;
-            // affine_to_jacobian(&P, &P_jacobian);
-            // affine_to_jacobian(&Q, &Q_jacobian);
-            // point_add_jacobian(&resultAdd_jacobian, &P_jacobian, &Q_jacobian, curve_prime, curve_a);
-            
-            if (debug) printf("[%d] step 3\n", i);
-            init_point_at_infinity(&result); // Reset result
-            if (debug) printf("[%d] step 4\n", i);
-            #ifdef debug_bn_copy
-                printf("ec_point_scalar_mul: bn_copy(result.x, tmp_result.x)\n");
+            // printf("\n\n[%d]\n", i);
+            #ifdef use_jacobian_coordinates
+                // bn_print_no_fuse(">> point_add current.x: ", &current.x);
+                // bn_print_no_fuse(">> point_add current.y: ", &current.y);
+                // bn_print_no_fuse(">> point_add result.x: ", &result.x);
+                // bn_print_no_fuse(">> point_add result.y: ", &result.y);
+                affine_to_jacobian(&result, &P_jacobian);
+                affine_to_jacobian(&current, &Q_jacobian);
+                // bn_print_no_fuse(">> point_add P_jacobian.x: ", &P_jacobian.X);
+                // bn_print_no_fuse(">> point_add P_jacobian.y: ", &P_jacobian.Y);
+                // bn_print_no_fuse(">> point_add P_jacobian.z: ", &P_jacobian.Z);
+                // bn_print_no_fuse(">> point_add Q_jacobian.x: ", &Q_jacobian.X);
+                // bn_print_no_fuse(">> point_add Q_jacobian.y: ", &Q_jacobian.Y);
+                // bn_print_no_fuse(">> point_add Q_jacobian.z: ", &Q_jacobian.Z);
+                point_add_jacobian(&resultAdd_jacobian, &Q_jacobian, &P_jacobian, curve_prime, curve_a);
+                // bn_print_no_fuse("<< point_add resultAdd_jacobian.x: ", &resultAdd_jacobian.X);
+                // bn_print_no_fuse("<< point_add resultAdd_jacobian.y: ", &resultAdd_jacobian.Y);
+                // bn_print_no_fuse("<< point_add resultAdd_jacobian.z: ", &resultAdd_jacobian.Z);
+                jacobian_to_affine(&resultAdd_jacobian, &result, curve_prime);
+                // bn_print_no_fuse("<< point_add result.x: ", &result.x);
+                // bn_print_no_fuse("<< point_add result.y: ", &result.y);
+            #else
+                // bn_print_no_fuse(">> point_add current.x: ", &current.x);
+                // bn_print_no_fuse(">> point_add current.y: ", &current.y);
+                // bn_print_no_fuse(">> point_add result.x: ", &result.x);
+                // bn_print_no_fuse(">> point_add result.y: ", &result.y);
+                point_add_affine(&tmp_result, &result, &current, curve_prime, curve_a);  // Add current to the result
+                // bn_print_no_fuse("<< point_add tmp_result.x: ", &tmp_result.x);
+                // bn_print_no_fuse("<< point_add tmp_result.y: ", &tmp_result.y);
+                // if (debug) printf("[%d] step 3\n", i);
+                init_point_at_infinity(&result); // Reset result
+                // if (debug) printf("[%d] step 4\n", i);
+                // #ifdef debug_bn_copy
+                //     printf("ec_point_scalar_mul: bn_copy(result.x, tmp_result.x)\n");
+                // #endif
+                bn_copy(&result.x, &tmp_result.x);
+                // if (debug) printf("[%d] step 5\n", i);
+                // #ifdef debug_bn_copy
+                //     printf("ec_point_scalar_mul: bn_copy(result.y, tmp_result.y)\n");
+                // #endif
+                bn_copy(&result.y, &tmp_result.y);   
             #endif
-            bn_copy(&result.x, &tmp_result.x);
-            if (debug) printf("[%d] step 5\n", i);
-            #ifdef debug_bn_copy
-                printf("ec_point_scalar_mul: bn_copy(result.y, tmp_result.y)\n");
-            #endif
-            bn_copy(&result.y, &tmp_result.y);            
+            // printf("[%d] ", i);
+            // bn_print_no_fuse("point_add result.x: ", &result.x);
+            // bn_print_no_fuse("point_add result.y: ", &result.y);
         }
         if (debug) printf("[%d] step 6\n", i);
         // init tmp_result
@@ -567,26 +604,33 @@ __device__ EC_POINT_CUDA ec_point_scalar_mul(
         // Copy current to tmp_b
         #ifdef debug_bn_copy
             printf("ec_point_scalar_mul: bn_copy(tmp_b.x, current.x)\n");
+        #endif        
+        #ifdef use_jacobian_coordinates
+            affine_to_jacobian(&current, &Q_jacobian);
+            jacobian_point_double(&resultAdd_jacobian, &Q_jacobian, curve_prime, curve_a);
+            jacobian_to_affine(&resultAdd_jacobian, &current, curve_prime);
+        #else
+            bn_copy(&tmp_b.x, &current.x);
+            if (debug) printf("[%d] step 12\n", i);
+            #ifdef debug_bn_copy
+                printf("ec_point_scalar_mul: bn_copy(tmp_b.y, current.y)\n");
+            #endif
+            bn_copy(&tmp_b.y, &current.y);
+            // if (debug) printf("[%d] step 13\n", i);
+            point_add_affine(&tmp_result, &tmp_a, &tmp_b, curve_prime, curve_a);  // Double current by adding to itself
+            // if (debug) printf("[%d] step 14\n", i);
+            // Copy tmp_result to current
+            #ifdef debug_bn_copy
+                printf("ec_point_scalar_mul: bn_copy(current.x, tmp_result.x)\n");
+            #endif
+            bn_copy(&current.x, &tmp_result.x);
+            if (debug) printf("[%d] step 15\n", i);
+            #ifdef debug_bn_copy
+                printf("ec_point_scalar_mul: bn_copy(current.y, tmp_result.y)\n");
+            #endif
+            bn_copy(&current.y, &tmp_result.y);
         #endif
-        bn_copy(&tmp_b.x, &current.x);
-        if (debug) printf("[%d] step 12\n", i);
-        #ifdef debug_bn_copy
-            printf("ec_point_scalar_mul: bn_copy(tmp_b.y, current.y)\n");
-        #endif
-        bn_copy(&tmp_b.y, &current.y);
-        if (debug) printf("[%d] step 13\n", i);
-        point_add(&tmp_result, &tmp_a, &tmp_b, curve_prime, curve_a);  // Double current by adding to itself
-        if (debug) printf("[%d] step 14\n", i);
-        // Copy tmp_result to current
-        #ifdef debug_bn_copy
-            printf("ec_point_scalar_mul: bn_copy(current.x, tmp_result.x)\n");
-        #endif
-        bn_copy(&current.x, &tmp_result.x);
-        if (debug) printf("[%d] step 15\n", i);
-        #ifdef debug_bn_copy
-            printf("ec_point_scalar_mul: bn_copy(current.y, tmp_result.y)\n");
-        #endif
-        bn_copy(&current.y, &tmp_result.y);
+        
         if (debug) printf("[%d] passed\n", i);
     }    
     // Copy current to result

@@ -11,6 +11,7 @@ struct EC_POINT_JACOBIAN {
 
 __device__ bool bn_mod_inverse(BIGNUM_CUDA *result, const BIGNUM_CUDA *a, const BIGNUM_CUDA *n);
 __device__ void bignum_to_bit_array(BIGNUM_CUDA *n, unsigned int *bits);
+__device__ int point_is_at_infinity(const EC_POINT_CUDA *P);
 
 __device__ void set_point_at_infinity(EC_POINT_CUDA *point) {
     // Assuming EC_POINT_CUDA is a structure containing BIGNUM_CUDA x and y
@@ -46,54 +47,71 @@ __device__ void jacobian_point_double(
     } while(0)
 #endif
 
-__device__ int bn_mul_word(BIGNUM_CUDA *a, BN_ULONG w)
-{
-    BN_ULONG carry = 0;
-    int i;
+// __device__ int bn_mul_word(BIGNUM_CUDA *a, BN_ULONG w)
+// {
+//     BN_ULONG carry = 0;
+//     int i;
 
-    for (i = 0; i < a->top; i++)
-    {
-        #ifdef BN_128
-            unsigned __int128 res = (unsigned __int128)a->d[i] * w + carry;
-            a->d[i] = (BN_ULONG)res;
-            carry = (BN_ULONG)(res >> 128);
-        #else
-            BN_ULONG high, low;
-            BN_UMULT_LOHI(high, low, a->d[i], w);
-            low += carry;
-            high += (low < carry);
-            a->d[i] = low;
-            carry = high;
-        #endif
-    }
+//     for (i = 0; i < a->top; i++)
+//     {
+//         #ifdef BN_128
+//             unsigned __int128 res = (unsigned __int128)a->d[i] * w + carry;
+//             a->d[i] = (BN_ULONG)res;
+//             carry = (BN_ULONG)(res >> 128);
+//         #else
+//             BN_ULONG high, low;
+//             BN_UMULT_LOHI(high, low, a->d[i], w);
+//             low += carry;
+//             high += (low < carry);
+//             a->d[i] = low;
+//             carry = high;
+//         #endif
+//     }
 
-    if (carry != 0)
-    {
-        if (a->top < MAX_BIGNUM_SIZE)
-        {
-            a->d[a->top++] = carry;
-            return 1;
-        }
-        else
-        {
-            return 0; // Overflow
-        }
-    }
+//     if (carry != 0)
+//     {
+//         if (a->top < MAX_BIGNUM_SIZE)
+//         {
+//             a->d[a->top++] = carry;
+//             return 1;
+//         }
+//         else
+//         {
+//             return 0; // Overflow
+//         }
+//     }
 
-    a->top = find_top_cuda(a);
-    return 1;
-}
+//     a->top = find_top_cuda(a);
+//     return 1;
+// }
 
+// __device__ void affine_to_jacobian(const EC_POINT_CUDA *affine_point, EC_POINT_JACOBIAN *jacobian_point) {
+//     bn_copy(&jacobian_point->X, &affine_point->x);
+//     bn_copy(&jacobian_point->Y, &affine_point->y);
+//     init_one(&jacobian_point->Z); // Z = 1
+// }
 __device__ void affine_to_jacobian(const EC_POINT_CUDA *affine_point, EC_POINT_JACOBIAN *jacobian_point) {
-    bn_copy(&jacobian_point->X, &affine_point->x);
-    bn_copy(&jacobian_point->Y, &affine_point->y);
-    init_one(&jacobian_point->Z); // Z = 1
+    if (point_is_at_infinity(affine_point)) {
+        // Point at infinity in Jacobian coordinates is represented by Z = 0
+        init_zero(&jacobian_point->X);
+        init_zero(&jacobian_point->Y);
+        init_zero(&jacobian_point->Z); // Z = 0
+    } else {
+        bn_copy(&jacobian_point->X, &affine_point->x);
+        bn_copy(&jacobian_point->Y, &affine_point->y);
+        init_one(&jacobian_point->Z); // Z = 1
+    }
 }
 
 __device__ void jacobian_to_affine(const EC_POINT_JACOBIAN *jacobian_point, EC_POINT_CUDA *affine_point, const BIGNUM_CUDA *p) {
+    // bn_print_no_fuse("jacobian_to_affine >> jacobian_point->X: ", &jacobian_point->X);
+    // bn_print_no_fuse("jacobian_to_affine >> jacobian_point->Y: ", &jacobian_point->Y);
+    // bn_print_no_fuse("jacobian_to_affine >> jacobian_point->Z: ", &jacobian_point->Z);
     if (bn_is_zero(&jacobian_point->Z)) {
+        // printf("jacobian_to_affine: Point at infinity\n");
         // Point at infinity
         set_point_at_infinity(affine_point);
+        // printf("jacobian_to_affine: return\n");
         return;
     }
 
@@ -268,7 +286,7 @@ __device__ void point_add_jacobian(
     bn_mod(&result->Z, &temp, p); // result = a % m
     // bn_print_no_fuse("After first mod, result->Z: ", &result->Z);
     
-    bn_print_no_fuse("H: ", &H);
+    // bn_print_no_fuse("H: ", &H);
     // init_zero(&temp);
     bn_copy(&temp, &result->Z); // dest << src
     bn_mul(&temp, &H, &result->Z); // a * b = product

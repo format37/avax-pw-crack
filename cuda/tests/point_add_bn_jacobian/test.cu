@@ -6,11 +6,14 @@
 #include "bignum.h"
 #include "point.h"
 #include "public_key.h"
-#include "jacobian_point.h"
 
 #define use_jacobian_coordinates
-// #define take_tests_from_host
+#define take_tests_from_host
 #define NUM_TESTS 1
+
+// The test cases have the following format:  
+// Px Py Qx Qy (P+Q)x (P+Q)y (P+P)x (P+P)y  
+// where P and Q are points on the elliptic curve. 
 
 #define MAX_LINE_LENGTH 1024
 #define MAX_TEST_CASES 1000
@@ -195,12 +198,14 @@ __global__ void testEllipticCurve(TestCase *cases, int numCases, ThreadFunctionP
         // Debug with local test case initialization --
 
         EC_POINT_JACOBIAN P_jacobian, Q_jacobian, resultAdd_jacobian, resultDouble_jacobian;
+        printf("\ncalling affine_to_jacobian\n");
         affine_to_jacobian(&P, &P_jacobian);
         affine_to_jacobian(&Q, &Q_jacobian);
-        
+        printf("\ncalling point_add_jacobian\n");
         point_add_jacobian(&resultAdd_jacobian, &P_jacobian, &Q_jacobian, &CURVE_P_LOCAL, &CURVE_A_LOCAL);
+        printf("\ncalling jacobian_to_affine\n");
         jacobian_to_affine(&resultAdd_jacobian, &resultAdd, &CURVE_P_LOCAL);
-        
+        printf("\ncalling point_double_jacobian\n");
         jacobian_point_double(&resultDouble_jacobian, &P_jacobian, &CURVE_P_LOCAL, &CURVE_A_LOCAL);
         jacobian_to_affine(&resultDouble_jacobian, &resultDouble, &CURVE_P_LOCAL);
     #else

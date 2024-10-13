@@ -9,6 +9,7 @@
 // #define debug_bn_copy
 // #define debug_top
 // #define function_profiler
+#define use_jacobian_coordinates
 
 #ifdef BN_128
     #define BN_ULONG unsigned __int128
