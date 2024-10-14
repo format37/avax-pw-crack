@@ -9,6 +9,7 @@ services:
       - ../config.json:/config.json
       - ./entrypoint.sh:/app/entrypoint.sh
       - ./main.cu:/app/main.cu
+      - ./logs:/app/logs
     environment:
       - NVIDIA_VISIBLE_DEVICES=0  # Use the first GPU
     deploy:

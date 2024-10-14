@@ -10,7 +10,7 @@ nvcc \
     -use_fast_math \
     -I ./include \
     -I ./json \
-    -o program 2> build.log
+    -o program 2> logs/build.log
 
 start_time=$(date +%s.%N)
 echo Start execution: $(date)

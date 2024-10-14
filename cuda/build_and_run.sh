@@ -25,10 +25,10 @@ nvcc \
     -use_fast_math \
     -I ./include \
     -I ../json \
-    -o program 2> build.log
+    -o program 2> logs/build.log
 
-cat build.log
-echo "Errors: $(grep -c error build.log)"
+cat logs/build.log
+echo "Errors: $(grep -c error logs/build.log)"
 
 end_time=$(date +%s.%N)
 echo End: $(date)
@@ -37,12 +37,12 @@ echo "Build runtime: $runtime seconds\n"
 
 # export CUDA_VISIBLE_DEVICES=0
 
-rm -rf run.log
+rm -rf logs/run.log
 start_time=$(date +%s.%N)
 echo Start execution: $(date)
 
-./program >> run.log
-cat run.log
+./program >> logs/run.log
+cat logs/run.log
 
 end_time=$(date +%s.%N)
 echo End: $(date)

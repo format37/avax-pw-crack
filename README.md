@@ -13,6 +13,21 @@ Finally, you need either your p-chain address to match against.
 ##### Output:
 * 25th word
 
+#### Simple docker example
+Clone the repo
+```
+git clone https://github.com/format37/avax-pw-crack.git
+cd avax-pw-crack/cuda
+```
+Define your GPU architecture in the 
+```
+nano entrypoint.sh
+```
+Compose
+```
+sh compose.sh
+```
+
 #### Cuda usage
 You need to define the input parameters in the cuda/config.json
 Start from small search space (short threashold between start and end passphrase) to determine the performance and increase it gradually.
