@@ -8,7 +8,7 @@
 // #define debug_print
 // #define debug_bn_copy
 // #define debug_top
-#define function_profiler
+// #define function_profiler
 // #define use_jacobian_coordinates
 
 #ifdef BN_128
@@ -868,10 +868,8 @@ __device__ void bn_mul_from_div(const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, BIGN
             }
         #endif
     #else
-        // if (find_top_optimized(a, MAX_BIGNUM_SIZE) != a->top) printf("### ERROR: bn_mul: find_top_optimized(a, MAX_BIGNUM_SIZE) != a->top\n");
-        // if (find_top_optimized(b, MAX_BIGNUM_SIZE) != b->top) printf("### ERROR: bn_mul: find_top_optimized(b, MAX_BIGNUM_SIZE) != b->top\n");
-        // Multiply in vanila way if top is less than 3:
-        if (a->top < 3 && b->top < 3) { // Surprisingly, decreases the performance
+        // Multiply in vanila way if top is less than 3
+        if (a->top < 3 && b->top < 3) {
             int a_bit_len = bn_bit_length(a);
             int b_bit_len = bn_bit_length(b);
             int product_bit_len = a_bit_len + b_bit_len;
@@ -899,7 +897,7 @@ __device__ void bn_mul_from_div(const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, BIGN
                 product->top = find_top_optimized(product, 2);
                 if (!absolute) product->neg = a->neg ^ b->neg;
                 #ifdef function_profiler
-                    record_function(FN_BN_MUL_VANILA, start_time);
+                    record_function(FN_BN_MUL_VANILA_2, start_time);
                 #endif
                 return;
             }

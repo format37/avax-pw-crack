@@ -25,13 +25,14 @@ start_time=$(date +%s.%N)
 echo Start execution: $(date)
 # "sell stereo useless course suffer tribe jazz monster fresh excess wire again father film sudden pelican always room attack rubber pelican trash alone cancel" \
 # "a" \
-valgrind \
-    --tool=callgrind \
-    ./program \    
-    >> run.log
+# valgrind \
+#     --tool=callgrind \
+#     ./program \    
+#     >> run.log
+./program >> run.log
 
 # Enable core dumps
-ulimit -c unlimited
+# ulimit -c unlimited
 # Run the program
 # strace -f  ./program >> run.log 2>&1
 # gdb -ex run --args ./program
