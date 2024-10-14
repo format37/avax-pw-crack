@@ -15,12 +15,12 @@ for filename in os.listdir(include_folder):
     if os.path.isfile(file_path):
         with open(file_path, 'r') as file:
             file_content = file.read()
-            content += f"# {filename}\n```\n{file_content}\n```\n\n"
+            content += f"## {file_path}\n```\n{file_content}\n```\n\n"
 
 # Add content of main.cu
 with open(main_cu_path, 'r') as main_cu_file:
     main_cu_content = main_cu_file.read()
-    content += f"# main.cu\n```\n{main_cu_content}\n```\n"
+    content += f"## {main_cu_path}\n```\n{main_cu_content}\n```\n"
 
 # Save the content to prompt.txt
 os.makedirs(os.path.dirname(output_path), exist_ok=True)

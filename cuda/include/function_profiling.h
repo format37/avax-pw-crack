@@ -4,15 +4,18 @@
 #ifndef FUNCTION_PROFILING_H
 #define FUNCTION_PROFILING_H
 
-#define NUM_FUNCTIONS 7
+#define NUM_FUNCTIONS 11
 
 typedef enum {
     FN_BN_MUL,
     FN_BN_MUL_FROM_DIV,
+    FN_BN_MUL_VANILA,
     FN_BN_ADD,
     FN_BN_SUB,
-    FN_BN_SUB_FROM_DIV,
+    FN_BN_SUB_FROM_DIV,    
     FN_BN_DIV,
+    FN_BN_DIV_VANILA_1,
+    FN_BN_DIV_VANILA_2,
     FN_MAIN,
     FN_COUNT // Should be equal to NUM_FUNCTIONS
 } FunctionIndex;
@@ -42,10 +45,13 @@ void write_function_profile_to_csv(const char* filename, ThreadFunctionProfile* 
     const char* function_names_host[NUM_FUNCTIONS] = {
         "bn_mul",
         "bn_mul_from_div",
+        "bn_mul_vanila",
         "bn_add",
         "bn_sub",
-        "bn_sub_from_div",
+        "bn_sub_from_div",        
         "bn_div",
+        "bn_div_vanila_1",
+        "bn_div_vanila_2",
         "main"
     };
     

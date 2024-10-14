@@ -4,12 +4,12 @@
 #include <stdint.h>
 #include "function_profiling.h"
 
-#define BN_128
+// #define BN_128
 // #define debug_print
 // #define debug_bn_copy
 // #define debug_top
 #define function_profiler
-#define use_jacobian_coordinates
+// #define use_jacobian_coordinates
 
 #ifdef BN_128
     #define BN_ULONG unsigned __int128
@@ -49,12 +49,12 @@ typedef struct bignum_st {
 #endif
 
 __device__ void init_zero(BIGNUM_CUDA *bn) {
-    // *bn = ZERO_BIGNUM;
-    for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
-        bn->d[i] = 0;
-    }
-    bn->top = 1;
-    bn->neg = 0;
+    *bn = ZERO_BIGNUM;
+    // for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
+    //     bn->d[i] = 0;
+    // }
+    // bn->top = 1;
+    // bn->neg = 0;
 }
 __device__ void init_one(BIGNUM_CUDA *bn) {
     // Initialize the BIGNUM_CUDA to zero
@@ -802,7 +802,7 @@ __device__ void bn_mul_from_div(const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, BIGN
                 if (!absolute) product->neg = a->neg ^ b->neg;
                 // printf("[%d x %d] ", a_bit_len, b_bit_len);
                 // bn_print_no_fuse("<< product: ", product);
-                record_function(FN_BN_MUL_FROM_DIV, start_time);
+                record_function(FN_BN_MUL_VANILA, start_time);
                 return;
             }
         }
@@ -868,6 +868,43 @@ __device__ void bn_mul_from_div(const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, BIGN
             }
         #endif
     #else
+        // if (find_top_optimized(a, MAX_BIGNUM_SIZE) != a->top) printf("### ERROR: bn_mul: find_top_optimized(a, MAX_BIGNUM_SIZE) != a->top\n");
+        // if (find_top_optimized(b, MAX_BIGNUM_SIZE) != b->top) printf("### ERROR: bn_mul: find_top_optimized(b, MAX_BIGNUM_SIZE) != b->top\n");
+        // Multiply in vanila way if top is less than 3:
+        if (a->top < 3 && b->top < 3) { // Surprisingly, decreases the performance
+            int a_bit_len = bn_bit_length(a);
+            int b_bit_len = bn_bit_length(b);
+            int product_bit_len = a_bit_len + b_bit_len;
+            if (product_bit_len <= BN_ULONG_NUM_BITS * 2) {
+                // The product can fit in a single 128-bit word
+                unsigned __int128 temp_a, temp_b;// = (unsigned __int128)a->d[0] * b->d[0];
+                // first word of a
+                temp_a = (unsigned __int128)a->d[0];
+                // second word of a
+                if (a->top > 1) {
+                    temp_a += (unsigned __int128)a->d[1] << 64;
+                }
+                // first word of b
+                temp_b = (unsigned __int128)b->d[0];
+                // second word of b
+                if (b->top > 1) {
+                    temp_b += (unsigned __int128)b->d[1] << 64;
+                }
+                // Multiply the two 128-bit numbers
+                unsigned __int128 temp = temp_a * temp_b;
+
+                // Save the result in the product's d words
+                product->d[0] = (BN_ULONG)temp;
+                product->d[1] = (BN_ULONG)(temp >> 64);
+                product->top = find_top_optimized(product, 2);
+                if (!absolute) product->neg = a->neg ^ b->neg;
+                #ifdef function_profiler
+                    record_function(FN_BN_MUL_VANILA, start_time);
+                #endif
+                return;
+            }
+        }
+
         // Unroll loops if possible
         for (int i = 0; i < a->top; i++) {
             BN_ULONG carry = 0;
@@ -1090,7 +1127,33 @@ __device__ int bn_div(BIGNUM_CUDA *bn_quotient, BIGNUM_CUDA *bn_remainder, const
         bn_quotient->neg = bn_dividend->neg ^ bn_divisor->neg;
         bn_remainder->neg = bn_dividend->neg;
         #ifdef function_profiler
-            record_function(FN_BN_DIV, start_time);
+            record_function(FN_BN_DIV_VANILA_1, start_time);
+        #endif
+        return 1;
+    }
+    // TODO compare dividend, not divs_max_top
+    else if (divs_max_top == 2) {
+        // Divide in vanila way using 128-bit values if max top is 2:
+        unsigned __int128 dividend, divisor;
+        dividend = (unsigned __int128)bn_dividend->d[1] << 64 | bn_dividend->d[0];
+        divisor = (unsigned __int128)bn_divisor->d[1] << 64 | bn_divisor->d[0];
+        unsigned __int128 quotient = dividend / divisor;
+        unsigned __int128 remainder = dividend % divisor;
+        // first word of quotient
+        bn_quotient->d[0] = (BN_ULONG)quotient;
+        // second word of quotient
+        bn_quotient->d[1] = (BN_ULONG)(quotient >> 64);
+        bn_quotient->top = find_top_optimized(bn_quotient, 2);
+        bn_quotient->neg = bn_dividend->neg ^ bn_divisor->neg;
+
+        // first word of remainder
+        bn_remainder->d[0] = (BN_ULONG)remainder;
+        // second word of remainder
+        bn_remainder->d[1] = (BN_ULONG)(remainder >> 64);
+        bn_remainder->top = find_top_optimized(bn_remainder, 2);
+        bn_remainder->neg = bn_dividend->neg;
+        #ifdef function_profiler
+            record_function(FN_BN_DIV_VANILA_2, start_time);
         #endif
         return 1;
     }

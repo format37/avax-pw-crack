@@ -15,13 +15,13 @@ echo Start building: $(date)
 # -G \ # Generate device code debug information
 # -maxrregcount 64 \ # Set the maximum number of registers that GPU kernel function can use
 # -I/home/alex/projects/avax-pw-crack/public/openssl_cuda_local/include/ \
+    # -maxrregcount 64 \
 
 nvcc \
     --threads 8 \
     main.cu \
     -arch=sm_86 \
     -O3 \
-    -maxrregcount 64 \
     -use_fast_math \
     -I ./include \
     -I ../json \

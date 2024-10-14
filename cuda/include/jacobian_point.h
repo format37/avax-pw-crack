@@ -47,49 +47,6 @@ __device__ void jacobian_point_double(
     } while(0)
 #endif
 
-// __device__ int bn_mul_word(BIGNUM_CUDA *a, BN_ULONG w)
-// {
-//     BN_ULONG carry = 0;
-//     int i;
-
-//     for (i = 0; i < a->top; i++)
-//     {
-//         #ifdef BN_128
-//             unsigned __int128 res = (unsigned __int128)a->d[i] * w + carry;
-//             a->d[i] = (BN_ULONG)res;
-//             carry = (BN_ULONG)(res >> 128);
-//         #else
-//             BN_ULONG high, low;
-//             BN_UMULT_LOHI(high, low, a->d[i], w);
-//             low += carry;
-//             high += (low < carry);
-//             a->d[i] = low;
-//             carry = high;
-//         #endif
-//     }
-
-//     if (carry != 0)
-//     {
-//         if (a->top < MAX_BIGNUM_SIZE)
-//         {
-//             a->d[a->top++] = carry;
-//             return 1;
-//         }
-//         else
-//         {
-//             return 0; // Overflow
-//         }
-//     }
-
-//     a->top = find_top_cuda(a);
-//     return 1;
-// }
-
-// __device__ void affine_to_jacobian(const EC_POINT_CUDA *affine_point, EC_POINT_JACOBIAN *jacobian_point) {
-//     bn_copy(&jacobian_point->X, &affine_point->x);
-//     bn_copy(&jacobian_point->Y, &affine_point->y);
-//     init_one(&jacobian_point->Z); // Z = 1
-// }
 __device__ void affine_to_jacobian(const EC_POINT_CUDA *affine_point, EC_POINT_JACOBIAN *jacobian_point) {
     if (point_is_at_infinity(affine_point)) {
         // Point at infinity in Jacobian coordinates is represented by Z = 0
