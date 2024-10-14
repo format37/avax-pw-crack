@@ -1,0 +1,20 @@
+version: '3.8'
+services:
+  app:
+    build: .
+    volumes:
+      # - ./:/app
+      - ./include:/app/include
+      - ../json:/app/json
+      - ../config.json:/config.json
+      - ./entrypoint.sh:/app/entrypoint.sh
+      - ./main.cu:/app/main.cu
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=0  # Use the first GPU
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
