@@ -6,6 +6,7 @@ nvcc \
     --threads 8 \
     main.cu \
     -arch=sm_86 \
+    -std=c++17 \
     -O3 \
     -use_fast_math \
     -I ./include \
