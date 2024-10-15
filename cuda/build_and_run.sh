@@ -17,11 +17,13 @@ echo Start building: $(date)
 # -arch=sm_86 \ # 4090
 # -arch=sm_80 \ # A100
 
+# --ptxas-options=-v \
+# -lineinfo \
+
 nvcc \
     --threads 8 \
     main.cu \
     -arch=sm_86 \
-    -ccbin=/usr/bin/gcc-9 \
     -std=c++17 \
     -O3 \
     -use_fast_math \

@@ -27,8 +27,8 @@ plt.title('CPU vs GPU Time Comparison')
 plt.legend()
 plt.grid(True)
 
-# Display the plot
-plt.show()
-
 # Save the plot to a file
 plt.savefig('cpu_gpu_comparison.png')
+
+# Display the plot
+plt.show()

@@ -904,20 +904,30 @@ __device__ void bn_mul_from_div(const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, BIGN
         }
 
         // Unroll loops if possible
+        unsigned __int128 temp_product, temp_a, temp_b;
+
         for (int i = 0; i < a->top; i++) {
             BN_ULONG carry = 0;
             for (int j = 0; j < b->top; j++) {
-                unsigned __int128 temp = (unsigned __int128)a->d[i] * b->d[j] + product->d[i + j] + carry;
-                product->d[i + j] = (BN_ULONG)temp;
-                carry = (BN_ULONG)(temp >> 64);
+                // unsigned __int128 temp = (unsigned __int128)a->d[i] * b->d[j] + product->d[i + j] + carry;
+                temp_a = a->d[i];
+                temp_b = b->d[j];
+                temp_product = temp_a * temp_b;
+                temp_product += product->d[i + j];
+                temp_product += carry;
+                // product->d[i + j] = (BN_ULONG)temp;
+                // carry = (BN_ULONG)(temp >> 64);
+                product->d[i + j] = (BN_ULONG)temp_product;
+                carry = (BN_ULONG)(temp_product >> 64);
             }
             product->d[i + b->top] = carry;
         }
         // Update the top
-        product->top = a->top + b->top;
-        while (product->top > 1 && product->d[product->top - 1] == 0) {
-            product->top--;
-        }
+        // product->top = a->top + b->top;
+        // while (product->top > 1 && product->d[product->top - 1] == 0) {
+        //     product->top--;
+        // }
+        product->top = find_top_optimized(product, a->top + b->top);
     #endif
     // Set the sign
     if (!absolute) product->neg = a->neg ^ b->neg;

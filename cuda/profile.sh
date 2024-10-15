@@ -2,7 +2,7 @@
 # dbus-launch
 
 # remove old log
-rm -f run.log
+rm -rf run.log
 
 # Get the start time
 start_time=$(date +%s.%N)

@@ -161,9 +161,12 @@ int main() {
     // int blocksPerGrid = 4;
     // int blocksPerGrid = 80;
     // int blocksPerGrid = 45;
-    int threadsPerBlock = 256;
-    int blocksPerGrid = 128;
-    // int threadsPerBlock = 1;
+ 
+    // int threadsPerBlock = 256;
+    // int blocksPerGrid = 128;
+ 
+    int threadsPerBlock = 1;
+    int blocksPerGrid = 1;
 
     // Get the current stack size limit
     size_t currentLimit;
