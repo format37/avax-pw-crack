@@ -24,6 +24,14 @@
 
 #include "child_key.h"
 
+// BIGNUM *r = BN_new();
+// BIGNUM *a = BN_new();
+// BIGNUM *b = BN_new();
+// BN_CTX *ctx = BN_CTX_new();
+// BN_MONT_CTX *mont = BN_MONT_CTX_new();
+// // Initialize a, b, mont as needed
+// BN_mod_mul_montgomery(r, a, b, mont, ctx);
+
 #define MAX_PASSPHRASE_LENGTH 4 // TODO: Change this to the maximum passphrase length
 #define P_CHAIN_ADDRESS_LENGTH 45
 #define OVERFLOW_FLAG ULLONG_MAX

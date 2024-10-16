@@ -1,4 +1,11 @@
+#!/bin/bash
 clear
+set -x  # Enable verbose output
+rm -f program wrapper.so
+
+# Compile the wrapper
+gcc -shared -fPIC wrapper.c -o wrapper.so -ldl -lssl -lcrypto
+
 rm -f program
 g++ \
     main.c \
@@ -29,7 +36,10 @@ echo Start execution: $(date)
 #     --tool=callgrind \
 #     ./program \    
 #     >> run.log
-./program >> run.log
+LD_PRELOAD=./wrapper.so ./program >> run.log
+# ./program >> run.log
+# Run with Valgrind and wrapper
+# LD_PRELOAD="$PWD/wrapper.so" valgrind --tool=callgrind ./program >> run.log 2>&1
 
 # Enable core dumps
 # ulimit -c unlimited

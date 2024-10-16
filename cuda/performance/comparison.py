@@ -17,8 +17,11 @@ df = pd.read_csv('cpu_gpu_comparison/data.csv')
 
 # Plot the data
 plt.figure(figsize=(10, 6))
-plt.plot(df['SearchArea'], df['CPU_time'], label='CPU Time', marker='o')
-plt.plot(df['SearchArea'], df['GPU_time'], label='GPU Time', marker='o')
+# plt.plot(df['SearchArea'], df['CPU_time'], label='CPU Time', marker='o')
+# plt.plot(df['SearchArea'], df['GPU_time'], label='GPU Time', marker='o')
+# Iterate on all existed columns
+for column in df.columns[1:]:
+    plt.plot(df['SearchArea'], df[column], label=column, marker='o')
 
 # Labeling
 plt.xlabel('Search Area')
