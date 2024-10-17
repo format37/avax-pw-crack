@@ -1,0 +1,32 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "nvcc main",
+            "type": "shell",
+            "command": "/bin/bash",
+            "args": [
+                "-c",
+                "nvcc -G -g ${workspaceFolder}/test.cu -arch=sm_86 -lcrypto -I../../include/ -o program"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": [
+                "$nvcc"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "dedicated",
+                "showReuseMessage": true,
+                "clear": false
+            }
+        }
+    ]
+}
