@@ -1,21 +1,32 @@
 #include <cstdio>
 #include <cstring>
+#include <type_traits>
+#include <limits>
 #include "fixnum/warp_fixnum.cu"
 #include "array/fixnum_array.h"
-#include "functions/quorem_preinv.cu"
+#include "functions/divexact.cu"
+#include "functions/quorem.cu"
 
 using namespace cuFIXNUM;
 
 typedef warp_fixnum<64, u64_fixnum> fixnum;
 typedef fixnum_array<fixnum> fixnum_array_t;
 
-// Functor to perform division with remainder on the device
+// Functor to perform division on the device
 template<typename fixnum>
-struct divide_with_remainder_functor {
+struct divide_functor {
     __device__ void operator()(fixnum &quotient, fixnum &remainder, fixnum a, fixnum b) {
-        quorem_preinv<fixnum> div_op(b);
-        fixnum a_hi = fixnum::zero();
-        div_op(quotient, remainder, a_hi, a);
+        // Ensure divisor is odd to avoid assertion failure
+        typename fixnum::digit b0 = fixnum::get(b, 0);
+        if (!(b0 & 1)) {
+            printf("Error: Divisor must be odd.\n");
+            return;
+        }
+        // quorem<fixnum> div_op_quorem();
+        // div_op_quorem()(quotient, remainder, a, b);
+
+        divexact<fixnum> div_op_exact(b);
+        div_op_exact(quotient, a);
     }
 };
 
@@ -45,7 +56,7 @@ int main() {
 
     // Initialize num1 and num2
     initialize_number(num1, sizeof(num1), "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe");
-    initialize_number(num2, sizeof(num2), "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ff"); // Divisor = 255
+    initialize_number(num2, sizeof(num2), "03"); // Divisor = 3 (odd number)
 
     int nelts = 1; // Number of elements
 
@@ -56,20 +67,18 @@ int main() {
     fixnum_array_t *remainder = fixnum_array_t::create(nelts);
 
     // Apply the division functor to the arrays
-    fixnum_array_t::template map<divide_with_remainder_functor>(quotient, remainder, a, b);
+    fixnum_array_t::template map<divide_functor>(quotient, remainder, a, b);
 
     // Retrieve the quotient and remainder
     uint8_t quotient_output[64];
-    uint8_t remainder_output[64];
+    // uint8_t remainder_output[64];
     int nelts_out;
     quotient->retrieve_all(quotient_output, sizeof(quotient_output), &nelts_out);
-    remainder->retrieve_all(remainder_output, sizeof(remainder_output), &nelts_out);
+    // remainder->retrieve_all(remainder_output, sizeof(remainder_output), &nelts_out);
 
-    // Print the input numbers, quotient, and remainder
-    print_number("Dividend:  ", num1, sizeof(num1));
-    print_number("Divisor:   ", num2, sizeof(num2));
-    print_number("Quotient:  ", quotient_output, sizeof(quotient_output));
-    print_number("Remainder: ", remainder_output, sizeof(remainder_output));
+    // Print the quotient and remainder
+    print_number("Quotient: ", quotient_output, sizeof(quotient_output));
+    // print_number("Remainder: ", remainder_output, sizeof(remainder_output));
 
     // Clean up
     delete a;

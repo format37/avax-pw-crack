@@ -7,7 +7,7 @@ start_time=$(date +%s.%N)
 echo Start building: $(date)
 
 nvcc \
-    -I/home/alex/projects/temp/cuda-fixnum/src/ \
+    -I/home/alex/projects/cuda-fixnum/src/ \
     test.cu \
     -arch=sm_86 \
     -o program 2> build.log
