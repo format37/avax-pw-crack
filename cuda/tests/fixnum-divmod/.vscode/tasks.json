@@ -7,7 +7,7 @@
             "command": "/bin/bash",
             "args": [
                 "-c",
-                "nvcc -G -g ${workspaceFolder}/test.cu -arch=sm_86 -lcrypto -I../../include/ -o program"
+                "nvcc -G -g ${workspaceFolder}/test.cu -arch=sm_86 -lcrypto -I/home/alex/projects/temp/cuda-fixnum/src/ -o program"
             ],
             "options": {
                 "cwd": "${workspaceFolder}"

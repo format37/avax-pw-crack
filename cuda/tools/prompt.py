@@ -28,6 +28,7 @@ folders = [
     "~/projects/avax-pw-crack/cuda/tests/fixnum-sub/",
     "~/projects/avax-pw-crack/cuda/tests/fixnum-mul/",
     "~/projects/avax-pw-crack/cuda/tests/fixnum-div/",
+    "~/projects/avax-pw-crack/cuda/tests/fixnum-divmod/"
     ]
 output_path = "./prompt.md"
 

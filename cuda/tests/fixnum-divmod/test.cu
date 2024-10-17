@@ -9,13 +9,50 @@ using namespace cuFIXNUM;
 typedef warp_fixnum<64, u64_fixnum> fixnum;
 typedef fixnum_array<fixnum> fixnum_array_t;
 
-// Functor to perform division with remainder on the device
+// // Functor to perform division with remainder on the device
+// template<typename fixnum>
+// struct divide_with_remainder_functor {
+//     __device__ void operator()(fixnum &quotient, fixnum &remainder, fixnum a, fixnum b) {
+//         printf("Dividing %llu by %llu\n", a, b);
+//         quorem_preinv<fixnum> div_op(b);
+//         fixnum a_hi, a_lo;
+        
+//         // Assuming 'a' is our full dividend
+//         a_hi = fixnum::zero();  // Set to zero if 'a' is within single fixnum range
+//         a_lo = a;
+        
+//         div_op(quotient, remainder, a_hi, a_lo);
+//         printf("Quotient: %llu\n", quotient);
+//         printf("Remainder: %llu\n", remainder);
+//     }
+// };
+
 template<typename fixnum>
 struct divide_with_remainder_functor {
     __device__ void operator()(fixnum &quotient, fixnum &remainder, fixnum a, fixnum b) {
+        printf("Dividing %llu by %llu\n", a, b);
+        if (fixnum::is_zero(b)) {
+            quotient = fixnum::zero();
+            remainder = fixnum::zero();
+            return;
+        }
         quorem_preinv<fixnum> div_op(b);
-        fixnum a_hi = fixnum::zero();
-        div_op(quotient, remainder, a_hi, a);
+        fixnum a_hi, a_lo;
+        
+        // Assuming 'a' is our full dividend
+        a_hi = fixnum::zero();  // Set to zero if 'a' is within single fixnum range
+        a_lo = a;
+        
+        fixnum q_hi, q_lo;
+        div_op(q_hi, q_lo, remainder, a_hi, a_lo);
+        
+        // Use q_lo for small numbers, q_hi for large numbers
+        // quotient = (a_hi == fixnum::zero()) ? q_lo : q_hi;
+        printf("q_lo: %llu\n", q_lo);
+        printf("q_hi: %llu\n", q_hi);
+        
+        printf("Quotient: %llu\n", quotient);
+        printf("Remainder: %llu\n", remainder);
     }
 };
 
@@ -44,8 +81,8 @@ int main() {
     uint8_t num2[64];
 
     // Initialize num1 and num2
-    initialize_number(num1, sizeof(num1), "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe");
-    initialize_number(num2, sizeof(num2), "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ff"); // Divisor = 255
+    initialize_number(num1, sizeof(num1), "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000009");
+    initialize_number(num2, sizeof(num2), "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002");
 
     int nelts = 1; // Number of elements
 
