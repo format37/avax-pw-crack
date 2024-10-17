@@ -5,9 +5,13 @@ def barrett_reduction(x, m):
     :param m: The modulus (divisor).
     :return: A tuple containing (quotient, remainder).
     """
+    # print x and m
+    print(f">> x: {hex(x)}")
+    print(f">> m: {hex(m)}")
     # Step 1: Precompute mu = floor(2^(2 * k) / m), where k is the number of bits in m
     k = m.bit_length()
     mu = (1 << (2 * k)) // m
+    print(f"mu: {hex(mu)}")
 
     # Step 2: Calculate q = floor(x / m) using Barrett approximation
     q = (x * mu) >> (2 * k)
@@ -31,8 +35,8 @@ def barrett_reduction(x, m):
 # Test the solution with a large 128-bit integer
 if __name__ == "__main__":
     # Example dividend (128-bit integer) and modulus (64-bit integer)
-    x = 0x123456789ABCDEF123456789ABCDEF12  # 128-bit integer
-    m = 0x1ABCDEF123456789  # 64-bit modulus
+    x = 0x12345678ABCDEF12  # 128-bit integer
+    m = 0x1ABCDEF12345678  # 64-bit modulus
 
     # Compute quotient and remainder using Barrett reduction
     quotient, remainder = barrett_reduction(x, m)
