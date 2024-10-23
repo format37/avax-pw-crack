@@ -120,6 +120,12 @@ __device__ void GetPublicKey(uint8_t* buffer, uint8_t* key)
 
     // TODO: Check do we need to define extra G. Or we are able to use __constant__ CURVE_GX_values and CURVE_GY_values as new EC_POINT_CUDA instead
     EC_POINT_CUDA publicKey = ec_point_scalar_mul(&G, &newKey, &CURVE_P, &CURVE_A); // FAIL with index 0. CHECK newKey.
+    
+    // Make sure Montgomery context is initialized    
+    // init_curve_montgomery_context(&CURVE_P, &CURVE_A);    
+    // // Generate public key using Montgomery scalar multiplication
+    // EC_POINT_CUDA publicKey = ec_point_scalar_mul_montgomery(&G, &newKey, &curve_mont_ctx);
+    
     #ifdef debug_print
         // Print the public key
         bn_print("[*] publicKey.x: ", &publicKey.x);

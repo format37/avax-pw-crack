@@ -21,7 +21,7 @@ echo Start building: $(date)
 # -lineinfo \
 
 nvcc \
-    --threads 8 \
+    --threads $(nproc) \
     main.cu \
     -arch=sm_86 \
     -std=c++17 \
