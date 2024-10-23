@@ -33,7 +33,10 @@ __device__ void my_cuda_memcpy_uint32_t(uint32_t *dst, const uint32_t *src, unsi
 }
 
 __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uint32_t index) {
-	#ifdef debug_print
+	#ifdef function_profiler
+        unsigned long long start_time = clock64();
+    #endif
+    #ifdef debug_print
         printf("++ GetChildKeyDerivation ++\n");
         printf(">> key: ");
         print_as_hex(key, 32);
@@ -316,6 +319,9 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
         }
         printf("\n");
         printf("-- GetChildKeyDerivation --\n");    
+    #endif
+    #ifdef function_profiler
+        record_function(FN_GET_CHILD_KEY_DERIVATION, start_time);
     #endif
     return info;
 }

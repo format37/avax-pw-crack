@@ -210,6 +210,14 @@ unsigned char *GetPublicKey(unsigned char *privateKeyBytes, size_t privateKeyLen
         return NULL;
     }
 
+    int nid = EC_GROUP_get_curve_name(curve);
+    if (nid != NID_undef) {
+        const char *curve_name = OBJ_nid2sn(nid);
+        printf("Curve NID: %d, Name: %s\n", nid, curve_name);
+    } else {
+        printf("Curve does not have a NID.\n");
+    }
+
     EC_KEY_set_public_key(eckey, pub_key);
 
     *publicKeyLen = EC_POINT_point2oct(EC_KEY_get0_group(eckey), EC_KEY_get0_public_key(eckey), POINT_CONVERSION_COMPRESSED, NULL, 0, NULL);
@@ -666,3 +674,49 @@ char* childToAvaxpAddress(const char *publicKeyHex) {
     return finalAddress;
 }
 // -- ChildToAvaxpAddress --
+
+// int EC_POINT_mul_alter(const EC_GROUP *group, EC_POINT *r, const BIGNUM *g_scalar,
+//                  const EC_POINT *point, const BIGNUM *p_scalar, BN_CTX *ctx)
+// {
+//     printf("++ EC_POINT_mul ++\n");
+//     int ret = 0;
+//     size_t num;
+// // #ifndef FIPS_MODULE
+//     BN_CTX *new_ctx = NULL;
+// // #endif
+
+//     if (!ec_point_is_compat(r, group)
+//         || (point != NULL && !ec_point_is_compat(point, group))) {
+//         ERR_raise(ERR_LIB_EC, EC_R_INCOMPATIBLE_OBJECTS);
+//         return 0;
+//     }
+
+//     if (g_scalar == NULL && p_scalar == NULL)
+//         return EC_POINT_set_to_infinity(group, r);
+
+// // #ifndef FIPS_MODULE
+//     if (ctx == NULL)
+//         ctx = new_ctx = BN_CTX_secure_new();
+// // #endif
+//     if (ctx == NULL) {
+//         // ERR_raise(ERR_LIB_EC, ERR_R_INTERNAL_ERROR);
+//         return 0;
+//     }
+
+//     num = (point != NULL && p_scalar != NULL) ? 1 : 0;
+//     if (group->meth->mul != NULL) {
+//             printf("EC_POINT_mul: group->meth->mul\n");
+//             // ret = group->meth->mul(group, r, g_scalar, num, &point, &p_scalar, ctx);
+//         }
+//     else {
+//             /* use default */
+//             printf("EC_POINT_mul: ossl_ec_wNAF_mul\n");
+//             // ret = ossl_ec_wNAF_mul(group, r, g_scalar, num, &point, &p_scalar, ctx);
+//         }
+
+// #ifndef FIPS_MODULE
+//     BN_CTX_free(new_ctx);
+// #endif
+//     printf("-- EC_POINT_mul --\n");
+//     return ret;
+// }

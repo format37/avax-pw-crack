@@ -4,7 +4,7 @@
 #ifndef FUNCTION_PROFILING_H
 #define FUNCTION_PROFILING_H
 
-#define NUM_FUNCTIONS 12
+#define NUM_FUNCTIONS 15
 
 typedef enum {
     FN_BN_MUL,
@@ -17,6 +17,9 @@ typedef enum {
     FN_BN_DIV,
     FN_BN_DIV_VANILA_1,
     FN_BN_DIV_VANILA_2,
+    FN_GET_CHILD_KEY_DERIVATION,
+    FN_GET_PUBLIC_KEY,
+    FN_EC_POINT_SCALAR_MUL,
     FN_MAIN,
     FN_COUNT // Should be equal to NUM_FUNCTIONS
 } FunctionIndex;
@@ -54,6 +57,9 @@ void write_function_profile_to_csv(const char* filename, ThreadFunctionProfile* 
         "bn_div",
         "bn_div_vanila_1",
         "bn_div_vanila_2",
+        "GetChildKeyDerivation",
+        "GetPublicKey",
+        "ec_point_scalar_mul",
         "main"
     };
     

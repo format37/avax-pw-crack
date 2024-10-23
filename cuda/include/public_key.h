@@ -50,6 +50,9 @@
 
 __device__ void GetPublicKey(uint8_t* buffer, uint8_t* key)
 {
+    #ifdef function_profiler
+        unsigned long long start_time = clock64();
+    #endif
     #ifdef debug_print
         printf("++ GetPublicKey ++\n");
         // print key
@@ -180,5 +183,8 @@ __device__ void GetPublicKey(uint8_t* buffer, uint8_t* key)
             printf("%02x", buffer[i]);
         }
         printf("\n-- GetPublicKey --\n");
+    #endif
+    #ifdef function_profiler
+        record_function(FN_GET_PUBLIC_KEY, start_time);
     #endif
 }

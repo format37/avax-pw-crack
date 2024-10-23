@@ -498,6 +498,9 @@ __device__ EC_POINT_CUDA ec_point_scalar_mul(
     BIGNUM_CUDA *curve_prime, 
     BIGNUM_CUDA *curve_a
     ) {
+    #ifdef function_profiler
+        unsigned long long start_time = clock64();
+    #endif
     bool debug = 0;
     if (debug) {
         debug_printf("++ ec_point_scalar_mul ++\n");
@@ -636,5 +639,8 @@ __device__ EC_POINT_CUDA ec_point_scalar_mul(
     // Copy current to result
     if (debug) bn_print("3 result.x: ", &result.x);
     if (debug) bn_print("3 result.y: ", &result.y);
+    #ifdef function_profiler
+        record_function(FN_EC_POINT_SCALAR_MUL, start_time);
+    #endif
     return result;
 }

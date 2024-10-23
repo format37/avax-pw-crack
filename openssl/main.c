@@ -1,18 +1,30 @@
 #include <cstdio>
 #include <cstring>
 #include <cstdlib>
+#include <stdint.h>
 #define PBKDF2_SHA512_STATIC
 #define PBKDF2_SHA512_IMPLEMENTATION
-#include <openssl/evp.h>
-#include <openssl/crypto.h>
-#include <openssl/hmac.h>
-#include <openssl/bn.h>
-#include <openssl/ec.h>
-#include <openssl/obj_mac.h>
-#include <openssl/sha.h>
-#include <openssl/ripemd.h>
-#include <stdint.h>
-#include <openssl/sha.h>
+
+// #include <openssl/evp.h>
+// #include <openssl/crypto.h>
+// #include <openssl/hmac.h>
+// #include <openssl/bn.h>
+// #include <openssl/ec.h>
+// #include <openssl/obj_mac.h>
+// #include <openssl/sha.h>
+// #include <openssl/ripemd.h>
+// #include <openssl/sha.h>
+
+#include "openssl/evp.h"
+#include "openssl/crypto.h"
+#include "openssl/hmac.h"
+#include "openssl/bn.h"
+#include "openssl/ec.h"
+#include "openssl/obj_mac.h"
+#include "openssl/sha.h"
+#include "openssl/ripemd.h"
+#include "openssl/sha.h"
+
 #include <vector>
 #include "nlohmann/json.hpp"
 #include <fstream>
