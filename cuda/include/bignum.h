@@ -8,7 +8,7 @@
 // #define debug_print
 // #define debug_bn_copy
 // #define debug_top
-#define function_profiler
+// #define function_profiler
 // #define use_jacobian_coordinates
 
 #ifdef BN_128
