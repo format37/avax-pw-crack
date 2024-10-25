@@ -59,6 +59,13 @@ __device__ struct mont_test_case test_cases[] = {
         "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
         "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
         "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFD"
+    },
+    
+    // Test 4: 384-bit numbers
+    {
+        "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFFFF0000000000000000FFFFFFFF",
+        "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
+        "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFFFF0000000000000000FFFFFFFD"
     }
 };
 
@@ -68,7 +75,7 @@ __device__ void run_mont_test(const struct mont_test_case *test) {
     BIGNUM_CUDA a, b, n, r;
     init_zero(&a);
     init_zero(&b);
-    init_zero(&n);
+    init_zero(&n); 
     init_zero(&r);
     
     // Convert test values
@@ -83,36 +90,62 @@ __device__ void run_mont_test(const struct mont_test_case *test) {
         return;
     }
     
-    // Set up Montgomery context
+    // Set up Montgomery context 
     if(!BN_MONT_CTX_set_cuda(mont, &n)) {
         printf("Failed to initialize Montgomery context\n");
         return;
     }
     
     printf("\nTest inputs:\n");
-    bn_print("a = ", &a);
-    bn_print("b = ", &b);
-    bn_print("n = ", &n);
+    bn_print_no_fuse("a: ", &a);
+    bn_print_no_fuse("b: ", &b);
+    bn_print_no_fuse("n: ", &n);
+
+    // Convert to Montgomery form 
+    BIGNUM_CUDA aRR, bRR;
+    init_zero(&aRR);
+    init_zero(&bRR);
     
-    // Perform Montgomery multiplication
-    if(!BN_mod_mul_montgomery_cuda(&r, &a, &b, mont)) {
-        printf("Montgomery multiplication failed\n");
+    if(!BN_mod_mul_montgomery_cuda(&aRR, &a, &mont->RR, mont) ||
+       !BN_mod_mul_montgomery_cuda(&bRR, &b, &mont->RR, mont)) {
+        printf("Failed to convert to Montgomery form\n");
         return;
     }
     
+    printf("\nMontgomery form (RR values):\n"); 
+    bn_print_no_fuse("aRR: ", &aRR);
+    bn_print_no_fuse("bRR: ", &bRR);
+
+    // Perform Montgomery multiplication
+    if(!BN_mod_mul_montgomery_cuda(&r, &aRR, &bRR, mont)) {
+        printf("Montgomery multiplication failed\n");
+        return; 
+    }
+
     printf("\nResult:\n");
-    bn_print("r = ", &r);
+    bn_print_no_fuse("r (Montgomery form): ", &r);
     
-    // Print Montgomery context values
+    // Convert back from Montgomery form
+    BIGNUM_CUDA final;
+    init_zero(&final);
+    BIGNUM_CUDA one; 
+    init_one(&one);
+    
+    if(!BN_mod_mul_montgomery_cuda(&final, &r, &one, mont)) {
+        printf("Failed to convert back from Montgomery form\n");
+        return;
+    }
+    
+    bn_print_no_fuse("r (final result): ", &final);
+    
     printf("\nMontgomery Context:\n");
-    bn_print("N (modulus) = ", &mont->N);
-    printf("N0[0] = %016llx\n", mont->n0[0]);
-    printf("N0[1] = %016llx\n", mont->n0[1]);
-    bn_print("RR = ", &mont->RR);
+    bn_print_no_fuse("N (modulus): ", &mont->N);
+    printf("N0: [%016llx, %016llx]\n", mont->n0[0], mont->n0[1]);
+    bn_print_no_fuse("RR: ", &mont->RR);
     
     printf("\n");
     
-    // Free memory
+    // Cleanup
     free(mont);
 }
 

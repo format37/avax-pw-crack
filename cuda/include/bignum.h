@@ -1317,8 +1317,11 @@ __device__ BN_MONT_CTX_CUDA* BN_MONT_CTX_new_cuda() {
 
 // Set up Montgomery context for a given modulus
 __device__ int BN_MONT_CTX_set_cuda(BN_MONT_CTX_CUDA *mont, const BIGNUM_CUDA *mod) {
-    if (bn_is_zero(mod)) 
+    if (bn_is_zero(mod))
         return 0;
+
+    // Copy modulus
+    bn_copy(&mont->N, mod);
 
     // Calculate R = 2^(word_size * num_words)
     BIGNUM_CUDA R;
@@ -1329,67 +1332,60 @@ __device__ int BN_MONT_CTX_set_cuda(BN_MONT_CTX_CUDA *mont, const BIGNUM_CUDA *m
 
     // Calculate R^2 mod N
     bn_mod(&mont->RR, &R, mod);
-    bn_mod_mul(&mont->RR, &mont->RR, &mont->RR, mod);
+    bn_mod_mul(&mont->RR, &mont->RR, &R, mod);
 
-    // Copy modulus
-    bn_copy(&mont->N, mod);
+    // Calculate n0 = -N^(-1) mod word_size
+    BN_ULONG N0 = mod->d[0];
+    BN_ULONG X = 1;
 
-    // Calculate n0 = -N^(-1) mod R
-    BIGNUM_CUDA tmp;
-    init_zero(&tmp);
-    bn_set_word(&tmp, 1);
-    BN_ULONG mask = BN_MASK2;  // For 64-bit word size
-    mont->n0[0] = (((BN_ULONG)0 - mont->N.d[0] * tmp.d[0]) & mask);
+    // Newton iteration to find modular multiplicative inverse
+    for (int i = 0; i < 5; i++) {  // Usually 5 iterations is enough
+        BN_ULONG T = X * (2 - N0 * X);
+        if (T == X) break;
+        X = T & BN_MASK2;
+    }
     
+    mont->n0[0] = (-X) & BN_MASK2;  // Take two's complement
+    mont->n0[1] = 0;
+
     return 1;
 }
 
 __device__ int bn_mul_mont_cuda(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, 
                                const BN_MONT_CTX_CUDA *mont) {
-    // #ifdef function_profiler
-    //     unsigned long long start_time = clock64();
-    // #endif
-    
-    // Initialize temporary variables
-    BIGNUM_CUDA t;
+    // Initialize temporary variables 
+    BIGNUM_CUDA t, t1;
     init_zero(&t);
+    init_zero(&t1);
 
-    // 1. Compute t = a * b
+    // 1. T = A×B
     bn_mul(a, b, &t);
-
-    // 2. Compute m = (t * n0') mod R, where R is 2^64 for 64-bit implementation
-    BN_ULONG m;
-    BN_ULONG n0 = mont->n0[0];  // For 64-bit implementation
-    m = (t.d[0] * n0) & BN_MASK2;
-
-    // 3. Compute t = (t + m*N) / R
+    
+    // 2. m = ((T mod R) × N′) mod R
+    // For R = 2^w where w is the word size, this is:
+    BN_ULONG m = (t.d[0] * mont->n0[0]) & BN_MASK2;
+    
+    // 3. t = (T + m×N) / R
     BIGNUM_CUDA mn;
     init_zero(&mn);
-    
-    // Multiply m by N
     bn_set_word(&mn, m);
-    bn_mul(&mn, &mont->N, &mn);
+    bn_mul(&mn, &mont->N, &mn); 
+    bn_add(&t1, &t, &mn);
     
-    // Add to t
-    bn_add(&t, &t, &mn);
-    
-    // Divide by R (shift right by word size)
-    for (int i = 0; i < t.top-1; i++) {
-        t.d[i] = t.d[i+1];
+    // Division by R is equivalent to right shift by word size
+    for (int i = 0; i < MAX_BIGNUM_SIZE-1; i++) {
+        t1.d[i] = t1.d[i+1];
     }
-    t.top--;
+    t1.d[MAX_BIGNUM_SIZE-1] = 0;
+    t1.top = find_top_optimized(&t1, t1.top);
 
-    // 4. If t ≥ N then subtract N
-    if (bn_cmp(&t, &mont->N) >= 0) {
-        bn_sub(&t, &t, &mont->N); 
+    // 4. If t ≥ N then t = t - N
+    if (bn_cmp(&t1, &mont->N) >= 0) {
+        bn_sub(&t1, &t1, &mont->N);
     }
 
-    // Copy result to r
-    bn_copy(r, &t);
-
-    // #ifdef function_profiler
-    //     record_function(FN_BN_MUL_MONT, start_time);
-    // #endif
+    // Copy result
+    bn_copy(r, &t1);
     return 1;
 }
 
