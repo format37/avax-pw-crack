@@ -674,7 +674,7 @@ typedef struct {
 #define BN_BYTES        (BN_BITS2 / 8)        // Number of bytes in a word
 #define BN_BITS4        (BN_BITS2 / 2)        // Half the number of bits in a word
 #define BN_MASK         ((BN_ULONG)(-1))      // All bits set
-#define BN_MASK2        (BN_MASK >> BN_BITS4) // Lower half bits set
+// #define BN_MASK2        (BN_MASK >> BN_BITS4) // Lower half bits set
 
 // Set bit n in a BIGNUM_CUDA
 __device__ int bn_set_bit(BIGNUM_CUDA *a, int n) {

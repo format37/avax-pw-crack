@@ -8,7 +8,7 @@
 // #define debug_print
 // #define debug_bn_copy
 // #define debug_top
-#define function_profiler
+// #define function_profiler
 // #define use_jacobian_coordinates
 
 #ifdef BN_128
@@ -1287,3 +1287,119 @@ __device__ void bn_mod_sub(BIGNUM_CUDA *result, const BIGNUM_CUDA *a, const BIGN
         result->neg = 0;
     }
 }
+
+// Montgomery multiplication ++
+
+// Add these definitions to your bignum.h
+#define BN_MASK2 ((BN_ULONG)(-1)) // Full word mask
+#define FN_BN_MUL_MONT 40 // Add this to your function profiling enum if using
+
+// Montgomery context structure
+typedef struct {
+    BIGNUM_CUDA N;    // Modulus
+    BIGNUM_CUDA RR;   // R^2 mod N where R = 2^(wordsize * nwords)
+    BN_ULONG n0[2];   // Montgomery multiplier
+} BN_MONT_CTX_CUDA;
+
+// Initialize Montgomery context
+__device__ BN_MONT_CTX_CUDA* BN_MONT_CTX_new_cuda() {
+    BN_MONT_CTX_CUDA* ret = (BN_MONT_CTX_CUDA*)malloc(sizeof(BN_MONT_CTX_CUDA));
+    if (ret == NULL)
+        return NULL;
+        
+    init_zero(&ret->N);
+    init_zero(&ret->RR);
+    ret->n0[0] = 0;
+    ret->n0[1] = 0;
+    
+    return ret;
+}
+
+// Set up Montgomery context for a given modulus
+__device__ int BN_MONT_CTX_set_cuda(BN_MONT_CTX_CUDA *mont, const BIGNUM_CUDA *mod) {
+    if (bn_is_zero(mod)) 
+        return 0;
+
+    // Calculate R = 2^(word_size * num_words)
+    BIGNUM_CUDA R;
+    init_zero(&R);
+    int bits = mod->top * BN_ULONG_NUM_BITS;
+    bn_set_word(&R, 1);
+    left_shift(&R, bits);
+
+    // Calculate R^2 mod N
+    bn_mod(&mont->RR, &R, mod);
+    bn_mod_mul(&mont->RR, &mont->RR, &mont->RR, mod);
+
+    // Copy modulus
+    bn_copy(&mont->N, mod);
+
+    // Calculate n0 = -N^(-1) mod R
+    BIGNUM_CUDA tmp;
+    init_zero(&tmp);
+    bn_set_word(&tmp, 1);
+    BN_ULONG mask = BN_MASK2;  // For 64-bit word size
+    mont->n0[0] = (((BN_ULONG)0 - mont->N.d[0] * tmp.d[0]) & mask);
+    
+    return 1;
+}
+
+__device__ int bn_mul_mont_cuda(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, 
+                               const BN_MONT_CTX_CUDA *mont) {
+    // #ifdef function_profiler
+    //     unsigned long long start_time = clock64();
+    // #endif
+    
+    // Initialize temporary variables
+    BIGNUM_CUDA t;
+    init_zero(&t);
+
+    // 1. Compute t = a * b
+    bn_mul(a, b, &t);
+
+    // 2. Compute m = (t * n0') mod R, where R is 2^64 for 64-bit implementation
+    BN_ULONG m;
+    BN_ULONG n0 = mont->n0[0];  // For 64-bit implementation
+    m = (t.d[0] * n0) & BN_MASK2;
+
+    // 3. Compute t = (t + m*N) / R
+    BIGNUM_CUDA mn;
+    init_zero(&mn);
+    
+    // Multiply m by N
+    bn_set_word(&mn, m);
+    bn_mul(&mn, &mont->N, &mn);
+    
+    // Add to t
+    bn_add(&t, &t, &mn);
+    
+    // Divide by R (shift right by word size)
+    for (int i = 0; i < t.top-1; i++) {
+        t.d[i] = t.d[i+1];
+    }
+    t.top--;
+
+    // 4. If t ≥ N then subtract N
+    if (bn_cmp(&t, &mont->N) >= 0) {
+        bn_sub(&t, &t, &mont->N); 
+    }
+
+    // Copy result to r
+    bn_copy(r, &t);
+
+    // #ifdef function_profiler
+    //     record_function(FN_BN_MUL_MONT, start_time);
+    // #endif
+    return 1;
+}
+
+// Main interface function
+__device__ int BN_mod_mul_montgomery_cuda(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNUM_CUDA *b,
+                                        BN_MONT_CTX_CUDA *mont) {
+    int ret = bn_mul_mont_cuda(r, a, b, mont);
+    // Normalize result (remove leading zeros)
+    r->top = find_top_optimized(r, r->top);
+    return ret;
+}
+
+// Montgomery multiplication --

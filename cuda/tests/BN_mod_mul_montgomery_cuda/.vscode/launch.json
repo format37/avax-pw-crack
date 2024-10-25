@@ -1,0 +1,15 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "build: Main",
+            "type": "cuda-gdb",
+            "request": "launch",
+            "program": "${workspaceFolder}/program",
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "preLaunchTask": "nvcc main"
+        }
+    ]
+}
