@@ -191,10 +191,6 @@ unsigned char *GetPublicKey(unsigned char *privateKeyBytes, size_t privateKeyLen
     unsigned char *publicKeyBytes = NULL;
     
     curve = EC_GROUP_new_by_curve_name(NID_secp256k1);
-    // print all curve parameters
-    #ifdef debug_print
-        printf("Curve parameters:\n");
-    #endif
     
     if (curve == NULL) {
         return NULL;
@@ -260,7 +256,7 @@ unsigned char *GetPublicKey(unsigned char *privateKeyBytes, size_t privateKeyLen
 }
 
 BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uint32_t index) {
-    printf("++ GetChildKeyDerivation ++\n");
+    // printf("++ GetChildKeyDerivation ++\n");
 	static int chain_counter = 0;
     // static char path[100] = ""; // Assuming path length won't exceed 100
     static std::string path = ""; // Use std::string
@@ -282,7 +278,7 @@ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uint32_t index
             printf("    * INDEX is 0\n");
         #endif
 		size_t publicKeyLen = 0;
-        printf(" [0] GetPublicKey >>\n");
+        // printf(" [0] GetPublicKey >>\n");
 		// unsigned char *publicKeyBytes = GetPublicKey(key, 32, &publicKeyLen);
         unsigned char *publicKeyBytes = getCachedPublicKey(key, 32, &publicKeyLen);
 		#ifdef debug_print

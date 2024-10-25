@@ -53,15 +53,6 @@ __device__ void GetPublicKey(uint8_t* buffer, uint8_t* key)
     #ifdef function_profiler
         unsigned long long start_time = clock64();
     #endif
-    #ifdef debug_print
-        printf("++ GetPublicKey ++\n");
-        // print key
-        printf(">> key: ");
-        for (int i = 0; i < 32; i++) {
-            printf("%02x", key[i]);
-        }
-        printf("\n");
-    #endif
     BIGNUM_CUDA newKey;
     init_zero(&newKey);
     #ifdef BN_128
@@ -97,11 +88,6 @@ __device__ void GetPublicKey(uint8_t* buffer, uint8_t* key)
     #endif
     newKey.top = CURVE_P_VALUES_MAX_SIZE;
 
-    #ifdef debug_print
-        // Print newKey
-        bn_print("[#] newKey: ", &newKey);
-    #endif
-
     // Initialize generator
     EC_POINT_CUDA G;
     init_zero(&G.x);
@@ -113,10 +99,6 @@ __device__ void GetPublicKey(uint8_t* buffer, uint8_t* key)
         }
     G.x.top = CURVE_P_VALUES_MAX_SIZE;
     G.y.top = CURVE_P_VALUES_MAX_SIZE;
-    #ifdef debug_top
-        if (G.x.top != find_top(&G.x)) printf("### ERROR: GetPublicKey: G.x.top (%d) != find_top(&G.x) (%d)\n", G.x.top, find_top(&G.x));
-        if (G.y.top != find_top(&G.y)) printf("### ERROR: GetPublicKey: G.y.top (%d) != find_top(&G.y) (%d)\n", G.y.top, find_top(&G.y));
-    #endif
 
     // TODO: Check do we need to define extra G. Or we are able to use __constant__ CURVE_GX_values and CURVE_GY_values as new EC_POINT_CUDA instead
     EC_POINT_CUDA publicKey = ec_point_scalar_mul(&G, &newKey, &CURVE_P, &CURVE_A); // FAIL with index 0. CHECK newKey.
@@ -125,12 +107,6 @@ __device__ void GetPublicKey(uint8_t* buffer, uint8_t* key)
     // init_curve_montgomery_context(&CURVE_P, &CURVE_A);    
     // // Generate public key using Montgomery scalar multiplication
     // EC_POINT_CUDA publicKey = ec_point_scalar_mul_montgomery(&G, &newKey, &curve_mont_ctx);
-    
-    #ifdef debug_print
-        // Print the public key
-        bn_print("[*] publicKey.x: ", &publicKey.x);
-        bn_print("[*] publicKey.y: ", &publicKey.y);
-    #endif
 
     
     // Copy the public key to buffer
@@ -169,27 +145,8 @@ __device__ void GetPublicKey(uint8_t* buffer, uint8_t* key)
     bn_div(&quotient, &remainder, &publicKey.y, &two);
     uint8_t prefix = bn_is_zero(&remainder) ? 0x02 : 0x03;
     
-    // Alternate solution of copying the public key to buffer
-    // Is not so clear as the previous one but works for both 64-bit and 128-bit
-    // // Copy the public key to buffer
-    // size_t limb_size_bytes = sizeof(BN_ULONG);
-    // for (int i = 0; i < CURVE_P_VALUES_MAX_SIZE; i++) {
-    //     BN_ULONG limb = publicKey.x.d[CURVE_P_VALUES_MAX_SIZE - 1 - i];
-    //     for (int j = 0; j < limb_size_bytes; j++) {
-    //         buffer[limb_size_bytes * i + j + 1] = (limb >> (8 * (limb_size_bytes - 1 - j))) & 0xFF;
-    //     }
-    // }
-    
     // Add prefix before the buffer
     buffer[0] = prefix;
-    #ifdef debug_print
-        // Print the public key
-        printf(">> buffer: ");
-        for (int i = 0; i < 33; i++) {
-            printf("%02x", buffer[i]);
-        }
-        printf("\n-- GetPublicKey --\n");
-    #endif
     #ifdef function_profiler
         record_function(FN_GET_PUBLIC_KEY, start_time);
     #endif
