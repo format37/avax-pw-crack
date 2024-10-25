@@ -4,6 +4,18 @@
 #define DKLEN 64
 #define ROUNDS 2048
 
+typedef struct GetPublicKeyBuffer_st {
+    unsigned char *privateKeyBytes;
+    size_t privateKeyLen;
+    size_t *publicKeyLen;
+    unsigned char *publicKeyBytes;
+} GetPublicKeyBuffer;
+
+// Global vector to store GetPublicKey call parameters and results
+std::vector<GetPublicKeyBuffer> publicKeyCache;
+
+unsigned char* getCachedPublicKey(unsigned char* privateKeyBytes, size_t privateKeyLen, size_t* publicKeyLen);
+
 void print_as_hex_char(unsigned char *data, int len) {
     for (int i = 0; i < len; i++) {
         printf("%02x", data[i]);
@@ -167,7 +179,11 @@ void print_bn(const char* label, const BIGNUM* bn) {
 }
 
 unsigned char *GetPublicKey(unsigned char *privateKeyBytes, size_t privateKeyLen, size_t *publicKeyLen) {
-    // printf("++ GetPublicKey ++\n");
+    printf("++ GetPublicKey ++\n");
+    printf(">> privateKeyBytes: ");
+    print_as_hex_char(privateKeyBytes, privateKeyLen);
+    printf(">> privateKeyLen: %zu\n", privateKeyLen);
+    printf(">> publicKeyLen: %zu\n", *publicKeyLen);
     EC_GROUP *curve = NULL;
     EC_KEY *eckey = NULL;
     BIGNUM *privateKey = NULL;
@@ -236,6 +252,10 @@ unsigned char *GetPublicKey(unsigned char *privateKeyBytes, size_t privateKeyLen
     EC_POINT_free(pub_key);
     BN_free(privateKey);
 
+    printf("<< publicKeyBytes: ");
+    print_as_hex_char(publicKeyBytes, *publicKeyLen);
+    printf("-- GetPublicKey --\n");
+
     return publicKeyBytes;
 }
 
@@ -263,7 +283,8 @@ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uint32_t index
         #endif
 		size_t publicKeyLen = 0;
         printf(" [0] GetPublicKey >>\n");
-		unsigned char *publicKeyBytes = GetPublicKey(key, 32, &publicKeyLen);
+		// unsigned char *publicKeyBytes = GetPublicKey(key, 32, &publicKeyLen);
+        unsigned char *publicKeyBytes = getCachedPublicKey(key, 32, &publicKeyLen);
 		#ifdef debug_print
             print_as_hex_char(publicKeyBytes, publicKeyLen);
         #endif
@@ -436,7 +457,8 @@ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uint32_t index
         size_t publicKeyLen = 0;
         if (index != 0) {
             printf(" [1] GetPublicKey >>\n");
-            unsigned char *publicKeyBytes = GetPublicKey(newKeyBytes, 32, &publicKeyLen);
+            // unsigned char *publicKeyBytes = GetPublicKey(newKeyBytes, 32, &publicKeyLen);
+            unsigned char *publicKeyBytes = getCachedPublicKey(key, 32, &publicKeyLen);
         }
 		
         #ifdef debug_print
@@ -681,48 +703,69 @@ char* childToAvaxpAddress(const char *publicKeyHex) {
 }
 // -- ChildToAvaxpAddress --
 
-// int EC_POINT_mul_alter(const EC_GROUP *group, EC_POINT *r, const BIGNUM *g_scalar,
-//                  const EC_POINT *point, const BIGNUM *p_scalar, BN_CTX *ctx)
-// {
-//     printf("++ EC_POINT_mul ++\n");
-//     int ret = 0;
-//     size_t num;
-// // #ifndef FIPS_MODULE
-//     BN_CTX *new_ctx = NULL;
-// // #endif
+// Helper function to initialize/clear the cache
+void initializePublicKeyCache() {
+    publicKeyCache.clear();
+}
 
-//     if (!ec_point_is_compat(r, group)
-//         || (point != NULL && !ec_point_is_compat(point, group))) {
-//         ERR_raise(ERR_LIB_EC, EC_R_INCOMPATIBLE_OBJECTS);
-//         return 0;
-//     }
+// Helper function to check if input parameters match
+bool compareInputParameters(const unsigned char* a, const unsigned char* b, size_t len) {
+    return (memcmp(a, b, len) == 0);
+}
 
-//     if (g_scalar == NULL && p_scalar == NULL)
-//         return EC_POINT_set_to_infinity(group, r);
+// Helper function to find matching cache entry and handle GetPublicKey calls
+unsigned char* getCachedPublicKey(unsigned char* privateKeyBytes, size_t privateKeyLen, size_t* publicKeyLen) {
+    // First, check if we have this computation cached
+    for (const auto& cache : publicKeyCache) {
+        if (privateKeyLen == cache.privateKeyLen && 
+            compareInputParameters(privateKeyBytes, cache.privateKeyBytes, privateKeyLen)) {
+            
+            #ifdef debug_print
+                printf("Cache hit! Using pre-calculated public key\n");
+            #endif
+            
+            // Found a match, copy the cached results
+            *publicKeyLen = *cache.publicKeyLen;
+            unsigned char* result = new unsigned char[*publicKeyLen];
+            memcpy(result, cache.publicKeyBytes, *publicKeyLen);
+            return result;
+        }
+    }
+    
+    #ifdef debug_print
+        printf("Cache miss. Calculating new public key\n");
+    #endif
+    
+    // If not found in cache, call original GetPublicKey
+    unsigned char* publicKeyBytes = GetPublicKey(privateKeyBytes, privateKeyLen, publicKeyLen);
+    
+    if (publicKeyBytes != nullptr) {
+        // Create new cache entry
+        GetPublicKeyBuffer newCache;
+        
+        // Allocate and copy private key
+        newCache.privateKeyBytes = new unsigned char[privateKeyLen];
+        memcpy(newCache.privateKeyBytes, privateKeyBytes, privateKeyLen);
+        newCache.privateKeyLen = privateKeyLen;
+        
+        // Allocate and copy public key
+        newCache.publicKeyBytes = new unsigned char[*publicKeyLen];
+        memcpy(newCache.publicKeyBytes, publicKeyBytes, *publicKeyLen);
+        newCache.publicKeyLen = new size_t(*publicKeyLen);
+        
+        // Add to cache
+        publicKeyCache.push_back(newCache);
+    }
+    
+    return publicKeyBytes;
+}
 
-// // #ifndef FIPS_MODULE
-//     if (ctx == NULL)
-//         ctx = new_ctx = BN_CTX_secure_new();
-// // #endif
-//     if (ctx == NULL) {
-//         // ERR_raise(ERR_LIB_EC, ERR_R_INTERNAL_ERROR);
-//         return 0;
-//     }
-
-//     num = (point != NULL && p_scalar != NULL) ? 1 : 0;
-//     if (group->meth->mul != NULL) {
-//             printf("EC_POINT_mul: group->meth->mul\n");
-//             // ret = group->meth->mul(group, r, g_scalar, num, &point, &p_scalar, ctx);
-//         }
-//     else {
-//             /* use default */
-//             printf("EC_POINT_mul: ossl_ec_wNAF_mul\n");
-//             // ret = ossl_ec_wNAF_mul(group, r, g_scalar, num, &point, &p_scalar, ctx);
-//         }
-
-// #ifndef FIPS_MODULE
-//     BN_CTX_free(new_ctx);
-// #endif
-//     printf("-- EC_POINT_mul --\n");
-//     return ret;
-// }
+// Helper function to clean up cache memory
+void cleanupPublicKeyCache() {
+    for (auto& cache : publicKeyCache) {
+        delete[] cache.privateKeyBytes;
+        delete[] cache.publicKeyBytes;
+        delete cache.publicKeyLen;
+    }
+    publicKeyCache.clear();
+}
