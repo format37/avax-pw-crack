@@ -167,6 +167,7 @@ void print_bn(const char* label, const BIGNUM* bn) {
 }
 
 unsigned char *GetPublicKey(unsigned char *privateKeyBytes, size_t privateKeyLen, size_t *publicKeyLen) {
+    // printf("++ GetPublicKey ++\n");
     EC_GROUP *curve = NULL;
     EC_KEY *eckey = NULL;
     BIGNUM *privateKey = NULL;
@@ -239,6 +240,7 @@ unsigned char *GetPublicKey(unsigned char *privateKeyBytes, size_t privateKeyLen
 }
 
 BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uint32_t index) {
+    printf("++ GetChildKeyDerivation ++\n");
 	static int chain_counter = 0;
     // static char path[100] = ""; // Assuming path length won't exceed 100
     static std::string path = ""; // Use std::string
@@ -260,6 +262,7 @@ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uint32_t index
             printf("    * INDEX is 0\n");
         #endif
 		size_t publicKeyLen = 0;
+        printf(" [0] GetPublicKey >>\n");
 		unsigned char *publicKeyBytes = GetPublicKey(key, 32, &publicKeyLen);
 		#ifdef debug_print
             print_as_hex_char(publicKeyBytes, publicKeyLen);
@@ -431,7 +434,10 @@ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uint32_t index
         #endif
 		
         size_t publicKeyLen = 0;
-		unsigned char *publicKeyBytes = GetPublicKey(newKeyBytes, 32, &publicKeyLen);
+        if (index != 0) {
+            printf(" [1] GetPublicKey >>\n");
+            unsigned char *publicKeyBytes = GetPublicKey(newKeyBytes, 32, &publicKeyLen);
+        }
 		
         #ifdef debug_print
             print_as_hex_char(publicKeyBytes, publicKeyLen);

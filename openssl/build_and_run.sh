@@ -22,4 +22,6 @@ cat build.log
 echo "Checking which libcrypto is being used:"
 ldd program | grep libcrypto
 
-valgrind --tool=callgrind ./program
+rm -rf run.log
+valgrind --tool=callgrind ./program >> run.log 2>&1
+cat run.log

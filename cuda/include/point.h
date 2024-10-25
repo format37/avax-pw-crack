@@ -510,6 +510,13 @@ __device__ EC_POINT_CUDA ec_point_scalar_mul(
         bn_print(">> curve_prime: ", curve_prime);
         bn_print(">> curve_a: ", curve_a);
     }
+    printf("++ ec_point_scalar_mul ++\n");
+    printf("Input Point:\n");
+    bn_print_no_fuse(">> point x: ", &point->x);
+    bn_print_no_fuse(">> point y: ", &point->y);
+    bn_print_no_fuse(">> Scalar: ", scalar);
+    bn_print_no_fuse(">> curve_prime: ", curve_prime);
+    bn_print_no_fuse(">> curve_a: ", curve_a);
     
     EC_POINT_CUDA current = *point; // This initializes the current point with the input point
     EC_POINT_CUDA result; // Initialize the result variable, which accumulates the result
@@ -639,6 +646,9 @@ __device__ EC_POINT_CUDA ec_point_scalar_mul(
     // Copy current to result
     if (debug) bn_print("3 result.x: ", &result.x);
     if (debug) bn_print("3 result.y: ", &result.y);
+    bn_print_no_fuse("<< result.x: ", &result.x);
+    bn_print_no_fuse("<< result.y: ", &result.y);
+    printf("-- ec_point_scalar_mul --\n");
     #ifdef function_profiler
         record_function(FN_EC_POINT_SCALAR_MUL, start_time);
     #endif
