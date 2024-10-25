@@ -455,11 +455,11 @@ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uint32_t index
         #endif
 		
         size_t publicKeyLen = 0;
-        if (index != 0) {
-            printf(" [1] GetPublicKey >>\n");
+        // if (index != 0) {
+        //     printf(" [1] GetPublicKey >>\n");
             // unsigned char *publicKeyBytes = GetPublicKey(newKeyBytes, 32, &publicKeyLen);
-            unsigned char *publicKeyBytes = getCachedPublicKey(key, 32, &publicKeyLen);
-        }
+            // unsigned char *publicKeyBytes = getCachedPublicKey(key, 32, &publicKeyLen); // 3 times
+        // }
 		
         #ifdef debug_print
             print_as_hex_char(publicKeyBytes, publicKeyLen);

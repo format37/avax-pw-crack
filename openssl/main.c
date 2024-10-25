@@ -150,7 +150,8 @@ void generate_passphrases_iterative(const std::string& start_passphrase, const s
         BIP32Info child_key_5 = GetChildKeyDerivation(child_key_4.master_private_key, child_key_4.chain_code, index0);
         
         size_t publicKeyLen = 0;
-        unsigned char *publicKeyBytes = GetPublicKey(child_key_5.master_private_key, 32, &publicKeyLen);
+        // unsigned char *publicKeyBytes = GetPublicKey(child_key_5.master_private_key, 32, &publicKeyLen);
+        unsigned char *publicKeyBytes = getCachedPublicKey(child_key_5.master_private_key, 32, &publicKeyLen);
         char *publicKeyHex = byteArrayToHexString(publicKeyBytes, publicKeyLen);
         char *avaxp_address = childToAvaxpAddress(publicKeyHex);
         
@@ -206,6 +207,8 @@ void generate_passphrases(char *passphrase, int index, int length, const char *s
         uint32_t index9000 = 0x80002328;
         uint32_t index0Hardened = 0x80000000;
         uint32_t index0 = 0x00000000;
+
+        initializePublicKeyCache();
         
         BIP32Info child_key_1 = GetChildKeyDerivation(master_key.master_private_key, master_key.chain_code, index44);
         BIP32Info child_key_2 = GetChildKeyDerivation(child_key_1.master_private_key, child_key_1.chain_code, index9000);
@@ -236,9 +239,10 @@ void generate_passphrases(char *passphrase, int index, int length, const char *s
             ;
         }
         
+        cleanupPublicKeyCache();
         delete[] publicKeyHex;
         delete[] avaxp_address;
-        delete[] publicKeyBytes;
+        delete[] publicKeyBytes;        
         return;
     }
     
