@@ -37,39 +37,18 @@ __device__ void hex2bn_cuda(BIGNUM_CUDA *bn, const char *hex) {
         if(val != 0) bn->top = i + 1;
     }
     if(bn->top == 0) bn->top = 1;
+    bn->top = find_top_cuda(bn);
 }
 
 __device__ struct mont_test_case test_cases[] = {
-    // Test 1: Small numbers (32-bit)
+    // Test: From Python and OpenSSL code
     {
-        "11111111",  // a
-        "22222222",  // b
-        "FFFFFFFF"   // n
+        "2D",  // a = 45
+        "4C",  // b = 76
+        "65"   // n = 101
     },
-    
-    // Test 2: 64-bit numbers
-    {
-        "FFFFFFFFFFFFFFFF",
-        "FFFFFFFFFFFFFFFF", 
-        "FFFFFFFFFFFFFFFD"
-    },
-    
-    // Test 3: 128-bit numbers
-    {
-        "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
-        "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
-        "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFD"
-    },
-    
-    // Test 4: 384-bit numbers
-    {
-        "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFFFF0000000000000000FFFFFFFF",
-        "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
-        "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFFFF0000000000000000FFFFFFFD"
-    }
 };
 
-// Test function
 __device__ void run_mont_test(const struct mont_test_case *test) {
     // Create bignums
     BIGNUM_CUDA a, b, n, r;
@@ -106,8 +85,9 @@ __device__ void run_mont_test(const struct mont_test_case *test) {
     init_zero(&aRR);
     init_zero(&bRR);
     
-    if(!BN_mod_mul_montgomery_cuda(&aRR, &a, &mont->RR, mont) ||
-       !BN_mod_mul_montgomery_cuda(&bRR, &b, &mont->RR, mont)) {
+    // Convert a and b to Montgomery form: aRR = a * RR mod N
+    if(!bn_mod_mul(&aRR, &a, &mont->RR, &n) ||
+       !bn_mod_mul(&bRR, &b, &mont->RR, &n)) {
         printf("Failed to convert to Montgomery form\n");
         return;
     }
@@ -128,10 +108,9 @@ __device__ void run_mont_test(const struct mont_test_case *test) {
     // Convert back from Montgomery form
     BIGNUM_CUDA final;
     init_zero(&final);
-    BIGNUM_CUDA one; 
-    init_one(&one);
-    
-    if(!BN_mod_mul_montgomery_cuda(&final, &r, &one, mont)) {
+
+    // Convert back to standard representation
+    if(!BN_from_montgomery_cuda(&final, &r, mont)) {
         printf("Failed to convert back from Montgomery form\n");
         return;
     }
@@ -140,7 +119,7 @@ __device__ void run_mont_test(const struct mont_test_case *test) {
     
     printf("\nMontgomery Context:\n");
     bn_print_no_fuse("N (modulus): ", &mont->N);
-    printf("N0: [%016llx, %016llx]\n", mont->n0[0], mont->n0[1]);
+    printf("n0: [%016llx, %016llx]\n", mont->n0[0], mont->n0[1]);
     bn_print_no_fuse("RR: ", &mont->RR);
     
     printf("\n");

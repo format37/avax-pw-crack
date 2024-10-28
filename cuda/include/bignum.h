@@ -1016,14 +1016,18 @@ __device__ void mod_mul(BIGNUM_CUDA *a, BIGNUM_CUDA *b, BIGNUM_CUDA *mod, BIGNUM
 }
 
 __device__ bool bn_is_zero(const BIGNUM_CUDA *a) {
-    #ifdef debug_top
-        if (a->top != find_top(a)) printf("### ERROR: bn_is_zero: a->top (%d) != find_top(a) (%d)\n", a->top, find_top(a));
-    #endif
+    printf("++ bn_is_zero ++\n");
+    bn_print_no_fuse(">> a: ", a);
+    // #ifdef debug_top
+        if (a->top != find_top_cuda(a)) printf("### ERROR: bn_is_zero: a->top (%d) != find_top(a) (%d)\n", a->top, find_top_cuda(a));
+    // #endif
     for (int i = 0; i < a->top; ++i) {
         if (a->d[i] != 0) {
+            printf("<< false\n");
             return false;
         }
     }
+    printf("<< true\n");
     return true;
 }
 
@@ -1301,6 +1305,26 @@ typedef struct {
     BN_ULONG n0[2];   // Montgomery multiplier
 } BN_MONT_CTX_CUDA;
 
+__device__ BN_ULONG modular_inverse(BN_ULONG a) {
+    BN_ULONG t = 0, newt = 1;
+    BN_ULONG r = BN_MASK2 + 1, newr = a;
+    while (newr != 0) {
+        BN_ULONG quotient = r / newr;
+        BN_ULONG temp;
+
+        temp = newt;
+        newt = t - quotient * newt;
+        t = temp;
+
+        temp = newr;
+        newr = r - quotient * newr;
+        r = temp;
+    }
+    if (r > 1) return 0; // Not invertible
+    if ((int64_t)t < 0) t += BN_MASK2 + 1;
+    return t;
+}
+
 // Initialize Montgomery context
 __device__ BN_MONT_CTX_CUDA* BN_MONT_CTX_new_cuda() {
     BN_MONT_CTX_CUDA* ret = (BN_MONT_CTX_CUDA*)malloc(sizeof(BN_MONT_CTX_CUDA));
@@ -1396,6 +1420,12 @@ __device__ int BN_mod_mul_montgomery_cuda(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, 
     // Normalize result (remove leading zeros)
     r->top = find_top_optimized(r, r->top);
     return ret;
+}
+
+__device__ int BN_from_montgomery_cuda(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, BN_MONT_CTX_CUDA *mont) {
+    BIGNUM_CUDA one;
+    init_one(&one);
+    return BN_mod_mul_montgomery_cuda(r, a, &one, mont);
 }
 
 // Montgomery multiplication --

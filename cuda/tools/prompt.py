@@ -4,31 +4,52 @@ def collect_file_contents(folders, extensions, output_path):
     content = ""
     
     for folder in folders:
-        # if folder is a file
-        if os.path.isfile(folder):
-            file_path = os.path.expanduser(folder)
-            with open(file_path, 'r') as f:
-                file_content = f.read()
-                content += f"## {file_path}\n```\n{file_content}\n```\n\n"
-            continue
-        folder_path = os.path.expanduser(folder)
-        for root, _, files in os.walk(folder_path):
-            for file in files:
-                file_extension = os.path.splitext(file)[1][1:]  # Get the extension without the dot
-                if file_extension in extensions:
-                    file_path = os.path.join(root, file)
-                    with open(file_path, 'r') as f:
+        # Expand the path first
+        path = os.path.expanduser(folder)
+        
+        # Handle individual files
+        if os.path.isfile(path):
+            file_extension = os.path.splitext(path)[1][1:]  # Get the extension without the dot
+            if file_extension in extensions:
+                print(f"Reading file: {path}")
+                try:
+                    with open(path, 'r') as f:
                         file_content = f.read()
-                        content += f"## {file_path}\n```\n{file_content}\n```\n\n"
+                        content += f"## {path}\n```\n{file_content}\n```\n\n"
+                except Exception as e:
+                    print(f"Error reading file {path}: {e}")
+            continue
+            
+        # Handle folders
+        if os.path.isdir(path):
+            for root, _, files in os.walk(path):
+                for file in files:
+                    file_extension = os.path.splitext(file)[1][1:]
+                    if file_extension in extensions:
+                        file_path = os.path.join(root, file)
+                        print(f"Reading file: {file_path}")
+                        try:
+                            with open(file_path, 'r') as f:
+                                file_content = f.read()
+                                content += f"## {file_path}\n```\n{file_content}\n```\n\n"
+                        except Exception as e:
+                            print(f"Error reading file {file_path}: {e}")
+        else:
+            print(f"Warning: Path not found or accessible: {path}")
     
+    # Create output directory if it doesn't exist
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    with open(output_path, 'w') as output_file:
-        output_file.write(content)
     
-    print(f"Content has been saved to {output_path}")
+    # Write the collected content
+    try:
+        with open(output_path, 'w') as output_file:
+            output_file.write(content)
+        print(f"Content has been saved to {output_path}")
+    except Exception as e:
+        print(f"Error writing to output file: {e}")
 
 # Example usage
-extensions = ['cu', 'h', 'c', 'py']
+extensions = ['cu', 'h', 'c', 'py', 'log']
 folders = [
     # "~/projects/temp/cuda-fixnum/",
     # "~/projects/avax-pw-crack/cuda/tests/fixnum-add/",
@@ -36,9 +57,31 @@ folders = [
     # "~/projects/avax-pw-crack/cuda/tests/fixnum-mul/",
     # "~/projects/avax-pw-crack/cuda/tests/fixnum-div/",
     # "~/projects/avax-pw-crack/cuda/tests/fixnum-divmod/"
-    "../include/",
-    "../main.cu",
+    
+    # "../include/",
+    # "../main.cu",
+
+    # "~/projects/openssl/crypto/ec/ec_lib.c",
+    # "~/projects/openssl/crypto/ec/ec_mult.c",
+    # "~/projects/openssl/crypto/ec/ec_local.h",
+    # "~/projects/openssl/crypto/ec/ecp_smpl.c",
+    # "~/projects/openssl/crypto/ec/ecp_mont.c",
+    # "~/projects/openssl/crypto/bn/bn_mont.c",
+    
+    # "~/projects/avax-pw-crack/cuda/tests/BN_mod_mul_montgomery_cuda/run.log",
+
+    # "~/projects/openssl/crypto/bn/bn_sparc.c",
+    # "~/projects/openssl/crypto/bn/bn_ppc.c",
+    # "~/projects/openssl/crypto/bn/bn_asm.c"
+    "~/projects/avax-pw-crack/python/tests/bn_mul_mod_montgomery/test.py",
+    "~/projects/avax-pw-crack/python/tests/bn_mul_mod_montgomery/run.log",
+    "~/projects/avax-pw-crack/openssl/tests/BN_mod_mul_montgomery/test.c",
+    # "~/projects/avax-pw-crack/cuda/include/bignum.h",
+    "~/projects/avax-pw-crack/openssl/tests/BN_mod_mul_montgomery/run.log",
+    "~/projects/avax-pw-crack/cuda/tests/BN_mod_mul_montgomery_cuda/test.cu",
     ]
+
 output_path = "./prompt.md"
 
 collect_file_contents(folders, extensions, output_path)
+

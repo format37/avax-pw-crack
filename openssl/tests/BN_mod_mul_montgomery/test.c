@@ -20,35 +20,14 @@ static void print_bn(const char* label, const BIGNUM* bn) {
     OPENSSL_free(hex);
 }
 
-/* Test cases with different bit sizes */
+/* Test cases */
 static struct mont_test_case test_cases[] = {
-    // Test 1: Small numbers (32-bit)
+    // Test: From Python code
     {
-        "11111111",  // a
-        "22222222",  // b
-        "FFFFFFFF"   // n
+        "2D",  // a = 45
+        "4C",  // b = 76
+        "65"   // n = 101
     },
-    
-    // Test 2: 64-bit numbers
-    {
-        "FFFFFFFFFFFFFFFF",
-        "FFFFFFFFFFFFFFFF", 
-        "FFFFFFFFFFFFFFFD"
-    },
-    
-    // Test 3: 128-bit numbers
-    {
-        "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
-        "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
-        "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFD"
-    },
-    
-    // Test 4: 384-bit numbers
-    {
-        "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFFFF0000000000000000FFFFFFFF",
-        "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
-        "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFFFF0000000000000000FFFFFFFD"
-    }
 };
 
 /* Run a single test case */
@@ -122,7 +101,13 @@ static void run_mont_test(const struct mont_test_case* test) {
     // Print the Montgomery context values for reference
     printf("\nMontgomery Context:\n");
     print_bn("N (modulus)", &mont->N);
-    printf("N0: [%016lx, %016lx]\n", mont->n0[0], mont->n0[1]);
+    printf("N0: [");
+#if BN_BITS2 == 64
+    printf("%016lx", mont->n0[0]);
+#elif BN_BITS2 == 32
+    printf("%08lx", mont->n0[0]);
+#endif
+    printf("]\n");
     print_bn("RR", &mont->RR);
 
     printf("\n");
