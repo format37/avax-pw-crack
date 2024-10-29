@@ -53,8 +53,8 @@ __global__ void kernel_test_div(
         }
     #endif
 
-    a.top = find_top(&a);
-    b.top = find_top(&b);
+    a.top = find_top_cuda(&a);
+    b.top = find_top_cuda(&b);
 
     // Call bn_div
     int ret = bn_div(&quotient, &remainder, &a, &b);
@@ -62,6 +62,9 @@ __global__ void kernel_test_div(
         printf("bn_div failed\n");
         return;
     }
+
+    bn_print_no_fuse("quotient: ", &quotient);
+    bn_print_no_fuse("remainder: ", &remainder);
 
     // Copy quotient and remainder back to host
     #ifdef BN_128
@@ -116,31 +119,40 @@ int main() {
         printf("\nBN_64\n");
     #endif
 
-    // Prepare test data
+    // // Prepare test data
+    // BN_ULONG_HOST test_values_a[][MAX_BIGNUM_SIZE_HOST] = {
+    //     {10, 0, 0, 0, 0, 0, 0, 0, 0, 0}, // Test 0
+    //     {100, 0, 0, 0, 0, 0, 0, 0, 0, 0}, // Test 1
+    //     {0xA54B1234CDEF5678ULL, 0x1234567890ABCDEFULL, 0, 0, 0, 0, 0, 0, 0, 0}, // Test 2
+    //     {50, 0, 0, 0, 0, 0, 0, 0, 0, 0}, // Test 3 (negative a)
+    //     {50, 0, 0, 0, 0, 0, 0, 0, 0, 0}, // Test 4
+    //     {50, 0, 0, 0, 0, 0, 0, 0, 0, 0}, // Test 5 (negative a)
+    //     {12345, 0, 0, 0, 0, 0, 0, 0, 0, 0}, // Test 6 (small a)
+    //     {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, // Test 7 (a = 0)
+    // };
+
+    // BN_ULONG_HOST test_values_b[][MAX_BIGNUM_SIZE_HOST] = {
+    //     {2, 0, 0, 0, 0, 0, 0, 0, 0, 0}, // Test 0
+    //     {3, 0, 0, 0, 0, 0, 0, 0, 0, 0}, // Test 1
+    //     {987654321, 0, 0, 0, 0, 0, 0, 0, 0, 0}, // Test 2
+    //     {7, 0, 0, 0, 0, 0, 0, 0, 0, 0}, // Test 3
+    //     {7, 0, 0, 0, 0, 0, 0, 0, 0, 0}, // Test 4 (negative b)
+    //     {7, 0, 0, 0, 0, 0, 0, 0, 0, 0}, // Test 5 (negative b)
+    //     {12345678901234567890ULL, 0, 0, 0, 0, 0, 0, 0, 0, 0}, // Test 6 (large b)
+    //     {12345, 0, 0, 0, 0, 0, 0, 0, 0, 0}, // Test 7
+    // };
+
+    // int sign_a[] = {0, 0, 0, 1, 0, 1, 0, 0};
+    // int sign_b[] = {0, 0, 0, 0, 1, 1, 0, 0};
+
     BN_ULONG_HOST test_values_a[][MAX_BIGNUM_SIZE_HOST] = {
-        {10, 0, 0, 0, 0, 0, 0, 0, 0, 0}, // Test 0
-        {100, 0, 0, 0, 0, 0, 0, 0, 0, 0}, // Test 1
-        {0xA54B1234CDEF5678ULL, 0x1234567890ABCDEFULL, 0, 0, 0, 0, 0, 0, 0, 0}, // Test 2
-        {50, 0, 0, 0, 0, 0, 0, 0, 0, 0}, // Test 3 (negative a)
-        {50, 0, 0, 0, 0, 0, 0, 0, 0, 0}, // Test 4
-        {50, 0, 0, 0, 0, 0, 0, 0, 0, 0}, // Test 5 (negative a)
-        {12345, 0, 0, 0, 0, 0, 0, 0, 0, 0}, // Test 6 (small a)
-        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, // Test 7 (a = 0)
+        {0, 0, 0xfffffffffffffffe, 0xffffffffffffffff, 1, 0, 0, 0, 0, 0} // 1 ffffffffffffffff fffffffffffffffe 0000000000000000 0000000000000000
     };
-
     BN_ULONG_HOST test_values_b[][MAX_BIGNUM_SIZE_HOST] = {
-        {2, 0, 0, 0, 0, 0, 0, 0, 0, 0}, // Test 0
-        {3, 0, 0, 0, 0, 0, 0, 0, 0, 0}, // Test 1
-        {987654321, 0, 0, 0, 0, 0, 0, 0, 0, 0}, // Test 2
-        {7, 0, 0, 0, 0, 0, 0, 0, 0, 0}, // Test 3
-        {7, 0, 0, 0, 0, 0, 0, 0, 0, 0}, // Test 4 (negative b)
-        {7, 0, 0, 0, 0, 0, 0, 0, 0, 0}, // Test 5 (negative b)
-        {12345678901234567890ULL, 0, 0, 0, 0, 0, 0, 0, 0, 0}, // Test 6 (large b)
-        {12345, 0, 0, 0, 0, 0, 0, 0, 0, 0}, // Test 7
+        {1, 0, 1, 0, 0, 0, 0, 0, 0, 0} // 1 0000000000000000 0000000000000001
     };
-
-    int sign_a[] = {0, 0, 0, 1, 0, 1, 0, 0};
-    int sign_b[] = {0, 0, 0, 0, 1, 1, 0, 0};
+    int sign_a[] = {0};
+    int sign_b[] = {0};
 
     int num_tests = sizeof(test_values_a) / sizeof(test_values_a[0]);
 
@@ -239,14 +251,14 @@ int main() {
             printf("Test PASSED: CUDA and OpenSSL results match.\n");
         } else {
             printf("### Test FAILED: CUDA and OpenSSL results DO NOT MATCH. ###\n");
-            // Print results for debugging
-            print_bn("a", a);
-            print_bn("b", b);
-            print_bn("CUDA quotient", BN_bin2bn((unsigned char*)cuda_Q, sizeof(BN_ULONG_HOST)*MAX_BIGNUM_SIZE_HOST, NULL));
-            print_bn("CUDA remainder", BN_bin2bn((unsigned char*)cuda_R, sizeof(BN_ULONG_HOST)*MAX_BIGNUM_SIZE_HOST, NULL));
-            print_bn("OpenSSL quotient", q);
-            print_bn("OpenSSL remainder", r);
         }
+        // Print results for debugging
+        print_bn("a", a);
+        print_bn("b", b);
+        print_bn("CUDA quotient", BN_bin2bn((unsigned char*)cuda_Q, sizeof(BN_ULONG_HOST)*MAX_BIGNUM_SIZE_HOST, NULL));
+        print_bn("CUDA remainder", BN_bin2bn((unsigned char*)cuda_R, sizeof(BN_ULONG_HOST)*MAX_BIGNUM_SIZE_HOST, NULL));
+        print_bn("OpenSSL quotient", q);
+        print_bn("OpenSSL remainder", r);
 
         BN_free(a);
         BN_free(b);

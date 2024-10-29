@@ -99,6 +99,27 @@ static struct mont_test_case test_cases[] = {
         "F",            // a = 15
         "D",            // b = 13
         "11"            // n = 17 (small prime)
+    },
+
+    // Test Case 11: 128-bit max values
+    {
+        "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", // a = 2^128 - 1
+        "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE", // b = 2^128 - 2
+        "100000000000000000000000000000001"  // n = 2^128 + 1
+    },
+
+    // Test Case 12: Large prime numbers near 2^127
+    {
+        "7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", // a = 2^127 - 1
+        "80000000000000000000000000000001", // b = 2^127 + 1
+        "8000000000000000000000000000000D"  // n = Large prime near 2^127
+    },
+
+    // Test Case 13: Random 128-bit numbers
+    {
+        "e10925726c3018dcb512f4ebf0a8835b", // Random a
+        "eb772e27b51120720c3913490298d9a7", // Random b
+        "fbb36e8a921f0b6e56e12b56ce3f0ad3"  // Random n
     }
 };
 

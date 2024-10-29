@@ -72,6 +72,7 @@ __device__ int bn_mod(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNUM_CUDA *n
 __device__ bool bn_is_zero(const BIGNUM_CUDA *a);
 __device__ void bn_extended_gcd(const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, BIGNUM_CUDA *x, BIGNUM_CUDA *y, BIGNUM_CUDA *gcd);
 __device__ bool bn_mod_inverse(BIGNUM_CUDA *result, const BIGNUM_CUDA *a, const BIGNUM_CUDA *n);
+__device__ int bn_div_mock(BIGNUM_CUDA *bn_quotient, BIGNUM_CUDA *bn_remainder, const BIGNUM_CUDA *bn_dividend, const BIGNUM_CUDA *bn_divisor);
 
 __device__ char find_top_cuda(const BIGNUM_CUDA *bn) {
     for (char i = MAX_BIGNUM_SIZE - 1; i >= 0; i--) {
@@ -804,7 +805,7 @@ __device__ void bn_mul_from_div(const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, BIGN
                 if (!absolute) product->neg = a->neg ^ b->neg;
                 // printf("[%d x %d] ", a_bit_len, b_bit_len);
                 // bn_print_no_fuse("<< product: ", product);
-                record_function(FN_BN_MUL_VANILA, start_time);
+                // record_function(FN_BN_MUL_VANILA, start_time);
                 return;
             }
         }
@@ -943,6 +944,70 @@ __device__ void bn_mul_from_div(const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, BIGN
     // bn_print_no_fuse("<< product: ", product);
 }
 
+__device__ int bn_mod_mock(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNUM_CUDA *n) {
+    // r: Remainder (updated)
+    // a: Dividend
+    // n: Modulus
+    bool debug = 0;
+    if (debug) {
+        printf("++ bn_mod ++\n");
+        bn_print_no_fuse(">> r: ", r);
+        bn_print_no_fuse(">> a: ", a);
+        bn_print_no_fuse(">> n: ", n);
+    }
+
+    BIGNUM_CUDA q;
+    init_zero(&q);
+
+    // if (r == n) {
+    if (bn_cmp(r, n) == 0) {
+        printf("bn_mod: ERR_R_PASSED_INVALID_ARGUMENT");
+        return 0;
+    }
+    // init_zero(r);
+    if (!bn_div_mock(&q, r, a, n)) {
+    // if (!bn_div(&q, r, a, n)) {
+        printf("bn_mod: bn_div failed\n");
+        return 0;
+    }
+
+    BIGNUM_CUDA tmp;
+    init_zero(&tmp);
+
+    if (r->neg) {
+        if (debug) printf("r is negative\n");
+        bool result;
+        // If the remainder is negative, add the absolute value of the divisor
+        if (n->neg) {
+            if (debug) printf("d is negative\n");
+            result = bn_sub(&tmp, r, n); // tmp = r - n
+            if (!result) {
+                return 0;
+            }
+            #ifdef debug_bn_copy
+                printf("bn_mod: bn_copy(tmp, r)\n");
+            #endif
+            // copy tmp to r
+            bn_copy(r, &tmp);
+        } else {
+            if (debug) printf("d is not negative\n");
+            result = bn_add(&tmp, r, n); // tmp = r + n            
+            if (!result) {
+                return 0;
+            }
+            #ifdef debug_bn_copy
+                printf("bn_mod: bn_copy(tmp, r)\n");
+            #endif
+            // copy tmp to r
+            bn_copy(r, &tmp);
+        }
+    }
+    if (debug) bn_print_no_fuse("<< q: ", &q);
+    if (debug) bn_print_no_fuse("<< r (out): ", r);
+    if (debug) printf("-- bn_mod --\n");
+    return 1;
+}
+
 __device__ int bn_mod(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNUM_CUDA *n) {
     // r: Remainder (updated)
     // a: Dividend
@@ -958,7 +1023,8 @@ __device__ int bn_mod(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNUM_CUDA *n
     BIGNUM_CUDA q;
     init_zero(&q);
 
-    if (r == n) {
+    // if (r == n) {
+    if (bn_cmp(r, n) == 0) {
         printf("bn_mod: ERR_R_PASSED_INVALID_ARGUMENT");
         return 0;
     }
@@ -1118,15 +1184,187 @@ __device__ void left_shift(BIGNUM_CUDA *a, int shift) {
     a->top = find_top_optimized(a, potential_new_top);
 }
 
+__device__ int bn_div_mock(BIGNUM_CUDA *bn_quotient, BIGNUM_CUDA *bn_remainder, const BIGNUM_CUDA *bn_dividend, const BIGNUM_CUDA *bn_divisor)
+{
+    printf("++ bn_div ++\n");
+    bn_print_no_fuse(">> bn_quotient: ", bn_quotient);
+    bn_print_no_fuse(">> bn_remainder: ", bn_remainder);
+    bn_print_no_fuse(">> bn_dividend: ", bn_dividend);
+    bn_print_no_fuse(">> bn_divisor: ", bn_divisor);
+    char divs_max_top = max(bn_dividend->top, bn_divisor->top);
+    BIGNUM_CUDA abs_dividend;
+    init_zero(&abs_dividend);
+    // Copy absolute values
+    for (int i = 0; i < bn_dividend->top; i++) {
+        abs_dividend.d[i] = bn_dividend->d[i];
+    }
+    abs_dividend.top = bn_dividend->top;   
+
+    // Store signs and work with absolute values
+    abs_dividend.neg = 0;
+
+    // Initialize quotient and remainder
+    init_zero(bn_quotient);
+    init_zero(bn_remainder);
+    // Perform long division
+    BIGNUM_CUDA current_dividend;
+    init_zero(&current_dividend);
+    char dividend_size = abs_dividend.top;
+    return 1;
+}
+
 __device__ int bn_div(BIGNUM_CUDA *bn_quotient, BIGNUM_CUDA *bn_remainder, const BIGNUM_CUDA *bn_dividend, const BIGNUM_CUDA *bn_divisor)
 {
     #ifdef function_profiler
         unsigned long long start_time = clock64();
     #endif
     #ifdef debug_print
-        // printf("++ bn_div ++\n");
-        // bn_print(">> bn_dividend: ", bn_dividend);
-        // bn_print(">> bn_divisor: ", bn_divisor);
+        printf("++ bn_div ++\n");
+        bn_print_no_fuse(">> bn_quotient: ", bn_quotient);
+        bn_print_no_fuse(">> bn_remainder: ", bn_remainder);
+        bn_print_no_fuse(">> bn_dividend: ", bn_dividend);
+        bn_print_no_fuse(">> bn_divisor: ", bn_divisor);
+    #endif
+    char divs_max_top = max(bn_dividend->top, bn_divisor->top);
+    
+    // perform classical div_mod if only single word
+    if (divs_max_top == 1) {
+        BN_ULONG dividend = bn_dividend->d[0];
+        BN_ULONG divisor = bn_divisor->d[0];
+        BN_ULONG quotient = dividend / divisor;
+        BN_ULONG remainder = dividend % divisor;
+        bn_quotient->d[0] = quotient;
+        bn_remainder->d[0] = remainder;
+        bn_quotient->top = (quotient == 0) ? 0 : 1;
+        // bn_remainder->top = (remainder == 0) ? 0 : 1;
+        bn_remainder->top = find_top_optimized(bn_remainder, 2);
+        bn_quotient->neg = bn_dividend->neg ^ bn_divisor->neg;
+        bn_remainder->neg = bn_dividend->neg;
+        #ifdef function_profiler
+            record_function(FN_BN_DIV_VANILA_1, start_time);
+        #endif
+        return 1;
+    }
+    // TODO compare dividend, not divs_max_top
+    else if (divs_max_top == 2) {
+        // Divide in vanila way using 128-bit values if max top is 2:
+        unsigned __int128 dividend, divisor;
+        dividend = (unsigned __int128)bn_dividend->d[1] << 64 | bn_dividend->d[0];
+        divisor = (unsigned __int128)bn_divisor->d[1] << 64 | bn_divisor->d[0];
+        unsigned __int128 quotient = dividend / divisor;
+        unsigned __int128 remainder = dividend % divisor;
+        // first word of quotient
+        bn_quotient->d[0] = (BN_ULONG)quotient;
+        // second word of quotient
+        bn_quotient->d[1] = (BN_ULONG)(quotient >> 64);
+        bn_quotient->top = find_top_optimized(bn_quotient, 2);
+        bn_quotient->neg = bn_dividend->neg ^ bn_divisor->neg;
+
+        // first word of remainder
+        bn_remainder->d[0] = (BN_ULONG)remainder;
+        // second word of remainder
+        bn_remainder->d[1] = (BN_ULONG)(remainder >> 64);
+        bn_remainder->top = find_top_optimized(bn_remainder, 2);
+        bn_remainder->neg = bn_dividend->neg;
+        #ifdef function_profiler
+            record_function(FN_BN_DIV_VANILA_2, start_time);
+        #endif
+        return 1;
+    }
+    BIGNUM_CUDA abs_dividend;
+    init_zero(&abs_dividend);
+    // Copy absolute values
+    for (int i = 0; i < bn_dividend->top; i++) {
+        abs_dividend.d[i] = bn_dividend->d[i];
+    }
+    abs_dividend.top = bn_dividend->top;   
+
+    // Store signs and work with absolute values
+    abs_dividend.neg = 0;
+
+    // Initialize quotient and remainder
+    init_zero(bn_quotient);
+    init_zero(bn_remainder);
+    // Perform long division
+    BIGNUM_CUDA current_dividend;
+    init_zero(&current_dividend);
+    char dividend_size = abs_dividend.top;
+
+    for (int i = dividend_size - 1; i >= 0; i--) {
+        // Shift current_dividend left by one word and add next word of dividend
+        left_shift(&current_dividend, BN_ULONG_NUM_BITS);
+        current_dividend.d[0] = abs_dividend.d[i];
+        // Find quotient digit
+        BN_ULONG q = 0;
+        BN_ULONG left = 0, right = BN_ULONG_MAX;
+        // BN_ULONG prev_mid = 0;
+        // unsigned int j = 0;
+        while (left <= right) {
+            BN_ULONG mid = left + (right - left) / 2;
+            BIGNUM_CUDA temp, product;
+            init_zero(&temp);
+            init_zero(&product);
+            temp.d[0] = mid;
+            temp.top = 1;
+            bn_mul_from_div(bn_divisor, &temp, &product, true);
+
+            if (bn_cmp(&product, &current_dividend) <= 0) {
+                q = mid;
+                left = mid + 1;
+            } else {
+                right = mid - 1;
+            }            
+        }
+
+        // Add quotient digit to result
+        left_shift(bn_quotient, BN_ULONG_NUM_BITS);
+        bn_quotient->d[0] |= q;
+
+        // Subtract q * divisor from current_dividend
+        BIGNUM_CUDA temp, product;
+        init_zero(&temp);
+        init_zero(&product);
+        temp.d[0] = q;
+        temp.top = 1;
+
+        bn_mul_from_div(bn_divisor, &temp, &product, true);
+        bn_sub_from_div(&current_dividend, &current_dividend, &product);
+    }
+
+    // Set remainder
+    for (int i = 0; i < current_dividend.top; i++) {
+        bn_remainder->d[i] = current_dividend.d[i];
+    }
+
+    // Apply correct signs
+    bn_quotient->neg = bn_dividend->neg ^ bn_divisor->neg;
+    bn_remainder->neg = bn_dividend->neg;
+
+    // Normalize results
+    bn_quotient->top = find_top_optimized(bn_quotient, divs_max_top);
+    bn_remainder->top = find_top_optimized(bn_remainder, divs_max_top);
+    #ifdef debug_print
+        // bn_print("<< bn_quotient: ", bn_quotient);
+        // bn_print("<< bn_remainder: ", bn_remainder);
+        // printf("-- bn_div --\n");
+    #endif
+    #ifdef function_profiler
+        record_function(FN_BN_DIV, start_time);
+    #endif
+    return 1;
+}
+
+__device__ int bn_div_x(BIGNUM_CUDA *bn_quotient, BIGNUM_CUDA *bn_remainder, const BIGNUM_CUDA *bn_dividend, const BIGNUM_CUDA *bn_divisor)
+{
+    #ifdef function_profiler
+        unsigned long long start_time = clock64();
+    #endif
+    #ifdef debug_print
+        printf("++ bn_div ++\n");
+        bn_print_no_fuse(">> bn_quotient: ", bn_quotient);
+        bn_print_no_fuse(">> bn_remainder: ", bn_remainder);
+        bn_print_no_fuse(">> bn_dividend: ", bn_dividend);
+        bn_print_no_fuse(">> bn_divisor: ", bn_divisor);
     #endif
     char divs_max_top = max(bn_dividend->top, bn_divisor->top);
     
@@ -1273,7 +1511,7 @@ __device__ int bn_mod_mul(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNUM_CUD
     init_zero(&tmp);
     bn_mul(a, b, &tmp); // a * b = product
     // bn_print_no_fuse("After bn_mul, tmp: ", &tmp);
-    int ret = bn_mod(r, &tmp, m); // result = tmp % m
+    int ret = bn_mod_mock(r, &tmp, m); // result = tmp % m
     // bn_print_no_fuse("<< r: ", r);
     // printf("-- bn_mod_mul --\n");
     return ret;

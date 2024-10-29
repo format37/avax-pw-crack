@@ -173,6 +173,27 @@ def test_montgomery_multiplication():
             'b': 13,
             'n': 17,    # Small prime
             'description': 'Small prime modulus'
+        },
+        # Test Case 11: 128-bit numbers
+        {
+            'a': 340282366920938463463374607431768211455,  # 2^128 - 1
+            'b': 340282366920938463463374607431768211454,  # 2^128 - 2
+            'n': 340282366920938463463374607431768211457,  # 2^128 + 1
+            'description': '128-bit max values'
+        },
+        # Test Case 12: Large prime numbers near 2^127
+        {
+            'a': 170141183460469231731687303715884105727,  # 2^127 - 1
+            'b': 170141183460469231731687303715884105729,  # 2^127 + 1
+            'n': 170141183460469231731687303715884105741,  # Large prime near 2^127
+            'description': 'Large primes near 2^127'
+        },
+        # Test Case 13: Random 128-bit numbers
+        {
+            'a': 299123789237981273498127349817234981723,
+            'b': 312987398472398472389472394723947239847,
+            'n': 334567890123456789012345678901234567891,
+            'description': 'Random 128-bit numbers'
         }
     ]
     
