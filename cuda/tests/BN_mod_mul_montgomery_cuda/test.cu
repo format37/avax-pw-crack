@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "bignum.h"
+#include "point.h"
 
 // Test case structure 
 __device__ struct mont_test_case {
@@ -40,13 +41,85 @@ __device__ void hex2bn_cuda(BIGNUM_CUDA *bn, const char *hex) {
     bn->top = find_top_cuda(bn);
 }
 
+// __device__ struct mont_test_case test_cases[] = {
+//     // Test: From Python and OpenSSL code
+//     {
+//         "2D",  // a = 45
+//         "4C",  // b = 76
+//         "65"   // n = 101
+//     },
+// };
+
 __device__ struct mont_test_case test_cases[] = {
-    // Test: From Python and OpenSSL code
+    // Test Case 1: Basic small numbers (original example)
     {
-        "2D",  // a = 45
-        "4C",  // b = 76
-        "65"   // n = 101
+        "2D",   // a = 45
+        "4C",   // b = 76
+        "65"    // n = 101
     },
+    
+    // Test Case 2: Powers of 2
+    {
+        "40",   // a = 64  (2^6)
+        "20",   // b = 32  (2^5)
+        "61"    // n = 97
+    },
+    
+    // Test Case 3: Large prime modulus
+    {
+        "FFF1", // a = 0xFFF1
+        "FFF2", // b = 0xFFF2
+        "FFF7"  // n = 0xFFF7
+    },
+    
+    // Test Case 4: Edge case - operands equal to modulus minus 1
+    {
+        "60",   // a = 96
+        "60",   // b = 96
+        "61"    // n = 97
+    },
+    
+    // Test Case 5: Edge case - one operand is 1
+    {
+        "01",   // a = 1
+        "FF",   // b = 0xFF
+        "FB"    // n = 251
+    },
+    
+    // Test Case 6: Edge case - one operand is 0
+    {
+        "00",   // a = 0
+        "FF",   // b = 0xFF
+        "FB"    // n = 251
+    },
+    
+    // Test Case 7: Operands larger than modulus
+    {
+        "12D",  // a = 301
+        "191",  // b = 401
+        "FB"    // n = 251
+    },
+    
+    // Test Case 8: Modulus with specific bit pattern
+    {
+        "AAAA", // a = 0xAAAA
+        "5555", // b = 0x5555
+        "FFFB"  // n = 0xFFFB
+    },
+    
+    // Test Case 9: Equal operands
+    {
+        "1234", // a = 0x1234
+        "1234", // b = 0x1234
+        "FFFD"  // n = 0xFFFD
+    },
+    
+    // Test Case 10: Operations with small prime modulus
+    {
+        "0F",   // a = 15
+        "0D",   // b = 13
+        "11"    // n = 17
+    }
 };
 
 __device__ void run_mont_test(const struct mont_test_case *test) {
@@ -62,69 +135,15 @@ __device__ void run_mont_test(const struct mont_test_case *test) {
     hex2bn_cuda(&b, test->b_hex);
     hex2bn_cuda(&n, test->n_hex);
     
-    // Create and initialize Montgomery context
-    BN_MONT_CTX_CUDA *mont = BN_MONT_CTX_new_cuda();
-    if(mont == NULL) {
-        printf("Failed to create Montgomery context\n");
-        return;
-    }
-    
-    // Set up Montgomery context 
-    if(!BN_MONT_CTX_set_cuda(mont, &n)) {
-        printf("Failed to initialize Montgomery context\n");
-        return;
-    }
-    
     printf("\nTest inputs:\n");
     bn_print_no_fuse("a: ", &a);
     bn_print_no_fuse("b: ", &b);
     bn_print_no_fuse("n: ", &n);
 
-    // Convert to Montgomery form 
-    BIGNUM_CUDA aRR, bRR;
-    init_zero(&aRR);
-    init_zero(&bRR);
-    
-    // Convert a and b to Montgomery form
-    if(!bn_mod_mul(&aRR, &a, &mont->R, &n) || !bn_mod_mul(&bRR, &b, &mont->R, &n)) {
-        printf("Failed to convert to Montgomery form\n");
-        return;
-    }
-    
-    printf("\nMontgomery form (RR values):\n"); 
-    bn_print_no_fuse("aRR: ", &aRR);
-    bn_print_no_fuse("bRR: ", &bRR);
-
-    // Perform Montgomery multiplication
-    if(!BN_mod_mul_montgomery_cuda(&r, &aRR, &bRR, mont)) {
-        printf("Montgomery multiplication failed\n");
-        return; 
-    }
-
-    printf("\nResult:\n");
-    bn_print_no_fuse("r (Montgomery form): ", &r);
-    
-    // Convert back from Montgomery form
-    BIGNUM_CUDA final;
-    init_zero(&final);
-
-    // Convert back to standard representation
-    if(!BN_from_montgomery_cuda(&final, &r, mont)) {
-        printf("Failed to convert back from Montgomery form\n");
-        return;
-    }
-    
-    bn_print_no_fuse("r (final result): ", &final);
-    
-    printf("\nMontgomery Context:\n");
-    bn_print_no_fuse("N (modulus): ", &mont->N);
-    printf("n0: [%016llx, %016llx]\n", mont->n0[0], mont->n0[1]);
-    bn_print_no_fuse("RR: ", &mont->RR);
+    bn_mod_mul_montgomery(&a, &b, &n, &r);
+    bn_print_no_fuse("Result: ", &r);
     
     printf("\n");
-    
-    // Cleanup
-    free(mont);
 }
 
 __global__ void test_montgomery() {

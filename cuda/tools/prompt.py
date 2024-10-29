@@ -70,16 +70,17 @@ folders = [
     
     
 
-    # "~/projects/openssl/crypto/bn/bn_sparc.c",
-    # "~/projects/openssl/crypto/bn/bn_ppc.c",
-    # "~/projects/openssl/crypto/bn/bn_asm.c"
+    # # "~/projects/openssl/crypto/bn/bn_sparc.c",
+    # # "~/projects/openssl/crypto/bn/bn_ppc.c",
+    # # "~/projects/openssl/crypto/bn/bn_asm.c"
     "~/projects/avax-pw-crack/python/tests/bn_mul_mod_montgomery/test.py",
-    "~/projects/avax-pw-crack/openssl/tests/BN_mod_mul_montgomery/test.c",
-    "~/projects/avax-pw-crack/cuda/tests/BN_mod_mul_montgomery_cuda/test.cu",
+    # # "~/projects/avax-pw-crack/openssl/tests/BN_mod_mul_montgomery/test.c",
+    # # "~/projects/avax-pw-crack/cuda/tests/BN_mod_mul_montgomery_cuda/test.cu",
+    "~/projects/avax-pw-crack/cuda/include/point.h",
     "~/projects/avax-pw-crack/cuda/include/bignum.h",
-    "~/projects/avax-pw-crack/python/tests/bn_mul_mod_montgomery/run.log",
-    "~/projects/avax-pw-crack/openssl/tests/BN_mod_mul_montgomery/run.log",
-    "~/projects/avax-pw-crack/cuda/tests/BN_mod_mul_montgomery_cuda/run.log",
+    # # "~/projects/avax-pw-crack/python/tests/bn_mul_mod_montgomery/run.log",
+    # # "~/projects/avax-pw-crack/openssl/tests/BN_mod_mul_montgomery/run.log",
+    # # "~/projects/avax-pw-crack/cuda/tests/BN_mod_mul_montgomery_cuda/run.log",
     ]
 
 output_path = "./prompt.md"

@@ -70,6 +70,8 @@ __device__ void init_one(BIGNUM_CUDA *bn) {
 __device__ bool bn_add(BIGNUM_CUDA *result, const BIGNUM_CUDA *a, const BIGNUM_CUDA *b);
 __device__ int bn_mod(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNUM_CUDA *n);
 __device__ bool bn_is_zero(const BIGNUM_CUDA *a);
+__device__ void bn_extended_gcd(const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, BIGNUM_CUDA *x, BIGNUM_CUDA *y, BIGNUM_CUDA *gcd);
+__device__ bool bn_mod_inverse(BIGNUM_CUDA *result, const BIGNUM_CUDA *a, const BIGNUM_CUDA *n);
 
 __device__ char find_top_cuda(const BIGNUM_CUDA *bn) {
     for (char i = MAX_BIGNUM_SIZE - 1; i >= 0; i--) {
@@ -948,9 +950,9 @@ __device__ int bn_mod(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNUM_CUDA *n
     bool debug = 0;
     if (debug) {
         printf("++ bn_mod ++\n");
-        bn_print(">> r: ", r);
-        bn_print(">> a: ", a);
-        bn_print(">> n: ", n);
+        bn_print_no_fuse(">> r: ", r);
+        bn_print_no_fuse(">> a: ", a);
+        bn_print_no_fuse(">> n: ", n);
     }
 
     BIGNUM_CUDA q;
@@ -961,6 +963,7 @@ __device__ int bn_mod(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNUM_CUDA *n
         return 0;
     }
     if (!bn_div(&q, r, a, n)) {
+        printf("bn_mod: bn_div failed\n");
         return 0;
     }
 
@@ -995,7 +998,8 @@ __device__ int bn_mod(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNUM_CUDA *n
             bn_copy(r, &tmp);
         }
     }
-    if (debug) bn_print("<< r bn_mod: ", r);
+    if (debug) bn_print_no_fuse("<< q: ", &q);
+    if (debug) bn_print_no_fuse("<< r (out): ", r);
     if (debug) printf("-- bn_mod --\n");
     return 1;
 }
@@ -1016,18 +1020,18 @@ __device__ void mod_mul(BIGNUM_CUDA *a, BIGNUM_CUDA *b, BIGNUM_CUDA *mod, BIGNUM
 }
 
 __device__ bool bn_is_zero(const BIGNUM_CUDA *a) {
-    printf("++ bn_is_zero ++\n");
-    bn_print_no_fuse(">> a: ", a);
-    // #ifdef debug_top
+    // printf("++ bn_is_zero ++\n");
+    // bn_print_no_fuse(">> a: ", a);
+    #ifdef debug_top
         if (a->top != find_top_cuda(a)) printf("### ERROR: bn_is_zero: a->top (%d) != find_top(a) (%d)\n", a->top, find_top_cuda(a));
-    // #endif
+    #endif
     for (int i = 0; i < a->top; ++i) {
         if (a->d[i] != 0) {
-            printf("<< false\n");
+            // printf("<< false\n");
             return false;
         }
     }
-    printf("<< true\n");
+    // printf("<< true\n");
     return true;
 }
 
@@ -1261,10 +1265,18 @@ __device__ int bn_mod_sqr(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNUM_CUD
 }
 
 __device__ int bn_mod_mul(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, const BIGNUM_CUDA *m) {
+    // printf("++ bn_mod_mul ++\n");
+    // bn_print_no_fuse(">> a: ", a);
+    // bn_print_no_fuse(">> b: ", b);
+    // bn_print_no_fuse(">> m: ", m);
     BIGNUM_CUDA tmp;
     init_zero(&tmp);
     bn_mul(a, b, &tmp); // a * b = product
-    return bn_mod(r, &tmp, m); // result = product % m
+    // bn_print_no_fuse("After bn_mul, tmp: ", &tmp);
+    int ret = bn_mod(r, &tmp, m); // result = tmp % m
+    // bn_print_no_fuse("<< r: ", r);
+    // printf("-- bn_mod_mul --\n");
+    return ret;
 }
 
 __device__ void bn_mod_lshift(BIGNUM_CUDA *r, BIGNUM_CUDA *a, int shift, const BIGNUM_CUDA *p) {
@@ -1295,295 +1307,155 @@ __device__ void bn_mod_sub(BIGNUM_CUDA *result, const BIGNUM_CUDA *a, const BIGN
 
 // Montgomery multiplication ++
 
-// Add these definitions to your bignum.h
-#define BN_MASK2 ((BN_ULONG)(-1)) // Full word mask
-#define FN_BN_MUL_MONT 40 // Add this to your function profiling enum if using
-
-// Montgomery context structure
-// typedef struct {
-//     BIGNUM_CUDA N;    // Modulus
-//     BIGNUM_CUDA RR;   // R^2 mod N where R = 2^(wordsize * nwords)
-//     BN_ULONG n0[2];   // Montgomery multiplier
-// } BN_MONT_CTX_CUDA;
-// Montgomery context structure
-typedef struct {
-    BIGNUM_CUDA N;    // Modulus
-    BIGNUM_CUDA RR;   // R^2 mod N
-    BIGNUM_CUDA R;    // R mod N
-    BN_ULONG n0[2];   // Montgomery multiplier
-    BIGNUM_CUDA Ninv; // -N^{-1} mod R
-} BN_MONT_CTX_CUDA;
-
-
-__device__ BN_ULONG modular_inverse(BN_ULONG a) {
-    BN_ULONG t = 0, newt = 1;
-    BN_ULONG r = BN_MASK2 + 1, newr = a;
-    while (newr != 0) {
-        BN_ULONG quotient = r / newr;
-        BN_ULONG temp;
-
-        temp = newt;
-        newt = t - quotient * newt;
-        t = temp;
-
-        temp = newr;
-        newr = r - quotient * newr;
-        r = temp;
+__device__ void bn_mod_neg(BIGNUM_CUDA *result, const BIGNUM_CUDA *n, const BIGNUM_CUDA *R) {
+    // Compute -n mod R
+    if (bn_cmp(n, R) < 0) {
+        // If n < R, just subtract n from R
+        bn_sub(result, R, n);
+    } else {
+        // If n >= R, first reduce n modulo R
+        BIGNUM_CUDA tmp;
+        init_zero(&tmp);
+        bn_mod(&tmp, n, R);  // tmp = n mod R
+        bn_sub(result, R, &tmp);  // result = R - (n mod R)
     }
-    if (r > 1) return 0; // Not invertible
-    if ((int64_t)t < 0) t += BN_MASK2 + 1;
-    return t;
 }
 
-__device__ void compute_Ninv(BIGNUM_CUDA *Ninv, const BIGNUM_CUDA *N, const BIGNUM_CUDA *R) {
-    // Use Extended Euclidean Algorithm to compute Ninv
-    BIGNUM_CUDA t0, t1, r0, r1, q, temp;
-    init_zero(&t0); init_zero(&t1);
-    init_zero(&r0); init_zero(&r1);
-    init_zero(&q); init_zero(&temp);
+__device__ bool compute_mont_nprime(BIGNUM_CUDA *n_prime, const BIGNUM_CUDA *n, const BIGNUM_CUDA *R) {
+    // printf("++ compute_mont_nprime ++\n");
+    // bn_print_no_fuse(">> n: ", n);
+    // bn_print_no_fuse(">> R: ", R);
+    
+    // Compute -n
+    BIGNUM_CUDA neg_n;
+    init_zero(&neg_n);
+    bn_mod_neg(&neg_n, n, R);
+    // bn_print_no_fuse("neg_n: ", &neg_n);
 
-    // Initialize
-    bn_copy(&r0, R);
-    bn_copy(&r1, N);
-    bn_set_word(&t0, 0);
-    bn_set_word(&t1, 1);
+    // Compute (-n)^(-1) mod R using bn_mod_inverse
+    return bn_mod_inverse(n_prime, &neg_n, R);
+    
+    // Result is already reduced modulo R since bn_mod_inverse handles this
+    // No need for additional modulo operation
+}
 
-    while (!bn_is_zero(&r1)) {
-        bn_div(&q, &temp, &r0, &r1); // q = r0 / r1, temp = r0 % r1
-        bn_print_no_fuse("# temp: ", &temp);
-        // Update r0 and r1
-        bn_copy(&r0, &r1);
-        bn_copy(&r1, &temp);
+// Helper function to verify if two numbers are coprime
+__device__ bool are_coprime(const BIGNUM_CUDA *a, const BIGNUM_CUDA *b) {
+    BIGNUM_CUDA gcd;
+    init_zero(&gcd);
+    
+    // Calculate GCD using extended Euclidean algorithm
+    bn_extended_gcd(a, b, NULL, NULL, &gcd);
+    
+    // Numbers are coprime if their GCD is 1
+    return bn_is_one(&gcd);
+}
 
+__device__ void bn_mod_mul_montgomery(const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, const BIGNUM_CUDA *n, BIGNUM_CUDA *result) {
+    bool debug = false;
+    // Step 1: Calculate R = 2^k where k is the number of bits in n
+    if (debug) printf("R calculation:\n");
+    int k = bn_bit_length(n);
+    if (debug) printf("k: %d\n", k);
+    BIGNUM_CUDA R;
+    init_zero(&R);
+    bn_set_word(&R, 1);
+    left_shift(&R, k);
+    if (debug) bn_print_no_fuse("R: ", &R);
 
-        // Update t0 and t1
-        bn_mul(&q, &t1, &temp);
-        bn_sub(&temp, &t0, &temp);
-        bn_copy(&t0, &t1);
-        bn_copy(&t1, &temp);
-    }
-
-    BIGNUM_CUDA one;
-    init_one(&one);
-    if (bn_cmp(&r0, &one) > 0) {
-        printf("N and R are not coprime\n");
+    // Ensure R and n are coprime
+    if (!are_coprime(&R, n)) {
+        printf("Error: R and n must be coprime\n");
         return;
     }
 
-    if (t0.neg) {
-        bn_add(&t0, &t0, R);
+    // Step 2: Compute n' = -n^{-1} mod R
+    BIGNUM_CUDA n_prime;
+    init_zero(&n_prime);
+    if (!compute_mont_nprime(&n_prime, n, &R)) {
+        printf("Error: Could not compute n_prime\n");
+        return;
+    }
+    if (debug) bn_print_no_fuse("n_prime: ", &n_prime);
+
+    // Step 3: Convert operands to Montgomery form using bn_mod_mul
+    BIGNUM_CUDA a_bar, b_bar;
+    init_zero(&a_bar);
+    init_zero(&b_bar);
+    // Calculate a_bar = (a * R) % n
+    bn_mod_mul(&a_bar, a, &R, n);
+    // Calculate b_bar = (b * R) % n
+    bn_mod_mul(&b_bar, b, &R, n);
+    // Debug prints
+    if (debug) {
+        printf("\nMontgomery form (RR values):\n");
+        bn_print_no_fuse("aRR: ", &a_bar);
+        bn_print_no_fuse("bRR: ", &b_bar);
     }
 
-    bn_copy(Ninv, &t0);
-}
-
-// Initialize Montgomery context
-__device__ BN_MONT_CTX_CUDA* BN_MONT_CTX_new_cuda() {
-    BN_MONT_CTX_CUDA* ret = (BN_MONT_CTX_CUDA*)malloc(sizeof(BN_MONT_CTX_CUDA));
-    if (ret == NULL)
-        return NULL;
-        
-    init_zero(&ret->N);
-    init_zero(&ret->RR);
-    ret->n0[0] = 0;
-    ret->n0[1] = 0;
-    
-    return ret;
-}
-
-__device__ int BN_MONT_CTX_set_cuda(BN_MONT_CTX_CUDA *mont, const BIGNUM_CUDA *mod) {
-    if (bn_is_zero(mod))
-        return 0;
-
-    // Copy modulus
-    bn_copy(&mont->N, mod);
-
-    // Calculate R = 2^bits where bits is the bit length of N
-    BIGNUM_CUDA R;
-    init_zero(&R);
-    int bits = bn_bit_length(mod);
-    bn_set_word(&R, 1);
-    left_shift(&R, bits);
-
-    // Compute mont->R = R mod N
-    bn_mod(&mont->R, &R, mod);
-
-    // Compute mont->RR = (R^2) mod N
-    bn_mod_mul(&mont->RR, &mont->R, &mont->R, mod);
-
-    // Compute Ninv = -N^{-1} mod R
-    // For small moduli, Ninv can be computed as BN_ULONG
-    // BN_ULONG N0 = mod->d[0];
-    // BN_ULONG R0 = (BN_ULONG)1 << BN_ULONG_NUM_BITS; // Assuming R is a power of word size
-    // BN_ULONG Ninv = modular_inverse(N0) % R0;
-    // Ninv = (-Ninv) & BN_MASK2;
-    // bn_set_word(&mont->Ninv, Ninv);
-
-    compute_Ninv(&mont->Ninv, &mont->N, &R);
-
-    return 1;
-}
-
-// Set up Montgomery context for a given modulus
-__device__ int BN_MONT_CTX_set_cuda_x(BN_MONT_CTX_CUDA *mont, const BIGNUM_CUDA *mod) {
-    if (bn_is_zero(mod))
-        return 0;
-
-    // Copy modulus
-    bn_copy(&mont->N, mod);
-
-    // Calculate R = 2^(word_size * num_words)
-    BIGNUM_CUDA R;
-    init_zero(&R);
-    // int bits = mod->top * BN_ULONG_NUM_BITS;
-    int bits = bn_bit_length(mod);
-    bn_set_word(&R, 1);
-    left_shift(&R, bits);
-
-    // // Calculate R^2 mod N
-    // bn_mod(&mont->RR, &R, mod);
-    // bn_mod_mul(&mont->RR, &mont->RR, &R, mod);
-    // Compute R = 2^bits
-    bn_set_word(&R, 1);
-    left_shift(&R, bits);
-    // Compute mont->R = R mod N
-    bn_mod(&mont->R, &R, mod);
-    // Compute mont->RR = (R * R) mod N
-    bn_mod_mul(&mont->RR, &mont->R, &mont->R, mod);
-
-
-    // Calculate n0 = -N^(-1) mod word_size
-    BN_ULONG N0 = mod->d[0];
-    BN_ULONG X = 1;
-
-    // Newton iteration to find modular multiplicative inverse
-    for (int i = 0; i < 5; i++) {  // Usually 5 iterations is enough
-        BN_ULONG T = X * (2 - N0 * X);
-        if (T == X) break;
-        X = T & BN_MASK2;
-    }
-    
-    mont->n0[0] = (-X) & BN_MASK2;  // Take two's complement
-    mont->n0[1] = 0;
-
-    return 1;
-}
-
-__device__ void right_shift(BIGNUM_CUDA *bn, int shift) {
-    if (shift == 0) return;
-
-    int word_shift = shift / BN_ULONG_NUM_BITS;
-    int bit_shift = shift % BN_ULONG_NUM_BITS;
-
-    // Shift whole words
-    if (word_shift > 0) {
-        for (int i = 0; i < bn->top - word_shift; i++) {
-            bn->d[i] = bn->d[i + word_shift];
-        }
-        for (int i = bn->top - word_shift; i < bn->top; i++) {
-            bn->d[i] = 0;
-        }
-        bn->top -= word_shift;
-    }
-
-    // Shift remaining bits
-    if (bit_shift > 0) {
-        BN_ULONG carry = 0;
-        for (int i = bn->top - 1; i >= 0; i--) {
-            BN_ULONG new_carry = bn->d[i] << (BN_ULONG_NUM_BITS - bit_shift);
-            bn->d[i] = (bn->d[i] >> bit_shift) | carry;
-            carry = new_carry;
-        }
-    }
-
-    // Normalize top
-    while (bn->top > 0 && bn->d[bn->top - 1] == 0) {
-        bn->top--;
-    }
-    if (bn->top == 0) bn->top = 1;
-}
-
-__device__ int bn_mul_mont_cuda(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, 
-                                const BN_MONT_CTX_CUDA *mont) {
-    BIGNUM_CUDA t, m, mn, u;
+    // Step 4: Montgomery multiplication in Montgomery form
+    BIGNUM_CUDA t;
     init_zero(&t);
+    
+    if (debug) printf("Montgomery multiplication steps:\n");
+    // Calculate t = a_bar * b_bar
+    bn_mul(&a_bar, &b_bar, &t);
+    if (debug) bn_print_no_fuse("t = aRR * bRR: ", &t);
+    BIGNUM_CUDA m;
     init_zero(&m);
-    init_zero(&mn);
+    
+    // Calculate m = (t * n_prime) % R
+    bn_mod_mul(&m, &t, &n_prime, &R);
+    if (debug) bn_print_no_fuse("m = (t * n') mod R: ", &m);
+    
+    // Calculate u = (t + m * n) // R
+    BIGNUM_CUDA mn_product;
+    init_zero(&mn_product);
+    bn_mul(&m, n, &mn_product);  // m * n
+
+    BIGNUM_CUDA t_plus_mn;
+    init_zero(&t_plus_mn);
+    bn_add(&t_plus_mn, &t, &mn_product);  // t + m*n
+
+    // Divide by R (equivalent to right shift by k bits)
+    BIGNUM_CUDA u, tmp;
     init_zero(&u);
+    init_zero(&tmp);
+    // bn_div(quotient, remainder, dividend, divisor)
+    bn_div(&u, &tmp, &t_plus_mn, &R); // (t + m*n) / R
 
-    // Step 1: t = a * b
-    bn_mul(a, b, &t);
-
-    // Step 2: m = (t * Ninv) mod R
-    bn_mul(&t, &mont->Ninv, &m);
-    bn_mod(&m, &m, &mont->R);
-
-    // Step 3: u = (t + m * N) / R
-    bn_mul(&m, &mont->N, &mn);
-    bn_add(&u, &t, &mn);
-    right_shift(&u, bn_bit_length(&mont->R));
-
-    // Step 4: if u >= N, u = u - N
-    if (bn_cmp(&u, &mont->N) >= 0) {
-        bn_sub(&u, &u, &mont->N);
+    // Final reduction step: if u ≥ n, subtract n
+    if (bn_cmp(&u, n) >= 0) {
+        BIGNUM_CUDA tmp;
+        init_zero(&tmp);
+        bn_sub(&tmp, &u, n);
+        bn_copy(&u, &tmp);
     }
+    if (debug) bn_print_no_fuse("u (first reduction): ", &u);
 
-    // Copy result
-    bn_copy(r, &u);
-    return 1;
-}
-
-__device__ int bn_mul_mont_cuda_x(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, 
-                               const BN_MONT_CTX_CUDA *mont) {
-    // Initialize temporary variables 
-    BIGNUM_CUDA t, t1;
+    // Step 5: Convert result back from Montgomery form
+    if (debug) printf("Conversion from Montgomery form:\n");
     init_zero(&t);
-    init_zero(&t1);
-
-    // 1. T = A×B
-    bn_mul(a, b, &t);
-    
-    // 2. m = ((T mod R) × N′) mod R
-    // For R = 2^w where w is the word size, this is:
-    BN_ULONG m = (t.d[0] * mont->n0[0]) & BN_MASK2;
-    
-    // 3. t = (T + m×N) / R
-    BIGNUM_CUDA mn;
-    init_zero(&mn);
-    bn_set_word(&mn, m);
-    bn_mul(&mn, &mont->N, &mn); 
-    bn_add(&t1, &t, &mn);
-    
-    // Division by R is equivalent to right shift by word size
-    for (int i = 0; i < MAX_BIGNUM_SIZE-1; i++) {
-        t1.d[i] = t1.d[i+1];
+    // Copy u to t
+    bn_copy(&t, &u);
+    if (debug) bn_print_no_fuse("t: ", &t);
+    // m = (t * n_prime) % R
+    bn_mod_mul(&m, &t, &n_prime, &R);
+    if (debug) bn_print_no_fuse("m = (t * n') mod R: ", &m);
+    // u = (t + m * n) // R
+    bn_mul(&m, n, &mn_product);  // m * n
+    bn_add(&t_plus_mn, &t, &mn_product);  // t + m*n
+    bn_div(&u, &tmp, &t_plus_mn, &R); // (t + m*n) / R
+    // if u >= n: u -= n
+    if (bn_cmp(&u, n) >= 0) {
+        BIGNUM_CUDA tmp;
+        init_zero(&tmp);
+        bn_sub(&tmp, &u, n);
+        bn_copy(&u, &tmp);
     }
-    t1.d[MAX_BIGNUM_SIZE-1] = 0;
-    t1.top = find_top_optimized(&t1, t1.top);
-
-    // 4. If t ≥ N then t = t - N
-    if (bn_cmp(&t1, &mont->N) >= 0) {
-        bn_sub(&t1, &t1, &mont->N);
-    }
-
-    // Copy result
-    bn_copy(r, &t1);
-    return 1;
+    if (debug) bn_print_no_fuse("u (final result): ", &u);
+    // Copy u to result
+    bn_copy(result, &u);
 }
-
-// Main interface function
-__device__ int BN_mod_mul_montgomery_cuda(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNUM_CUDA *b,
-                                        BN_MONT_CTX_CUDA *mont) {
-    int ret = bn_mul_mont_cuda(r, a, b, mont);
-    // Normalize result (remove leading zeros)
-    r->top = find_top_optimized(r, r->top);
-    return ret;
-}
-
-__device__ int BN_from_montgomery_cuda(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, BN_MONT_CTX_CUDA *mont) {
-    BIGNUM_CUDA one;
-    init_one(&one);
-    return BN_mod_mul_montgomery_cuda(r, a, &one, mont);
-}
-
+    
 // Montgomery multiplication --

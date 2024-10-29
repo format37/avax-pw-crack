@@ -21,13 +21,85 @@ static void print_bn(const char* label, const BIGNUM* bn) {
 }
 
 /* Test cases */
+// static struct mont_test_case test_cases[] = {
+//     // Test: From Python code
+//     {
+//         "2D",  // a = 45
+//         "4C",  // b = 76
+//         "65"   // n = 101
+//     },
+// };
+/* Test cases */
 static struct mont_test_case test_cases[] = {
-    // Test: From Python code
+    // Test Case 1: Basic small numbers
     {
-        "2D",  // a = 45
-        "4C",  // b = 76
-        "65"   // n = 101
+        "2D",           // a = 45
+        "4C",           // b = 76
+        "65"            // n = 101
     },
+    
+    // Test Case 2: Powers of 2
+    {
+        "40",           // a = 64 (2^6)
+        "20",           // b = 32 (2^5)
+        "61"            // n = 97 (prime close to power of 2)
+    },
+    
+    // Test Case 3: Large prime modulus
+    {
+        "FFF1",         // a = 0xFFF1
+        "FFF2",         // b = 0xFFF2
+        "FFF7"          // n = 0xFFF7 (large prime)
+    },
+    
+    // Test Case 4: Edge case - operands equal to modulus minus 1
+    {
+        "60",           // a = 96 (n-1)
+        "60",           // b = 96 (n-1)
+        "61"            // n = 97 (prime modulus)
+    },
+    
+    // Test Case 5: Edge case - multiplication by 1
+    {
+        "1",            // a = 1
+        "FF",           // b = 255
+        "FB"            // n = 251 (prime)
+    },
+    
+    // Test Case 6: Edge case - multiplication by 0
+    {
+        "0",            // a = 0
+        "FF",           // b = 255
+        "FB"            // n = 251
+    },
+    
+    // Test Case 7: Operands larger than modulus
+    {
+        "12D",          // a = 301 (> n)
+        "191",          // b = 401 (> n)
+        "FB"            // n = 251
+    },
+    
+    // Test Case 8: Modulus with specific bit pattern
+    {
+        "AAAA",         // a = 0xAAAA (1010...1010)
+        "5555",         // b = 0x5555 (0101...0101)
+        "FFFB"          // n = 0xFFFB (prime close to power of 2)
+    },
+    
+    // Test Case 9: Equal operands (square calculation)
+    {
+        "1234",         // a = 0x1234
+        "1234",         // b = 0x1234
+        "FFFD"          // n = 0xFFFD (prime)
+    },
+    
+    // Test Case 10: Small prime modulus
+    {
+        "F",            // a = 15
+        "D",            // b = 13
+        "11"            // n = 17 (small prime)
+    }
 };
 
 /* Run a single test case */
