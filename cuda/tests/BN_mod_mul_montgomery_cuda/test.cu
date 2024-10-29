@@ -85,9 +85,8 @@ __device__ void run_mont_test(const struct mont_test_case *test) {
     init_zero(&aRR);
     init_zero(&bRR);
     
-    // Convert a and b to Montgomery form: aRR = a * RR mod N
-    if(!bn_mod_mul(&aRR, &a, &mont->RR, &n) ||
-       !bn_mod_mul(&bRR, &b, &mont->RR, &n)) {
+    // Convert a and b to Montgomery form
+    if(!bn_mod_mul(&aRR, &a, &mont->R, &n) || !bn_mod_mul(&bRR, &b, &mont->R, &n)) {
         printf("Failed to convert to Montgomery form\n");
         return;
     }

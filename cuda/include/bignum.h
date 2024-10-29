@@ -1135,7 +1135,8 @@ __device__ int bn_div(BIGNUM_CUDA *bn_quotient, BIGNUM_CUDA *bn_remainder, const
         bn_quotient->d[0] = quotient;
         bn_remainder->d[0] = remainder;
         bn_quotient->top = (quotient == 0) ? 0 : 1;
-        bn_remainder->top = (remainder == 0) ? 0 : 1;
+        // bn_remainder->top = (remainder == 0) ? 0 : 1;
+        bn_remainder->top = find_top_optimized(bn_remainder, 2);
         bn_quotient->neg = bn_dividend->neg ^ bn_divisor->neg;
         bn_remainder->neg = bn_dividend->neg;
         #ifdef function_profiler
@@ -1299,11 +1300,20 @@ __device__ void bn_mod_sub(BIGNUM_CUDA *result, const BIGNUM_CUDA *a, const BIGN
 #define FN_BN_MUL_MONT 40 // Add this to your function profiling enum if using
 
 // Montgomery context structure
+// typedef struct {
+//     BIGNUM_CUDA N;    // Modulus
+//     BIGNUM_CUDA RR;   // R^2 mod N where R = 2^(wordsize * nwords)
+//     BN_ULONG n0[2];   // Montgomery multiplier
+// } BN_MONT_CTX_CUDA;
+// Montgomery context structure
 typedef struct {
     BIGNUM_CUDA N;    // Modulus
-    BIGNUM_CUDA RR;   // R^2 mod N where R = 2^(wordsize * nwords)
+    BIGNUM_CUDA RR;   // R^2 mod N
+    BIGNUM_CUDA R;    // R mod N
     BN_ULONG n0[2];   // Montgomery multiplier
+    BIGNUM_CUDA Ninv; // -N^{-1} mod R
 } BN_MONT_CTX_CUDA;
+
 
 __device__ BN_ULONG modular_inverse(BN_ULONG a) {
     BN_ULONG t = 0, newt = 1;
@@ -1325,6 +1335,48 @@ __device__ BN_ULONG modular_inverse(BN_ULONG a) {
     return t;
 }
 
+__device__ void compute_Ninv(BIGNUM_CUDA *Ninv, const BIGNUM_CUDA *N, const BIGNUM_CUDA *R) {
+    // Use Extended Euclidean Algorithm to compute Ninv
+    BIGNUM_CUDA t0, t1, r0, r1, q, temp;
+    init_zero(&t0); init_zero(&t1);
+    init_zero(&r0); init_zero(&r1);
+    init_zero(&q); init_zero(&temp);
+
+    // Initialize
+    bn_copy(&r0, R);
+    bn_copy(&r1, N);
+    bn_set_word(&t0, 0);
+    bn_set_word(&t1, 1);
+
+    while (!bn_is_zero(&r1)) {
+        bn_div(&q, &temp, &r0, &r1); // q = r0 / r1, temp = r0 % r1
+        bn_print_no_fuse("# temp: ", &temp);
+        // Update r0 and r1
+        bn_copy(&r0, &r1);
+        bn_copy(&r1, &temp);
+
+
+        // Update t0 and t1
+        bn_mul(&q, &t1, &temp);
+        bn_sub(&temp, &t0, &temp);
+        bn_copy(&t0, &t1);
+        bn_copy(&t1, &temp);
+    }
+
+    BIGNUM_CUDA one;
+    init_one(&one);
+    if (bn_cmp(&r0, &one) > 0) {
+        printf("N and R are not coprime\n");
+        return;
+    }
+
+    if (t0.neg) {
+        bn_add(&t0, &t0, R);
+    }
+
+    bn_copy(Ninv, &t0);
+}
+
 // Initialize Montgomery context
 __device__ BN_MONT_CTX_CUDA* BN_MONT_CTX_new_cuda() {
     BN_MONT_CTX_CUDA* ret = (BN_MONT_CTX_CUDA*)malloc(sizeof(BN_MONT_CTX_CUDA));
@@ -1339,8 +1391,41 @@ __device__ BN_MONT_CTX_CUDA* BN_MONT_CTX_new_cuda() {
     return ret;
 }
 
-// Set up Montgomery context for a given modulus
 __device__ int BN_MONT_CTX_set_cuda(BN_MONT_CTX_CUDA *mont, const BIGNUM_CUDA *mod) {
+    if (bn_is_zero(mod))
+        return 0;
+
+    // Copy modulus
+    bn_copy(&mont->N, mod);
+
+    // Calculate R = 2^bits where bits is the bit length of N
+    BIGNUM_CUDA R;
+    init_zero(&R);
+    int bits = bn_bit_length(mod);
+    bn_set_word(&R, 1);
+    left_shift(&R, bits);
+
+    // Compute mont->R = R mod N
+    bn_mod(&mont->R, &R, mod);
+
+    // Compute mont->RR = (R^2) mod N
+    bn_mod_mul(&mont->RR, &mont->R, &mont->R, mod);
+
+    // Compute Ninv = -N^{-1} mod R
+    // For small moduli, Ninv can be computed as BN_ULONG
+    // BN_ULONG N0 = mod->d[0];
+    // BN_ULONG R0 = (BN_ULONG)1 << BN_ULONG_NUM_BITS; // Assuming R is a power of word size
+    // BN_ULONG Ninv = modular_inverse(N0) % R0;
+    // Ninv = (-Ninv) & BN_MASK2;
+    // bn_set_word(&mont->Ninv, Ninv);
+
+    compute_Ninv(&mont->Ninv, &mont->N, &R);
+
+    return 1;
+}
+
+// Set up Montgomery context for a given modulus
+__device__ int BN_MONT_CTX_set_cuda_x(BN_MONT_CTX_CUDA *mont, const BIGNUM_CUDA *mod) {
     if (bn_is_zero(mod))
         return 0;
 
@@ -1350,13 +1435,22 @@ __device__ int BN_MONT_CTX_set_cuda(BN_MONT_CTX_CUDA *mont, const BIGNUM_CUDA *m
     // Calculate R = 2^(word_size * num_words)
     BIGNUM_CUDA R;
     init_zero(&R);
-    int bits = mod->top * BN_ULONG_NUM_BITS;
+    // int bits = mod->top * BN_ULONG_NUM_BITS;
+    int bits = bn_bit_length(mod);
     bn_set_word(&R, 1);
     left_shift(&R, bits);
 
-    // Calculate R^2 mod N
-    bn_mod(&mont->RR, &R, mod);
-    bn_mod_mul(&mont->RR, &mont->RR, &R, mod);
+    // // Calculate R^2 mod N
+    // bn_mod(&mont->RR, &R, mod);
+    // bn_mod_mul(&mont->RR, &mont->RR, &R, mod);
+    // Compute R = 2^bits
+    bn_set_word(&R, 1);
+    left_shift(&R, bits);
+    // Compute mont->R = R mod N
+    bn_mod(&mont->R, &R, mod);
+    // Compute mont->RR = (R * R) mod N
+    bn_mod_mul(&mont->RR, &mont->R, &mont->R, mod);
+
 
     // Calculate n0 = -N^(-1) mod word_size
     BN_ULONG N0 = mod->d[0];
@@ -1375,7 +1469,71 @@ __device__ int BN_MONT_CTX_set_cuda(BN_MONT_CTX_CUDA *mont, const BIGNUM_CUDA *m
     return 1;
 }
 
+__device__ void right_shift(BIGNUM_CUDA *bn, int shift) {
+    if (shift == 0) return;
+
+    int word_shift = shift / BN_ULONG_NUM_BITS;
+    int bit_shift = shift % BN_ULONG_NUM_BITS;
+
+    // Shift whole words
+    if (word_shift > 0) {
+        for (int i = 0; i < bn->top - word_shift; i++) {
+            bn->d[i] = bn->d[i + word_shift];
+        }
+        for (int i = bn->top - word_shift; i < bn->top; i++) {
+            bn->d[i] = 0;
+        }
+        bn->top -= word_shift;
+    }
+
+    // Shift remaining bits
+    if (bit_shift > 0) {
+        BN_ULONG carry = 0;
+        for (int i = bn->top - 1; i >= 0; i--) {
+            BN_ULONG new_carry = bn->d[i] << (BN_ULONG_NUM_BITS - bit_shift);
+            bn->d[i] = (bn->d[i] >> bit_shift) | carry;
+            carry = new_carry;
+        }
+    }
+
+    // Normalize top
+    while (bn->top > 0 && bn->d[bn->top - 1] == 0) {
+        bn->top--;
+    }
+    if (bn->top == 0) bn->top = 1;
+}
+
 __device__ int bn_mul_mont_cuda(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, 
+                                const BN_MONT_CTX_CUDA *mont) {
+    BIGNUM_CUDA t, m, mn, u;
+    init_zero(&t);
+    init_zero(&m);
+    init_zero(&mn);
+    init_zero(&u);
+
+    // Step 1: t = a * b
+    bn_mul(a, b, &t);
+
+    // Step 2: m = (t * Ninv) mod R
+    bn_mul(&t, &mont->Ninv, &m);
+    bn_mod(&m, &m, &mont->R);
+
+    // Step 3: u = (t + m * N) / R
+    bn_mul(&m, &mont->N, &mn);
+    bn_add(&u, &t, &mn);
+    right_shift(&u, bn_bit_length(&mont->R));
+
+    // Step 4: if u >= N, u = u - N
+    if (bn_cmp(&u, &mont->N) >= 0) {
+        bn_sub(&u, &u, &mont->N);
+    }
+
+    // Copy result
+    bn_copy(r, &u);
+    return 1;
+}
+
+__device__ int bn_mul_mont_cuda_x(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, 
                                const BN_MONT_CTX_CUDA *mont) {
     // Initialize temporary variables 
     BIGNUM_CUDA t, t1;
