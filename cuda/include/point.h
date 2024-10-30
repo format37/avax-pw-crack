@@ -550,16 +550,6 @@ __device__ EC_POINT_CUDA ec_point_scalar_mul(
     return result;
 }
 
-// Montgomery form of elliptic curve point multiplication ++
-
-typedef struct {
-    BIGNUM_CUDA N;     // The modulus
-    BIGNUM_CUDA R;     // R = 2^(word_size * num_words)
-    BIGNUM_CUDA Ri;    // R^(-1) mod N
-    BIGNUM_CUDA R2;    // R^2 mod N
-    BN_ULONG n0;       // -N^(-1) mod 2^word_size
-} MONT_CTX_CUDA;
-
 // Helper macros for word operations
 #define WORD_BITS BN_ULONG_NUM_BITS
 #define WORD_MASK ((BN_ULONG)(-1))
@@ -714,81 +704,6 @@ __device__ void bn_mul_word_internal(BN_ULONG a, BN_ULONG b, BN_ULONG *hi, BN_UL
     *lo = p0;
 }
 
-__device__ void mont_reduce(BIGNUM_CUDA *result, BIGNUM_CUDA *T, const MONT_CTX_CUDA *mont_ctx) {
-    // T is a double-precision number (2× the size of regular numbers)
-    // result will be a single-precision number
-    
-    const int N_words = mont_ctx->N.top;
-    BN_ULONG carry = 0;
-    BIGNUM_CUDA m;
-    init_zero(&m);
-    
-    // Process each word of T
-    for (int i = 0; i < N_words; i++) {
-        // Calculate m = (T[0] * n0) mod 2^WORD_BITS
-        // where n0 is precomputed -N^(-1) mod 2^WORD_BITS
-        BN_ULONG u = (T->d[i] + carry) & WORD_MASK;
-        BN_ULONG m_i = (u * mont_ctx->n0) & WORD_MASK;
-        m.d[i] = m_i;
-        
-        // T = T + m*N, shifted right by one word
-        BN_ULONG k = 0;  // Carry for multiplication
-        carry = 0;       // Carry for addition
-        
-        for (int j = 0; j < N_words; j++) {
-            // Multiply m_i by N[j]
-            BN_ULONG hi, lo;
-            bn_mul_word_internal(m_i, mont_ctx->N.d[j], &hi, &lo);
-            
-            // Add to T[i+j] with carries
-            BN_ULONG t = T->d[i + j] + k;
-            if (t < T->d[i + j]) hi++;
-            t += lo;
-            if (t < lo) hi++;
-            T->d[i + j] = t;
-            k = hi;
-        }
-        
-        // Propagate carries
-        for (int j = i + N_words; j < 2 * N_words && (k || carry); j++) {
-            BN_ULONG t = T->d[j] + k + carry;
-            carry = (t < T->d[j]) || (k && t == T->d[j]);
-            T->d[j] = t;
-            k = 0;
-        }
-    }
-    
-    // Right shift by N_words
-    for (int i = 0; i < N_words; i++) {
-        T->d[i] = T->d[i + N_words];
-    }
-    for (int i = N_words; i < 2 * N_words; i++) {
-        T->d[i] = 0;
-    }
-    
-    // Final reduction - if T >= N, subtract N
-    if (bn_cmp(T, &mont_ctx->N) >= 0) {
-        BIGNUM_CUDA tmp;
-        init_zero(&tmp);
-        bn_sub(&tmp, T, &mont_ctx->N);
-        bn_copy(T, &tmp);
-    }
-    
-    bn_copy(result, T);
-}
-
-// Complete Montgomery multiplication
-__device__ void mont_mul(BIGNUM_CUDA *result, const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, 
-                        const MONT_CTX_CUDA *mont_ctx) {
-    // T = a * b
-    BIGNUM_CUDA T;
-    init_zero(&T);
-    bn_mul(a, b, &T);
-    
-    // Perform Montgomery reduction
-    mont_reduce(result, &T, mont_ctx);
-}
-
 // Helper function to verify the result
 __device__ int verify_extended_gcd(const BIGNUM_CUDA *a, const BIGNUM_CUDA *b,
                                  const BIGNUM_CUDA *x, const BIGNUM_CUDA *y,
@@ -863,47 +778,6 @@ __device__ int bn_mod_inverse_gcd(BIGNUM_CUDA *result, const BIGNUM_CUDA *a, con
     
     bn_copy(result, &x);
     return 1;
-}
-
-// Initialize Montgomery context
-__device__ void mont_ctx_init(MONT_CTX_CUDA *ctx, const BIGNUM_CUDA *N) {
-    // Copy modulus
-    bn_copy(&ctx->N, N);
-    
-    // Calculate R = 2^(word_size * num_words)
-    init_zero(&ctx->R);
-    int num_bits = N->top * WORD_BITS;
-    bn_set_bit(&ctx->R, num_bits);
-    
-    // Calculate R^2 mod N
-    init_zero(&ctx->R2);
-    BIGNUM_CUDA tmp;
-    init_zero(&tmp);
-    bn_mul(&ctx->R, &ctx->R, &tmp);
-    bn_mod(&ctx->R2, &tmp, N);
-    
-    // Calculate R^(-1) mod N
-    init_zero(&ctx->Ri);
-    BIGNUM_CUDA one;
-    init_one(&one);
-    BIGNUM_CUDA tmp_gcd;
-    init_zero(&tmp_gcd);
-    bn_extended_gcd(&ctx->R, N, &ctx->Ri, NULL, &tmp_gcd);
-    if (ctx->Ri.neg) {
-        bn_add(&ctx->Ri, &ctx->Ri, N);
-    }
-    
-    // Calculate n0 = -N^(-1) mod 2^WORD_BITS
-    BIGNUM_CUDA N_prime;
-    init_zero(&N_prime);
-    BN_ULONG n0 = 1;
-    for (int i = 0; i < WORD_BITS; i++) {
-        BN_ULONG t = n0 * N->d[0];
-        if (t & ((BN_ULONG)1 << i)) {
-            n0 |= (BN_ULONG)1 << i;
-        }
-    }
-    ctx->n0 = (BN_ULONG)0 - n0;  // Two's complement
 }
 
 // Helper macro for checking the least significant bit of a word
@@ -1008,235 +882,192 @@ __device__ void bn_lshift1(BIGNUM_CUDA *a) {
     }
 }
 
-// Helper function for Montgomery inversion
-__device__ void mont_inv(BIGNUM_CUDA *result, const BIGNUM_CUDA *a, const MONT_CTX_CUDA *mont_ctx) {
-    // Calculate a^(-1) * R mod N using binary extended GCD algorithm
-    // This is more efficient than converting out of Montgomery form,
-    // inverting, and converting back
+// ec_point_scalar_mul montgomery ++
+// Add this structure to store Montgomery context
+typedef struct {
+    BIGNUM_CUDA R;       // Montgomery radix (R = 2^k where k is the bit length of n)
+    BIGNUM_CUDA n;       // The modulus
+    BIGNUM_CUDA n_prime; // -n^(-1) mod R
+    BIGNUM_CUDA R2;      // R^2 mod n (used for Montgomery conversion)
+    BIGNUM_CUDA one;     // 1 in Montgomery form (R mod n)
+} MONT_CTX_CUDA;
+
+// Montgomery initialization for curve parameters
+__device__ void init_curve_montgomery_context(const BIGNUM_CUDA *curve_p, const BIGNUM_CUDA *curve_a) {
+    MONT_CTX_CUDA ctx;
     
-    BIGNUM_CUDA u, v, x1, x2;
-    init_zero(&u);
-    init_zero(&v);
-    init_zero(&x1);
-    init_zero(&x2);
-    
-    bn_copy(&u, a);
-    bn_copy(&v, &mont_ctx->N);
-    init_one(&x1);
-    init_zero(&x2);
-    
-    while (!bn_is_zero(&u)) {
-        while (!bn_is_bit_set(&u, 0)) {  // u is even
-            bn_rshift1(&u);
-            if (bn_is_bit_set(&x1, 0))
-                bn_add(&x1, &x1, &mont_ctx->N);
-            bn_rshift1(&x1);
-        }
-        
-        while (!bn_is_bit_set(&v, 0)) {  // v is even
-            bn_rshift1(&v);
-            if (bn_is_bit_set(&x2, 0))
-                bn_add(&x2, &x2, &mont_ctx->N);
-            bn_rshift1(&x2);
-        }
-        
-        if (bn_cmp(&u, &v) >= 0) {
-            bn_sub(&u, &u, &v);
-            if (bn_cmp(&x1, &x2) < 0)
-                bn_add(&x1, &x1, &mont_ctx->N);
-            bn_sub(&x1, &x1, &x2);
-        } else {
-            bn_sub(&v, &v, &u);
-            if (bn_cmp(&x2, &x1) < 0)
-                bn_add(&x2, &x2, &mont_ctx->N);
-            bn_sub(&x2, &x2, &x1);
-        }
-    }
-    
-    bn_copy(result, &x2);
+    // Initialize values
+    init_zero(&ctx.R);
+    init_zero(&ctx.n);
+    init_zero(&ctx.n_prime);
+    init_zero(&ctx.R2);
+    init_zero(&ctx.one);
+
+    // Set modulus
+    bn_copy(&ctx.n, curve_p);
+
+    // Calculate R = 2^k where k is the bit length of n
+    int k = bn_bit_length(curve_p);
+    bn_set_word(&ctx.R, 1);
+    left_shift(&ctx.R, k);
+
+    // Calculate n' = -n^(-1) mod R
+    compute_mont_nprime(&ctx.n_prime, curve_p, &ctx.R);
+
+    // Calculate R^2 mod n
+    bn_mul(&ctx.R, &ctx.R, &ctx.R2);  // R^2
+    bn_mod(&ctx.R2, &ctx.R2, curve_p); // R^2 mod n
+
+    // Calculate 1 in Montgomery form (R mod n)
+    bn_mod(&ctx.one, &ctx.R, curve_p);
 }
 
-__device__ EC_POINT_CUDA ec_point_scalar_mul_montgomery(
-    EC_POINT_CUDA *point, 
-    BIGNUM_CUDA *scalar,
-    const MONT_CTX_CUDA *mont_ctx) {
+// Convert point to Montgomery form
+__device__ void point_to_montgomery(EC_POINT_CUDA *result, const EC_POINT_CUDA *p, const MONT_CTX_CUDA *ctx) {
+    // Convert x coordinate
+    bn_mod_mul_montgomery(&p->x, &ctx->R2, &ctx->n, &result->x);
     
-    bool debug = 0;
-    if (debug) {
-        printf("++ ec_point_scalar_mul_montgomery ++\n");
-        bn_print(">> point x: ", &point->x);
-        bn_print(">> point y: ", &point->y);
-        bn_print(">> scalar: ", scalar);
+    // Convert y coordinate
+    bn_mod_mul_montgomery(&p->y, &ctx->R2, &ctx->n, &result->y);
+}
+
+// Convert point from Montgomery form
+__device__ void point_from_montgomery(EC_POINT_CUDA *result, const EC_POINT_CUDA *p, const MONT_CTX_CUDA *ctx) {
+    // Create a Montgomery representation of 1
+    BIGNUM_CUDA one;
+    init_zero(&one);
+    bn_set_word(&one, 1);
+
+    // Convert x coordinate back
+    bn_mod_mul_montgomery(&p->x, &one, &ctx->n, &result->x);
+    
+    // Convert y coordinate back
+    bn_mod_mul_montgomery(&p->y, &one, &ctx->n, &result->y);
+}
+
+// Montgomery point addition in Montgomery form
+__device__ void point_add_montgomery(EC_POINT_CUDA *result, EC_POINT_CUDA *p1, EC_POINT_CUDA *p2, 
+                                   const BIGNUM_CUDA *curve_p, const BIGNUM_CUDA *curve_a,
+                                   const MONT_CTX_CUDA *ctx) {
+    // Handle point at infinity cases
+    if (point_is_at_infinity(p1)) {
+        copy_point(result, p2);
+        return;
     }
+    if (point_is_at_infinity(p2)) {
+        copy_point(result, p1);
+        return;
+    }
+
+    // Initialize temporary variables
+    BIGNUM_CUDA s, x3, y3, tmp1, tmp2, tmp3;
+    init_zero(&s);
+    init_zero(&x3);
+    init_zero(&y3);
+    init_zero(&tmp1);
+    init_zero(&tmp2);
+    init_zero(&tmp3);
+
+    // Case 1: P1 = P2 and y1 = -y2 (including P1 = P2 = point at infinity)
+    if (bn_cmp(&p1->x, &p2->x) == 0) {
+        if (bn_cmp(&p1->y, &p2->y) != 0) {
+            // Points are inverses of each other
+            set_point_at_infinity(result);
+            return;
+        }
+
+        // Point doubling case (P1 = P2)
+        // s = (3x₁² + a) / 2y₁
+
+        // Calculate 3x₁²
+        bn_mod_mul_montgomery(&p1->x, &p1->x, curve_p, &tmp1);    // x₁²
+        BIGNUM_CUDA three;
+        init_zero(&three);
+        bn_set_word(&three, 3);
+        bn_mod_mul_montgomery(&tmp1, &three, curve_p, &tmp2);     // 3x₁²
+
+        // Add curve parameter 'a' (in Montgomery form)
+        bn_add(&tmp2, &tmp2, curve_a);                           // 3x₁² + a
+        bn_mod(&tmp2, &tmp2, curve_p);
+
+        // Calculate 2y₁
+        bn_mod_mul_montgomery(&p1->y, &ctx->R2, curve_p, &tmp1);  // Convert y₁ to Montgomery form
+        BIGNUM_CUDA two;
+        init_zero(&two);
+        bn_set_word(&two, 2);
+        bn_mod_mul_montgomery(&tmp1, &two, curve_p, &tmp3);       // 2y₁
+
+        // Calculate final slope
+        bn_mod_inverse(&tmp1, &tmp3, curve_p);                    // 1/2y₁
+        bn_mod_mul_montgomery(&tmp2, &tmp1, curve_p, &s);         // s = (3x₁² + a)/2y₁
+    } else {
+        // Regular point addition case
+        // s = (y₂ - y₁)/(x₂ - x₁)
+
+        // Calculate y₂ - y₁
+        bn_mod_mul_montgomery(&p2->y, &ctx->one, curve_p, &tmp1);
+        bn_mod_mul_montgomery(&p1->y, &ctx->one, curve_p, &tmp2);
+        bn_sub(&tmp1, &tmp1, &tmp2);
+        bn_mod(&tmp1, &tmp1, curve_p);  // Ensure result is properly reduced
+
+        // Calculate x₂ - x₁
+        bn_mod_mul_montgomery(&p2->x, &ctx->one, curve_p, &tmp2);
+        bn_mod_mul_montgomery(&p1->x, &ctx->one, curve_p, &tmp3);
+        bn_sub(&tmp2, &tmp2, &tmp3);
+        bn_mod(&tmp2, &tmp2, curve_p);
+
+        // Calculate slope
+        bn_mod_inverse(&tmp3, &tmp2, curve_p);
+        bn_mod_mul_montgomery(&tmp1, &tmp3, curve_p, &s);
+    }
+
+    // Calculate x₃ = s² - x₁ - x₂
+    bn_mod_mul_montgomery(&s, &s, curve_p, &tmp1);                // s²
+    bn_sub(&tmp1, &tmp1, &p1->x);                                // s² - x₁
+    bn_sub(&tmp1, &tmp1, &p2->x);                                // s² - x₁ - x₂
+    bn_mod(&x3, &tmp1, curve_p);
+
+    // Calculate y₃ = s(x₁ - x₃) - y₁
+    bn_sub(&p1->x, &p1->x, &x3);                                 // x₁ - x₃
+    bn_mod_mul_montgomery(&s, &p1->x, curve_p, &tmp1);           // s(x₁ - x₃)
+    bn_sub(&tmp1, &tmp1, &p1->y);                                // s(x₁ - x₃) - y₁
+    bn_mod(&y3, &tmp1, curve_p);
+
+    // Set result coordinates
+    bn_copy(&result->x, &x3);
+    bn_copy(&result->y, &y3);
+}
+
+// Main Montgomery scalar multiplication function
+__device__ EC_POINT_CUDA ec_point_scalar_mul_montgomery(EC_POINT_CUDA *point, BIGNUM_CUDA *scalar, 
+                                                      const MONT_CTX_CUDA *ctx) {
+    EC_POINT_CUDA result, current;
+    init_point_at_infinity(&result);
     
     // Convert input point to Montgomery form
-    EC_POINT_CUDA current;
-    mont_mul(&current.x, &point->x, &mont_ctx->R2, mont_ctx); // x * R mod N
-    mont_mul(&current.y, &point->y, &mont_ctx->R2, mont_ctx); // y * R mod N
-    
-    EC_POINT_CUDA result;
-    init_point_at_infinity(&result);
-    mont_mul(&result.x, &result.x, &mont_ctx->R2, mont_ctx); // Convert infinity point to Montgomery form
-    mont_mul(&result.y, &result.y, &mont_ctx->R2, mont_ctx);
-    
-    // Temporary points for calculations
-    EC_POINT_CUDA tmp_result, tmp_a, tmp_b;
-    
-    // Convert scalar to bit array
+    point_to_montgomery(&current, point, ctx);
+
+    // Convert bits of scalar to array
     unsigned int bits[256];
     bignum_to_bit_array(scalar, bits);
-    
-    for (int i = 0; i < 256; i++) {
-        if (bits[i]) {
-            // Point addition in Montgomery form
-            if (!point_is_at_infinity(&result)) {
-                // Calculate slope in Montgomery form
-                BIGNUM_CUDA slope, dx, dy;
-                init_zero(&slope);
-                init_zero(&dx);
-                init_zero(&dy);
-                
-                if (bn_cmp(&current.x, &result.x) == 0 && bn_cmp(&current.y, &result.y) == 0) {
-                    // Point doubling slope calculation
-                    BIGNUM_CUDA tmp1, tmp2, two, three;
-                    init_zero(&tmp1);
-                    init_zero(&tmp2);
-                    bn_set_word(&two, 2);
-                    bn_set_word(&three, 3);
-                    
-                    // 3x^2 in Montgomery form
-                    mont_mul(&tmp1, &current.x, &current.x, mont_ctx);
-                    mont_mul(&tmp2, &tmp1, &three, mont_ctx);
-                    
-                    // 2y in Montgomery form
-                    mont_mul(&dy, &current.y, &two, mont_ctx);
-                    
-                    // Calculate inverse of 2y using Montgomery inverse
-                    BIGNUM_CUDA dy_inv;
-                    init_zero(&dy_inv);
-                    mont_inv(&dy_inv, &dy, mont_ctx);
-                    
-                    // Final slope calculation
-                    mont_mul(&slope, &tmp2, &dy_inv, mont_ctx);
-                } else {
-                    // Point addition slope calculation
-                    bn_sub(&dy, &current.y, &result.y);
-                    bn_sub(&dx, &current.x, &result.x);
-                    
-                    // Convert dx and dy to Montgomery form
-                    BIGNUM_CUDA dx_mont, dy_mont;
-                    init_zero(&dx_mont);
-                    init_zero(&dy_mont);
-                    mont_mul(&dx_mont, &dx, &mont_ctx->R2, mont_ctx);
-                    mont_mul(&dy_mont, &dy, &mont_ctx->R2, mont_ctx);
-                    
-                    // Calculate inverse of dx using Montgomery inverse
-                    BIGNUM_CUDA dx_inv;
-                    init_zero(&dx_inv);
-                    mont_inv(&dx_inv, &dx_mont, mont_ctx);
-                    
-                    // Final slope calculation
-                    mont_mul(&slope, &dy_mont, &dx_inv, mont_ctx);
-                }
-                
-                // Calculate new x coordinate
-                BIGNUM_CUDA x3, tmp;
-                init_zero(&x3);
-                init_zero(&tmp);
-                
-                mont_mul(&tmp, &slope, &slope, mont_ctx);  // s^2
-                bn_sub(&x3, &tmp, &current.x);            // s^2 - x1
-                bn_sub(&x3, &x3, &result.x);              // s^2 - x1 - x2
-                
-                // Calculate new y coordinate
-                BIGNUM_CUDA y3;
-                init_zero(&y3);
-                
-                bn_sub(&tmp, &result.x, &x3);             // x1 - x3
-                mont_mul(&tmp, &slope, &tmp, mont_ctx);    // s(x1 - x3)
-                bn_sub(&y3, &tmp, &result.y);             // s(x1 - x3) - y1
-                
-                // Update result
-                bn_copy(&result.x, &x3);
-                bn_copy(&result.y, &y3);
-            } else {
-                // If result is infinity, just copy current point
-                bn_copy(&result.x, &current.x);
-                bn_copy(&result.y, &current.y);
-            }
+
+    // Double-and-add algorithm using Montgomery arithmetic
+    for (int i = 255; i >= 0; i--) {
+        // Double
+        if (i != 255) {
+            point_add_montgomery(&result, &result, &result, &ctx->n, NULL, ctx);
         }
         
-        // Point doubling for next iteration
-        if (i < 255) {  // No need to double after the last bit
-            if (!point_is_at_infinity(&current)) {
-                // Calculate slope for doubling
-                BIGNUM_CUDA slope, tmp1, tmp2, two, three;
-                init_zero(&slope);
-                init_zero(&tmp1);
-                init_zero(&tmp2);
-                bn_set_word(&two, 2);
-                bn_set_word(&three, 3);
-                
-                // 3x^2 in Montgomery form
-                mont_mul(&tmp1, &current.x, &current.x, mont_ctx);
-                mont_mul(&tmp2, &tmp1, &three, mont_ctx);
-                
-                // 2y in Montgomery form
-                BIGNUM_CUDA dy;
-                init_zero(&dy);
-                mont_mul(&dy, &current.y, &two, mont_ctx);
-                
-                // Calculate inverse of 2y using Montgomery inverse
-                BIGNUM_CUDA dy_inv;
-                init_zero(&dy_inv);
-                mont_inv(&dy_inv, &dy, mont_ctx);
-                
-                // Final slope calculation
-                mont_mul(&slope, &tmp2, &dy_inv, mont_ctx);
-                
-                // Calculate new x coordinate
-                BIGNUM_CUDA x3;
-                init_zero(&x3);
-                mont_mul(&tmp1, &slope, &slope, mont_ctx);  // s^2
-                bn_sub(&x3, &tmp1, &current.x);            // s^2 - x1
-                bn_sub(&x3, &x3, &current.x);              // s^2 - 2x1
-                
-                // Calculate new y coordinate
-                BIGNUM_CUDA y3;
-                init_zero(&y3);
-                bn_sub(&tmp1, &current.x, &x3);            // x1 - x3
-                mont_mul(&tmp2, &slope, &tmp1, mont_ctx);   // s(x1 - x3)
-                bn_sub(&y3, &tmp2, &current.y);            // s(x1 - x3) - y1
-                
-                // Update current point
-                bn_copy(&current.x, &x3);
-                bn_copy(&current.y, &y3);
-            }
+        // Add
+        if (bits[i]) {
+            point_add_montgomery(&result, &result, &current, &ctx->n, NULL, ctx);
         }
     }
-    
+
     // Convert result back from Montgomery form
     EC_POINT_CUDA final_result;
-    BIGNUM_CUDA one;
-    init_one(&one);
-    mont_mul(&final_result.x, &result.x, &one, mont_ctx);  // x / R mod N
-    mont_mul(&final_result.y, &result.y, &one, mont_ctx);  // y / R mod N
+    point_from_montgomery(&final_result, &result, ctx);
     
     return final_result;
 }
-
-// Global or device-side context initialization
-__device__ MONT_CTX_CUDA curve_mont_ctx;
-
-// Initialize the Montgomery context for curve parameters
-__device__ void init_curve_montgomery_context(BIGNUM_CUDA *CURVE_P, BIGNUM_CUDA *CURVE_A) {
-    // Initialize Montgomery context with the curve prime
-    mont_ctx_init(&curve_mont_ctx, CURVE_P);
-    
-    // Store curve parameter A in Montgomery form if needed for point operations
-    BIGNUM_CUDA A_mont;
-    init_zero(&A_mont);
-    mont_mul(&A_mont, CURVE_A, &curve_mont_ctx.R2, &curve_mont_ctx);
-}
-
-// Montgomery form of elliptic curve point multiplication --
+// ec_point_scalar_mul montgomery --

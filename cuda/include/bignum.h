@@ -70,9 +70,6 @@ __device__ void init_one(BIGNUM_CUDA *bn) {
 __device__ bool bn_add(BIGNUM_CUDA *result, const BIGNUM_CUDA *a, const BIGNUM_CUDA *b);
 __device__ int bn_mod(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNUM_CUDA *n);
 __device__ bool bn_is_zero(const BIGNUM_CUDA *a);
-// __device__ void bn_extended_gcd(const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, BIGNUM_CUDA *x, BIGNUM_CUDA *y, BIGNUM_CUDA *gcd);
-// __device__ bool bn_mod_inverse(BIGNUM_CUDA *result, const BIGNUM_CUDA *a, const BIGNUM_CUDA *n);
-__device__ int bn_div_mock(BIGNUM_CUDA *bn_quotient, BIGNUM_CUDA *bn_remainder, const BIGNUM_CUDA *bn_dividend, const BIGNUM_CUDA *bn_divisor);
 
 __device__ char find_top_cuda(const BIGNUM_CUDA *bn) {
     for (char i = MAX_BIGNUM_SIZE - 1; i >= 0; i--) {
@@ -944,70 +941,6 @@ __device__ void bn_mul_from_div(const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, BIGN
     // bn_print_no_fuse("<< product: ", product);
 }
 
-__device__ int bn_mod_mock(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNUM_CUDA *n) {
-    // r: Remainder (updated)
-    // a: Dividend
-    // n: Modulus
-    bool debug = 0;
-    if (debug) {
-        printf("++ bn_mod ++\n");
-        bn_print_no_fuse(">> r: ", r);
-        bn_print_no_fuse(">> a: ", a);
-        bn_print_no_fuse(">> n: ", n);
-    }
-
-    BIGNUM_CUDA q;
-    init_zero(&q);
-
-    // if (r == n) {
-    if (bn_cmp(r, n) == 0) {
-        printf("bn_mod: ERR_R_PASSED_INVALID_ARGUMENT");
-        return 0;
-    }
-    // init_zero(r);
-    if (!bn_div_mock(&q, r, a, n)) {
-    // if (!bn_div(&q, r, a, n)) {
-        printf("bn_mod: bn_div failed\n");
-        return 0;
-    }
-
-    BIGNUM_CUDA tmp;
-    init_zero(&tmp);
-
-    if (r->neg) {
-        if (debug) printf("r is negative\n");
-        bool result;
-        // If the remainder is negative, add the absolute value of the divisor
-        if (n->neg) {
-            if (debug) printf("d is negative\n");
-            result = bn_sub(&tmp, r, n); // tmp = r - n
-            if (!result) {
-                return 0;
-            }
-            #ifdef debug_bn_copy
-                printf("bn_mod: bn_copy(tmp, r)\n");
-            #endif
-            // copy tmp to r
-            bn_copy(r, &tmp);
-        } else {
-            if (debug) printf("d is not negative\n");
-            result = bn_add(&tmp, r, n); // tmp = r + n            
-            if (!result) {
-                return 0;
-            }
-            #ifdef debug_bn_copy
-                printf("bn_mod: bn_copy(tmp, r)\n");
-            #endif
-            // copy tmp to r
-            bn_copy(r, &tmp);
-        }
-    }
-    if (debug) bn_print_no_fuse("<< q: ", &q);
-    if (debug) bn_print_no_fuse("<< r (out): ", r);
-    if (debug) printf("-- bn_mod --\n");
-    return 1;
-}
-
 __device__ int bn_mod(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNUM_CUDA *n) {
     // r: Remainder (updated)
     // a: Dividend
@@ -1184,35 +1117,6 @@ __device__ void left_shift(BIGNUM_CUDA *a, int shift) {
     a->top = find_top_optimized(a, potential_new_top);
 }
 
-__device__ int bn_div_mock(BIGNUM_CUDA *bn_quotient, BIGNUM_CUDA *bn_remainder, const BIGNUM_CUDA *bn_dividend, const BIGNUM_CUDA *bn_divisor)
-{
-    printf("++ bn_div ++\n");
-    bn_print_no_fuse(">> bn_quotient: ", bn_quotient);
-    bn_print_no_fuse(">> bn_remainder: ", bn_remainder);
-    bn_print_no_fuse(">> bn_dividend: ", bn_dividend);
-    bn_print_no_fuse(">> bn_divisor: ", bn_divisor);
-    char divs_max_top = max(bn_dividend->top, bn_divisor->top);
-    BIGNUM_CUDA abs_dividend;
-    init_zero(&abs_dividend);
-    // Copy absolute values
-    for (int i = 0; i < bn_dividend->top; i++) {
-        abs_dividend.d[i] = bn_dividend->d[i];
-    }
-    abs_dividend.top = bn_dividend->top;   
-
-    // Store signs and work with absolute values
-    abs_dividend.neg = 0;
-
-    // Initialize quotient and remainder
-    init_zero(bn_quotient);
-    init_zero(bn_remainder);
-    // Perform long division
-    BIGNUM_CUDA current_dividend;
-    init_zero(&current_dividend);
-    char dividend_size = abs_dividend.top;
-    return 1;
-}
-
 __device__ int bn_div(BIGNUM_CUDA *bn_quotient, BIGNUM_CUDA *bn_remainder, const BIGNUM_CUDA *bn_dividend, const BIGNUM_CUDA *bn_divisor)
 {
     #ifdef function_profiler
@@ -1369,7 +1273,6 @@ __device__ int bn_mod_mul(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNUM_CUD
     bn_mul(a, b, &tmp); // a * b = product
     // bn_print_no_fuse("After bn_mul, tmp: ", &tmp);
     int ret = bn_mod(r, &tmp, m); // result = tmp % m
-    // int ret = bn_mod_mock(r, &tmp, m); // result = tmp % m
     // bn_print_no_fuse("<< r: ", r);
     // printf("-- bn_mod_mul --\n");
     return ret;
@@ -1656,9 +1559,15 @@ __device__ bool are_coprime(const BIGNUM_CUDA *a, const BIGNUM_CUDA *b) {
 }
 
 __device__ void bn_mod_mul_montgomery(const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, const BIGNUM_CUDA *n, BIGNUM_CUDA *result) {
-    bool debug = false;
-    // Step 1: Calculate R = 2^k where k is the number of bits in n
-    if (debug) printf("R calculation:\n");
+    bool debug = true;
+    if (debug) {
+        printf("++ bn_mod_mul_montgomery ++\n");
+        bn_print_no_fuse(">> a: ", a);
+        bn_print_no_fuse(">> b: ", b);
+        bn_print_no_fuse(">> n: ", n);
+        // Step 1: Calculate R = 2^k where k is the number of bits in n
+        printf("R calculation:\n");
+    }
     int k = bn_bit_length(n);
     if (debug) printf("k: %d\n", k);
     BIGNUM_CUDA R;

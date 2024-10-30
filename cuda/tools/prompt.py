@@ -59,29 +59,30 @@ folders = [
     # "~/projects/avax-pw-crack/cuda/tests/fixnum-divmod/"
     
     # "../include/",
-    # "../main.cu",
 
-    # "~/projects/openssl/crypto/ec/ec_lib.c",
+    "~/projects/openssl/include/openssl/ec.h",
+    "~/projects/openssl/crypto/ec/ec_lib.c",  
+    "~/projects/openssl/include/openssl/bn.h",
+    "~/projects/openssl/crypto/bn/bn_mont.c",
     # "~/projects/openssl/crypto/ec/ec_mult.c",
     # "~/projects/openssl/crypto/ec/ec_local.h",
     # "~/projects/openssl/crypto/ec/ecp_smpl.c",
     # "~/projects/openssl/crypto/ec/ecp_mont.c",
     # "~/projects/openssl/crypto/bn/bn_mont.c",
-    
-    
-
     # # "~/projects/openssl/crypto/bn/bn_sparc.c",
     # # "~/projects/openssl/crypto/bn/bn_ppc.c",
     # # "~/projects/openssl/crypto/bn/bn_asm.c"
     # "~/projects/avax-pw-crack/python/tests/bn_mul_mod_montgomery/test.py",
     # "~/projects/avax-pw-crack/openssl/tests/BN_mod_mul_montgomery/test.c",
-    # "~/projects/avax-pw-crack/cuda/tests/BN_mod_mul_montgomery_cuda/test.cu",
-    # "~/projects/avax-pw-crack/cuda/include/point.h",
     "~/projects/avax-pw-crack/cuda/include/bignum.h",
-    "~/projects/avax-pw-crack/cuda/tests/bn_div/test.cu",
+    "~/projects/avax-pw-crack/cuda/include/point.h",
+    "~/projects/avax-pw-crack/cuda/include/public_key.h",
+    # "~/projects/avax-pw-crack/cuda/tests/bn_div/test.cu",
     # # "~/projects/avax-pw-crack/python/tests/bn_mul_mod_montgomery/run.log",
     # # "~/projects/avax-pw-crack/openssl/tests/BN_mod_mul_montgomery/run.log",
-    # # "~/projects/avax-pw-crack/cuda/tests/BN_mod_mul_montgomery_cuda/run.log",
+    "~/projects/avax-pw-crack/cuda/tests/BN_mod_mul_montgomery_cuda/test.cu",
+    "~/projects/avax-pw-crack/cuda/tests/BN_mod_mul_montgomery_cuda/run.log",
+    "../main.cu",
     ]
 
 output_path = "./prompt.md"
