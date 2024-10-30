@@ -70,8 +70,8 @@ __device__ void init_one(BIGNUM_CUDA *bn) {
 __device__ bool bn_add(BIGNUM_CUDA *result, const BIGNUM_CUDA *a, const BIGNUM_CUDA *b);
 __device__ int bn_mod(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNUM_CUDA *n);
 __device__ bool bn_is_zero(const BIGNUM_CUDA *a);
-__device__ void bn_extended_gcd(const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, BIGNUM_CUDA *x, BIGNUM_CUDA *y, BIGNUM_CUDA *gcd);
-__device__ bool bn_mod_inverse(BIGNUM_CUDA *result, const BIGNUM_CUDA *a, const BIGNUM_CUDA *n);
+// __device__ void bn_extended_gcd(const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, BIGNUM_CUDA *x, BIGNUM_CUDA *y, BIGNUM_CUDA *gcd);
+// __device__ bool bn_mod_inverse(BIGNUM_CUDA *result, const BIGNUM_CUDA *a, const BIGNUM_CUDA *n);
 __device__ int bn_div_mock(BIGNUM_CUDA *bn_quotient, BIGNUM_CUDA *bn_remainder, const BIGNUM_CUDA *bn_dividend, const BIGNUM_CUDA *bn_divisor);
 
 __device__ char find_top_cuda(const BIGNUM_CUDA *bn) {
@@ -1296,152 +1296,9 @@ __device__ int bn_div(BIGNUM_CUDA *bn_quotient, BIGNUM_CUDA *bn_remainder, const
         current_dividend.d[0] = abs_dividend.d[i];
         // Find quotient digit
         BN_ULONG q = 0;
-        BN_ULONG left = 0, right = BN_ULONG_MAX;
-        // BN_ULONG prev_mid = 0;
-        // unsigned int j = 0;
+        unsigned __int128 left = 0, right = BN_ULONG_MAX;
         while (left <= right) {
-            BN_ULONG mid = left + (right - left) / 2;
-            BIGNUM_CUDA temp, product;
-            init_zero(&temp);
-            init_zero(&product);
-            temp.d[0] = mid;
-            temp.top = 1;
-            bn_mul_from_div(bn_divisor, &temp, &product, true);
-
-            if (bn_cmp(&product, &current_dividend) <= 0) {
-                q = mid;
-                left = mid + 1;
-            } else {
-                right = mid - 1;
-            }            
-        }
-
-        // Add quotient digit to result
-        left_shift(bn_quotient, BN_ULONG_NUM_BITS);
-        bn_quotient->d[0] |= q;
-
-        // Subtract q * divisor from current_dividend
-        BIGNUM_CUDA temp, product;
-        init_zero(&temp);
-        init_zero(&product);
-        temp.d[0] = q;
-        temp.top = 1;
-
-        bn_mul_from_div(bn_divisor, &temp, &product, true);
-        bn_sub_from_div(&current_dividend, &current_dividend, &product);
-    }
-
-    // Set remainder
-    for (int i = 0; i < current_dividend.top; i++) {
-        bn_remainder->d[i] = current_dividend.d[i];
-    }
-
-    // Apply correct signs
-    bn_quotient->neg = bn_dividend->neg ^ bn_divisor->neg;
-    bn_remainder->neg = bn_dividend->neg;
-
-    // Normalize results
-    bn_quotient->top = find_top_optimized(bn_quotient, divs_max_top);
-    bn_remainder->top = find_top_optimized(bn_remainder, divs_max_top);
-    #ifdef debug_print
-        // bn_print("<< bn_quotient: ", bn_quotient);
-        // bn_print("<< bn_remainder: ", bn_remainder);
-        // printf("-- bn_div --\n");
-    #endif
-    #ifdef function_profiler
-        record_function(FN_BN_DIV, start_time);
-    #endif
-    return 1;
-}
-
-__device__ int bn_div_x(BIGNUM_CUDA *bn_quotient, BIGNUM_CUDA *bn_remainder, const BIGNUM_CUDA *bn_dividend, const BIGNUM_CUDA *bn_divisor)
-{
-    #ifdef function_profiler
-        unsigned long long start_time = clock64();
-    #endif
-    #ifdef debug_print
-        printf("++ bn_div ++\n");
-        bn_print_no_fuse(">> bn_quotient: ", bn_quotient);
-        bn_print_no_fuse(">> bn_remainder: ", bn_remainder);
-        bn_print_no_fuse(">> bn_dividend: ", bn_dividend);
-        bn_print_no_fuse(">> bn_divisor: ", bn_divisor);
-    #endif
-    char divs_max_top = max(bn_dividend->top, bn_divisor->top);
-    
-    // perform classical div_mod if only single word
-    if (divs_max_top == 1) {
-        BN_ULONG dividend = bn_dividend->d[0];
-        BN_ULONG divisor = bn_divisor->d[0];
-        BN_ULONG quotient = dividend / divisor;
-        BN_ULONG remainder = dividend % divisor;
-        bn_quotient->d[0] = quotient;
-        bn_remainder->d[0] = remainder;
-        bn_quotient->top = (quotient == 0) ? 0 : 1;
-        // bn_remainder->top = (remainder == 0) ? 0 : 1;
-        bn_remainder->top = find_top_optimized(bn_remainder, 2);
-        bn_quotient->neg = bn_dividend->neg ^ bn_divisor->neg;
-        bn_remainder->neg = bn_dividend->neg;
-        #ifdef function_profiler
-            record_function(FN_BN_DIV_VANILA_1, start_time);
-        #endif
-        return 1;
-    }
-    // TODO compare dividend, not divs_max_top
-    else if (divs_max_top == 2) {
-        // Divide in vanila way using 128-bit values if max top is 2:
-        unsigned __int128 dividend, divisor;
-        dividend = (unsigned __int128)bn_dividend->d[1] << 64 | bn_dividend->d[0];
-        divisor = (unsigned __int128)bn_divisor->d[1] << 64 | bn_divisor->d[0];
-        unsigned __int128 quotient = dividend / divisor;
-        unsigned __int128 remainder = dividend % divisor;
-        // first word of quotient
-        bn_quotient->d[0] = (BN_ULONG)quotient;
-        // second word of quotient
-        bn_quotient->d[1] = (BN_ULONG)(quotient >> 64);
-        bn_quotient->top = find_top_optimized(bn_quotient, 2);
-        bn_quotient->neg = bn_dividend->neg ^ bn_divisor->neg;
-
-        // first word of remainder
-        bn_remainder->d[0] = (BN_ULONG)remainder;
-        // second word of remainder
-        bn_remainder->d[1] = (BN_ULONG)(remainder >> 64);
-        bn_remainder->top = find_top_optimized(bn_remainder, 2);
-        bn_remainder->neg = bn_dividend->neg;
-        #ifdef function_profiler
-            record_function(FN_BN_DIV_VANILA_2, start_time);
-        #endif
-        return 1;
-    }
-    BIGNUM_CUDA abs_dividend;
-    init_zero(&abs_dividend);
-    // Copy absolute values
-    for (int i = 0; i < bn_dividend->top; i++) {
-        abs_dividend.d[i] = bn_dividend->d[i];
-    }
-    abs_dividend.top = bn_dividend->top;   
-
-    // Store signs and work with absolute values
-    abs_dividend.neg = 0;
-
-    // Initialize quotient and remainder
-    init_zero(bn_quotient);
-    init_zero(bn_remainder);
-    // Perform long division
-    BIGNUM_CUDA current_dividend;
-    init_zero(&current_dividend);
-    char dividend_size = abs_dividend.top;
-
-    for (int i = dividend_size - 1; i >= 0; i--) {
-        // Shift current_dividend left by one word and add next word of dividend
-        left_shift(&current_dividend, BN_ULONG_NUM_BITS);
-        current_dividend.d[0] = abs_dividend.d[i];
-        // Find quotient digit
-        BN_ULONG q = 0;
-        BN_ULONG left = 0, right = BN_ULONG_MAX;
-        // BN_ULONG prev_mid = 0;
-        // unsigned int j = 0;
-        while (left <= right) {
-            BN_ULONG mid = left + (right - left) / 2;
+            unsigned __int128 mid = left + (right - left) / 2;
             BIGNUM_CUDA temp, product;
             init_zero(&temp);
             init_zero(&product);
@@ -1511,7 +1368,8 @@ __device__ int bn_mod_mul(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNUM_CUD
     init_zero(&tmp);
     bn_mul(a, b, &tmp); // a * b = product
     // bn_print_no_fuse("After bn_mul, tmp: ", &tmp);
-    int ret = bn_mod_mock(r, &tmp, m); // result = tmp % m
+    int ret = bn_mod(r, &tmp, m); // result = tmp % m
+    // int ret = bn_mod_mock(r, &tmp, m); // result = tmp % m
     // bn_print_no_fuse("<< r: ", r);
     // printf("-- bn_mod_mul --\n");
     return ret;
@@ -1541,6 +1399,214 @@ __device__ void bn_mod_sub(BIGNUM_CUDA *result, const BIGNUM_CUDA *a, const BIGN
         bn_add(result, &tmp, n); // result = a + b
         result->neg = 0;
     }
+}
+
+// Computes the extended GCD of a and b
+// Returns gcd(a,b) and finds x,y such that ax + by = gcd(a,b)
+// If x or y is NULL, that coefficient is not computed
+__device__ void bn_extended_gcd(const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, 
+                               BIGNUM_CUDA *x, BIGNUM_CUDA *y, BIGNUM_CUDA *gcd) {
+    BIGNUM_CUDA old_r, r;
+    BIGNUM_CUDA old_s, s;
+    BIGNUM_CUDA old_t, t;
+    BIGNUM_CUDA quotient, temp1, temp2;
+    
+    // Initialize all temporary variables
+    init_zero(&old_r);
+    init_zero(&r);
+    init_zero(&old_s);
+    init_zero(&s);
+    init_zero(&old_t);
+    init_zero(&t);
+    init_zero(&quotient);
+    init_zero(&temp1);
+    init_zero(&temp2);
+    
+    // Initialize starting values
+    bn_copy(&old_r, a);     // old_r = a
+    bn_copy(&r, b);         // r = b
+    init_one(&old_s);       // old_s = 1
+    init_zero(&s);          // s = 0
+    init_zero(&old_t);      // old_t = 0
+    init_one(&t);           // t = 1
+    
+    // While r ≠ 0
+    while (!bn_is_zero(&r)) {
+        // Compute quotient = old_r / r
+        init_zero(&quotient);
+        init_zero(&temp1);
+        bn_div(&quotient, &temp1, &old_r, &r);
+        
+        // temp1 = quotient * r
+        init_zero(&temp1);
+        bn_mul(&quotient, &r, &temp1);
+        
+        // temp2 = old_r - temp1 = old_r - quotient * r
+        init_zero(&temp2);
+        bn_sub(&temp2, &old_r, &temp1);
+        
+        // old_r = r
+        bn_copy(&old_r, &r);
+        
+        // r = temp2
+        bn_copy(&r, &temp2);
+        
+        // Same for s
+        // temp1 = quotient * s
+        init_zero(&temp1);
+        bn_mul(&quotient, &s, &temp1);
+        
+        // temp2 = old_s - temp1
+        init_zero(&temp2);
+        bn_sub(&temp2, &old_s, &temp1);
+        
+        // old_s = s
+        bn_copy(&old_s, &s);
+        
+        // s = temp2
+        bn_copy(&s, &temp2);
+        
+        // Same for t
+        // temp1 = quotient * t
+        init_zero(&temp1);
+        bn_mul(&quotient, &t, &temp1);
+        
+        // temp2 = old_t - temp1
+        init_zero(&temp2);
+        bn_sub(&temp2, &old_t, &temp1);
+        
+        // old_t = t
+        bn_copy(&old_t, &t);
+        
+        // t = temp2
+        bn_copy(&t, &temp2);
+    }
+    
+    // Set outputs
+    if (gcd != NULL) {
+        bn_copy(gcd, &old_r);
+    }
+    
+    if (x != NULL) {
+        bn_copy(x, &old_s);
+        // Adjust sign if necessary
+        if (a->neg) {
+            x->neg = !x->neg;
+        }
+    }
+    
+    if (y != NULL) {
+        bn_copy(y, &old_t);
+        // Adjust sign if necessary
+        if (b->neg) {
+            y->neg = !y->neg;
+        }
+    }
+}
+
+__device__ bool bn_mod_inverse(BIGNUM_CUDA *result, const BIGNUM_CUDA *a, const BIGNUM_CUDA *n) {
+    #ifdef debug_print
+        printf("++ bn_mod_inverse ++\n");
+        bn_print(">> a: ", a);
+        bn_print(">> n: ", n);
+    #endif
+    
+    if (bn_is_one(n)) {
+        return false;  // No modular inverse exists if modulus is 1
+    }
+
+    if (bn_is_one(a)) {
+        // The modular inverse of 1 is 1
+        init_one(result);
+        return true;
+    }
+
+    BIGNUM_CUDA r;
+    BIGNUM_CUDA nr;
+    BIGNUM_CUDA t;
+    BIGNUM_CUDA nt;
+    BIGNUM_CUDA q;
+    BIGNUM_CUDA tmp;
+    BIGNUM_CUDA tmp2;
+    BIGNUM_CUDA tmp3;
+
+    init_zero(&r);
+    init_zero(&nr);
+    init_zero(&t);
+    init_one(&nt);
+    init_zero(&q);
+    init_zero(&tmp);
+    init_zero(&tmp2);
+    init_zero(&tmp3);
+    #ifdef debug_bn_copy
+        printf("bn_mod_inverse: bn_copy(r, n)\n");
+    #endif
+    bn_copy(&r, n);
+    bn_mod(&nr, a, n); // Compute non-negative remainder of 'a' modulo 'n'
+    #ifdef debug_print
+        unsigned int counter = 0;
+    #endif
+    while (!bn_is_zero(&nr)) {
+        bn_div(&q, &tmp, &r, &nr); // Compute quotient and remainder
+        #ifdef debug_bn_copy
+            printf("bn_mod_inverse: bn_copy(tmp, nt)\n");
+        #endif
+        bn_copy(&tmp, &nt);
+        bn_mul(&q, &nt, &tmp2); // tmp2 = q * nt
+        init_zero(&tmp3);
+        bn_sub(&tmp3, &t, &tmp2); // tmp3 = t - tmp2
+        // if (tmp3.top!=find_top(&tmp3)) printf("*** hypotesis true: bn_sub top is not correct\n");
+        #ifdef debug_bn_copy
+            printf("bn_mod_inverse: bn_copy(nt, tmp3)\n");
+        #endif
+        bn_copy(&nt, &tmp3); // dst << src
+        #ifdef debug_bn_copy
+            printf("bn_mod_inverse: bn_copy(t, tmp)\n");
+        #endif
+        bn_copy(&t, &tmp);
+        #ifdef debug_bn_copy
+            printf("bn_mod_inverse: bn_copy(tmp, nr)\n");
+        #endif
+        bn_copy(&tmp, &nr);
+        bn_mul(&q, &nr, &tmp2);
+        init_zero(&tmp3);
+        bn_sub(&tmp3, &r, &tmp2); // tmp3 = r - tmp2
+        #ifdef debug_bn_copy
+            printf("bn_mod_inverse: bn_copy(r, tmp3)\n");
+        #endif
+        bn_copy(&nr, &tmp3);
+        #ifdef debug_bn_copy
+            printf("bn_mod_inverse: bn_copy(r, tmp)\n");
+        #endif
+        bn_copy(&r, &tmp);        
+        #ifdef debug_print
+            counter++;
+            printf("[%d] ", counter);
+            bn_print(" t: ", &t);
+        #endif
+    }
+
+    if (!bn_is_one(&r)) {
+        init_zero(result);
+        return false; // No modular inverse exists
+    }
+
+    if (t.neg != 0) {
+        bn_add(&tmp2, &t, n); // tmp2 = t + n
+        #ifdef debug_bn_copy
+            printf("bn_mod_inverse: bn_copy(t, tmp2)\n");
+        #endif
+        bn_copy(&t, &tmp2);
+    }
+    #ifdef debug_bn_copy
+        printf("bn_mod_inverse: bn_copy(result, t)\n");
+    #endif
+    bn_copy(result, &t);
+    #ifdef debug_print
+        bn_print("<< result: ", result);
+        printf("-- bn_mod_inverse --\n");
+    #endif
+    return true;
 }
 
 // Montgomery multiplication ++
