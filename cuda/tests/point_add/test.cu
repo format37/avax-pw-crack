@@ -72,7 +72,7 @@ __device__ unsigned long long d_strtoull(const char *str, char **endptr, int bas
 }
 
 // Function to initialize a BIGNUM from a hex string
-__device__ void initBignumFromHex(BIGNUM *bn, const char *hex) {
+__device__ void initBignumFromHex(BIGNUM_CUDA *bn, const char *hex) {
     init_zero(bn);
     int len = d_strlen(hex);
     int word_index = 0;
@@ -85,7 +85,7 @@ __device__ void initBignumFromHex(BIGNUM *bn, const char *hex) {
         bn->d[word_index++] = word;
     }
 
-    bn->top = find_top(bn);
+    bn->top = find_top_cuda(bn);
 }
 
 // CUDA kernel to perform the tests
@@ -112,8 +112,8 @@ __global__ void testEllipticCurve(TestCase *cases, int numCases, ThreadFunctionP
     initBignumFromHex(&Q.y, tc->Qy);
 
     // Perform point addition
-    const BIGNUM CURVE_A_LOCAL = {0};
-    const BIGNUM CURVE_P_LOCAL = {
+    const BIGNUM_CUDA CURVE_A_LOCAL = {0};
+    const BIGNUM_CUDA CURVE_P_LOCAL = {
         {
             0xFFFFFFFEFFFFFC2F,
             0xFFFFFFFFFFFFFFFF,
@@ -124,11 +124,11 @@ __global__ void testEllipticCurve(TestCase *cases, int numCases, ThreadFunctionP
         false
     };
 
-    point_add(&resultAdd, &P, &Q, &CURVE_P_LOCAL, &CURVE_A_LOCAL);
+    point_add_affine(&resultAdd, &P, &Q, &CURVE_P_LOCAL, &CURVE_A_LOCAL);
     // Perform point doubling
-    point_add(&resultDouble, &P, &P, &CURVE_P_LOCAL, &CURVE_A_LOCAL);
+    point_add_affine(&resultDouble, &P, &P, &CURVE_P_LOCAL, &CURVE_A_LOCAL);
     // Initialize expected results
-    BIGNUM expectedAddX, expectedAddY, expectedDoubleX, expectedDoubleY;
+    BIGNUM_CUDA expectedAddX, expectedAddY, expectedDoubleX, expectedDoubleY;
     initBignumFromHex(&expectedAddX, tc->ExpectedAddX);
     initBignumFromHex(&expectedAddY, tc->ExpectedAddY);
     initBignumFromHex(&expectedDoubleX, tc->ExpectedDoubleX);

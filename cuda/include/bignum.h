@@ -10,6 +10,7 @@
 // #define debug_top
 // #define function_profiler
 // #define use_jacobian_coordinates
+#define use_montgomery_ec_point_multiplication
 
 #ifdef BN_128
     #define BN_ULONG unsigned __int128
@@ -49,12 +50,12 @@ typedef struct bignum_st {
 #endif
 
 __device__ void init_zero(BIGNUM_CUDA *bn) {
-    *bn = ZERO_BIGNUM;
-    // for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
-    //     bn->d[i] = 0;
-    // }
-    // bn->top = 1;
-    // bn->neg = 0;
+    // *bn = ZERO_BIGNUM;
+    for (int i = 0; i < MAX_BIGNUM_SIZE; i++) {
+        bn->d[i] = 0;
+    }
+    bn->top = 1;
+    bn->neg = 0;
 }
 __device__ void init_one(BIGNUM_CUDA *bn) {
     // Initialize the BIGNUM_CUDA to zero
@@ -142,7 +143,7 @@ __device__ void bn_print_no_fuse(const char* msg, const BIGNUM_CUDA* a) {
         printf("-");  // Handle the case where BIGNUM_CUDA is negative
     }
     // for (int i = MAX_BIGNUM_SIZE - 1; i >= 0; i--) {
-    for (int i = a->top - 1; i >= 0; i--) {
+    for (char i = a->top - 1; i >= 0; i--) {
         // Print words up to top - 1 with appropriate formatting
         // if (i == MAX_BIGNUM_SIZE - 1) {
         if (i == a->top - 1) {
@@ -233,7 +234,11 @@ __device__ int bn_cmp_abs(const BIGNUM_CUDA *a, const BIGNUM_CUDA *b) {
 }
 
 // Helper function to perform a deep copy of BIGNUM_CUDA
-__device__ void bn_copy(BIGNUM_CUDA *dest, const BIGNUM_CUDA *src) {
+__device__ void bn_copy(BIGNUM_CUDA * __restrict__ dest, const BIGNUM_CUDA *src) {
+    // if (dest == NULL || src == NULL) {
+    //     printf("Error: Null pointer in bn_copy\n");
+    //     return;
+    // }
     // bn_print_no_fuse("bn_copy >> src: ", src);
     // bn_print_no_fuse("bn_copy >> dest: ", dest);
     init_zero(dest);
@@ -1272,7 +1277,11 @@ __device__ int bn_mod_mul(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNUM_CUD
     init_zero(&tmp);
     bn_mul(a, b, &tmp); // a * b = product
     // bn_print_no_fuse("After bn_mul, tmp: ", &tmp);
-    int ret = bn_mod(r, &tmp, m); // result = tmp % m
+    BIGNUM_CUDA r_tmp;
+    init_zero(&r_tmp);
+    // int ret = bn_mod(r, &tmp, m); // result = tmp % m
+    int ret = bn_mod(&r_tmp, &tmp, m); // result = tmp % m
+    bn_copy(r, &r_tmp);
     // bn_print_no_fuse("<< r: ", r);
     // printf("-- bn_mod_mul --\n");
     return ret;
@@ -1529,15 +1538,29 @@ __device__ void bn_mod_neg(BIGNUM_CUDA *result, const BIGNUM_CUDA *n, const BIGN
 }
 
 __device__ bool compute_mont_nprime(BIGNUM_CUDA *n_prime, const BIGNUM_CUDA *n, const BIGNUM_CUDA *R) {
-    // printf("++ compute_mont_nprime ++\n");
-    // bn_print_no_fuse(">> n: ", n);
-    // bn_print_no_fuse(">> R: ", R);
+    bool debug = false;
+    if (debug) {
+        printf("++ compute_mont_nprime ++\n");
+        bn_print_no_fuse(">> n: ", n);
+        bn_print_no_fuse(">> R: ", R);
+    }
+
+    // Check for null pointers and invalid inputs
+    if (bn_is_zero(n)) {
+        printf("Error: modulus n cannot be zero\n");
+        return false;
+    }
+
+    if (bn_is_zero(R)) {
+        printf("Error: R cannot be zero\n");
+        return false;
+    }
     
     // Compute -n
     BIGNUM_CUDA neg_n;
     init_zero(&neg_n);
     bn_mod_neg(&neg_n, n, R);
-    // bn_print_no_fuse("neg_n: ", &neg_n);
+    if (debug) bn_print_no_fuse("neg_n: ", &neg_n);
 
     // Compute (-n)^(-1) mod R using bn_mod_inverse
     return bn_mod_inverse(n_prime, &neg_n, R);
@@ -1558,18 +1581,39 @@ __device__ bool are_coprime(const BIGNUM_CUDA *a, const BIGNUM_CUDA *b) {
     return bn_is_one(&gcd);
 }
 
-__device__ void bn_mod_mul_montgomery(const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, const BIGNUM_CUDA *n, BIGNUM_CUDA *result) {
-    bool debug = true;
+__device__ void bn_mod_mul_montgomery(
+    const BIGNUM_CUDA *a, 
+    const BIGNUM_CUDA *b, 
+    const BIGNUM_CUDA *n, 
+    BIGNUM_CUDA * __restrict__ result_of_multiplication
+    ) {
+    bool debug = false;
     if (debug) {
         printf("++ bn_mod_mul_montgomery ++\n");
         bn_print_no_fuse(">> a: ", a);
         bn_print_no_fuse(">> b: ", b);
         bn_print_no_fuse(">> n: ", n);
-        // Step 1: Calculate R = 2^k where k is the number of bits in n
-        printf("R calculation:\n");
     }
+    // BIGNUM_CUDA debug_bignum;
+    // init_zero(&debug_bignum);
+    // bn_copy(result_of_multiplication, &debug_bignum); // TODO: remove this line OK
+    
+    // Check for null inputs
+    if (bn_is_zero(n)) {
+        printf("Error: modulus n cannot be zero\n");
+        init_zero(result_of_multiplication);
+        return;
+    }
+    // Step 1: Calculate R = 2^k where k is the number of bits in n
+    if (debug) printf("R calculation:\n");
     int k = bn_bit_length(n);
     if (debug) printf("k: %d\n", k);
+    if (k == 0) {
+        printf("Error: invalid modulus bit length\n");
+        init_zero(result_of_multiplication);
+        return;
+    }
+    
     BIGNUM_CUDA R;
     init_zero(&R);
     bn_set_word(&R, 1);
@@ -1606,6 +1650,10 @@ __device__ void bn_mod_mul_montgomery(const BIGNUM_CUDA *a, const BIGNUM_CUDA *b
         bn_print_no_fuse("bRR: ", &b_bar);
     }
 
+    // BIGNUM_CUDA debug_bignum;
+    // init_zero(&debug_bignum);
+    // bn_copy(result_of_multiplication, &debug_bignum); // TODO: remove this line OK
+
     // Step 4: Montgomery multiplication in Montgomery form
     BIGNUM_CUDA t;
     init_zero(&t);
@@ -1616,10 +1664,23 @@ __device__ void bn_mod_mul_montgomery(const BIGNUM_CUDA *a, const BIGNUM_CUDA *b
     if (debug) bn_print_no_fuse("t = aRR * bRR: ", &t);
     BIGNUM_CUDA m;
     init_zero(&m);
+
+    // BIGNUM_CUDA debug_bignum;
+    // init_zero(&debug_bignum);
+    // bn_copy(result_of_multiplication, &debug_bignum); // TODO: remove this line OK
     
     // Calculate m = (t * n_prime) % R
     bn_mod_mul(&m, &t, &n_prime, &R);
+
+    // BIGNUM_CUDA debug_bignum;
+    // init_zero(&debug_bignum);
+    // bn_copy(result_of_multiplication, &debug_bignum); // TODO: remove this line ERR
+
     if (debug) bn_print_no_fuse("m = (t * n') mod R: ", &m);
+
+    // BIGNUM_CUDA debug_bignum;
+    // init_zero(&debug_bignum);
+    // bn_copy(result_of_multiplication, &debug_bignum); // TODO: remove this line ERR
     
     // Calculate u = (t + m * n) // R
     BIGNUM_CUDA mn_product;
@@ -1646,6 +1707,10 @@ __device__ void bn_mod_mul_montgomery(const BIGNUM_CUDA *a, const BIGNUM_CUDA *b
     }
     if (debug) bn_print_no_fuse("u (first reduction): ", &u);
 
+    // BIGNUM_CUDA debug_bignum;
+    // init_zero(&debug_bignum);
+    // bn_copy(result_of_multiplication, &debug_bignum); // TODO: remove this line ERR
+
     // Step 5: Convert result back from Montgomery form
     if (debug) printf("Conversion from Montgomery form:\n");
     init_zero(&t);
@@ -1655,20 +1720,27 @@ __device__ void bn_mod_mul_montgomery(const BIGNUM_CUDA *a, const BIGNUM_CUDA *b
     // m = (t * n_prime) % R
     bn_mod_mul(&m, &t, &n_prime, &R);
     if (debug) bn_print_no_fuse("m = (t * n') mod R: ", &m);
+
     // u = (t + m * n) // R
     bn_mul(&m, n, &mn_product);  // m * n
     bn_add(&t_plus_mn, &t, &mn_product);  // t + m*n
     bn_div(&u, &tmp, &t_plus_mn, &R); // (t + m*n) / R
+
     // if u >= n: u -= n
     if (bn_cmp(&u, n) >= 0) {
         BIGNUM_CUDA tmp;
         init_zero(&tmp);
         bn_sub(&tmp, &u, n);
         bn_copy(&u, &tmp);
-    }
+    }    
     if (debug) bn_print_no_fuse("u (final result): ", &u);
     // Copy u to result
-    bn_copy(result, &u);
+    // BIGNUM_CUDA tmp_result;
+    // init_zero(&tmp_result);
+    // bn_copy(&tmp_result, &u);
+
+    bn_copy(result_of_multiplication, &u);
+    ;
 }
     
 // Montgomery multiplication --

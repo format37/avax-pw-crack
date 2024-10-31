@@ -3,9 +3,6 @@ rm -f program
 
 export CUDA_NVCC_EXECUTABLE="ccache nvcc"
 
-start_time=$(date +%s.%N)
-echo Start building: $(date)
-
 # --fmad=false \ # Disable use of fma instructions
 # -O3 \ # Enable optimizations
 # -O0 \ # Disable optimizations
@@ -20,13 +17,36 @@ echo Start building: $(date)
 # --ptxas-options=-v \
 # -lineinfo \
 
-nvcc \
+# nvcc \
+#     --threads $(nproc) \
+#     main.cu \
+#     -arch=sm_86 \
+#     -std=c++17 \
+#     -O3 \
+#     -use_fast_math \
+#     -I ./include \
+#     -I ../json \
+#     -o program 2> logs/build.log
+
+# First, create a precompiled header
+# echo "Creating precompiled header"
+# nvcc -x cu -arch=sm_86 -I ./include -I ../json common_headers.h -o common_headers.h.gch
+
+# Install ccache if not already installed
+# sudo apt-get install ccache  # For Ubuntu/Debian
+
+start_time=$(date +%s.%N)
+echo Start building: $(date)
+echo "Building the program"
+# -G -g \ # for quick building
+ccache nvcc \
     --threads $(nproc) \
     main.cu \
     -arch=sm_86 \
     -std=c++17 \
     -O3 \
     -use_fast_math \
+    -Xcompiler -pipe \
     -I ./include \
     -I ../json \
     -o program 2> logs/build.log

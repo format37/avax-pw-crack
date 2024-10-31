@@ -399,17 +399,16 @@ __device__ EC_POINT_CUDA ec_point_scalar_mul(
     bool debug = 0;
     if (debug) {
         debug_printf("++ ec_point_scalar_mul ++\n");
-        bn_print(">> point x: ", &point->x);
-        bn_print(">> point y: ", &point->y);
-        bn_print(">> scalar: ", scalar);
-        bn_print(">> curve_prime: ", curve_prime);
-        bn_print(">> curve_a: ", curve_a);
+        bn_print_no_fuse(">> scalar: ", scalar);
+        bn_print_no_fuse(">> point x: ", &point->x);
+        bn_print_no_fuse(">> point y: ", &point->y);        
+        bn_print_no_fuse(">> curve_prime: ", curve_prime);
+        bn_print_no_fuse(">> curve_a: ", curve_a);
     }
     printf("++ ec_point_scalar_mul ++\n");
-    printf("Input Point:\n");
+    bn_print_no_fuse(">> Scalar: ", scalar);
     bn_print_no_fuse(">> point x: ", &point->x);
     bn_print_no_fuse(">> point y: ", &point->y);
-    bn_print_no_fuse(">> Scalar: ", scalar);
     bn_print_no_fuse(">> curve_prime: ", curve_prime);
     bn_print_no_fuse(">> curve_a: ", curve_a);
     
@@ -537,6 +536,10 @@ __device__ EC_POINT_CUDA ec_point_scalar_mul(
         #endif
         
         if (debug) printf("[%d] passed\n", i);
+        // printf("i: %d\n", i);
+        // bn_print_no_fuse("point_add result.x: ", &result.x);
+        // bn_print_no_fuse("point_add result.y: ", &result.y);
+        // break; // TODO: Remove this break
     }    
     // Copy current to result
     if (debug) bn_print("3 result.x: ", &result.x);
@@ -893,42 +896,72 @@ typedef struct {
 } MONT_CTX_CUDA;
 
 // Montgomery initialization for curve parameters
-__device__ void init_curve_montgomery_context(const BIGNUM_CUDA *curve_p, const BIGNUM_CUDA *curve_a) {
-    MONT_CTX_CUDA ctx;
+__device__ bool init_curve_montgomery_context(const BIGNUM_CUDA *curve_p, const BIGNUM_CUDA *curve_a, MONT_CTX_CUDA *ctx) {
+    bool debug = false;
+    if (debug) {
+        printf("++ init_curve_montgomery_context ++\n");
+        bn_print_no_fuse(">> curve_p: ", curve_p);
+        bn_print_no_fuse(">> curve_a: ", curve_a);
+    }    
+    if (bn_is_zero(curve_p)) {
+        printf("Error: curve modulus cannot be zero\n");
+        return false;
+    }
+
+    // MONT_CTX_CUDA ctx;
     
     // Initialize values
-    init_zero(&ctx.R);
-    init_zero(&ctx.n);
-    init_zero(&ctx.n_prime);
-    init_zero(&ctx.R2);
-    init_zero(&ctx.one);
+    init_zero(&ctx->R);
+    init_zero(&ctx->n);
+    init_zero(&ctx->n_prime);
+    init_zero(&ctx->R2);
+    init_zero(&ctx->one);
 
     // Set modulus
-    bn_copy(&ctx.n, curve_p);
+    bn_copy(&ctx->n, curve_p);
 
     // Calculate R = 2^k where k is the bit length of n
     int k = bn_bit_length(curve_p);
-    bn_set_word(&ctx.R, 1);
-    left_shift(&ctx.R, k);
+    if (k == 0) {
+        printf("Error: invalid curve modulus bit length\n");
+        return false;
+    }
+    bn_set_word(&ctx->R, 1);
+    left_shift(&ctx->R, k);
 
     // Calculate n' = -n^(-1) mod R
-    compute_mont_nprime(&ctx.n_prime, curve_p, &ctx.R);
+    // compute_mont_nprime(&ctx->n_prime, curve_p, &ctx->R);
+    // Calculate n' = -n^(-1) mod R
+    if (!compute_mont_nprime(&ctx->n_prime, curve_p, &ctx->R)) {
+        printf("Error: Could not compute n_prime for curve context\n");
+        return false;
+    }
 
     // Calculate R^2 mod n
-    bn_mul(&ctx.R, &ctx.R, &ctx.R2);  // R^2
-    bn_mod(&ctx.R2, &ctx.R2, curve_p); // R^2 mod n
+    bn_mul(&ctx->R, &ctx->R, &ctx->R2);  // R^2
+    bn_mod(&ctx->R2, &ctx->R2, curve_p); // R^2 mod n
 
     // Calculate 1 in Montgomery form (R mod n)
-    bn_mod(&ctx.one, &ctx.R, curve_p);
+    bn_mod(&ctx->one, &ctx->R, curve_p);
+    return true;
 }
 
 // Convert point to Montgomery form
 __device__ void point_to_montgomery(EC_POINT_CUDA *result, const EC_POINT_CUDA *p, const MONT_CTX_CUDA *ctx) {
+    BIGNUM_CUDA rx, ry;
+    init_zero(&rx);
+    init_zero(&ry);
     // Convert x coordinate
-    bn_mod_mul_montgomery(&p->x, &ctx->R2, &ctx->n, &result->x);
+    // bn_mod_mul_montgomery(&p->x, &ctx->R2, &ctx->n, &result->x);
+    // bn_mod_mul_montgomery(&p->x, &ctx->R, &ctx->n, &rx);
+    bn_mod_mul_montgomery(&p->x, &ctx->R2, &ctx->n, &rx);
+    bn_copy(&result->x, &rx);
     
     // Convert y coordinate
-    bn_mod_mul_montgomery(&p->y, &ctx->R2, &ctx->n, &result->y);
+    // bn_mod_mul_montgomery(&p->y, &ctx->R2, &ctx->n, &result->y);
+    // bn_mod_mul_montgomery(&p->y, &ctx->R, &ctx->n, &ry);
+    bn_mod_mul_montgomery(&p->y, &ctx->R2, &ctx->n, &ry);
+    bn_copy(&result->y, &ry);
 }
 
 // Convert point from Montgomery form
@@ -946,9 +979,14 @@ __device__ void point_from_montgomery(EC_POINT_CUDA *result, const EC_POINT_CUDA
 }
 
 // Montgomery point addition in Montgomery form
-__device__ void point_add_montgomery(EC_POINT_CUDA *result, EC_POINT_CUDA *p1, EC_POINT_CUDA *p2, 
-                                   const BIGNUM_CUDA *curve_p, const BIGNUM_CUDA *curve_a,
-                                   const MONT_CTX_CUDA *ctx) {
+__device__ void point_add_montgomery(
+    EC_POINT_CUDA *result, 
+    EC_POINT_CUDA *p1, 
+    EC_POINT_CUDA *p2, 
+    const BIGNUM_CUDA *curve_p,
+    const BIGNUM_CUDA *curve_a,
+    const MONT_CTX_CUDA *ctx
+    ) {
     // Handle point at infinity cases
     if (point_is_at_infinity(p1)) {
         copy_point(result, p2);
@@ -960,13 +998,14 @@ __device__ void point_add_montgomery(EC_POINT_CUDA *result, EC_POINT_CUDA *p1, E
     }
 
     // Initialize temporary variables
-    BIGNUM_CUDA s, x3, y3, tmp1, tmp2, tmp3;
+    BIGNUM_CUDA s, x3, y3, tmp1, tmp2, tmp3, tmp4;
     init_zero(&s);
     init_zero(&x3);
     init_zero(&y3);
     init_zero(&tmp1);
     init_zero(&tmp2);
     init_zero(&tmp3);
+    init_zero(&tmp4);
 
     // Case 1: P1 = P2 and y1 = -y2 (including P1 = P2 = point at infinity)
     if (bn_cmp(&p1->x, &p2->x) == 0) {
@@ -987,8 +1026,17 @@ __device__ void point_add_montgomery(EC_POINT_CUDA *result, EC_POINT_CUDA *p1, E
         bn_mod_mul_montgomery(&tmp1, &three, curve_p, &tmp2);     // 3x₁²
 
         // Add curve parameter 'a' (in Montgomery form)
-        bn_add(&tmp2, &tmp2, curve_a);                           // 3x₁² + a
-        bn_mod(&tmp2, &tmp2, curve_p);
+        // bn_add(&tmp2, &tmp2, curve_a);                           // 3x₁² + a
+        init_zero(&tmp4);
+        // bn_print_no_fuse("### tmp2: ", &tmp2);
+        // bn_print_no_fuse("### curve_a: ", curve_a);
+        bn_add(&tmp4, &tmp2, curve_a);                           // 3x₁² + a
+        bn_copy(&tmp2, &tmp4);
+
+        init_zero(&tmp4);
+        // bn_mod(&tmp2, &tmp2, curve_p); // TODO: Avoid of collizion between tmp2 and tmp2
+        bn_mod(&tmp4, &tmp2, curve_p);
+        bn_copy(&tmp2, &tmp4);
 
         // Calculate 2y₁
         bn_mod_mul_montgomery(&p1->y, &ctx->R2, curve_p, &tmp1);  // Convert y₁ to Montgomery form
@@ -1007,14 +1055,14 @@ __device__ void point_add_montgomery(EC_POINT_CUDA *result, EC_POINT_CUDA *p1, E
         // Calculate y₂ - y₁
         bn_mod_mul_montgomery(&p2->y, &ctx->one, curve_p, &tmp1);
         bn_mod_mul_montgomery(&p1->y, &ctx->one, curve_p, &tmp2);
-        bn_sub(&tmp1, &tmp1, &tmp2);
-        bn_mod(&tmp1, &tmp1, curve_p);  // Ensure result is properly reduced
+        bn_sub(&tmp1, &tmp1, &tmp2);    // TODO: Check for colllizion
+        bn_mod(&tmp1, &tmp1, curve_p);  // Ensure result is properly reduced // TODO: Check for colllizion
 
         // Calculate x₂ - x₁
         bn_mod_mul_montgomery(&p2->x, &ctx->one, curve_p, &tmp2);
         bn_mod_mul_montgomery(&p1->x, &ctx->one, curve_p, &tmp3);
-        bn_sub(&tmp2, &tmp2, &tmp3);
-        bn_mod(&tmp2, &tmp2, curve_p);
+        bn_sub(&tmp2, &tmp2, &tmp3);// TODO: Check for colllizion
+        bn_mod(&tmp2, &tmp2, curve_p);// TODO: Check for colllizion
 
         // Calculate slope
         bn_mod_inverse(&tmp3, &tmp2, curve_p);
@@ -1023,14 +1071,14 @@ __device__ void point_add_montgomery(EC_POINT_CUDA *result, EC_POINT_CUDA *p1, E
 
     // Calculate x₃ = s² - x₁ - x₂
     bn_mod_mul_montgomery(&s, &s, curve_p, &tmp1);                // s²
-    bn_sub(&tmp1, &tmp1, &p1->x);                                // s² - x₁
-    bn_sub(&tmp1, &tmp1, &p2->x);                                // s² - x₁ - x₂
+    bn_sub(&tmp1, &tmp1, &p1->x);   // TODO: Check for colllizion                             // s² - x₁
+    bn_sub(&tmp1, &tmp1, &p2->x);     // TODO: Check for colllizion                           // s² - x₁ - x₂
     bn_mod(&x3, &tmp1, curve_p);
 
     // Calculate y₃ = s(x₁ - x₃) - y₁
     bn_sub(&p1->x, &p1->x, &x3);                                 // x₁ - x₃
     bn_mod_mul_montgomery(&s, &p1->x, curve_p, &tmp1);           // s(x₁ - x₃)
-    bn_sub(&tmp1, &tmp1, &p1->y);                                // s(x₁ - x₃) - y₁
+    bn_sub(&tmp1, &tmp1, &p1->y);  // TODO: Check for colllizion                              // s(x₁ - x₃) - y₁
     bn_mod(&y3, &tmp1, curve_p);
 
     // Set result coordinates
@@ -1039,35 +1087,63 @@ __device__ void point_add_montgomery(EC_POINT_CUDA *result, EC_POINT_CUDA *p1, E
 }
 
 // Main Montgomery scalar multiplication function
-__device__ EC_POINT_CUDA ec_point_scalar_mul_montgomery(EC_POINT_CUDA *point, BIGNUM_CUDA *scalar, 
-                                                      const MONT_CTX_CUDA *ctx) {
-    EC_POINT_CUDA result, current;
+__device__ void ec_point_scalar_mul_montgomery(
+    EC_POINT_CUDA *point, 
+    BIGNUM_CUDA *scalar,
+    const MONT_CTX_CUDA *ctx,
+    EC_POINT_CUDA *final_result
+    ) {
+    bool debug = true;
+    if (debug) {
+        printf("++ ec_point_scalar_mul_montgomery ++\n");
+        bn_print_no_fuse(">> scalar: ", scalar);
+        bn_print_no_fuse(">> point.x: ", &point->x);
+        bn_print_no_fuse(">> point.y: ", &point->y);
+        bn_print_no_fuse(">> ctx->R: ", &ctx->R);
+        bn_print_no_fuse(">> ctx->n: ", &ctx->n);
+        bn_print_no_fuse(">> ctx->n_prime: ", &ctx->n_prime);
+        bn_print_no_fuse(">> ctx->R2: ", &ctx->R2);
+        bn_print_no_fuse(">> ctx->one: ", &ctx->one);
+    }
+    EC_POINT_CUDA result;
     init_point_at_infinity(&result);
     
     // Convert input point to Montgomery form
+    EC_POINT_CUDA current;
     point_to_montgomery(&current, point, ctx);
 
     // Convert bits of scalar to array
     unsigned int bits[256];
     bignum_to_bit_array(scalar, bits);
 
+    BIGNUM_CUDA curve_a;
+    init_zero(&curve_a); // Assuming curve_a is zero for the curve used
+
     // Double-and-add algorithm using Montgomery arithmetic
     for (int i = 255; i >= 0; i--) {
-        // Double
-        if (i != 255) {
-            point_add_montgomery(&result, &result, &result, &ctx->n, NULL, ctx);
+        if (!point_is_at_infinity(&result)) {
+            EC_POINT_CUDA temp_result;
+            point_add_montgomery(&temp_result, &result, &result, &ctx->n, &curve_a, ctx);
+            copy_point(&result, &temp_result);
         }
-        
-        // Add
+
         if (bits[i]) {
-            point_add_montgomery(&result, &result, &current, &ctx->n, NULL, ctx);
+            if (point_is_at_infinity(&result)) {
+                copy_point(&result, &current);
+            } else {
+                EC_POINT_CUDA temp_result;
+                point_add_montgomery(&temp_result, &result, &current, &ctx->n, &curve_a, ctx);
+                copy_point(&result, &temp_result);
+            }
         }
     }
 
     // Convert result back from Montgomery form
-    EC_POINT_CUDA final_result;
-    point_from_montgomery(&final_result, &result, ctx);
-    
-    return final_result;
+    point_from_montgomery(final_result, &result, ctx);
+    if (debug) {
+        bn_print_no_fuse("<< final_result.x: ", &final_result->x);
+        bn_print_no_fuse("<< final_result.y: ", &final_result->y);
+        printf("-- ec_point_scalar_mul_montgomery --\n");
+    }
 }
 // ec_point_scalar_mul montgomery --
