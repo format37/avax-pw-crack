@@ -371,3 +371,106 @@ __device__ EC_POINT_CUDA ec_point_scalar_mul_jacobian(
 
     return affine_result;
 }
+
+// Montgomery point operations in Montgomery form ++
+#ifdef use_montgomery_ec_point_multiplication
+__device__ void jacobian_point_double_montgomery(
+    EC_POINT_JACOBIAN *result,
+    const EC_POINT_JACOBIAN *P,
+    const BIGNUM_CUDA *p,
+    const BIGNUM_CUDA *curve_a_mont,
+    const MONT_CTX_CUDA *mont_ctx
+) {
+    if (bn_is_zero(&P->Z) || bn_is_zero(&P->Y)) {
+        init_zero(&result->X);
+        init_zero(&result->Y);
+        init_zero(&result->Z);
+        return;
+    }
+
+    BIGNUM_CUDA S, M, tmp1, tmp2, tmp3, Y1_squared;
+    init_zero(&S);
+    init_zero(&M);
+    init_zero(&tmp1);
+    init_zero(&tmp2);
+    init_zero(&tmp3);
+    init_zero(&Y1_squared);
+
+    // S = 4 * X1 * Y1^2 mod p
+    bn_mod_sqr_montgomery(&tmp1, &P->Y, p, mont_ctx);  // tmp1 = Y1^2
+    bn_copy(&Y1_squared, &tmp1);
+    bn_mod_mul_montgomery(&tmp2, &P->X, &tmp1, p, mont_ctx);  // tmp2 = X1 * Y1^2
+    bn_mod_lshift(&S, &tmp2, 2, p);  // S = 4 * X1 * Y1^2 mod p
+
+    // M = 3 * X1^2 + a * Z1^4 mod p
+    bn_mod_sqr_montgomery(&tmp1, &P->X, p, mont_ctx);  // tmp1 = X1^2
+
+    // Compute Z1^4
+    bn_mod_sqr_montgomery(&tmp2, &P->Z, p, mont_ctx);  // tmp2 = Z1^2
+    bn_mod_sqr_montgomery(&tmp2, &tmp2, p, mont_ctx);  // tmp2 = Z1^4
+
+    // Multiply 'a' with Z1^4
+    bn_mod_mul_montgomery(&tmp3, curve_a_mont, &tmp2, p, mont_ctx);
+
+    // M = 3 * X1^2 + a * Z1^4
+    BIGNUM_CUDA three;
+    init_zero(&three);
+    bn_set_word(&three, 3);
+    bn_to_montgomery(&three, &three, mont_ctx);
+    bn_mod_mul_montgomery(&M, &tmp1, &three, p, mont_ctx);
+    bn_mod_add(&M, &M, &tmp3, p);
+
+    // Continue with the rest of the function using Montgomery operations
+    // ...
+}
+
+__device__ EC_POINT_CUDA ec_point_scalar_mul_jacobian_montgomery(
+    EC_POINT_CUDA *point, 
+    BIGNUM_CUDA *scalar, 
+    const BIGNUM_CUDA *curve_p, 
+    const BIGNUM_CUDA *curve_a,
+    const MONT_CTX_CUDA *mont_ctx
+) {
+    EC_POINT_JACOBIAN current, result;
+    affine_to_jacobian(point, &current);
+
+    // Convert current point to Montgomery form
+    bn_to_montgomery(&current.X, &current.X, mont_ctx);
+    bn_to_montgomery(&current.Y, &current.Y, mont_ctx);
+    bn_to_montgomery(&current.Z, &current.Z, mont_ctx);
+
+    // Initialize result as point at infinity in Jacobian coordinates
+    init_zero(&result.X);
+    init_zero(&result.Y);
+    init_zero(&result.Z);
+
+    unsigned int bits[256];
+    bignum_to_bit_array(scalar, bits);
+
+    BIGNUM_CUDA curve_a_mont;
+    init_zero(&curve_a_mont);
+    bn_to_montgomery(&curve_a_mont, curve_a, mont_ctx);
+
+    for (int i = 255; i >= 0; i--) {
+        // Point doubling
+        jacobian_point_double_montgomery(&result, &result, curve_p, &curve_a_mont, mont_ctx);
+
+        if (bits[i]) {
+            // Point addition
+            point_add_jacobian_montgomery(&result, &result, &current, curve_p, &curve_a_mont, mont_ctx);
+        }
+    }
+
+    // Convert result back from Montgomery form
+    bn_from_montgomery(&result.X, &result.X, mont_ctx);
+    bn_from_montgomery(&result.Y, &result.Y, mont_ctx);
+    bn_from_montgomery(&result.Z, &result.Z, mont_ctx);
+
+    // Convert result back to affine coordinates
+    EC_POINT_CUDA affine_result;
+    jacobian_to_affine(&result, &affine_result, curve_p);
+
+    return affine_result;
+}
+#endif
+// Montgomery point operations in Montgomery form --

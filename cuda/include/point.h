@@ -986,6 +986,89 @@ __device__ void point_add_montgomery(
     const BIGNUM_CUDA *curve_p,
     const BIGNUM_CUDA *curve_a,
     const MONT_CTX_CUDA *ctx
+) {
+    // Handle point at infinity cases
+    if (point_is_at_infinity(p1)) {
+        copy_point(result, p2);
+        return;
+    }
+    if (point_is_at_infinity(p2)) {
+        copy_point(result, p1);
+        return;
+    }
+
+    // Initialize temporary variables
+    BIGNUM_CUDA s, x3, y3, tmp1, tmp2, tmp3, tmp4;
+    init_zero(&s);
+    init_zero(&x3);
+    init_zero(&y3);
+    init_zero(&tmp1);
+    init_zero(&tmp2);
+    init_zero(&tmp3);
+    init_zero(&tmp4);
+
+    // Convert constants to Montgomery form
+    BIGNUM_CUDA two, three, two_mont, three_mont;
+    init_zero(&two);
+    init_zero(&three);
+    init_zero(&two_mont);
+    init_zero(&three_mont);
+
+    bn_set_word(&two, 2);
+    bn_set_word(&three, 3);
+
+    // Convert constants to Montgomery form
+    bn_mod_mul_montgomery(&two, &ctx->R2, curve_p, &two_mont);
+    bn_mod_mul_montgomery(&three, &ctx->R2, curve_p, &three_mont);
+
+    // Case 1: P1 = P2 and y1 = -y2
+    if (bn_cmp(&p1->x, &p2->x) == 0) {
+        if (bn_cmp(&p1->y, &p2->y) != 0) {
+            set_point_at_infinity(result);
+            return;
+        }
+
+        // Point doubling
+        bn_mod_mul_montgomery(&p1->x, &p1->x, curve_p, &tmp1);      // tmp1 = x₁²
+        bn_mod_mul_montgomery(&tmp1, &three_mont, curve_p, &tmp2);  // tmp2 = 3x₁²
+
+        // tmp2 = 3x₁² + a (since a=0, we can skip adding a)
+
+        bn_mod_mul_montgomery(&p1->y, &two_mont, curve_p, &tmp3);   // tmp3 = 2y₁
+        bn_mod_inverse(&tmp4, &tmp3, curve_p);                      // tmp4 = (2y₁)⁻¹
+
+        bn_mod_mul_montgomery(&tmp2, &tmp4, curve_p, &s);           // s = (3x₁²)/(2y₁)
+
+    } else {
+        // Regular point addition
+        bn_mod_sub(&tmp1, &p2->y, &p1->y, curve_p);                 // tmp1 = y₂ - y₁
+        bn_mod_sub(&tmp2, &p2->x, &p1->x, curve_p);                 // tmp2 = x₂ - x₁
+        bn_mod_inverse(&tmp3, &tmp2, curve_p);                      // tmp3 = (x₂ - x₁)⁻¹
+        bn_mod_mul_montgomery(&tmp1, &tmp3, curve_p, &s);           // s = (y₂ - y₁)/(x₂ - x₁)
+    }
+
+    // x₃ = s² - x₁ - x₂
+    bn_mod_mul_montgomery(&s, &s, curve_p, &tmp1);                  // tmp1 = s²
+    bn_mod_sub(&tmp2, &tmp1, &p1->x, curve_p);                      // tmp2 = s² - x₁
+    bn_mod_sub(&x3, &tmp2, &p2->x, curve_p);                        // x₃ = s² - x₁ - x₂
+
+    // y₃ = s(x₁ - x₃) - y₁
+    bn_mod_sub(&tmp1, &p1->x, &x3, curve_p);                        // tmp1 = x₁ - x₃
+    bn_mod_mul_montgomery(&s, &tmp1, curve_p, &tmp2);               // tmp2 = s(x₁ - x₃)
+    bn_mod_sub(&y3, &tmp2, &p1->y, curve_p);                        // y₃ = s(x₁ - x₃) - y₁
+
+    // Set result coordinates
+    bn_copy(&result->x, &x3);
+    bn_copy(&result->y, &y3);
+}
+
+__device__ void point_add_montgomery_x(
+    EC_POINT_CUDA *result, 
+    EC_POINT_CUDA *p1, 
+    EC_POINT_CUDA *p2, 
+    const BIGNUM_CUDA *curve_p,
+    const BIGNUM_CUDA *curve_a,
+    const MONT_CTX_CUDA *ctx
     ) {
     // Handle point at infinity cases
     if (point_is_at_infinity(p1)) {
