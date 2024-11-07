@@ -1742,5 +1742,251 @@ __device__ void bn_mod_mul_montgomery(
     bn_copy(result_of_multiplication, &u);
     ;
 }
+
+
+
+// #define TABLE_SIZE 32 // Maximum precomputation table size for sliding windows
+
+// // Check if a number is odd
+// __device__ bool BN_is_odd(const BIGNUM_CUDA *a) {
+//     if (a->top == 0) return false;
+//     return (a->d[0] & 1) == 1;
+// }
+
+// // Get the number of bits in a BIGNUM_CUDA (already defined in your code)
+// // __device__ int bn_num_bits(const BIGNUM_CUDA *a)
+
+// // Check if a BIGNUM_CUDA equals a word value
+// __device__ bool BN_abs_is_word(const BIGNUM_CUDA *a, BN_ULONG w) {
+//     if (a->top == 0) return w == 0;
+//     if (a->top > 1) return false;
+//     return a->d[0] == w;
+// }
+
+// // Convert a BIGNUM_CUDA to Montgomery form
+// __device__ bool bn_to_mont_fixed_top(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, 
+//                                    const BIGNUM_CUDA *mont_n, const BIGNUM_CUDA *m) {
+//     BIGNUM_CUDA tmp;
+//     init_zero(&tmp);
+    
+//     // Compute a * R mod m
+//     bn_mul(a, &mont_n->R2, &tmp);
+//     return bn_mod(r, &tmp, m) == 1;
+// }
+
+// // Perform Montgomery multiplication with fixed top
+// __device__ bool bn_mul_mont_fixed_top(BIGNUM_CUDA *r, const BIGNUM_CUDA *a,
+//                                     const BIGNUM_CUDA *b, const BIGNUM_CUDA *m,
+//                                     const BIGNUM_CUDA *mont_n) {
+//     BIGNUM_CUDA tmp;
+//     init_zero(&tmp);
+//     bn_mod_mul_montgomery(a, b, m, &tmp);
+//     bn_copy(r, &tmp);
+//     return true;
+// }
+
+// Basic window size calculation
+__device__ int BN_window_bits_for_exponent_size(int bits) {
+    if (bits > 671) return 6;
+    if (bits > 239) return 5;
+    if (bits > 79)  return 4;
+    if (bits > 23)  return 3;
+    return 1;
+}
+
+// // Define constant for value one
+// __device__ const BIGNUM_CUDA BN_value_one = {
+//     {1}, // d[0] = 1, rest are 0
+//     1,   // top
+//     0    // neg
+// };
+
+// Check if a bit is set
+__device__ bool BN_is_bit_set(const BIGNUM_CUDA *a, int n) {
+    if (n < 0) return 0;
+    int word_index = n / BN_ULONG_NUM_BITS;
+    int bit_index = n % BN_ULONG_NUM_BITS;
+    
+    if (word_index >= a->top) return 0;
+    return (a->d[word_index] & ((BN_ULONG)1 << bit_index)) != 0;
+}
+
+// // Convert from Montgomery form
+// __device__ bool BN_from_montgomery(BIGNUM_CUDA *r, const BIGNUM_CUDA *a,
+//                                  const BIGNUM_CUDA *mont_n, const BIGNUM_CUDA *m) {
+//     BIGNUM_CUDA one;
+//     init_zero(&one);
+//     bn_set_word(&one, 1);
+    
+//     // Convert from Montgomery form by multiplying by 1
+//     return bn_mod_mul_montgomery(a, &one, m, r);
+// }
+
+// __device__ int bn_mod_exp_mont(BIGNUM_CUDA *rr, const BIGNUM_CUDA *a, const BIGNUM_CUDA *p,
+//                              const BIGNUM_CUDA *m, BIGNUM_CUDA *tmp_mont) {
+//     // #ifdef function_profiler
+//     //     unsigned long long start_time = clock64();
+//     // #endif
+
+//     int i, j, bits, ret = 0;
+//     int start = 1;
+//     BIGNUM_CUDA d, r, val[TABLE_SIZE];
+//     bool debug = false;
+
+//     if (debug) {
+//         printf("++ bn_mod_exp_mont ++\n");
+//         bn_print_no_fuse(">> rr: ", rr);
+//         bn_print_no_fuse(">> a: ", a);
+//         bn_print_no_fuse(">> p: ", p);
+//         bn_print_no_fuse(">> m: ", m);
+//     }
+
+//     // Check validity of inputs
+//     if (!BN_is_odd(m)) {
+//         printf("Error: modulus must be odd\n");
+//         return 0;
+//     }
+
+//     // Get number of bits in exponent
+//     bits = bn_num_bits(p);
+//     if (bits == 0) {
+//         // x^0 mod 1 or x^0 mod -1 is still zero
+//         if (BN_abs_is_word(m, 1)) {
+//             ret = 1;
+//             init_zero(rr);
+//         } else {
+//             ret = bn_set_word(rr, 1);
+//         }
+//         if (debug) printf("bits == 0, returning..\n");
+//         return ret;
+//     }
+
+//     // Initialize temporaries
+//     init_zero(&d);
+//     init_zero(&r);
+//     for (i = 0; i < TABLE_SIZE; i++) {
+//         init_zero(&val[i]);
+//     }
+
+//     // Handle reduction by modulus
+//     if (a->neg || bn_cmp(a, m) >= 0) {
+//         BIGNUM_CUDA tmp;
+//         init_zero(&tmp);
+//         if (!bn_mod(&tmp, a, m)) {
+//             if (debug) printf("bn_mod failed\n");
+//             goto err;
+//         }
+//         if (!bn_to_mont_fixed_top(&val[0], &tmp, tmp_mont, m)) {
+//             if (debug) printf("bn_to_mont_fixed_top 1 failed\n"); 
+//             goto err;
+//         }
+//     } else {
+//         if (!bn_to_mont_fixed_top(&val[0], a, tmp_mont, m)) {
+//             if (debug) printf("bn_to_mont_fixed_top 2 failed\n");
+//             goto err;
+//         }
+//     }
+
+//     // Window size optimization
+//     int window = BN_window_bits_for_exponent_size(bits);
+//     if (window > 1) {
+//         if (!bn_mul_mont_fixed_top(&d, &val[0], &val[0], m, tmp_mont)) {
+//             if (debug) printf("bn_mul_mont_fixed_top failed\n");
+//             goto err;
+//         }
+
+//         j = 1 << (window - 1);
+//         for (i = 1; i < j; i++) {
+//             if (!bn_mul_mont_fixed_top(&val[i], &val[i-1], &d, m, tmp_mont)) {
+//                 if (debug) printf("bn_mul_mont_fixed_top in loop failed\n");
+//                 goto err;
+//             }
+//         }
+//     }
+
+//     // Initialize result
+//     start = 1;
+//     int wstart = bits - 1;
+//     int wend = 0;
+
+//     // Set initial value for r
+//     if (!bn_to_mont_fixed_top(&r, &BN_value_one, tmp_mont, m)) {
+//         if (debug) printf("bn_to_mont_fixed_top 3 failed\n");
+//         goto err; 
+//     }
+
+//     // Main loop
+//     for (;;) {
+//         int wvalue;
+        
+//         if (BN_is_bit_set(p, wstart) == 0) {
+//             if (!start) {
+//                 if (!bn_mul_mont_fixed_top(&r, &r, &r, m, tmp_mont)) {
+//                     goto err;
+//                 }
+//             }
+//             if (wstart == 0) break;
+//             wstart--;
+//             continue;
+//         }
+
+//         // Find window value
+//         wvalue = 1;
+//         wend = 0;
+//         for (i = 1; i < window; i++) {
+//             if (wstart - i < 0) break;
+//             if (BN_is_bit_set(p, wstart - i)) {
+//                 wvalue <<= (i - wend);
+//                 wvalue |= 1;
+//                 wend = i;
+//             }
+//         }
+
+//         // Window operations
+//         j = wend + 1;
+//         if (!start) {
+//             for (i = 0; i < j; i++) {
+//                 if (!bn_mul_mont_fixed_top(&r, &r, &r, m, tmp_mont)) {
+//                     goto err;
+//                 }
+//             }
+//         }
+
+//         // Multiply with window value
+//         if (!bn_mul_mont_fixed_top(&r, &r, &val[wvalue >> 1], m, tmp_mont)) {
+//             goto err;
+//         }
+
+//         wstart -= wend + 1;
+//         start = 0;
+//         if (wstart < 0) break;
+//     }
+
+//     // Convert back from Montgomery form
+//     if (!BN_from_montgomery(rr, &r, tmp_mont, m)) {
+//         goto err;
+//     }
+
+//     ret = 1;
+
+// err:
+//     if (debug) {
+//         bn_print_no_fuse("<< rr: ", rr);
+//         printf("-- bn_mod_exp_mont --\n");  
+//     }
+
+//     // #ifdef function_profiler
+//     //     record_function(FN_BN_MOD_EXP_MONT, start_time);
+//     // #endif
+//     return ret;
+// }
+
+
+
+// __device__ int BN_mod_exp_mont_consttime(BIGNUM_CUDA *rr, const BIGNUM_CUDA *a, const BIGNUM_CUDA *p, const BIGNUM_CUDA *m, BN_MONT_CTX_CUDA *in_mont)
+// {
+//     printf("BN_mod_exp_mont_consttime not yet implemented\n");
+//     return 0;
+// }
     
 // Montgomery multiplication --
