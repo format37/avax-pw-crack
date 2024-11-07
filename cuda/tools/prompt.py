@@ -75,9 +75,12 @@ folders = [
     # "~/projects/avax-pw-crack/openssl/tests/ec_point_scalar_mul_montgomery/test.c",
     # "~/projects/avax-pw-crack/openssl/tests/ec_point_scalar_mul_montgomery/run.log",
     # "~/projects/openssl/crypto/ec/ecp_smpl.c",
-    "~/projects/openssl/crypto/ec/ec_local.h",
+    # "~/projects/openssl/crypto/ec/ec_local.h",
+    "~/projects/avax-pw-crack/openssl/tests/BN_mod_mul_montgomery/test.c",
+    "~/projects/avax-pw-crack/openssl/tests/BN_mod_mul_montgomery/run.log",
     "~/projects/avax-pw-crack/openssl/tests/ec_point_ladder_step/test.c",
     "~/projects/avax-pw-crack/openssl/tests/ec_point_ladder_step/run.log",
+    "~/projects/openssl/crypto/bn/bn_exp.c",
     # "~/projects/avax-pw-crack/python/tests/bn_mul_mod_montgomery/test.py",
     # "~/projects/avax-pw-crack/python/tests/bn_mul_mod_montgomery/run.log",
     # "~/projects/avax-pw-crack/cuda/include/bignum.h",
@@ -99,4 +102,3 @@ folders = [
 output_path = "./prompt.md"
 
 collect_file_contents(folders, extensions, output_path)
-
