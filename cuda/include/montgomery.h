@@ -11,8 +11,169 @@ typedef struct {
     BIGNUM_CUDA R2;      // R^2 mod n (used for Montgomery reduction)
 } BN_MONT_CTX_CUDA;
 
-
 // Montgomery multiplication
+__device__ void bn_mod_mul_montgomery(
+    const BIGNUM_CUDA *a, 
+    const BIGNUM_CUDA *b, 
+    const BIGNUM_CUDA *n, 
+    BIGNUM_CUDA * __restrict__ result_of_multiplication
+    ) {
+    bool debug = false;
+    if (debug) {
+        printf("++ bn_mod_mul_montgomery ++\n");
+        bn_print_no_fuse(">> a: ", a);
+        bn_print_no_fuse(">> b: ", b);
+        bn_print_no_fuse(">> n: ", n);
+    }
+    // BIGNUM_CUDA debug_bignum;
+    // init_zero(&debug_bignum);
+    // bn_copy(result_of_multiplication, &debug_bignum); // TODO: remove this line OK
+    
+    // Check for null inputs
+    if (bn_is_zero(n)) {
+        printf("Error: modulus n cannot be zero\n");
+        init_zero(result_of_multiplication);
+        return;
+    }
+    // Step 1: Calculate R = 2^k where k is the number of bits in n
+    if (debug) printf("R calculation:\n");
+    int k = bn_bit_length(n);
+    if (debug) printf("k: %d\n", k);
+    if (k == 0) {
+        printf("Error: invalid modulus bit length\n");
+        init_zero(result_of_multiplication);
+        return;
+    }
+    
+    BIGNUM_CUDA R;
+    init_zero(&R);
+    bn_set_word(&R, 1);
+    left_shift(&R, k);
+    if (debug) bn_print_no_fuse("R: ", &R);
+
+    // Ensure R and n are coprime
+    if (!are_coprime(&R, n)) {
+        printf("Error: R and n must be coprime\n");
+        return;
+    }
+
+    // Step 2: Compute n' = -n^{-1} mod R
+    BIGNUM_CUDA n_prime;
+    init_zero(&n_prime);
+    if (!compute_mont_nprime(&n_prime, n, &R)) {
+        printf("Error: Could not compute n_prime\n");
+        return;
+    }
+    if (debug) bn_print_no_fuse("n_prime: ", &n_prime);
+
+    // Step 3: Convert operands to Montgomery form using bn_mod_mul
+    BIGNUM_CUDA a_bar, b_bar;
+    init_zero(&a_bar);
+    init_zero(&b_bar);
+    // Calculate a_bar = (a * R) % n
+    bn_mod_mul(&a_bar, a, &R, n);
+    // Calculate b_bar = (b * R) % n
+    bn_mod_mul(&b_bar, b, &R, n);
+    // Debug prints
+    if (debug) {
+        printf("\nMontgomery form (RR values):\n");
+        bn_print_no_fuse("aRR: ", &a_bar);
+        bn_print_no_fuse("bRR: ", &b_bar);
+    }
+
+    // BIGNUM_CUDA debug_bignum;
+    // init_zero(&debug_bignum);
+    // bn_copy(result_of_multiplication, &debug_bignum); // TODO: remove this line OK
+
+    // Step 4: Montgomery multiplication in Montgomery form
+    BIGNUM_CUDA t;
+    init_zero(&t);
+    
+    if (debug) printf("Montgomery multiplication steps:\n");
+    // Calculate t = a_bar * b_bar
+    bn_mul(&a_bar, &b_bar, &t);
+    if (debug) bn_print_no_fuse("t = aRR * bRR: ", &t);
+    BIGNUM_CUDA m;
+    init_zero(&m);
+
+    // BIGNUM_CUDA debug_bignum;
+    // init_zero(&debug_bignum);
+    // bn_copy(result_of_multiplication, &debug_bignum); // TODO: remove this line OK
+    
+    // Calculate m = (t * n_prime) % R
+    bn_mod_mul(&m, &t, &n_prime, &R);
+
+    // BIGNUM_CUDA debug_bignum;
+    // init_zero(&debug_bignum);
+    // bn_copy(result_of_multiplication, &debug_bignum); // TODO: remove this line ERR
+
+    if (debug) bn_print_no_fuse("m = (t * n') mod R: ", &m);
+
+    // BIGNUM_CUDA debug_bignum;
+    // init_zero(&debug_bignum);
+    // bn_copy(result_of_multiplication, &debug_bignum); // TODO: remove this line ERR
+    
+    // Calculate u = (t + m * n) // R
+    BIGNUM_CUDA mn_product;
+    init_zero(&mn_product);
+    bn_mul(&m, n, &mn_product);  // m * n
+
+    BIGNUM_CUDA t_plus_mn;
+    init_zero(&t_plus_mn);
+    bn_add(&t_plus_mn, &t, &mn_product);  // t + m*n
+
+    // Divide by R (equivalent to right shift by k bits)
+    BIGNUM_CUDA u, tmp;
+    init_zero(&u);
+    init_zero(&tmp);
+    // bn_div(quotient, remainder, dividend, divisor)
+    bn_div(&u, &tmp, &t_plus_mn, &R); // (t + m*n) / R
+
+    // Final reduction step: if u ≥ n, subtract n
+    if (bn_cmp(&u, n) >= 0) {
+        BIGNUM_CUDA tmp;
+        init_zero(&tmp);
+        bn_sub(&tmp, &u, n);
+        bn_copy(&u, &tmp);
+    }
+    if (debug) bn_print_no_fuse("u (first reduction): ", &u);
+
+    // BIGNUM_CUDA debug_bignum;
+    // init_zero(&debug_bignum);
+    // bn_copy(result_of_multiplication, &debug_bignum); // TODO: remove this line ERR
+
+    // Step 5: Convert result back from Montgomery form
+    if (debug) printf("Conversion from Montgomery form:\n");
+    init_zero(&t);
+    // Copy u to t
+    bn_copy(&t, &u);
+    if (debug) bn_print_no_fuse("t: ", &t);
+    // m = (t * n_prime) % R
+    bn_mod_mul(&m, &t, &n_prime, &R);
+    if (debug) bn_print_no_fuse("m = (t * n') mod R: ", &m);
+
+    // u = (t + m * n) // R
+    bn_mul(&m, n, &mn_product);  // m * n
+    bn_add(&t_plus_mn, &t, &mn_product);  // t + m*n
+    bn_div(&u, &tmp, &t_plus_mn, &R); // (t + m*n) / R
+
+    // if u >= n: u -= n
+    if (bn_cmp(&u, n) >= 0) {
+        BIGNUM_CUDA tmp;
+        init_zero(&tmp);
+        bn_sub(&tmp, &u, n);
+        bn_copy(&u, &tmp);
+    }    
+    if (debug) bn_print_no_fuse("u (final result): ", &u);
+    // Copy u to result
+    // BIGNUM_CUDA tmp_result;
+    // init_zero(&tmp_result);
+    // bn_copy(&tmp_result, &u);
+
+    bn_copy(result_of_multiplication, &u);
+    ;
+}
+
 __device__ void bn_mod_mul_montgomery_proto(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, const BIGNUM_CUDA *m, BN_MONT_CTX_CUDA *mont) {
     bool debug = true;
 
