@@ -8,13 +8,14 @@
 
 
 int main(void) {
+    printf("Starting...\n");
     // Initialize BN_CTX
     BN_CTX *ctx = BN_CTX_new();
     if (!ctx) {
         fprintf(stderr, "Failed to create BN_CTX\n");
         return 1;
     }
-
+    printf("BN_CTX created\n");
     // Create BIGNUM scalar
     BIGNUM *scalar = BN_new();
     if (!scalar) {
@@ -22,7 +23,7 @@ int main(void) {
         BN_CTX_free(ctx);
         return 1;
     }
-
+    printf("Scalar created\n");
     // Set scalar to the same value as in your CUDA code
     const char *scalar_hex = "1988f4633d8e6f312f3a8fc1da0e6274f77940bb5ea3f36a571cebc1db19b147";
     if (!BN_hex2bn(&scalar, scalar_hex)) {
@@ -31,7 +32,7 @@ int main(void) {
         BN_CTX_free(ctx);
         return 1;
     }
-
+    printf("Scalar set\n");
     // Get EC_GROUP *group for secp256k1
     EC_GROUP *group = EC_GROUP_new_by_curve_name(NID_secp256k1);
     if (!group) {
@@ -40,7 +41,7 @@ int main(void) {
         BN_CTX_free(ctx);
         return 1;
     }
-
+    printf("Group created\n");
     // Get the generator point G
     const EC_POINT *G = EC_GROUP_get0_generator(group);
     if (!G) {
@@ -50,7 +51,7 @@ int main(void) {
         BN_CTX_free(ctx);
         return 1;
     }
-
+    printf("Generator point G obtained\n");
     // Create EC_POINT *result to store the multiplication result
     EC_POINT *result = EC_POINT_new(group);
     if (!result) {
@@ -60,7 +61,12 @@ int main(void) {
         BN_CTX_free(ctx);
         return 1;
     }
-
+    printf("Result point created\n");
+    // Print input values
+    printf("Scalar: %s\n", scalar_hex);
+    printf("Generator point G:\n");
+    printf("x: %s\n", BN_bn2hex(EC_POINT_point2bn(group, G, POINT_CONVERSION_UNCOMPRESSED, NULL, ctx)));
+    printf("y: %s\n", BN_bn2hex(EC_POINT_point2bn(group, G, POINT_CONVERSION_UNCOMPRESSED, NULL, ctx)));
     // Perform scalar multiplication: result = scalar * G
     if (!EC_POINT_mul(group, result, NULL, G, scalar, ctx)) {
         fprintf(stderr, "Failed to perform scalar multiplication\n");

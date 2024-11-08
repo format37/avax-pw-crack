@@ -38,9 +38,9 @@ rm -rf run.log
 
 start_time=$(date +%s.%N)
 echo Start execution: $(date)
-valgrind \
-    --tool=callgrind \
-    --callgrind-out-file=callgrind.out.15134 \
+# valgrind \
+#     --tool=callgrind \
+#     --callgrind-out-file=callgrind.out.15134 \
     ./program \
     >> run.log 2>&1
     # ./program \
@@ -49,6 +49,6 @@ valgrind \
 end_time=$(date +%s.%N)
 runtime=$(echo "$end_time - $start_time" | bc)
 
-cat run.log
+# cat run.log
 
 echo "Shell runtime: $runtime seconds"

@@ -1123,6 +1123,70 @@ __device__ void ec_point_scalar_mul_montgomery(
     BIGNUM_CUDA *scalar,
     const MONT_CTX_CUDA *ctx,
     EC_POINT_CUDA *final_result
+) {
+    bool debug = true;
+    if (debug) {
+        printf("++ [v.1] ec_point_scalar_mul_montgomery ++\n");
+        bn_print_no_fuse(">> scalar: ", scalar);
+        bn_print_no_fuse(">> point.x: ", &point->x);
+        bn_print_no_fuse(">> point.y: ", &point->y);
+        bn_print_no_fuse(">> ctx->R: ", &ctx->R);
+        bn_print_no_fuse(">> ctx->n: ", &ctx->n);
+        bn_print_no_fuse(">> ctx->n_prime: ", &ctx->n_prime);
+        bn_print_no_fuse(">> ctx->R2: ", &ctx->R2);
+        bn_print_no_fuse(">> ctx->one: ", &ctx->one);
+    }
+    // Initialize result to the point at infinity
+    EC_POINT_CUDA result;
+    init_point_at_infinity(&result);
+    
+    // Convert input point to Montgomery form
+    EC_POINT_CUDA current;
+    point_to_montgomery(&current, point, ctx);
+    
+    // Convert scalar to bit array
+    unsigned int bits[256];
+    bignum_to_bit_array(scalar, bits);
+
+    // Assume curve parameter 'a' is zero (for secp256k1)
+    BIGNUM_CUDA curve_a;
+    init_zero(&curve_a);
+
+    // Perform scalar multiplication
+    for (int i = 255; i >= 0; i--) {
+        // Always perform the doubling
+        if (!point_is_at_infinity(&result)) {
+            EC_POINT_CUDA temp_result;
+            point_add_montgomery(&temp_result, &result, &result, &ctx->n, &curve_a, ctx);
+            copy_point(&result, &temp_result);
+        }
+
+        // Add current point if the bit is set
+        if (bits[i]) {
+            if (point_is_at_infinity(&result)) {
+                copy_point(&result, &current);
+            } else {
+                EC_POINT_CUDA temp_result;
+                point_add_montgomery(&temp_result, &result, &current, &ctx->n, &curve_a, ctx);
+                copy_point(&result, &temp_result);
+            }
+        }
+    }
+
+    // Convert result back from Montgomery form
+    point_from_montgomery(final_result, &result, ctx);
+    if (debug) {
+        bn_print_no_fuse("<< final_result.x: ", &final_result->x);
+        bn_print_no_fuse("<< final_result.y: ", &final_result->y);
+        printf("-- ec_point_scalar_mul_montgomery --\n");
+    }
+}
+
+__device__ void ec_point_scalar_mul_montgomery_x(
+    EC_POINT_CUDA *point, 
+    BIGNUM_CUDA *scalar,
+    const MONT_CTX_CUDA *ctx,
+    EC_POINT_CUDA *final_result
     ) {
     bool debug = true;
     if (debug) {
