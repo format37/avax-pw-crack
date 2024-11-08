@@ -1,7 +1,9 @@
 clear
 export LD_LIBRARY_PATH=/usr/lib64:$LD_LIBRARY_PATH
 rm -f program
+rm -f build.log
     # -Wno-deprecated-declarations \
+    # -g -Wall -O0 -fno-inline \
 g++ \
     test.c \
     -std=c++11 \
@@ -37,9 +39,9 @@ rm -rf run.log
 
 start_time=$(date +%s.%N)
 echo Start execution: $(date)
-# valgrind \
-#     --tool=callgrind \
-#     --callgrind-out-file=callgrind.out.15134 \
+valgrind \
+    --tool=callgrind \
+    --callgrind-out-file=callgrind.out.15134 \
     ./program \
     >> run.log 2>&1
 

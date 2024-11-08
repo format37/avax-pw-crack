@@ -1,8 +1,9 @@
 #include <stdio.h>
 #include <cuda_runtime.h>
 #include "bignum.h"
-#include "point.h"
 #include "montgomery.h"
+#include "point.h"
+
 
 // Function to convert a hex string to BIGNUM_CUDA
 __device__ void hex2bn_cuda(BIGNUM_CUDA *bn, const char *hex) {
@@ -43,8 +44,8 @@ __global__ void test_bn_mod_exp_mont() {
     init_zero(&r);
 
     // Set values as in the OpenSSL example
-    hex2bn_cuda(&a, "123456789ABCDEF123456789ABCDEF");
-    hex2bn_cuda(&p, "FEDCBA9876543210FEDCBA9876543210");
+    hex2bn_cuda(&a, "2D71E2130231F67E5AD4AB26B4E02EEDE79F749144E6119E36C99EB4227BCE35");
+    hex2bn_cuda(&p, "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2D");
     hex2bn_cuda(&m, "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F");
 
     printf("Base (a): ");

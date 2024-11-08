@@ -1,7 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "bignum.h"
-#include "point.h"
+#include "montgomery.h"
+// #include "point.h"
+
 
 // Test case structure 
 __device__ struct mont_test_case {

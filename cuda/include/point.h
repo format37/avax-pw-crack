@@ -1,5 +1,8 @@
 #include "jacobian_point.h"
 
+// __device__ bool compute_mont_nprime(BIGNUM_CUDA *n_prime, const BIGNUM_CUDA *n, const BIGNUM_CUDA *R);
+// __device__ void bn_mod_mul_montgomery(const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, const BIGNUM_CUDA *n, BIGNUM_CUDA * __restrict__ result_of_multiplication);
+
 // limit to 256 bits
 __device__ void bignum_to_bit_array(BIGNUM_CUDA *n, unsigned int *bits) {
     #ifdef debug_print
@@ -553,15 +556,6 @@ __device__ EC_POINT_CUDA ec_point_scalar_mul(
     return result;
 }
 
-// Helper macros for word operations
-#define WORD_BITS BN_ULONG_NUM_BITS
-#define WORD_MASK ((BN_ULONG)(-1))
-
-// Helper macros for bit operations (if not already defined)
-#define BN_BITS2        BN_ULONG_NUM_BITS     // Number of bits in a word
-#define BN_BYTES        (BN_BITS2 / 8)        // Number of bytes in a word
-#define BN_BITS4        (BN_BITS2 / 2)        // Half the number of bits in a word
-#define BN_MASK         ((BN_ULONG)(-1))      // All bits set
 // #define BN_MASK2        (BN_MASK >> BN_BITS4) // Lower half bits set
 
 // Set bit n in a BIGNUM_CUDA
@@ -632,52 +626,6 @@ __device__ int bn_clear_bit(BIGNUM_CUDA *a, int n) {
     }
     
     return 1;
-}
-
-// Helper function to get the number of bits in a BIGNUM_CUDA
-__device__ int bn_num_bits(const BIGNUM_CUDA *a) {
-    if (a->top == 0) {
-        return 0;
-    }
-    
-    // Find the highest non-zero word
-    int word_index = a->top - 1;
-    while (word_index >= 0 && a->d[word_index] == 0) {
-        word_index--;
-    }
-    
-    if (word_index < 0) {
-        return 0;
-    }
-    
-    // Find the highest set bit in the highest non-zero word
-    BN_ULONG word = a->d[word_index];
-    int bit_count = word_index * BN_BITS2;
-    
-    while (word) {
-        word >>= 1;
-        bit_count++;
-    }
-    
-    return bit_count;
-}
-
-// Example usage function
-__device__ void test_bn_set_bit(BIGNUM_CUDA *a) {
-    // Set some bits
-    bn_set_bit(a, 0);    // Set least significant bit
-    bn_set_bit(a, 63);   // Set bit 63 (assuming 64-bit words)
-    bn_set_bit(a, 127);  // Set bit 127
-    
-    // Print the number in binary (for debugging)
-    #ifdef debug_print
-        printf("Number in binary: ");
-        for (int i = bn_num_bits(a) - 1; i >= 0; i--) {
-            printf("%d", bn_is_bit_set(a, i));
-            if (i % 8 == 0) printf(" ");
-        }
-        printf("\n");
-    #endif
 }
 
 // Helper function for single-word multiplication

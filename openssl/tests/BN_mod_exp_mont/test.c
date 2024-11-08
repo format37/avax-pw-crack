@@ -28,12 +28,12 @@ int main(void) {
     }
 
     /* Set values for a, p, and m */
-    if (!BN_hex2bn(&a, "123456789ABCDEF123456789ABCDEF")) {
+    if (!BN_hex2bn(&a, "2D71E2130231F67E5AD4AB26B4E02EEDE79F749144E6119E36C99EB4227BCE35")) {
         fprintf(stderr, "Error setting base 'a'.\n");
         goto cleanup;
     }
 
-    if (!BN_hex2bn(&p, "FEDCBA9876543210FEDCBA9876543210")) {
+    if (!BN_hex2bn(&p, "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2D")) {
         fprintf(stderr, "Error setting exponent 'p'.\n");
         goto cleanup;
     }
