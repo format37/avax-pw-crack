@@ -174,7 +174,7 @@ __device__ void bn_mod_mul_montgomery(
     ;
 }
 
-__device__ void bn_mod_mul_montgomery_proto(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, const BIGNUM_CUDA *m, BN_MONT_CTX_CUDA *mont) {
+__device__ void bn_mod_mul_montgomery_proto(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, const BIGNUM_CUDA *m, const BN_MONT_CTX_CUDA *mont) {
     bool debug = true;
 
     if (debug) {
@@ -234,6 +234,10 @@ __device__ void bn_mod_mul_montgomery_proto(BIGNUM_CUDA *r, const BIGNUM_CUDA *a
         bn_print_no_fuse("<< r: ", r);
         printf("-- bn_mod_mul_montgomery --\n");
     }
+}
+
+__device__ void bn_to_montgomery(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BN_MONT_CTX_CUDA *mont, const BIGNUM_CUDA *m) {
+    bn_mod_mul_montgomery_proto(r, a, &mont->R2, m, mont);
 }
 
 // Function to count the number of bits in a BN_ULONG
@@ -405,7 +409,12 @@ __device__ int BN_mod_exp_mont(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNU
     wstart = bits - 1;          
     wend = 0;   
 
-    init_one(&rr);
+    // init_one(&rr);
+    // Initialize rr by converting 1 to Montgomery form instead of using init_one
+    BIGNUM_CUDA one;
+    init_one(&one);
+    bn_to_montgomery(&rr, &one, &mont, m);
+
 
     for (;;) {
         int wvalue;
@@ -448,7 +457,7 @@ __device__ int BN_mod_exp_mont(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNU
     }
 
     // Montgomery reduction
-    BIGNUM_CUDA one;
+    // BIGNUM_CUDA one;
     init_one(&one);
     bn_mod_mul_montgomery_proto(r, &rr, &one, m, &mont);
     ret = 1;
