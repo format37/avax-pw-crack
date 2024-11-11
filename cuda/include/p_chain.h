@@ -3,6 +3,7 @@
 #include "ripmd160.h"
 #include "bech32.h"
 #include "bip32.h"
+#include "montgomery.h"
 #include "point.h"
 #include "public_key.h"
 #include "child_key.h"

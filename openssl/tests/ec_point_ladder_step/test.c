@@ -99,10 +99,9 @@ int main(void) {
     }
 
     // Print initial points
-    printf("Initial points:\n");
-    print_point("p (generator)", group, p, ctx);
-    print_point("r", group, r, ctx);
-    print_point("s", group, s, ctx);
+    print_point("Initial point: p (generator)", group, p, ctx);
+    print_point("Initial point: r", group, r, ctx);
+    print_point("Initial point: s", group, s, ctx);
 
     // Perform ladder step
     if (!ec_point_ladder_step(group, r, s, p, ctx)) {
@@ -111,9 +110,8 @@ int main(void) {
     }
 
     // Print resulting points
-    printf("\nAfter ladder step:\n");
-    print_point("r", group, r, ctx);
-    print_point("s", group, s, ctx);
+    print_point("After ladder step: r", group, r, ctx);
+    print_point("After ladder step: s", group, s, ctx);
 
     printf("\nTest completed successfully\n");
 
