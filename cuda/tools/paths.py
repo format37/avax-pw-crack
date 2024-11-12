@@ -1,22 +1,23 @@
 extensions = ['cu', 'h', 'c', 'py', 'log', 'md']
 folders = [
-
+    "~/projects/avax-pw-crack/cuda/prompts/119_BN_mod_lshift1_quick_base_logic.md",
     
-    # "~/projects/openssl/include/openssl/ec.h",
-    # "~/projects/openssl/include/openssl/bn.h",
-    # "~/projects/openssl/crypto/ec/ec_lib.c",
-    # "~/projects/openssl/crypto/bn/bn_mont.c",
-    "~/projects/openssl/crypto/bn/bn_mod.c",
-    # "~/projects/openssl/crypto/ec/ec_mult.c",
+    # "~/projects/openssl_original/include/openssl/ec.h",
+    # "~/projects/openssl_original/include/openssl/bn.h",
+    # "~/projects/openssl_original/crypto/ec/ec_lib.c",
+    # "~/projects/openssl_original/crypto/bn/bn_mont.c",
+    "~/projects/openssl_original/crypto/bn/bn_mod.c",
+    "~/projects/openssl_original/crypto/bn/bn_shift.c",
+    # "~/projects/openssl_original/crypto/ec/ec_mult.c",
     
-    # "~/projects/openssl/crypto/ec/ec_local.h",
-    # "~/projects/openssl/crypto/ec/ecp_smpl.c",
+    # "~/projects/openssl_original/crypto/ec/ec_local.h",
+    # "~/projects/openssl_original/crypto/ec/ecp_smpl.c",
 
-    # "~/projects/openssl/crypto/ec/ecp_mont.c",
-    # "~/projects/openssl/crypto/bn/bn_sparc.c",
-    # "~/projects/openssl/crypto/bn/bn_ppc.c",
-    # "~/projects/openssl/crypto/bn/bn_asm.c",
-    # "~/projects/openssl/crypto/bn/bn_exp.c",
+    # "~/projects/openssl_original/crypto/ec/ecp_mont.c",
+    # "~/projects/openssl_original/crypto/bn/bn_sparc.c",
+    # "~/projects/openssl_original/crypto/bn/bn_ppc.c",
+    # "~/projects/openssl_original/crypto/bn/bn_asm.c",
+    # "~/projects/openssl_original/crypto/bn/bn_exp.c",
 
     # "~/projects/avax-pw-crack/openssl/tests/ec_point_scalar_mul_montgomery/test.c",
     # "~/projects/avax-pw-crack/openssl/tests/ec_point_scalar_mul_montgomery/run.log",
@@ -29,8 +30,10 @@ folders = [
     # "~/projects/avax-pw-crack/openssl/tests/bn_mod_add_fixed_top/build.log",
     # "~/projects/avax-pw-crack/openssl/tests/BN_mod_add_quick/test.c",
     # "~/projects/avax-pw-crack/openssl/tests/BN_mod_add_quick/run.log",
-    "~/projects/avax-pw-crack/openssl/tests/BN_mod_sub_quick/test.c",
-    "~/projects/avax-pw-crack/openssl/tests/BN_mod_sub_quick/run.log",
+    # "~/projects/avax-pw-crack/openssl/tests/BN_mod_sub_quick/test.c",
+    # "~/projects/avax-pw-crack/openssl/tests/BN_mod_sub_quick/run.log",
+    "~/projects/avax-pw-crack/openssl/tests/BN_mod_lshift1_quick/test.c",
+    "~/projects/avax-pw-crack/openssl/tests/BN_mod_lshift1_quick/run.log",
     
     # "~/projects/avax-pw-crack/openssl/tests/BN_mod_exp_mont/test.c",
     # "~/projects/avax-pw-crack/openssl/tests/BN_mod_exp_mont/build.log",
