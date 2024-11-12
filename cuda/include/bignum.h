@@ -1860,3 +1860,28 @@ __device__ bool bn_mod_add_quick(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIG
     r->neg = 0;  // Result is always non-negative
     return true;
 }
+
+__device__ bool bn_mod_sub_quick(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, const BIGNUM_CUDA *m) {
+    // Return false if any input is negative or >= m
+    if (a->neg || b->neg || bn_cmp(a, m) >= 0 || bn_cmp(b, m) >= 0) {
+        return false;
+    }
+
+    // If a >= b, compute r = a - b
+    // If a < b, compute r = m - (b - a)
+    if (bn_cmp(a, b) >= 0) {
+        absolute_subtract(r, a, b);
+        r->neg = 0;
+    } else {
+        // First compute (b - a)
+        BIGNUM_CUDA temp;
+        init_zero(&temp);
+        absolute_subtract(&temp, b, a);
+
+        // Then compute m - (b - a)
+        absolute_subtract(r, m, &temp);
+        r->neg = 0;
+    }
+
+    return true;
+}
