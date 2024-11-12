@@ -1288,12 +1288,12 @@ __device__ void point_from_montgomery(EC_POINT_CUDA *result, const EC_POINT_CUDA
 //     }
 // }
 
-// // Helper function to invert a point
-// __device__ int EC_POINT_invert(EC_POINT_CUDA *r, const EC_POINT_CUDA *p, const BIGNUM_CUDA *field) {
-//     bn_copy(&r->x, &p->x);
-//     bn_mod_sub(&r->y, field, &p->y, field); // Negate y coordinate
-//     return 1;
-// }
+// Helper function to invert a point
+__device__ int EC_POINT_invert(EC_POINT_CUDA *r, const EC_POINT_CUDA *p, const BIGNUM_CUDA *field) {
+    bn_copy(&r->x, &p->x);
+    bn_mod_sub(&r->y, field, &p->y, field); // Negate y coordinate
+    return 1;
+}
 
 // __device__ void bn_mod_add_quick(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, const BIGNUM_CUDA *m) {
 //     bn_add(r, a, b);
@@ -1460,119 +1460,170 @@ __device__ void bn_mod_lshift1(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNU
     bn_mod(r, &temp, n);
 }
 
-__device__ int ec_point_cuda_ladder_step(
-    EC_POINT_CUDA *r,
-    EC_POINT_CUDA *s,
-    const EC_POINT_CUDA *p,
-    BIGNUM_CUDA *curve_prime,
-    const BIGNUM_CUDA *curve_a,
-    const BIGNUM_CUDA *curve_b
-) {
-    // Initialize temporary variables
-    BIGNUM_CUDA t0, t1, t2, t3, t4, t5, t6;
-    init_zero(&t0);
-    init_zero(&t1);
-    init_zero(&t2);
-    init_zero(&t3);
-    init_zero(&t4);
-    init_zero(&t5);
-    init_zero(&t6);
+// __device__ int ec_point_cuda_ladder_step(
+//     EC_POINT_CUDA *r,
+//     EC_POINT_CUDA *s,
+//     const EC_POINT_CUDA *p,
+//     BIGNUM_CUDA *curve_prime,
+//     const BIGNUM_CUDA *curve_a,
+//     const BIGNUM_CUDA *curve_b
+// ) {
+//     // Initialize temporary variables
+//     BIGNUM_CUDA t0, t1, t2, t3, t4, t5, t6;
+//     init_zero(&t0);
+//     init_zero(&t1);
+//     init_zero(&t2);
+//     init_zero(&t3);
+//     init_zero(&t4);
+//     init_zero(&t5);
+//     init_zero(&t6);
 
-    // Step 1: t6 = X_r * X_s mod p
-    bn_mod_mul_montgomery(&t6, &r->x, &s->x, curve_prime);
+//     // Step 1: t6 = X_r * X_s mod p
+//     bn_mod_mul_montgomery(&t6, &r->x, &s->x, curve_prime);
 
-    // t0 = Z_r * Z_s mod p
-    bn_mod_mul_montgomery(&t0, &r->z, &s->z, curve_prime);
+//     // t0 = Z_r * Z_s mod p
+//     bn_mod_mul_montgomery(&t0, &r->z, &s->z, curve_prime);
 
-    // t4 = X_r * Z_s mod p
-    bn_mod_mul_montgomery(&t4, &r->x, &s->z, curve_prime);
+//     // t4 = X_r * Z_s mod p
+//     bn_mod_mul_montgomery(&t4, &r->x, &s->z, curve_prime);
 
-    // t3 = Z_r * X_s mod p
-    bn_mod_mul_montgomery(&t3, &r->z, &s->x, curve_prime);
+//     // t3 = Z_r * X_s mod p
+//     bn_mod_mul_montgomery(&t3, &r->z, &s->x, curve_prime);
 
-    // Step 2: t5 = t6 + a * t0 mod p
-    // First compute a * t0 mod p
-    bn_mod_mul_montgomery(&t5, curve_a, &t0, curve_prime);
+//     // Step 2: t5 = t6 + a * t0 mod p
+//     // First compute a * t0 mod p
+//     bn_mod_mul_montgomery(&t5, curve_a, &t0, curve_prime);
 
-    // Then t5 = t6 + t5 mod p
-    bn_mod_add(&t5, &t6, &t5, curve_prime);
+//     // Then t5 = t6 + t5 mod p
+//     bn_mod_add(&t5, &t6, &t5, curve_prime);
 
-    // Step 3: t6 = t3 + t4 mod p
-    bn_mod_add(&t6, &t3, &t4, curve_prime);
+//     // Step 3: t6 = t3 + t4 mod p
+//     bn_mod_add(&t6, &t3, &t4, curve_prime);
 
-    // Step 4: t5 = t6 * t5 mod p
-    bn_mod_mul_montgomery(&t5, &t6, &t5, curve_prime);
+//     // Step 4: t5 = t6 * t5 mod p
+//     bn_mod_mul_montgomery(&t5, &t6, &t5, curve_prime);
 
-    // Step 5: t0 = t0^2 mod p
-    bn_mod_sqr_montgomery(&t0, &t0, curve_prime);
+//     // Step 5: t0 = t0^2 mod p
+//     bn_mod_sqr_montgomery(&t0, &t0, curve_prime);
 
-    // Step 6: t2 = 2 * b mod p
-    bn_mod_lshift1(&t2, curve_b, curve_prime);
+//     // Step 6: t2 = 2 * b mod p
+//     bn_mod_lshift1(&t2, curve_b, curve_prime);
 
-    // Step 7: t0 = t2 * t0 mod p
-    bn_mod_mul_montgomery(&t0, &t2, &t0, curve_prime);
+//     // Step 7: t0 = t2 * t0 mod p
+//     bn_mod_mul_montgomery(&t0, &t2, &t0, curve_prime);
 
-    // Step 8: t5 = 2 * t5 mod p
-    bn_mod_lshift1(&t5, &t5, curve_prime);
+//     // Step 8: t5 = 2 * t5 mod p
+//     bn_mod_lshift1(&t5, &t5, curve_prime);
 
-    // Step 9: t3 = t4 - t3 mod p
-    bn_mod_sub(&t3, &t4, &t3, curve_prime);
+//     // Step 9: t3 = t4 - t3 mod p
+//     bn_mod_sub(&t3, &t4, &t3, curve_prime);
 
-    // Step 10: Z_s = t3^2 mod p
-    bn_mod_sqr_montgomery(&s->z, &t3, curve_prime);
+//     // Step 10: Z_s = t3^2 mod p
+//     bn_mod_sqr_montgomery(&s->z, &t3, curve_prime);
 
-    // Step 11: t4 = Z_s * X_p mod p
-    bn_mod_mul_montgomery(&t4, &s->z, &p->x, curve_prime);
+//     // Step 11: t4 = Z_s * X_p mod p
+//     bn_mod_mul_montgomery(&t4, &s->z, &p->x, curve_prime);
 
-    // Step 12: t0 = t0 + t5 mod p
-    bn_mod_add(&t0, &t0, &t5, curve_prime);
+//     // Step 12: t0 = t0 + t5 mod p
+//     bn_mod_add(&t0, &t0, &t5, curve_prime);
 
-    // Step 13: X_s = t0 - t4 mod p
-    bn_mod_sub(&s->x, &t0, &t4, curve_prime);
+//     // Step 13: X_s = t0 - t4 mod p
+//     bn_mod_sub(&s->x, &t0, &t4, curve_prime);
 
-    // Step 14: t4 = X_r^2 mod p
-    bn_mod_sqr_montgomery(&t4, &r->x, curve_prime);
+//     // Step 14: t4 = X_r^2 mod p
+//     bn_mod_sqr_montgomery(&t4, &r->x, curve_prime);
 
-    // Step 15: t5 = Z_r^2 mod p
-    bn_mod_sqr_montgomery(&t5, &r->z, curve_prime);
+//     // Step 15: t5 = Z_r^2 mod p
+//     bn_mod_sqr_montgomery(&t5, &r->z, curve_prime);
 
-    // Step 16: t6 = a * t5 mod p
-    bn_mod_mul_montgomery(&t6, curve_a, &t5, curve_prime);
+//     // Step 16: t6 = a * t5 mod p
+//     bn_mod_mul_montgomery(&t6, curve_a, &t5, curve_prime);
 
-    // Step 17: t1 = (X_r + Z_r)^2 - t4 - t5 mod p
-    bn_mod_add(&t1, &r->x, &r->z, curve_prime);
-    bn_mod_sqr_montgomery(&t1, &t1, curve_prime);
-    bn_mod_sub(&t1, &t1, &t4, curve_prime);
-    bn_mod_sub(&t1, &t1, &t5, curve_prime);
+//     // Step 17: t1 = (X_r + Z_r)^2 - t4 - t5 mod p
+//     bn_mod_add(&t1, &r->x, &r->z, curve_prime);
+//     bn_mod_sqr_montgomery(&t1, &t1, curve_prime);
+//     bn_mod_sub(&t1, &t1, &t4, curve_prime);
+//     bn_mod_sub(&t1, &t1, &t5, curve_prime);
 
-    // Step 18: t3 = (t4 - t6)^2 mod p
-    bn_mod_sub(&t3, &t4, &t6, curve_prime);
-    bn_mod_sqr_montgomery(&t3, &t3, curve_prime);
+//     // Step 18: t3 = (t4 - t6)^2 mod p
+//     bn_mod_sub(&t3, &t4, &t6, curve_prime);
+//     bn_mod_sqr_montgomery(&t3, &t3, curve_prime);
 
-    // Step 19: t0 = t2 * t5 * t1 mod p
-    bn_mod_mul_montgomery(&t0, &t5, &t1, curve_prime);
-    bn_mod_mul_montgomery(&t0, &t0, &t2, curve_prime);
+//     // Step 19: t0 = t2 * t5 * t1 mod p
+//     bn_mod_mul_montgomery(&t0, &t5, &t1, curve_prime);
+//     bn_mod_mul_montgomery(&t0, &t0, &t2, curve_prime);
 
-    // Step 20: X_r = t3 - t0 mod p
-    bn_mod_sub(&r->x, &t3, &t0, curve_prime);
+//     // Step 20: X_r = t3 - t0 mod p
+//     bn_mod_sub(&r->x, &t3, &t0, curve_prime);
 
-    // Step 21: t3 = t4 + t6 mod p
-    bn_mod_add(&t3, &t4, &t6, curve_prime);
+//     // Step 21: t3 = t4 + t6 mod p
+//     bn_mod_add(&t3, &t4, &t6, curve_prime);
 
-    // Step 22: t4 = t2 * t5^2 mod p
-    bn_mod_sqr_montgomery(&t4, &t5, curve_prime);
-    bn_mod_mul_montgomery(&t4, &t4, &t2, curve_prime);
+//     // Step 22: t4 = t2 * t5^2 mod p
+//     bn_mod_sqr_montgomery(&t4, &t5, curve_prime);
+//     bn_mod_mul_montgomery(&t4, &t4, &t2, curve_prime);
 
-    // Step 23: t1 = 2 * t1 * t3 mod p
-    bn_mod_mul_montgomery(&t1, &t1, &t3, curve_prime);
-    bn_mod_lshift1(&t1, &t1, curve_prime);
+//     // Step 23: t1 = 2 * t1 * t3 mod p
+//     bn_mod_mul_montgomery(&t1, &t1, &t3, curve_prime);
+//     bn_mod_lshift1(&t1, &t1, curve_prime);
 
-    // Step 24: Z_r = t4 + t1 mod p
-    bn_mod_add(&r->z, &t4, &t1, curve_prime);
+//     // Step 24: Z_r = t4 + t1 mod p
+//     bn_mod_add(&r->z, &t4, &t1, curve_prime);
 
-    // Y coordinates are not used in this ladder step
-    // Depending on your implementation, you may need to update them appropriately
-    // For now, we can set them to zero or leave them unchanged
+//     // Y coordinates are not used in this ladder step
+//     // Depending on your implementation, you may need to update them appropriately
+//     // For now, we can set them to zero or leave them unchanged
 
-    return 1; // Success
+//     return 1; // Success
+// }
+
+__device__ int ossl_ec_GFp_mont_field_inv(const BIGNUM_CUDA *a, BIGNUM_CUDA *result, const BIGNUM_CUDA *p) {    
+    // Check for invalid input
+    if (bn_is_zero(a)) {
+        return 0; // Cannot invert zero
+    }
+
+    // We'll use Fermat's Little Theorem: a^(p-2) mod p
+    // First compute p-2
+    BIGNUM_CUDA e;
+    init_zero(&e);
+    BIGNUM_CUDA two;
+    init_zero(&two);
+    two.d[0] = 2;
+    two.top = 1;
+        
+    if (!bn_sub(&e, p, &two)) { // e = p - 2
+        return 0;
+    }
+
+    // Now need to compute a^e mod p
+    // We'll do this using repeated squaring and multiplying
+    BIGNUM_CUDA base; // Copy of input a
+    init_zero(&base);
+    bn_copy(&base, a);
+    
+    BIGNUM_CUDA temp;
+    init_zero(&temp);
+    init_one(result);  // Start with result = 1
+
+    // Get the bit length of e
+    int bit_len = bn_bit_length(&e);
+    
+    // Process each bit of the exponent from left to right (MSB to LSB)
+    for (int i = bit_len - 1; i >= 0; i--) {
+        // Square the result
+        bn_mod_mul(result, result, result, p);
+        
+        // If current bit is 1, multiply by base
+        if (BN_is_bit_set(&e, i)) {
+            bn_mod_mul(result, result, &base, p);
+        }
+    }
+
+    // Verify result is not zero
+    if (bn_is_zero(result)) {
+        return 0; // Inversion failed
+    }
+
+    return 1;
 }

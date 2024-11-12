@@ -4,6 +4,8 @@ rm -f program
 rm -f build.log
     # -Wno-deprecated-declarations \
     # -g -Wall -O0 -fno-inline \
+
+
 g++ \
     test.c \
     -std=c++11 \
@@ -11,9 +13,9 @@ g++ \
     -lssl \
     -lcrypto \
     -I ../json \
-    -I /home/alex/projects/openssl/crypto/bn/ \
-    -I /home/alex/projects/openssl/crypto/ec/ \
-    -I /home/alex/projects/openssl/include/ \
+    -I /home/alex/projects/openssl_mod/crypto/bn/ \
+    -I /home/alex/projects/openssl_mod/crypto/ec/ \
+    -I /home/alex/projects/openssl_mod/include/ \
     -Wl,-rpath,/usr/local/openssl-debug/lib \
     -Wl,--enable-new-dtags \
     -l:libcrypto.so.3 \
