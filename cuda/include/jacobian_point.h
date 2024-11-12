@@ -1,6 +1,7 @@
 struct EC_POINT_CUDA {
   BIGNUM_CUDA x; 
   BIGNUM_CUDA y;
+  BIGNUM_CUDA z;
 };
 
 struct EC_POINT_JACOBIAN {

@@ -1837,3 +1837,26 @@ __device__ bool BN_is_bit_set(const BIGNUM_CUDA *a, int n) {
 // }
     
 // Montgomery multiplication --
+
+__device__ bool bn_mod_add_quick(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, const BIGNUM_CUDA *m) {
+    // Return false if either input is negative or >= m
+    if (a->neg || b->neg || bn_cmp(a, m) >= 0 || bn_cmp(b, m) >= 0) {
+        return false;
+    }
+
+    // Compute t = a + b
+    BIGNUM_CUDA t;
+    init_zero(&t);
+    absolute_add(&t, a, b);  // Use existing absolute_add function
+    
+    // If t < m, result is t
+    // If t >= m, result is t - m
+    if (bn_cmp(&t, m) >= 0) {
+        absolute_subtract(r, &t, m);
+    } else {
+        bn_copy(r, &t);
+    }
+
+    r->neg = 0;  // Result is always non-negative
+    return true;
+}
