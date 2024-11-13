@@ -926,368 +926,6 @@ __device__ void point_from_montgomery(EC_POINT_CUDA *result, const EC_POINT_CUDA
     bn_mod_mul_montgomery(&p->y, &one, &ctx->n, &result->y);
 }
 
-// // Montgomery point addition in Montgomery form
-// __device__ void point_add_montgomery(
-//     EC_POINT_CUDA *result, 
-//     EC_POINT_CUDA *p1, 
-//     EC_POINT_CUDA *p2, 
-//     const BIGNUM_CUDA *curve_p,
-//     const BIGNUM_CUDA *curve_a,
-//     const MONT_CTX_CUDA *ctx
-// ) {
-//     // Handle point at infinity cases
-//     if (point_is_at_infinity(p1)) {
-//         copy_point(result, p2);
-//         return;
-//     }
-//     if (point_is_at_infinity(p2)) {
-//         copy_point(result, p1);
-//         return;
-//     }
-
-//     // Initialize temporary variables
-//     BIGNUM_CUDA s, x3, y3, tmp1, tmp2, tmp3, tmp4;
-//     init_zero(&s);
-//     init_zero(&x3);
-//     init_zero(&y3);
-//     init_zero(&tmp1);
-//     init_zero(&tmp2);
-//     init_zero(&tmp3);
-//     init_zero(&tmp4);
-
-//     // Convert constants to Montgomery form
-//     BIGNUM_CUDA two, three, two_mont, three_mont;
-//     init_zero(&two);
-//     init_zero(&three);
-//     init_zero(&two_mont);
-//     init_zero(&three_mont);
-
-//     bn_set_word(&two, 2);
-//     bn_set_word(&three, 3);
-
-//     // Convert constants to Montgomery form
-//     bn_mod_mul_montgomery(&two, &ctx->R2, curve_p, &two_mont);
-//     bn_mod_mul_montgomery(&three, &ctx->R2, curve_p, &three_mont);
-
-//     // Case 1: P1 = P2 and y1 = -y2
-//     if (bn_cmp(&p1->x, &p2->x) == 0) {
-//         if (bn_cmp(&p1->y, &p2->y) != 0) {
-//             set_point_at_infinity(result);
-//             return;
-//         }
-
-//         // Point doubling
-//         bn_mod_mul_montgomery(&p1->x, &p1->x, curve_p, &tmp1);      // tmp1 = x₁²
-//         bn_mod_mul_montgomery(&tmp1, &three_mont, curve_p, &tmp2);  // tmp2 = 3x₁²
-
-//         // tmp2 = 3x₁² + a (since a=0, we can skip adding a)
-
-//         bn_mod_mul_montgomery(&p1->y, &two_mont, curve_p, &tmp3);   // tmp3 = 2y₁
-//         bn_mod_inverse(&tmp4, &tmp3, curve_p);                      // tmp4 = (2y₁)⁻¹
-
-//         bn_mod_mul_montgomery(&tmp2, &tmp4, curve_p, &s);           // s = (3x₁²)/(2y₁)
-
-//     } else {
-//         // Regular point addition
-//         bn_mod_sub(&tmp1, &p2->y, &p1->y, curve_p);                 // tmp1 = y₂ - y₁
-//         bn_mod_sub(&tmp2, &p2->x, &p1->x, curve_p);                 // tmp2 = x₂ - x₁
-//         bn_mod_inverse(&tmp3, &tmp2, curve_p);                      // tmp3 = (x₂ - x₁)⁻¹
-//         bn_mod_mul_montgomery(&tmp1, &tmp3, curve_p, &s);           // s = (y₂ - y₁)/(x₂ - x₁)
-//     }
-
-//     // x₃ = s² - x₁ - x₂
-//     bn_mod_mul_montgomery(&s, &s, curve_p, &tmp1);                  // tmp1 = s²
-//     bn_mod_sub(&tmp2, &tmp1, &p1->x, curve_p);                      // tmp2 = s² - x₁
-//     bn_mod_sub(&x3, &tmp2, &p2->x, curve_p);                        // x₃ = s² - x₁ - x₂
-
-//     // y₃ = s(x₁ - x₃) - y₁
-//     bn_mod_sub(&tmp1, &p1->x, &x3, curve_p);                        // tmp1 = x₁ - x₃
-//     bn_mod_mul_montgomery(&s, &tmp1, curve_p, &tmp2);               // tmp2 = s(x₁ - x₃)
-//     bn_mod_sub(&y3, &tmp2, &p1->y, curve_p);                        // y₃ = s(x₁ - x₃) - y₁
-
-//     // Set result coordinates
-//     bn_copy(&result->x, &x3);
-//     bn_copy(&result->y, &y3);
-// }
-
-// __device__ void point_add_montgomery_x(
-//     EC_POINT_CUDA *result, 
-//     EC_POINT_CUDA *p1, 
-//     EC_POINT_CUDA *p2, 
-//     const BIGNUM_CUDA *curve_p,
-//     const BIGNUM_CUDA *curve_a,
-//     const MONT_CTX_CUDA *ctx
-//     ) {
-//     // Handle point at infinity cases
-//     if (point_is_at_infinity(p1)) {
-//         copy_point(result, p2);
-//         return;
-//     }
-//     if (point_is_at_infinity(p2)) {
-//         copy_point(result, p1);
-//         return;
-//     }
-
-//     // Initialize temporary variables
-//     BIGNUM_CUDA s, x3, y3, tmp1, tmp2, tmp3, tmp4;
-//     init_zero(&s);
-//     init_zero(&x3);
-//     init_zero(&y3);
-//     init_zero(&tmp1);
-//     init_zero(&tmp2);
-//     init_zero(&tmp3);
-//     init_zero(&tmp4);
-
-//     // Case 1: P1 = P2 and y1 = -y2 (including P1 = P2 = point at infinity)
-//     if (bn_cmp(&p1->x, &p2->x) == 0) {
-//         if (bn_cmp(&p1->y, &p2->y) != 0) {
-//             // Points are inverses of each other
-//             set_point_at_infinity(result);
-//             return;
-//         }
-
-//         // Point doubling case (P1 = P2)
-//         // s = (3x₁² + a) / 2y₁
-
-//         // Calculate 3x₁²
-//         bn_mod_mul_montgomery(&p1->x, &p1->x, curve_p, &tmp1);    // x₁²
-//         BIGNUM_CUDA three;
-//         init_zero(&three);
-//         bn_set_word(&three, 3);
-//         bn_mod_mul_montgomery(&tmp1, &three, curve_p, &tmp2);     // 3x₁²
-
-//         // Add curve parameter 'a' (in Montgomery form)
-//         // bn_add(&tmp2, &tmp2, curve_a);                           // 3x₁² + a
-//         init_zero(&tmp4);
-//         // bn_print_no_fuse("### tmp2: ", &tmp2);
-//         // bn_print_no_fuse("### curve_a: ", curve_a);
-//         bn_add(&tmp4, &tmp2, curve_a);                           // 3x₁² + a
-//         bn_copy(&tmp2, &tmp4);
-
-//         init_zero(&tmp4);
-//         // bn_mod(&tmp2, &tmp2, curve_p); // TODO: Avoid of collizion between tmp2 and tmp2
-//         bn_mod(&tmp4, &tmp2, curve_p);
-//         bn_copy(&tmp2, &tmp4);
-
-//         // Calculate 2y₁
-//         bn_mod_mul_montgomery(&p1->y, &ctx->R2, curve_p, &tmp1);  // Convert y₁ to Montgomery form
-//         BIGNUM_CUDA two;
-//         init_zero(&two);
-//         bn_set_word(&two, 2);
-//         bn_mod_mul_montgomery(&tmp1, &two, curve_p, &tmp3);       // 2y₁
-
-//         // Calculate final slope
-//         bn_mod_inverse(&tmp1, &tmp3, curve_p);                    // 1/2y₁
-//         bn_mod_mul_montgomery(&tmp2, &tmp1, curve_p, &s);         // s = (3x₁² + a)/2y₁
-//     } else {
-//         // Regular point addition case
-//         // s = (y₂ - y₁)/(x₂ - x₁)
-
-//         // Calculate y₂ - y₁
-//         bn_mod_mul_montgomery(&p2->y, &ctx->one, curve_p, &tmp1);
-//         bn_mod_mul_montgomery(&p1->y, &ctx->one, curve_p, &tmp2);
-//         bn_sub(&tmp1, &tmp1, &tmp2);    // TODO: Check for colllizion
-//         bn_mod(&tmp1, &tmp1, curve_p);  // Ensure result is properly reduced // TODO: Check for colllizion
-
-//         // Calculate x₂ - x₁
-//         bn_mod_mul_montgomery(&p2->x, &ctx->one, curve_p, &tmp2);
-//         bn_mod_mul_montgomery(&p1->x, &ctx->one, curve_p, &tmp3);
-//         bn_sub(&tmp2, &tmp2, &tmp3);// TODO: Check for colllizion
-//         bn_mod(&tmp2, &tmp2, curve_p);// TODO: Check for colllizion
-
-//         // Calculate slope
-//         bn_mod_inverse(&tmp3, &tmp2, curve_p);
-//         bn_mod_mul_montgomery(&tmp1, &tmp3, curve_p, &s);
-//     }
-
-//     // Calculate x₃ = s² - x₁ - x₂
-//     bn_mod_mul_montgomery(&s, &s, curve_p, &tmp1);                // s²
-//     bn_sub(&tmp1, &tmp1, &p1->x);   // TODO: Check for colllizion                             // s² - x₁
-//     bn_sub(&tmp1, &tmp1, &p2->x);     // TODO: Check for colllizion                           // s² - x₁ - x₂
-//     bn_mod(&x3, &tmp1, curve_p);
-
-//     // Calculate y₃ = s(x₁ - x₃) - y₁
-//     bn_sub(&p1->x, &p1->x, &x3);                                 // x₁ - x₃
-//     bn_mod_mul_montgomery(&s, &p1->x, curve_p, &tmp1);           // s(x₁ - x₃)
-//     bn_sub(&tmp1, &tmp1, &p1->y);  // TODO: Check for colllizion                              // s(x₁ - x₃) - y₁
-//     bn_mod(&y3, &tmp1, curve_p);
-
-//     // Set result coordinates
-//     bn_copy(&result->x, &x3);
-//     bn_copy(&result->y, &y3);
-// }
-
-// __device__ void ec_point_scalar_mul_montgomery(
-//     EC_POINT_CUDA *point, 
-//     BIGNUM_CUDA *scalar,
-//     const MONT_CTX_CUDA *ctx,
-//     EC_POINT_CUDA *final_result
-// ) {
-//     bool debug = true;
-//     if (debug) {
-//         printf("++ [v.1] ec_point_scalar_mul_montgomery ++\n");
-//         bn_print_no_fuse(">> scalar: ", scalar);
-//         bn_print_no_fuse(">> point.x: ", &point->x);
-//         bn_print_no_fuse(">> point.y: ", &point->y);
-//         bn_print_no_fuse(">> ctx->R: ", &ctx->R);
-//         bn_print_no_fuse(">> ctx->n: ", &ctx->n);
-//         bn_print_no_fuse(">> ctx->n_prime: ", &ctx->n_prime);
-//         bn_print_no_fuse(">> ctx->R2: ", &ctx->R2);
-//         bn_print_no_fuse(">> ctx->one: ", &ctx->one);
-//     }
-//     // Initialize result to the point at infinity
-//     EC_POINT_CUDA result;
-//     init_point_at_infinity(&result);
-    
-//     // Convert input point to Montgomery form
-//     EC_POINT_CUDA current;
-//     point_to_montgomery(&current, point, ctx);
-    
-//     // Convert scalar to bit array
-//     unsigned int bits[256];
-//     bignum_to_bit_array(scalar, bits);
-
-//     // Assume curve parameter 'a' is zero (for secp256k1)
-//     BIGNUM_CUDA curve_a;
-//     init_zero(&curve_a);
-
-//     // Perform scalar multiplication
-//     for (int i = 255; i >= 0; i--) {
-//         // Always perform the doubling
-//         if (!point_is_at_infinity(&result)) {
-//             EC_POINT_CUDA temp_result;
-//             point_add_montgomery(&temp_result, &result, &result, &ctx->n, &curve_a, ctx);
-//             copy_point(&result, &temp_result);
-//         }
-
-//         // Add current point if the bit is set
-//         if (bits[i]) {
-//             if (point_is_at_infinity(&result)) {
-//                 copy_point(&result, &current);
-//             } else {
-//                 EC_POINT_CUDA temp_result;
-//                 point_add_montgomery(&temp_result, &result, &current, &ctx->n, &curve_a, ctx);
-//                 copy_point(&result, &temp_result);
-//             }
-//         }
-//     }
-
-//     // Convert result back from Montgomery form
-//     point_from_montgomery(final_result, &result, ctx);
-//     if (debug) {
-//         bn_print_no_fuse("<< final_result.x: ", &final_result->x);
-//         bn_print_no_fuse("<< final_result.y: ", &final_result->y);
-//         printf("-- ec_point_scalar_mul_montgomery --\n");
-//     }
-// }
-
-// __device__ void ec_point_scalar_mul_montgomery_x(
-//     EC_POINT_CUDA *point, 
-//     BIGNUM_CUDA *scalar,
-//     const MONT_CTX_CUDA *ctx,
-//     EC_POINT_CUDA *final_result
-//     ) {
-//     bool debug = true;
-//     if (debug) {
-//         printf("++ ec_point_scalar_mul_montgomery ++\n");
-//         bn_print_no_fuse(">> scalar: ", scalar);
-//         bn_print_no_fuse(">> point.x: ", &point->x);
-//         bn_print_no_fuse(">> point.y: ", &point->y);
-//         bn_print_no_fuse(">> ctx->R: ", &ctx->R);
-//         bn_print_no_fuse(">> ctx->n: ", &ctx->n);
-//         bn_print_no_fuse(">> ctx->n_prime: ", &ctx->n_prime);
-//         bn_print_no_fuse(">> ctx->R2: ", &ctx->R2);
-//         bn_print_no_fuse(">> ctx->one: ", &ctx->one);
-//     }
-//     EC_POINT_CUDA result;
-//     init_point_at_infinity(&result);
-    
-//     // Convert input point to Montgomery form
-//     EC_POINT_CUDA current;
-//     point_to_montgomery(&current, point, ctx);
-
-//     // Convert bits of scalar to array
-//     unsigned int bits[256];
-//     bignum_to_bit_array(scalar, bits);
-
-//     BIGNUM_CUDA curve_a;
-//     init_zero(&curve_a); // Assuming curve_a is zero for the curve used
-
-//     // Double-and-add algorithm using Montgomery arithmetic
-//     for (int i = 255; i >= 0; i--) {
-//         if (!point_is_at_infinity(&result)) {
-//             EC_POINT_CUDA temp_result;
-//             point_add_montgomery(&temp_result, &result, &result, &ctx->n, &curve_a, ctx);
-//             copy_point(&result, &temp_result);
-//         }
-
-//         if (bits[i]) {
-//             if (point_is_at_infinity(&result)) {
-//                 copy_point(&result, &current);
-//             } else {
-//                 EC_POINT_CUDA temp_result;
-//                 point_add_montgomery(&temp_result, &result, &current, &ctx->n, &curve_a, ctx);
-//                 copy_point(&result, &temp_result);
-//             }
-//         }
-//     }
-
-//     // Convert result back from Montgomery form
-//     point_from_montgomery(final_result, &result, ctx);
-//     if (debug) {
-//         bn_print_no_fuse("<< final_result.x: ", &final_result->x);
-//         bn_print_no_fuse("<< final_result.y: ", &final_result->y);
-//         printf("-- ec_point_scalar_mul_montgomery --\n");
-//     }
-// }
-
-// __device__ void bn_mod_lshift1_quick(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNUM_CUDA *m) {
-//     bool debug = false;
-//     if (debug) {
-//         printf("++ bn_mod_lshift1_quick ++\n");
-//         bn_print_no_fuse(">> r: ", r);
-//         bn_print_no_fuse(">> a: ", a);
-//         bn_print_no_fuse(">> m: ", m);
-//     }
-
-//     // First perform a regular shift by 1
-//     BN_ULONG carry = 0;
-//     init_zero(r);
-
-//     // Copy and shift left by 1 bit
-//     for (int i = 0; i < a->top; i++) {
-//         r->d[i] = (a->d[i] << 1) | carry;
-//         carry = (a->d[i] >> (BN_ULONG_NUM_BITS - 1));
-//     }
-
-//     // If there's a carry, add an extra word
-//     if (carry && a->top < MAX_BIGNUM_SIZE) {
-//         r->d[a->top] = carry;
-//         r->top = a->top + 1;
-//     } else {
-//         r->top = a->top;
-//     }
-
-//     r->neg = a->neg;
-
-//     // Update top to remove leading zeros
-//     r->top = find_top_optimized(r, r->top);
-
-//     // If the result is larger than the modulus, subtract the modulus
-//     if (bn_cmp(r, m) >= 0) {
-//         BIGNUM_CUDA tmp;
-//         init_zero(&tmp);
-//         bn_copy(&tmp, r);
-//         bn_mod(&tmp, &tmp, m);
-//         bn_copy(r, &tmp);
-//     }
-
-//     if (debug) {
-//         bn_print_no_fuse("<< r: ", r);
-//         printf("-- bn_mod_lshift1_quick --\n");
-//     }
-// }
-
 // Helper function to invert a point
 __device__ int EC_POINT_invert(EC_POINT_CUDA *r, const EC_POINT_CUDA *p, const BIGNUM_CUDA *field) {
     bn_copy(&r->x, &p->x);
@@ -1295,156 +933,19 @@ __device__ int EC_POINT_invert(EC_POINT_CUDA *r, const EC_POINT_CUDA *p, const B
     return 1;
 }
 
-// __device__ void bn_mod_add_quick(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, const BIGNUM_CUDA *m) {
-//     bn_add(r, a, b);
-//     if (bn_cmp(r, m) >= 0) {
-//         bn_sub(r, r, m);
-//     }
-// }
-
-// __device__ void bn_mod_lshift_quick(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, int shift, const BIGNUM_CUDA *m) {
-//     // Left shift 'a' by 'shift' bits modulo 'm', assuming that 'a' is already reduced modulo 'm'
-//     if (shift == 0) {
-//         bn_copy(r, a);
-//         return;
-//     }
-
-//     BIGNUM_CUDA tmp;
-//     init_zero(&tmp);
-//     bn_copy(&tmp, a);
-//     left_shift(&tmp, shift);
-
-//     // Now reduce modulo m
-//     if (bn_cmp(&tmp, m) >= 0) {
-//         bn_mod(r, &tmp, m);
-//     } else {
-//         bn_copy(r, &tmp);
-//     }
-// }
-
-// __device__ void bn_mod_sub_quick(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, const BIGNUM_CUDA *m) {
-//     // Compute r = (a - b) mod m, assuming a and b are both less than m
-//     bn_sub(r, a, b);
-//     if (r->neg) {
-//         // If the result is negative, add modulus to make it positive
-//         bn_add(r, r, m);
-//         r->neg = 0;
-//     }
-// }
-
-// __device__ int ec_point_cuda_ladder_step(
-//     const EC_POINT_CUDA *p,     // Base point (affine coordinates, z = 1)
-//     EC_POINT_CUDA *r,           // First point (projective coordinates, x and z)
-//     EC_POINT_CUDA *s,           // Second point (projective coordinates, x and z)
-//     const BIGNUM_CUDA *field,   // Field modulus
-//     const BIGNUM_CUDA *curve_a, // Curve parameter a
-//     const BIGNUM_CUDA *curve_b  // Curve parameter b
-// ) {
-//     // Temporary variables
-//     BIGNUM_CUDA t0, t1, t2, t3, t4, t5, t6;
-//     init_zero(&t0); init_zero(&t1); init_zero(&t2);
-//     init_zero(&t3); init_zero(&t4); init_zero(&t5); init_zero(&t6);
-
-//     // Compute t6 = X_r * X_s
-//     bn_mod_mul(&t6, &r->x, &s->x, field);
-
-//     // Compute t0 = Z_r * Z_s
-//     bn_mod_mul(&t0, &r->z, &s->z, field);
-
-//     // Compute t4 = X_r * Z_s
-//     bn_mod_mul(&t4, &r->x, &s->z, field);
-
-//     // Compute t3 = Z_r * X_s
-//     bn_mod_mul(&t3, &r->z, &s->x, field);
-
-//     // Compute t5 = t6 + a * t0 (since a = 0, t5 = t6)
-//     bn_copy(&t5, &t6);
-
-//     // Compute t6 = t3 + t4
-//     bn_mod_add_quick(&t6, &t3, &t4, field);
-
-//     // Compute t5 = t6 * t5
-//     bn_mod_mul(&t5, &t6, &t5, field);
-
-//     // Compute t0 = t0^2
-//     bn_mod_sqr(&t0, &t0, field);
-
-//     // Compute t2 = 2b
-//     bn_mod_lshift_quick(&t2, curve_b, 2, field);
-
-//     // Update t0 = t2 * t0
-//     bn_mod_mul(&t0, &t2, &t0, field);
-
-//     // Prepare t5 = 2 * t5
-//     bn_mod_lshift1_quick(&t5, &t5, field);
-
-//     // Compute t3 = t4 - t3
-//     bn_mod_sub_quick(&t3, &t4, &t3, field);
-
-//     // Update s->z = t3^2
-//     bn_mod_sqr(&s->z, &t3, field);
-
-//     // Compute t4 = s->z * p->x
-//     bn_mod_mul(&t4, &s->z, &p->x, field);
-
-//     // Update t0 = t0 + t5
-//     bn_mod_add_quick(&t0, &t0, &t5, field);
-
-//     // Update s->x = t0 - t4
-//     bn_mod_sub_quick(&s->x, &t0, &t4, field);
-
-//     // Compute t4 = r->x^2
-//     bn_mod_sqr(&t4, &r->x, field);
-
-//     // Compute t5 = r->z^2
-//     bn_mod_sqr(&t5, &r->z, field);
-
-//     // Compute t6 = a * t5 (since a = 0, t6 = 0)
-//     init_zero(&t6);
-
-//     // Compute t1 = (r->x + r->z)^2 - t4 - t5
-//     bn_mod_add_quick(&t1, &r->x, &r->z, field);
-//     bn_mod_sqr(&t1, &t1, field);
-//     bn_mod_sub_quick(&t1, &t1, &t4, field);
-//     bn_mod_sub_quick(&t1, &t1, &t5, field);
-
-//     // Compute t3 = (t4 - t6)^2 (since t6 = 0, t3 = t4^2)
-//     bn_mod_sqr(&t3, &t4, field);
-
-//     // Compute t0 = t2 * t5 * t1
-//     bn_mod_mul(&t0, &t5, &t1, field);
-//     bn_mod_mul(&t0, &t2, &t0, field);
-
-//     // Update r->x = t3 - t0
-//     bn_mod_sub_quick(&r->x, &t3, &t0, field);
-
-//     // Compute t3 = t4 + t6 (since t6 = 0, t3 = t4)
-//     bn_copy(&t3, &t4);
-
-//     // Compute t4 = t2 * t5^2
-//     bn_mod_sqr(&t4, &t5, field);
-//     bn_mod_mul(&t4, &t4, &t2, field);
-
-//     // Compute t1 = 2 * t1 * t3
-//     bn_mod_mul(&t1, &t1, &t3, field);
-//     bn_mod_lshift1_quick(&t1, &t1, field);
-
-//     // Update r->z = t4 + t1
-//     bn_mod_add_quick(&r->z, &t4, &t1, field);
-
-//     return 1;
-// }
-
-// // Structure for projective coordinates
-// struct EC_POINT_PROJECTIVE {
-//     BIGNUM_CUDA X;  // X-coordinate 
-//     BIGNUM_CUDA Y;  // Y-coordinate
-//     BIGNUM_CUDA Z;  // Z-coordinate is homogeneous coordinate
-// };
-
 __device__ void bn_mod_sqr_montgomery(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, BIGNUM_CUDA *n) {
     // Compute r = a^2 mod n using Montgomery multiplication
     bn_mod_mul_montgomery(r, a, a, n);
+}
+
+__device__ bool ossl_bn_mod_sqr_montgomery(
+    BIGNUM_CUDA *r,           // OpenSSL: result
+    const BIGNUM_CUDA *a,     // OpenSSL: input to square
+    const BIGNUM_CUDA *n      // OpenSSL: modulus from group->field
+) {
+    // Call CUDA's bn_mod_sqr_montgomery with reordered parameters
+    bn_mod_mul_montgomery(a, a, n, r);
+    return true;  // Return true for success to match OpenSSL's behavior
 }
 
 __device__ void bn_mod_lshift1(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNUM_CUDA *n) {
@@ -1460,124 +961,12 @@ __device__ void bn_mod_lshift1(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNU
     bn_mod(r, &temp, n);
 }
 
-// __device__ int ec_point_cuda_ladder_step(
-//     EC_POINT_CUDA *r,
-//     EC_POINT_CUDA *s,
-//     const EC_POINT_CUDA *p,
-//     BIGNUM_CUDA *curve_prime,
-//     const BIGNUM_CUDA *curve_a,
-//     const BIGNUM_CUDA *curve_b
-// ) {
-//     // Initialize temporary variables
-//     BIGNUM_CUDA t0, t1, t2, t3, t4, t5, t6;
-//     init_zero(&t0);
-//     init_zero(&t1);
-//     init_zero(&t2);
-//     init_zero(&t3);
-//     init_zero(&t4);
-//     init_zero(&t5);
-//     init_zero(&t6);
 
-//     // Step 1: t6 = X_r * X_s mod p
-//     bn_mod_mul_montgomery(&t6, &r->x, &s->x, curve_prime);
-
-//     // t0 = Z_r * Z_s mod p
-//     bn_mod_mul_montgomery(&t0, &r->z, &s->z, curve_prime);
-
-//     // t4 = X_r * Z_s mod p
-//     bn_mod_mul_montgomery(&t4, &r->x, &s->z, curve_prime);
-
-//     // t3 = Z_r * X_s mod p
-//     bn_mod_mul_montgomery(&t3, &r->z, &s->x, curve_prime);
-
-//     // Step 2: t5 = t6 + a * t0 mod p
-//     // First compute a * t0 mod p
-//     bn_mod_mul_montgomery(&t5, curve_a, &t0, curve_prime);
-
-//     // Then t5 = t6 + t5 mod p
-//     bn_mod_add(&t5, &t6, &t5, curve_prime);
-
-//     // Step 3: t6 = t3 + t4 mod p
-//     bn_mod_add(&t6, &t3, &t4, curve_prime);
-
-//     // Step 4: t5 = t6 * t5 mod p
-//     bn_mod_mul_montgomery(&t5, &t6, &t5, curve_prime);
-
-//     // Step 5: t0 = t0^2 mod p
-//     bn_mod_sqr_montgomery(&t0, &t0, curve_prime);
-
-//     // Step 6: t2 = 2 * b mod p
-//     bn_mod_lshift1(&t2, curve_b, curve_prime);
-
-//     // Step 7: t0 = t2 * t0 mod p
-//     bn_mod_mul_montgomery(&t0, &t2, &t0, curve_prime);
-
-//     // Step 8: t5 = 2 * t5 mod p
-//     bn_mod_lshift1(&t5, &t5, curve_prime);
-
-//     // Step 9: t3 = t4 - t3 mod p
-//     bn_mod_sub(&t3, &t4, &t3, curve_prime);
-
-//     // Step 10: Z_s = t3^2 mod p
-//     bn_mod_sqr_montgomery(&s->z, &t3, curve_prime);
-
-//     // Step 11: t4 = Z_s * X_p mod p
-//     bn_mod_mul_montgomery(&t4, &s->z, &p->x, curve_prime);
-
-//     // Step 12: t0 = t0 + t5 mod p
-//     bn_mod_add(&t0, &t0, &t5, curve_prime);
-
-//     // Step 13: X_s = t0 - t4 mod p
-//     bn_mod_sub(&s->x, &t0, &t4, curve_prime);
-
-//     // Step 14: t4 = X_r^2 mod p
-//     bn_mod_sqr_montgomery(&t4, &r->x, curve_prime);
-
-//     // Step 15: t5 = Z_r^2 mod p
-//     bn_mod_sqr_montgomery(&t5, &r->z, curve_prime);
-
-//     // Step 16: t6 = a * t5 mod p
-//     bn_mod_mul_montgomery(&t6, curve_a, &t5, curve_prime);
-
-//     // Step 17: t1 = (X_r + Z_r)^2 - t4 - t5 mod p
-//     bn_mod_add(&t1, &r->x, &r->z, curve_prime);
-//     bn_mod_sqr_montgomery(&t1, &t1, curve_prime);
-//     bn_mod_sub(&t1, &t1, &t4, curve_prime);
-//     bn_mod_sub(&t1, &t1, &t5, curve_prime);
-
-//     // Step 18: t3 = (t4 - t6)^2 mod p
-//     bn_mod_sub(&t3, &t4, &t6, curve_prime);
-//     bn_mod_sqr_montgomery(&t3, &t3, curve_prime);
-
-//     // Step 19: t0 = t2 * t5 * t1 mod p
-//     bn_mod_mul_montgomery(&t0, &t5, &t1, curve_prime);
-//     bn_mod_mul_montgomery(&t0, &t0, &t2, curve_prime);
-
-//     // Step 20: X_r = t3 - t0 mod p
-//     bn_mod_sub(&r->x, &t3, &t0, curve_prime);
-
-//     // Step 21: t3 = t4 + t6 mod p
-//     bn_mod_add(&t3, &t4, &t6, curve_prime);
-
-//     // Step 22: t4 = t2 * t5^2 mod p
-//     bn_mod_sqr_montgomery(&t4, &t5, curve_prime);
-//     bn_mod_mul_montgomery(&t4, &t4, &t2, curve_prime);
-
-//     // Step 23: t1 = 2 * t1 * t3 mod p
-//     bn_mod_mul_montgomery(&t1, &t1, &t3, curve_prime);
-//     bn_mod_lshift1(&t1, &t1, curve_prime);
-
-//     // Step 24: Z_r = t4 + t1 mod p
-//     bn_mod_add(&r->z, &t4, &t1, curve_prime);
-
-//     // Y coordinates are not used in this ladder step
-//     // Depending on your implementation, you may need to update them appropriately
-//     // For now, we can set them to zero or leave them unchanged
-
-//     return 1; // Success
-// }
 
 __device__ int ossl_ec_GFp_mont_field_inv(const BIGNUM_CUDA *a, BIGNUM_CUDA *result, const BIGNUM_CUDA *p) {    
+    printf("++ ossl_ec_GFp_mont_field_inv ++\n");
+    bn_print_no_fuse(">> a: ", a);
+    bn_print_no_fuse(">> p: ", p);
     // Check for invalid input
     if (bn_is_zero(a)) {
         return 0; // Cannot invert zero
@@ -1626,4 +1015,137 @@ __device__ int ossl_ec_GFp_mont_field_inv(const BIGNUM_CUDA *a, BIGNUM_CUDA *res
     }
 
     return 1;
+}
+
+// TODO: Test this function
+__device__ int bn_mod_lshift_quick(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, int n, const BIGNUM_CUDA *m) {
+    // Left shift 'a' by 'n' bits modulo 'm', assuming that 'a' is non-negative and less than 'm'
+
+    // Copy 'a' to 'r' if they are not the same
+    // if (r != a) {
+    if (bn_cmp(r, a) != 0) {
+        bn_copy(r, a);
+    }
+
+    while (n > 0) {
+        int max_shift;
+
+        // Calculate the number of bits in 'm' and 'r'
+        int bits_m = bn_bit_length(m);
+        int bits_r = bn_bit_length(r);
+
+        // Calculate maximum shift without exceeding modulus bit length
+        max_shift = bits_m - bits_r;
+
+        if (max_shift < 0) {
+            // Error: Input not reduced (r >= m)
+            printf("Error: Input not reduced\n");
+            return 0;
+        }
+
+        // Limit max_shift to the remaining bits to shift
+        if (max_shift > n)
+            max_shift = n;
+
+        if (max_shift > 0) {
+            // Shift 'r' left by max_shift bits
+            left_shift(r, max_shift);
+            n -= max_shift;
+        } else {
+            // Shift 'r' left by 1 bit
+            if (!bn_lshift1(r, r)) {
+                return 0;
+            }
+            n -= 1;
+        }
+
+        // Reduce modulo 'm' if necessary
+        if (bn_cmp(r, m) >= 0) {
+            if (!bn_sub(r, r, m)) {
+                return 0;
+            }
+        }
+    }
+
+    return 1;
+}
+
+typedef struct ec_group_st_cuda {
+    BIGNUM_CUDA field;  // Prime field modulus p
+    BIGNUM_CUDA a;      // Curve parameter a
+    BIGNUM_CUDA b;      // Curve parameter b
+    BIGNUM_CUDA order;  // Order of the base point
+} EC_GROUP_CUDA;
+
+__device__ int ossl_ec_GFp_mont_field_mul(const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, BIGNUM_CUDA *r, BIGNUM_CUDA *p) {
+    bn_mod_mul_montgomery(r, a, b, p);
+    return 1;
+}
+
+__device__ int ec_point_ladder_step(
+    const EC_GROUP_CUDA *group,
+    EC_POINT_CUDA *r, 
+    EC_POINT_CUDA *s,
+    EC_POINT_CUDA *p
+) {
+    BIGNUM_CUDA t0, t1, t2, t3, t4, t5, t6;
+    
+    // Initialize all temporary variables
+    init_zero(&t0);
+    init_zero(&t1);
+    init_zero(&t2);
+    init_zero(&t3);
+    init_zero(&t4);
+    init_zero(&t5);
+    init_zero(&t6);
+
+    // Follow OpenSSL's OR logic order
+    int ret = (
+        // Initial steps
+        ossl_bn_mod_mul_montgomery(&t6, &r->x, &s->x, &group->field) &&
+        ossl_bn_mod_mul_montgomery(&t0, &r->y, &s->y, &group->field) &&
+        ossl_bn_mod_mul_montgomery(&t4, &r->x, &s->y, &group->field) &&
+        ossl_bn_mod_mul_montgomery(&t3, &r->y, &s->x, &group->field) &&
+        ossl_bn_mod_mul_montgomery(&t5, &group->a, &t0, &group->field) &&
+        bn_mod_add_quick(&t5, &t6, &t5, &group->field) &&
+        bn_mod_add_quick(&t6, &t3, &t4, &group->field) &&
+        ossl_bn_mod_mul_montgomery(&t5, &t6, &t5, &group->field) &&
+        ossl_bn_mod_sqr_montgomery(&t0, &t0, &group->field) &&
+        bn_mod_lshift_quick(&t2, &group->b, 2, &group->field) &&
+        ossl_bn_mod_mul_montgomery(&t0, &t2, &t0, &group->field) &&
+        bn_mod_lshift1_quick(&t5, &t5, &group->field) &&
+        bn_mod_sub_quick(&t3, &t4, &t3, &group->field) &&
+
+        // s->Z coord output
+        ossl_bn_mod_sqr_montgomery(&s->y, &t3, &group->field) &&
+        ossl_bn_mod_mul_montgomery(&t4, &s->y, &p->x, &group->field) &&
+        bn_mod_add_quick(&t0, &t0, &t5, &group->field) &&
+
+        // s->X coord output
+        bn_mod_sub_quick(&s->x, &t0, &t4, &group->field) &&
+        ossl_bn_mod_sqr_montgomery(&t4, &r->x, &group->field) &&
+        ossl_bn_mod_sqr_montgomery(&t5, &r->y, &group->field) &&
+        ossl_bn_mod_mul_montgomery(&t6, &t5, &group->a, &group->field) &&
+        bn_mod_add_quick(&t1, &r->x, &r->y, &group->field) &&
+        ossl_bn_mod_sqr_montgomery(&t1, &t1, &group->field) &&
+        bn_mod_sub_quick(&t1, &t1, &t4, &group->field) &&
+        bn_mod_sub_quick(&t1, &t1, &t5, &group->field) &&
+        bn_mod_sub_quick(&t3, &t4, &t6, &group->field) &&
+        ossl_bn_mod_sqr_montgomery(&t3, &t3, &group->field) &&
+        ossl_bn_mod_mul_montgomery(&t0, &t5, &t1, &group->field) &&
+        ossl_bn_mod_mul_montgomery(&t0, &t2, &t0, &group->field) &&
+
+        // r->X coord output 
+        bn_mod_sub_quick(&r->x, &t3, &t0, &group->field) &&
+        bn_mod_add_quick(&t3, &t4, &t6, &group->field) &&
+        ossl_bn_mod_sqr_montgomery(&t4, &t5, &group->field) &&
+        ossl_bn_mod_mul_montgomery(&t4, &t4, &t2, &group->field) &&
+        ossl_bn_mod_mul_montgomery(&t1, &t1, &t3, &group->field) &&
+        bn_mod_lshift1_quick(&t1, &t1, &group->field) &&
+
+        // r->Z coord output
+        bn_mod_add_quick(&r->y, &t4, &t1, &group->field)
+    );
+
+    return ret;
 }

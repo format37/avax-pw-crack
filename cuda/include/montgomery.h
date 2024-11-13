@@ -174,6 +174,17 @@ __device__ void bn_mod_mul_montgomery(
     ;
 }
 
+__device__ bool ossl_bn_mod_mul_montgomery(
+    BIGNUM_CUDA *result,           // OpenSSL: r
+    const BIGNUM_CUDA *a,          // OpenSSL: a
+    const BIGNUM_CUDA *b,          // OpenSSL: b
+    const BIGNUM_CUDA *n           // OpenSSL: mont->N
+) {
+    // Call CUDA's bn_mod_mul_montgomery with reordered parameters
+    bn_mod_mul_montgomery(a, b, n, result);
+    return true;  // Since CUDA version returns void, we return true for success
+}
+
 __device__ void bn_mod_mul_montgomery_proto(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, const BIGNUM_CUDA *m, const BN_MONT_CTX_CUDA *mont) {
     bool debug = true;
 
@@ -238,6 +249,38 @@ __device__ void bn_mod_mul_montgomery_proto(BIGNUM_CUDA *r, const BIGNUM_CUDA *a
 
 __device__ void bn_to_montgomery(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BN_MONT_CTX_CUDA *mont, const BIGNUM_CUDA *m) {
     bn_mod_mul_montgomery_proto(r, a, &mont->R2, m, mont);
+}
+
+__device__ void BN_from_montgomery_CUDA(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, BN_MONT_CTX_CUDA *mont) {
+    // Montgomery reduction: computes r = a * R^{-1} mod n
+    BIGNUM_CUDA t;
+    init_zero(&t);
+    bn_copy(&t, a);
+
+    // m = (t * mont->n_prime) mod mont->R
+    BIGNUM_CUDA m;
+    init_zero(&m);
+    bn_mod_mul(&m, &t, &mont->n_prime, &mont->R);
+
+    // u = (t + m * mont->n) / mont->R
+    BIGNUM_CUDA mn_product;
+    init_zero(&mn_product);
+    bn_mul(&m, &mont->n, &mn_product);  // m * n
+
+    BIGNUM_CUDA t_plus_mn;
+    init_zero(&t_plus_mn);
+    bn_add(&t_plus_mn, &t, &mn_product);  // t + m*n
+
+    BIGNUM_CUDA u;
+    init_zero(&u);
+    bn_div(&u, NULL, &t_plus_mn, &mont->R); // u = (t + m * n) / R
+
+    // If u >= n, subtract n
+    if (bn_cmp(&u, &mont->n) >= 0) {
+        bn_sub(&u, &u, &mont->n);
+    }
+
+    bn_copy(r, &u);
 }
 
 // Function to count the number of bits in a BN_ULONG
