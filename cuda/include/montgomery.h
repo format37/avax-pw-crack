@@ -2,6 +2,10 @@
 // #include "point.h"
 
 #define TABLE_SIZE 32 // Maximum precomputation table size for sliding windows
+#define N0_VALUE 0xd838091dd2253531ULL
+// #define BN_MASK2        (BN_MASK >> BN_BITS4) // Lower half bits set
+#define BN_MASK2 0xFFFFFFFFFFFFFFFFULL
+
 
 // Structure to store Montgomery context
 typedef struct {
@@ -11,8 +15,160 @@ typedef struct {
     BIGNUM_CUDA R2;      // R^2 mod n (used for Montgomery reduction)
 } BN_MONT_CTX_CUDA;
 
-// Montgomery multiplication
+__device__ void bn_rshift(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, int shift) {
+    if (shift == 0) {
+        bn_copy(r, a);
+        return;
+    }
+    int word_shift = shift / BN_ULONG_NUM_BITS;
+    int bit_shift = shift % BN_ULONG_NUM_BITS;
+    for (int i = 0; i < a->top - word_shift; i++) {
+        BN_ULONG hi = a->d[i + word_shift];
+        BN_ULONG lo = (i + word_shift + 1 < a->top) ? a->d[i + word_shift + 1] : 0;
+        r->d[i] = (hi >> bit_shift) | (lo << (BN_ULONG_NUM_BITS - bit_shift));
+    }
+    r->top = a->top - word_shift;
+    while (r->top > 0 && r->d[r->top - 1] == 0)
+        r->top--;
+}
+
+__device__ void bn_mask_bits(BIGNUM_CUDA *r, int bits) {
+    int word_index = bits / BN_ULONG_NUM_BITS;
+    int bit_index = bits % BN_ULONG_NUM_BITS;
+    if (word_index >= r->top)
+        return;
+    if (bit_index == 0) {
+        r->top = word_index;
+    } else {
+        r->top = word_index + 1;
+        BN_ULONG mask = (1UL << bit_index) - 1;
+        r->d[word_index] &= mask;
+    }
+    while (r->top > 0 && r->d[r->top - 1] == 0)
+        r->top--;
+}
+
+__device__ BN_ULONG compute_n0(const BIGNUM_CUDA *n) {
+    BN_ULONG n_mod = n->d[0]; // n mod 2^64
+    BN_ULONG n0 = 1;
+
+    // Newton-Raphson iteration to compute inverse modulo 2^64
+    for (int i = 0; i < 6; i++) {
+        n0 = n0 * (2 - n_mod * n0);
+    }
+
+    // Negate n0 to get -n^{-1} mod 2^64
+    n0 = (BN_ULONG)(0 - n0);
+
+    return n0;
+}
+
+// Multiply a BIGNUM_CUDA by a BN_ULONG word
+__device__ void bn_mul_word(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, BN_ULONG w) {
+    BN_ULONG carry = 0;
+    for (int i = 0; i < a->top; i++) {
+        unsigned __int128 prod = (unsigned __int128)a->d[i] * w + carry;
+        r->d[i] = (BN_ULONG)prod;
+        carry = (BN_ULONG)(prod >> 64);
+    }
+    r->d[a->top] = carry;
+    r->top = a->top + (carry ? 1 : 0);
+}
+
+// Right shift a BIGNUM_CUDA by a number of words
+__device__ void bn_rshift_words(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, int words) {
+    if (words >= a->top) {
+        init_zero(r);
+        return;
+    }
+    for (int i = 0; i < a->top - words; i++) {
+        r->d[i] = a->d[i + words];
+    }
+    r->top = a->top - words;
+}
+
+__device__ BN_ULONG bn_mul_add_words(BN_ULONG *rp, const BN_ULONG *ap, int num, BN_ULONG w) {
+    BN_ULONG carry = 0;
+    for (int i = 0; i < num; i++) {
+        unsigned __int128 mul = (unsigned __int128)ap[i] * w;
+        mul += carry;
+        mul += rp[i];
+        rp[i] = (BN_ULONG)mul;
+        carry = (BN_ULONG)(mul >> 64);
+    }
+    return carry;
+}
+
+__device__ BN_ULONG bn_sub_words(BN_ULONG *r, const BN_ULONG *a, const BN_ULONG *b, int n) {
+    BN_ULONG borrow = 0;
+    for (int i = 0; i < n; i++) {
+        BN_ULONG temp = a[i] - b[i] - borrow;
+        borrow = (a[i] < b[i] + borrow) || (borrow && a[i] == b[i]);
+        r[i] = temp;
+    }
+    return borrow;
+}
+
 __device__ void bn_mod_mul_montgomery(
+    const BIGNUM_CUDA *a, 
+    const BIGNUM_CUDA *b,
+    const BIGNUM_CUDA *n,
+    BIGNUM_CUDA *ret
+) {
+    // First do standard multiplication
+    BIGNUM_CUDA r;
+    init_zero(&r);
+    bn_mul(a, b, &r);
+    
+    int nl = n->top;
+    int max = 2 * nl;
+
+    // Ensure r has enough space
+    BIGNUM_CUDA t;
+    init_zero(&t);
+    for (int i = 0; i < max; i++) {
+        t.d[i] = (i < r.top) ? r.d[i] : 0;
+    }
+    t.top = max;
+    
+    // Montgomery reduction
+    BN_ULONG n0 = N0_VALUE;
+    BN_ULONG carry = 0;
+    
+    for (int i = 0; i < nl; i++) {
+        BN_ULONG v;
+        // Calculate m = (r[i] * n0) mod word_size
+        BN_ULONG m = (t.d[i] * n0) & BN_MASK2;
+        // r[i:i+nl] += m * n
+        v = bn_mul_add_words(&t.d[i], n->d, nl, m);
+        v = (v + carry + t.d[i + nl]) & BN_MASK2;
+        carry |= (v != t.d[i + nl]);
+        carry &= (v <= t.d[i + nl]);
+        t.d[i + nl] = v;
+    }
+
+    // Ensure ret has enough space
+    init_zero(ret);
+    
+    // Final subtraction
+    BIGNUM_CUDA tmp;
+    init_zero(&tmp);
+    
+    // Copy higher words
+    for (int i = 0; i < nl; i++) {
+        tmp.d[i] = t.d[i + nl];
+    }
+    tmp.top = nl;
+    
+    // Subtract if necessary
+    if (carry || bn_cmp(&tmp, n) >= 0) {
+        bn_sub(&tmp, &tmp, n);
+    }
+    
+    bn_copy(ret, &tmp);
+}
+
+__device__ void bn_mod_mul_montgomery_x(
     const BIGNUM_CUDA *a, 
     const BIGNUM_CUDA *b, 
     const BIGNUM_CUDA *n, 
@@ -23,11 +179,12 @@ __device__ void bn_mod_mul_montgomery(
         printf("++ bn_mod_mul_montgomery ++\n");
         bn_print_no_fuse(">> a: ", a);
         bn_print_no_fuse(">> b: ", b);
-        // bn_print_no_fuse(">> n: ", n);
+        bn_print_no_fuse(">> n: ", n);
     }
     printf("++ bn_mod_mul_montgomery ++\n");
     bn_print_no_fuse(">> a: ", a);
     bn_print_no_fuse(">> b: ", b);
+    bn_print_no_fuse(">> n: ", n);
     // BIGNUM_CUDA debug_bignum;
     // init_zero(&debug_bignum);
     // bn_copy(result_of_multiplication, &debug_bignum); // TODO: remove this line OK
@@ -104,7 +261,9 @@ __device__ void bn_mod_mul_montgomery(
     // bn_copy(result_of_multiplication, &debug_bignum); // TODO: remove this line OK
     
     // Calculate m = (t * n_prime) % R
-    bn_mod_mul(&m, &t, &n_prime, &R);
+    // bn_mod_mul(&m, &t, &n_prime, &R);
+    bn_mul(&t, &n_prime, &m);
+    bn_mask_bits(&m, k);  // k is the bit length of R
 
     // BIGNUM_CUDA debug_bignum;
     // init_zero(&debug_bignum);
@@ -127,10 +286,15 @@ __device__ void bn_mod_mul_montgomery(
 
     // Divide by R (equivalent to right shift by k bits)
     BIGNUM_CUDA u, tmp;
-    init_zero(&u);
-    init_zero(&tmp);
-    // bn_div(quotient, remainder, dividend, divisor)
-    bn_div(&u, &tmp, &t_plus_mn, &R); // (t + m*n) / R
+    // init_zero(&u);
+    // init_zero(&tmp);
+    // // bn_div(quotient, remainder, dividend, divisor)
+    // bn_div(&u, &tmp, &t_plus_mn, &R); // (t + m*n) / R
+
+    // Compute u = (t + m * n) / R
+    bn_mul(&m, n, &mn_product);
+    bn_add(&t_plus_mn, &t, &mn_product);
+    bn_rshift(&u, &t_plus_mn, k);
 
     // Final reduction step: if u ≥ n, subtract n
     if (bn_cmp(&u, n) >= 0) {
@@ -187,6 +351,7 @@ __device__ bool ossl_bn_mod_mul_montgomery(
 ) {
     bn_print_no_fuse("\nbn_mod_mul_montgomery >> a: ", a);
     bn_print_no_fuse("bn_mod_mul_montgomery >> b: ", b);
+    bn_print_no_fuse("bn_mod_mul_montgomery >> n: ", n);
     // Call CUDA's bn_mod_mul_montgomery with reordered parameters
     bn_mod_mul_montgomery(a, b, n, result);
     bn_print_no_fuse("bn_mod_mul_montgomery << result: ", result);

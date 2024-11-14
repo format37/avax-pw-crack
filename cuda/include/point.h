@@ -556,8 +556,6 @@ __device__ EC_POINT_CUDA ec_point_scalar_mul(
     return result;
 }
 
-// #define BN_MASK2        (BN_MASK >> BN_BITS4) // Lower half bits set
-
 // Set bit n in a BIGNUM_CUDA
 __device__ int bn_set_bit(BIGNUM_CUDA *a, int n) {
     int word_index = n / BN_BITS2;

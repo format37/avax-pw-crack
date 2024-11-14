@@ -62,15 +62,6 @@ int main() {
         goto cleanup;
     }
 
-    // // Print the result
-    // char *r_str = BN_bn2hex(r);
-    // if (r_str == NULL) {
-    //     fprintf(stderr, "Failed to convert result to hex string\n");
-    //     goto cleanup;
-    // }
-    // printf("Result r = (a * b) mod N:\n%s\n", r_str);
-    // OPENSSL_free(r_str);
-
 cleanup:
     // Free allocated resources
     BN_free(a);
