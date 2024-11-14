@@ -1608,6 +1608,8 @@ __device__ bool BN_is_bit_set(const BIGNUM_CUDA *a, int n) {
 }
 
 __device__ bool bn_mod_add_quick(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, const BIGNUM_CUDA *m) {
+    bn_print_no_fuse("bn_mod_add_quick >> a: ", a);
+    bn_print_no_fuse("bn_mod_add_quick >> b: ", b);
     // Return false if either input is negative or >= m
     if (a->neg || b->neg || bn_cmp(a, m) >= 0 || bn_cmp(b, m) >= 0) {
         return false;
@@ -1627,6 +1629,7 @@ __device__ bool bn_mod_add_quick(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIG
     }
 
     r->neg = 0;  // Result is always non-negative
+    bn_print_no_fuse("bn_mod_add_quick << r: ", r);
     return true;
 }
 

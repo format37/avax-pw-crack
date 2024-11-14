@@ -163,12 +163,13 @@ __device__ void bn_mod_mul_montgomery(
     // Subtract if necessary
     if (carry || bn_cmp(&tmp, n) >= 0) {
         bn_sub(&tmp, &tmp, n);
-    }
-    
+    }    
     bn_copy(ret, &tmp);
+    // Find top - can start search from n->top since result < n
+    ret->top = find_top_optimized(ret, n->top);    
 }
 
-__device__ void bn_mod_mul_montgomery_x(
+__device__ void bn_mod_mul_montgomery_deprecated(
     const BIGNUM_CUDA *a, 
     const BIGNUM_CUDA *b, 
     const BIGNUM_CUDA *n, 

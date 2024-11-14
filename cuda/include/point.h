@@ -941,8 +941,11 @@ __device__ bool ossl_bn_mod_sqr_montgomery(
     const BIGNUM_CUDA *a,     // OpenSSL: input to square
     const BIGNUM_CUDA *n      // OpenSSL: modulus from group->field
 ) {
+    bn_print_no_fuse("ossl_bn_mod_sqr_montgomery >> a: ", a);
+    bn_print_no_fuse("ossl_bn_mod_sqr_montgomery >> n: ", n);
     // Call CUDA's bn_mod_sqr_montgomery with reordered parameters
     bn_mod_mul_montgomery(a, a, n, r);
+    bn_print_no_fuse("ossl_bn_mod_sqr_montgomery << r: ", r);
     return true;  // Return true for success to match OpenSSL's behavior
 }
 
@@ -1106,16 +1109,28 @@ __device__ int ec_point_ladder_step(
     print_jacobian_point(">> r", r);
     print_jacobian_point(">> s", s);
     printf("** field_mul **\n");
-    ossl_bn_mod_mul_montgomery(&t6, &r->X, &s->X, &group->field); // TODO: Remove
-    // exit(0); // TODO: Remove
+    // TODO: Remove ++
+    int ret = (
+    ossl_bn_mod_mul_montgomery(&t6, &r->X, &s->X, &group->field) &&
+    ossl_bn_mod_mul_montgomery(&t0, &r->Z, &s->Z, &group->field) &&
+    ossl_bn_mod_mul_montgomery(&t4, &r->X, &s->Z, &group->field) &&
+    ossl_bn_mod_mul_montgomery(&t3, &r->Z, &s->X, &group->field) &&
+    ossl_bn_mod_mul_montgomery(&t5, &group->a, &t0, &group->field) &&
+    bn_mod_add_quick(&t5, &t6, &t5, &group->field) &&
+    bn_mod_add_quick(&t6, &t3, &t4, &group->field) &&
+    ossl_bn_mod_mul_montgomery(&t5, &t6, &t5, &group->field) &&
+    ossl_bn_mod_sqr_montgomery(&t0, &t0, &group->field)
+    );
+    // exit(0);
+    // TODO: Remove --
 
     // // Follow OpenSSL's OR logic order
     // int ret = (
     //     // Initial steps
-    //     ossl_bn_mod_mul_montgomery(&t6, &r->x, &s->x, &group->field) &&
-    //     ossl_bn_mod_mul_montgomery(&t0, &r->y, &s->y, &group->field) &&
-    //     ossl_bn_mod_mul_montgomery(&t4, &r->x, &s->y, &group->field) &&
-    //     ossl_bn_mod_mul_montgomery(&t3, &r->y, &s->x, &group->field) &&
+    //     ossl_bn_mod_mul_montgomery(&t6, &r->X, &s->X, &group->field) &&
+    //     ossl_bn_mod_mul_montgomery(&t0, &r->Y, &s->Y, &group->field) &&
+    //     ossl_bn_mod_mul_montgomery(&t4, &r->X, &s->Y, &group->field) &&
+    //     ossl_bn_mod_mul_montgomery(&t3, &r->Y, &s->X, &group->field) &&
     //     ossl_bn_mod_mul_montgomery(&t5, &group->a, &t0, &group->field) &&
     //     bn_mod_add_quick(&t5, &t6, &t5, &group->field) &&
     //     bn_mod_add_quick(&t6, &t3, &t4, &group->field) &&
@@ -1127,16 +1142,16 @@ __device__ int ec_point_ladder_step(
     //     bn_mod_sub_quick(&t3, &t4, &t3, &group->field) &&
 
     //     // s->Z coord output
-    //     ossl_bn_mod_sqr_montgomery(&s->y, &t3, &group->field) &&
-    //     ossl_bn_mod_mul_montgomery(&t4, &s->y, &p->x, &group->field) &&
+    //     ossl_bn_mod_sqr_montgomery(&s->Y, &t3, &group->field) &&
+    //     ossl_bn_mod_mul_montgomery(&t4, &s->Y, &p->X, &group->field) &&
     //     bn_mod_add_quick(&t0, &t0, &t5, &group->field) &&
 
     //     // s->X coord output
-    //     bn_mod_sub_quick(&s->x, &t0, &t4, &group->field) &&
-    //     ossl_bn_mod_sqr_montgomery(&t4, &r->x, &group->field) &&
-    //     ossl_bn_mod_sqr_montgomery(&t5, &r->y, &group->field) &&
+    //     bn_mod_sub_quick(&s->X, &t0, &t4, &group->field) &&
+    //     ossl_bn_mod_sqr_montgomery(&t4, &r->X, &group->field) &&
+    //     ossl_bn_mod_sqr_montgomery(&t5, &r->Y, &group->field) &&
     //     ossl_bn_mod_mul_montgomery(&t6, &t5, &group->a, &group->field) &&
-    //     bn_mod_add_quick(&t1, &r->x, &r->y, &group->field) &&
+    //     bn_mod_add_quick(&t1, &r->X, &r->Y, &group->field) &&
     //     ossl_bn_mod_sqr_montgomery(&t1, &t1, &group->field) &&
     //     bn_mod_sub_quick(&t1, &t1, &t4, &group->field) &&
     //     bn_mod_sub_quick(&t1, &t1, &t5, &group->field) &&
@@ -1146,7 +1161,7 @@ __device__ int ec_point_ladder_step(
     //     ossl_bn_mod_mul_montgomery(&t0, &t2, &t0, &group->field) &&
 
     //     // r->X coord output 
-    //     bn_mod_sub_quick(&r->x, &t3, &t0, &group->field) &&
+    //     bn_mod_sub_quick(&r->X, &t3, &t0, &group->field) &&
     //     bn_mod_add_quick(&t3, &t4, &t6, &group->field) &&
     //     ossl_bn_mod_sqr_montgomery(&t4, &t5, &group->field) &&
     //     ossl_bn_mod_mul_montgomery(&t4, &t4, &t2, &group->field) &&
@@ -1154,7 +1169,7 @@ __device__ int ec_point_ladder_step(
     //     bn_mod_lshift1_quick(&t1, &t1, &group->field) &&
 
     //     // r->Z coord output
-    //     bn_mod_add_quick(&r->y, &t4, &t1, &group->field)
+    //     bn_mod_add_quick(&r->Y, &t4, &t1, &group->field)
     // );
 
     // return ret;
