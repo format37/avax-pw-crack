@@ -23,8 +23,11 @@ __device__ void bn_mod_mul_montgomery(
         printf("++ bn_mod_mul_montgomery ++\n");
         bn_print_no_fuse(">> a: ", a);
         bn_print_no_fuse(">> b: ", b);
-        bn_print_no_fuse(">> n: ", n);
+        // bn_print_no_fuse(">> n: ", n);
     }
+    printf("++ bn_mod_mul_montgomery ++\n");
+    bn_print_no_fuse(">> a: ", a);
+    bn_print_no_fuse(">> b: ", b);
     // BIGNUM_CUDA debug_bignum;
     // init_zero(&debug_bignum);
     // bn_copy(result_of_multiplication, &debug_bignum); // TODO: remove this line OK
@@ -165,6 +168,7 @@ __device__ void bn_mod_mul_montgomery(
         bn_copy(&u, &tmp);
     }    
     if (debug) bn_print_no_fuse("u (final result): ", &u);
+    bn_print_no_fuse("u (final result): ", &u);
     // Copy u to result
     // BIGNUM_CUDA tmp_result;
     // init_zero(&tmp_result);
@@ -179,14 +183,18 @@ __device__ bool ossl_bn_mod_mul_montgomery(
     const BIGNUM_CUDA *a,          // OpenSSL: a
     const BIGNUM_CUDA *b,          // OpenSSL: b
     const BIGNUM_CUDA *n           // OpenSSL: mont->N
+    
 ) {
+    bn_print_no_fuse("\nbn_mod_mul_montgomery >> a: ", a);
+    bn_print_no_fuse("bn_mod_mul_montgomery >> b: ", b);
     // Call CUDA's bn_mod_mul_montgomery with reordered parameters
     bn_mod_mul_montgomery(a, b, n, result);
+    bn_print_no_fuse("bn_mod_mul_montgomery << result: ", result);
     return true;  // Since CUDA version returns void, we return true for success
 }
 
 __device__ void bn_mod_mul_montgomery_proto(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, const BIGNUM_CUDA *m, const BN_MONT_CTX_CUDA *mont) {
-    bool debug = true;
+    bool debug = false;
 
     if (debug) {
         printf("++ bn_mod_mul_montgomery ++\n");

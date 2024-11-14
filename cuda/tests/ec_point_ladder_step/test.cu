@@ -5,12 +5,17 @@
 #include "point.h"
 
 __device__ void init_test_vectors(
-    EC_GROUP_CUDA *group,         // Curve parameters  
-    EC_POINT_CUDA *base_point,    // P in affine coordinates
-    EC_POINT_CUDA *r_point,       // R in projective coordinates 
-    EC_POINT_CUDA *s_point        // S in projective coordinates
+    EC_GROUP_CUDA *group,         // Curve parameters
+    EC_POINT_JACOBIAN *base_point,    // P in affine coordinates
+    EC_POINT_JACOBIAN *r_point,       // R in projective coordinates 
+    EC_POINT_JACOBIAN *s_point        // S in projective coordinates
 ) {
     // Initialize group parameters
+    // Group: secp256k1
+    // Field: FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F
+    // A: 0
+    // B: 0700001AB7
+    // Order: FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
     // Field prime
     init_zero(&group->field);
     group->field.d[3] = 0xFFFFFFFFFFFFFFFF;
@@ -27,7 +32,7 @@ __device__ void init_test_vectors(
 
     // b = 7
     init_zero(&group->b); 
-    group->b.d[0] = 7;
+    group->b.d[0] = 0x0700001AB7;
     group->b.top = 1;
     group->b.neg = false;
 
@@ -41,46 +46,82 @@ __device__ void init_test_vectors(
     group->order.neg = false;
     
     // Initialize base point P (secp256k1 generator point)
+    // [1] Initial point: p (generator): 0479BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8
+    // X: 9981E643E9089F48979F48C033FD129C231E295329BC66DBD7362E5A487E2097
+    // Y: CF3F851FD4A582D670B6B59AAC19C1368DFC5D5D1F1DC64DB15EA6D2D3DBABE2
+    // Z: 01000003D1
+    // Z_is_one: 1
+    // EC_POINT_CUDA base_point;
+
+
+    // bn_print_no_fuse("&base_point.X:", &base_point->X);
+    // return;
     // x coordinate
-    init_zero(&base_point->x);
-    base_point->x.d[3] = 0x79BE667EF9DCBBAC;
-    base_point->x.d[2] = 0x55A06295CE870B07;
-    base_point->x.d[1] = 0x029BFCDB2DCE28D9;
-    base_point->x.d[0] = 0x59F2815B16F81798;
-    base_point->x.top = 4;
-    base_point->x.neg = false;
+    init_zero(&base_point->X);
+    // 9981E643E9089F48 979F48C033FD129C 231E295329BC66DB D7362E5A487E2097
+    base_point->X.d[3] = 0x9981E643E9089F48;
+    base_point->X.d[2] = 0x979F48C033FD129C;
+    base_point->X.d[1] = 0x231E295329BC66DB;
+    base_point->X.d[0] = 0xD7362E5A487E2097;
+    base_point->X.top = 4;
+    base_point->X.neg = false;
 
     // y coordinate
-    init_zero(&base_point->y);
-    base_point->y.d[3] = 0x483ADA7726A3C465;
-    base_point->y.d[2] = 0x5DA4FBFC0E1108A8;
-    base_point->y.d[1] = 0xFD17B448A6855419;
-    base_point->y.d[0] = 0x9C47D08FFB10D4B8;
-    base_point->y.top = 4;
-    base_point->y.neg = false;
+    init_zero(&base_point->Y);
+    // CF3F851FD4A582D6 70B6B59AAC19C136 8DFC5D5D1F1DC64D B15EA6D2D3DBABE2
+    base_point->Y.d[3] = 0xCF3F851FD4A582D6;
+    base_point->Y.d[2] = 0x70B6B59AAC19C136;
+    base_point->Y.d[1] = 0x8DFC5D5D1F1DC64D;
+    base_point->Y.d[0] = 0xB15EA6D2D3DBABE2;
+    base_point->Y.top = 4;
+    base_point->Y.neg = false;
 
-    // Initialize R point (2P) in projective coordinates
+    // z coordinate
+    init_zero(&base_point->Z);
+    // 00000001000003D1
+    base_point->Z.d[0] = 0x00000001000003D1;
+    base_point->Z.top = 1;
+    base_point->Z.neg = false;
+
+    // Copy S point from base_point
+    copy_jacobian_point(s_point, base_point);
+
+    // Initialize R point
     // x coordinate
-    init_zero(&r_point->x);
-    r_point->x.d[3] = 0xC6047F9441ED7D6D;
-    r_point->x.d[2] = 0x3045406E95C07CD8;
-    r_point->x.d[1] = 0x5C778E4B8CEF3CA7;
-    r_point->x.d[0] = 0xABAC09B95C709EE5;
-    r_point->x.top = 4;
-    r_point->x.neg = false;
+    init_zero(&r_point->X);
+    // 7C75DD9524177D59 3C03889B8DCD9B1C B05FB7D2A3DA7FE8 BA9F29B104E7DB13
+    r_point->X.d[3] = 0x7C75DD9524177D59;
+    r_point->X.d[2] = 0x3C03889B8DCD9B1C;
+    r_point->X.d[1] = 0xB05FB7D2A3DA7FE8;
+    r_point->X.d[0] = 0xBA9F29B104E7DB13;
+    r_point->X.top = 4;
+    r_point->X.neg = false;
 
-    // y coordinate 
-    init_zero(&r_point->y);
-    r_point->y.d[3] = 0x1AE168FEA63DC339;
-    r_point->y.d[2] = 0xA3C58419466CEAEE;
-    r_point->y.d[1] = 0xF7F632653266D0E1;
-    r_point->y.d[0] = 0x236431A950CFE52A;
-    r_point->y.top = 4;
-    r_point->y.neg = false;
+    // y coordinate
+    init_zero(&r_point->Y);
+    // 55DEBB381F4AD034 CC27CB48A46449AA A87D43FDB563384B 1CD20838E6FDDC9F
+    r_point->Y.d[3] = 0x55DEBB381F4AD034;
+    r_point->Y.d[2] = 0xCC27CB48A46449AA;
+    r_point->Y.d[1] = 0xA87D43FDB563384B;
+    r_point->Y.d[0] = 0x1CD20838E6FDDC9F;
+    r_point->Y.top = 4;
+    r_point->Y.neg = false;
 
-    // Initialize S point (P)
-    bn_copy(&s_point->x, &base_point->x);
-    bn_copy(&s_point->y, &base_point->y); 
+    // z coordinate
+    init_zero(&r_point->Z);
+    // 9E7F0A3FA94B05AC E16D6B355833826D 1BF8BABA3E3B8C9B 62BD4DA6A7B75B95
+    r_point->Z.d[3] = 0x9E7F0A3FA94B05AC;
+    r_point->Z.d[2] = 0xE16D6B355833826D;
+    r_point->Z.d[1] = 0x1BF8BABA3E3B8C9B;
+    r_point->Z.d[0] = 0x62BD4DA6A7B75B95;
+    r_point->Z.top = 4;
+    r_point->Z.neg = false;    
+
+    // Convert base point to Jacobian coordinates (s_point)
+    // affine_to_jacobian(&base_point, s_point);
+
+    // Compute r_point = 2P using point doubling in Jacobian coordinates
+    // jacobian_point_double(r_point, s_point, &group->field, &group->a);
 }
 
 __device__ void print_point(const char* label, const EC_POINT_CUDA *point) {
@@ -89,38 +130,40 @@ __device__ void print_point(const char* label, const EC_POINT_CUDA *point) {
     bn_print_no_fuse("  y: ", &point->y);
 }
 
+// In your main kernel function
 __global__ void test_ladder_step() {
     printf("Starting ladder step test...\n");
 
-    // Initialize test structures
+    // Initialize group and points
     EC_GROUP_CUDA group;
-    EC_POINT_CUDA base_point, r_point, s_point;
-    
-    // Initialize test vectors
-    init_test_vectors(&group, &base_point, &r_point, &s_point);
+    EC_POINT_JACOBIAN p_point, r_point, s_point;
 
-    // Print initial values
-    printf("Initial values:\n");
-    print_point("Base point P", &base_point);
-    print_point("R point (2P)", &r_point);
-    print_point("S point (P)", &s_point);
-    bn_print_no_fuse("Field prime", &group.field);
-    bn_print_no_fuse("Curve a", &group.a);
-    bn_print_no_fuse("Curve b", &group.b);
-    bn_print_no_fuse("Group order", &group.order);
+    // Initialize test vectors
+    init_test_vectors(&group, &p_point, &r_point, &s_point);
+
+    printf("Test vectors initialized.\n");
+    bn_print_no_fuse("Field prime: ", &group.field);
+    bn_print_no_fuse("Base point a:", &group.a);
+    bn_print_no_fuse("Base point b:", &group.b);
+    bn_print_no_fuse("Curve order: ", &group.order);    
+    print_jacobian_point("P point", &p_point);
+    print_jacobian_point("R point", &r_point);
+    print_jacobian_point("S point", &s_point);
+    // return; // TODO: Remove this line
 
     // Perform ladder step
-    int result = ec_point_ladder_step(&group, &r_point, &s_point, &base_point);
-    
+    int result = ec_point_ladder_step(&group, &r_point, &s_point, &p_point);
+
     if (result == 0) {
         printf("Ladder step operation failed!\n");
         return;
     }
 
     // Print results
-    printf("\nResults after ladder step:\n");
-    print_point("Result R point", &r_point);
-    print_point("Result S point", &s_point);
+    print_jacobian_point("Result R point", &r_point);
+    print_jacobian_point("Result S point", &s_point);
+    print_jacobian_point("Result P point", &p_point);
+    printf("Ladder step test complete.\n");
 }
 
 int main() {

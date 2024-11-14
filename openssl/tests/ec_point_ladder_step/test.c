@@ -12,10 +12,34 @@ void print_point(const char* label, const EC_GROUP *group, const EC_POINT *point
     char *hex = EC_POINT_point2hex(group, point, POINT_CONVERSION_UNCOMPRESSED, ctx);
     if (hex) {
         printf("%s: %s\n", label, hex);
+        char *x_hex = BN_bn2hex(point->X);
+        char *y_hex = BN_bn2hex(point->Y);
+        char *z_hex = BN_bn2hex(point->Z);
+        printf("  X: %s\n", x_hex);
+        printf("  Y: %s\n", y_hex);
+        printf("  Z: %s\n", z_hex);
+        printf("  Z_is_one: %d\n", point->Z_is_one);
+        printf("\n");
         OPENSSL_free(hex);
     } else {
         printf("%s: <error>\n", label);
     }
+}
+
+void print_ec_group(const EC_GROUP *group) {
+    printf("Group: %s\n", OBJ_nid2sn(EC_GROUP_get_curve_name(group)));
+    // char *order_hex = BN_bn2hex(EC_GROUP_get0_order(group));
+    // printf("  Order: %s\n", order_hex);
+    // char *field_hex = BN_bn2hex(EC_GROUP_get0_field(group));
+    char *field_hex = BN_bn2hex(group->field);
+    printf("  Field: %s\n", field_hex);
+    char *a_hex = BN_bn2hex(group->a);
+    printf("  A: %s\n", a_hex);
+    char *b_hex = BN_bn2hex(group->b);
+    printf("  B: %s\n", b_hex);
+    char *order_hex = BN_bn2hex(group->order);
+    printf("  Order: %s\n", order_hex);
+
 }
 
 // Function to create an EC_POINT from a hex string
@@ -45,8 +69,6 @@ EC_POINT *hex_to_ec_point(const EC_GROUP *group, const char *hex, BN_CTX *ctx) {
 
 int main(void) {
 
-    const char *r_hex = "04C17EF51345AB15D05F2D6F222316740156371AE09084EFE61E2D6FD604D4512049A7CD60CC88F345B07CD2BEA8DE9EE8923F1D209182587CDD95081B18A8C006";
-
     // Initialize OpenSSL
     BN_CTX *ctx = BN_CTX_new();
     if (!ctx) {
@@ -61,11 +83,17 @@ int main(void) {
         BN_CTX_free(ctx);
         return 1;
     }
+    print_ec_group(group);
 
     // Create points
     EC_POINT *r = EC_POINT_new(group);
     EC_POINT *s = EC_POINT_new(group);
     EC_POINT *p = EC_POINT_new(group);
+
+    // Print initial points
+    print_point("[0] Initial point: r", group, r, ctx);
+    print_point("[0] Initial point: s", group, s, ctx);
+    print_point("[0] Initial point: p", group, p, ctx);
 
     // Set base point (generator)
     if (!EC_POINT_copy(p, EC_GROUP_get0_generator(group))) {
@@ -99,9 +127,11 @@ int main(void) {
     }
 
     // Print initial points
-    print_point("Initial point: p (generator)", group, p, ctx);
-    print_point("Initial point: r", group, r, ctx);
-    print_point("Initial point: s", group, s, ctx);
+    print_point("[1] Initial point: r", group, r, ctx);
+    print_point("[1] Initial point: s", group, s, ctx);
+    print_point("[1] Initial point: p (generator)", group, p, ctx);
+
+    // exit(0); // TODO: Remove
 
     // Perform ladder step
     if (!ec_point_ladder_step(group, r, s, p, ctx)) {

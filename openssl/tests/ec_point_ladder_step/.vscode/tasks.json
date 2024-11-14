@@ -1,0 +1,37 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "type": "shell",
+            "label": "g++ build active file",
+            "command": "/usr/bin/g++",
+            "args": [
+                "-g",
+                "${file}",
+                "-std=c++11",
+                "-g",
+                "-O0",
+                "-fno-inline",
+                "-lcrypto",
+                "-I", "/home/alex/projects/openssl_mod/crypto/bn/",
+                "-I", "/home/alex/projects/openssl_mod/crypto/ec/",
+                "-I", "/home/alex/projects/openssl_mod/include/",
+                "-I", "../json",
+                "-lssl",
+                "-l:libcrypto.so.3",
+                "-o",
+                "${fileDirname}/${fileBasenameNoExtension}"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        }
+    ]
+}

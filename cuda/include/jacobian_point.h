@@ -13,6 +13,14 @@ struct EC_POINT_JACOBIAN {
 __device__ bool bn_mod_inverse(BIGNUM_CUDA *result, const BIGNUM_CUDA *a, const BIGNUM_CUDA *n);
 __device__ void bignum_to_bit_array(BIGNUM_CUDA *n, unsigned int *bits);
 __device__ int point_is_at_infinity(const EC_POINT_CUDA *P);
+__device__ void bn_mod_lshift1(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNUM_CUDA *n); // point.h
+
+__device__ void print_jacobian_point(const char* label, const EC_POINT_JACOBIAN *point) {
+    printf("%s:\n", label);
+    bn_print_no_fuse("  X: ", &point->X);
+    bn_print_no_fuse("  Y: ", &point->Y);
+    bn_print_no_fuse("  Z: ", &point->Z);
+}
 
 __device__ void set_point_at_infinity(EC_POINT_CUDA *point) {
     // Assuming EC_POINT_CUDA is a structure containing BIGNUM_CUDA x and y
@@ -32,6 +40,66 @@ __device__ void set_point_at_infinity(EC_POINT_CUDA *point) {
 }
 
 __device__ void jacobian_point_double(
+    EC_POINT_JACOBIAN *result,
+    const EC_POINT_JACOBIAN *P,
+    const BIGNUM_CUDA *p,
+    const BIGNUM_CUDA *a
+) {
+    if (bn_is_zero(&P->Z) || bn_is_zero(&P->Y)) {
+        init_zero(&result->X);
+        init_zero(&result->Y);
+        init_zero(&result->Z);
+        return;
+    }
+
+    BIGNUM_CUDA T1, T2, T3, T4, T5, T6;
+    init_zero(&T1);
+    init_zero(&T2);
+    init_zero(&T3);
+    init_zero(&T4);
+    init_zero(&T5);
+    init_zero(&T6);
+
+    // T1 = X1^2
+    bn_mod_sqr(&T1, &P->X, p);
+
+    // T2 = 3 * T1
+    BIGNUM_CUDA three;
+    init_zero(&three);
+    bn_set_word(&three, 3);
+    bn_mod_mul(&T2, &T1, &three, p);
+
+    // T3 = Y1^2
+    bn_mod_sqr(&T3, &P->Y, p);
+
+    // T4 = T3^2
+    bn_mod_sqr(&T4, &T3, p);
+
+    // T5 = X1 * T3
+    bn_mod_mul(&T5, &P->X, &T3, p);
+
+    // T5 = 2 * T5
+    bn_mod_lshift1(&T5, &T5, p);
+
+    // X3 = T2^2 - 2 * T5
+    bn_mod_sqr(&T6, &T2, p);
+    BIGNUM_CUDA temp;
+    init_zero(&temp);
+    bn_mod_lshift1(&temp, &T5, p);
+    bn_mod_sub(&result->X, &T6, &temp, p);
+
+    // Y3 = T2 * (T5 - X3) - 8 * T4
+    bn_mod_sub(&T6, &T5, &result->X, p);
+    bn_mod_mul(&T6, &T2, &T6, p);
+    bn_mod_lshift(&T4, &T4, 3, p); // 8 * T4
+    bn_mod_sub(&result->Y, &T6, &T4, p);
+
+    // Z3 = 2 * Y1 * Z1
+    bn_mod_mul(&T6, &P->Y, &P->Z, p);
+    bn_mod_lshift1(&result->Z, &T6, p);
+}
+
+__device__ void jacobian_point_double_x(
     EC_POINT_JACOBIAN *result,
     const EC_POINT_JACOBIAN *P,
     const BIGNUM_CUDA *p,
@@ -261,7 +329,7 @@ __device__ void point_add_jacobian(
     // bn_print_no_fuse("point_add << Z: ", &result->Z);
 }
 
-__device__ void jacobian_point_double(
+__device__ void jacobian_point_double_x(
     EC_POINT_JACOBIAN *result,
     const EC_POINT_JACOBIAN *P,
     const BIGNUM_CUDA *p,
@@ -475,3 +543,9 @@ __device__ EC_POINT_CUDA ec_point_scalar_mul_jacobian_montgomery(
 }
 #endif
 // Montgomery point operations in Montgomery form --
+
+__device__ void copy_jacobian_point(EC_POINT_JACOBIAN *dest, const EC_POINT_JACOBIAN *src) {
+    bn_copy(&dest->X, &src->X);
+    bn_copy(&dest->Y, &src->Y);
+    bn_copy(&dest->Z, &src->Z);
+}
