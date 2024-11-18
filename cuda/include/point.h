@@ -1083,12 +1083,6 @@ __device__ int ossl_ec_GFp_mont_field_mul(const BIGNUM_CUDA *a, const BIGNUM_CUD
     return 1;
 }
 
-// __device__ int ec_point_ladder_step(
-//     const EC_GROUP_CUDA *group,
-//     EC_POINT_CUDA *r, 
-//     EC_POINT_CUDA *s,
-//     EC_POINT_CUDA *p
-// ) {
 __device__ int ec_point_ladder_step(
     const EC_GROUP_CUDA *group,
     EC_POINT_JACOBIAN *r, 
@@ -1182,4 +1176,79 @@ __device__ int ec_point_ladder_step(
 
     return ret;
     // return 0; // TODO: Remove
+}
+
+__device__ void init_jacobian_point(EC_POINT_JACOBIAN *point) {
+    init_zero(&point->X);
+    init_zero(&point->Y);
+    init_zero(&point->Z);
+    point->Z.d[0] = 1;  // Set Z = 1 by default
+    point->Z.top = 1;
+}
+
+__device__ void ec_point_scalar_mul_montgomery(
+    const EC_POINT_CUDA *point, 
+    const BIGNUM_CUDA *scalar,
+    const MONT_CTX_CUDA *mont_ctx,
+    EC_POINT_CUDA *result
+) {
+    // Convert input point to Montgomery form
+    EC_POINT_CUDA mont_point;
+    init_zero(&mont_point.x);
+    init_zero(&mont_point.y);
+    point_to_montgomery(&mont_point, point, mont_ctx);
+
+    // Create EC_GROUP_CUDA structure for ladder step
+    EC_GROUP_CUDA group;
+    init_zero(&group.field);
+    init_zero(&group.a);
+    init_zero(&group.b);
+    init_zero(&group.order);
+    
+    // Set the field modulus
+    bn_copy(&group.field, &mont_ctx->n);
+    
+    // Convert curve parameter a to Montgomery form (0 for secp256k1)
+    init_zero(&group.a);
+
+    // Initialize Jacobian points for ladder computation
+    EC_POINT_JACOBIAN R, S, mont_point_jacobian;
+    init_jacobian_point(&R);
+    init_jacobian_point(&S);
+    
+    // Convert Montgomery affine point to Jacobian
+    affine_to_jacobian(&mont_point, &mont_point_jacobian);
+
+    // Get bit length of scalar
+    int bit_len = bn_bit_length(scalar);
+
+    // Montgomery ladder loop
+    for (int i = bit_len - 1; i >= 0; i--) {
+        if (BN_is_bit_set(scalar, i)) {
+            EC_POINT_JACOBIAN temp = R;
+            R = S;
+            S = temp;
+        }
+
+        ec_point_ladder_step(&group, &R, &S, &mont_point_jacobian);
+
+        if (BN_is_bit_set(scalar, i)) {
+            EC_POINT_JACOBIAN temp = R;
+            R = S;
+            S = temp;
+        }
+    }
+
+    // Convert result back to affine coordinates
+    EC_POINT_CUDA mont_result;
+    init_zero(&mont_result.x);
+    init_zero(&mont_result.y);
+    jacobian_to_affine(&R, &mont_result, &mont_ctx->n);
+
+    // Convert result from Montgomery form
+    point_from_montgomery(result, &mont_result, mont_ctx);
+
+    // Print result
+    bn_print_no_fuse("ec_point_scalar_mul_montgomery result.x: ", &result->x);
+    bn_print_no_fuse("ec_point_scalar_mul_montgomery result.y: ", &result->y);
 }
