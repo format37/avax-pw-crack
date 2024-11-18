@@ -118,6 +118,16 @@ __device__ BN_ULONG bn_mul_add_words(BN_ULONG *rp, const BN_ULONG *ap, int num, 
     return carry;
 }
 
+__device__ BN_ULONG bn_sub_words_02(BN_ULONG *r, const BN_ULONG *a, const BN_ULONG *b, int n) {
+    BN_ULONG borrow = 0;
+    for (int i = 0; i < n; i++) {
+        BN_ULONG temp = a[i] - b[i] - borrow;
+        borrow = (a[i] < b[i] + borrow) || (borrow && a[i] == b[i]);
+        r[i] = temp;
+    }
+    return borrow;
+}
+
 __device__ BN_ULONG bn_sub_words(BN_ULONG *r, const BN_ULONG *a, const BN_ULONG *b, int n) {
     BN_ULONG borrow = 0;
     for (int i = 0; i < n; i++) {
@@ -131,24 +141,19 @@ __device__ BN_ULONG bn_sub_words(BN_ULONG *r, const BN_ULONG *a, const BN_ULONG 
     return borrow;
 }
 
-__device__ void bn_mod_mul_montgomery(
+__device__ void bn_mod_mul_montgomery_A(
     const BIGNUM_CUDA *a, 
     const BIGNUM_CUDA *b,
     const BIGNUM_CUDA *n,
     BIGNUM_CUDA *ret
 ) {
-    printf("\n=== Starting Montgomery Multiplication ===\n");
-    
-    // Multiply a and b
+    // First do standard multiplication
     BIGNUM_CUDA r;
     init_zero(&r);
     bn_mul(a, b, &r);
-    printf("Initial multiplication (a * b):\n");
-    bn_print_no_fuse("r = a * b: ", &r);
     
     int nl = n->top;
     int max = 2 * nl;
-    printf("nl (modulus limbs): %d, max limbs needed: %d\n", nl, max);
 
     // Ensure r has enough space
     BIGNUM_CUDA t;
@@ -157,31 +162,109 @@ __device__ void bn_mod_mul_montgomery(
         t.d[i] = (i < r.top) ? r.d[i] : 0;
     }
     t.top = max;
-    printf("Initial t value (padded r):\n");
-    bn_print_no_fuse("t: ", &t);
     
     // Montgomery reduction
     BN_ULONG n0 = N0_VALUE;
-    printf("n0 (Montgomery parameter): %016llx\n", n0);
     BN_ULONG carry = 0;
     
-    printf("\n=== Starting Montgomery Reduction Loop ===\n");
+    for (int i = 0; i < nl; i++) {
+        BN_ULONG v;
+        // Calculate m = (r[i] * n0) mod word_size
+        BN_ULONG m = (t.d[i] * n0) & BN_MASK2;
+        // r[i:i+nl] += m * n
+        v = bn_mul_add_words(&t.d[i], n->d, nl, m);
+        v = (v + carry + t.d[i + nl]) & BN_MASK2;
+        carry |= (v != t.d[i + nl]);
+        carry &= (v <= t.d[i + nl]);
+        t.d[i + nl] = v;
+    }
+
+    // Ensure ret has enough space
+    init_zero(ret);
+    
+    // Final subtraction
+    BIGNUM_CUDA tmp;
+    init_zero(&tmp);
+    
+    // Copy higher words
+    for (int i = 0; i < nl; i++) {
+        tmp.d[i] = t.d[i + nl];
+    }
+    tmp.top = nl;
+    
+    // Subtract if necessary
+    if (carry || bn_cmp(&tmp, n) >= 0) {
+        bn_sub(&tmp, &tmp, n);
+    }    
+    bn_copy(ret, &tmp);
+    // Find top - can start search from n->top since result < n
+    ret->top = find_top_optimized(ret, n->top);    
+}
+
+__device__ BN_ULONG bn_sub_words_01(BN_ULONG *r, const BN_ULONG *a, const BN_ULONG *b, int n) {
+    BN_ULONG borrow = 0;
+    for (int i = 0; i < n; i++) {
+        BN_ULONG ai = a[i];
+        BN_ULONG bi = b[i];
+        BN_ULONG bi_borrow = bi + borrow;
+        borrow = (bi_borrow < bi) ? 1 : 0; // Check for overflow in bi + borrow
+        borrow += (ai < bi_borrow) ? 1 : 0;
+        r[i] = ai - bi_borrow;
+    }
+    return borrow;
+}
+
+__device__ void bn_mod_mul_montgomery_B(
+    const BIGNUM_CUDA *a, 
+    const BIGNUM_CUDA *b,
+    const BIGNUM_CUDA *n,
+    BIGNUM_CUDA *ret
+) {
+    // printf("\n=== Starting Montgomery Multiplication ===\n");
+    
+    // Multiply a and b
+    BIGNUM_CUDA r;
+    init_zero(&r);
+    bn_mul(a, b, &r);
+    // printf("Initial multiplication (a * b):\n");
+    // bn_print_no_fuse("r = a * b: ", &r);
+    
+    int nl = n->top;
+    int max = 2 * nl;
+    // printf("nl (modulus limbs): %d, max limbs needed: %d\n", nl, max);
+
+    // Ensure r has enough space
+    BIGNUM_CUDA t;
+    init_zero(&t);
+    for (int i = 0; i < max; i++) {
+        t.d[i] = (i < r.top) ? r.d[i] : 0;
+    }
+    t.top = max;
+    // printf("Initial t value (padded r):\n");
+    // bn_print_no_fuse("t: ", &t);
+    
+    // Montgomery reduction
+    BN_ULONG n0 = N0_VALUE;
+    // printf("n0 (Montgomery parameter): %016llx\n", n0);
+    BN_ULONG carry = 0;
+    
+    // printf("\n=== Starting Montgomery Reduction Loop ===\n");
     for (int i = 0; i < nl; i++) {
         // Calculate m = (t[i] * n0) mod word_size
         BN_ULONG m = (t.d[i] * n0) & BN_MASK2;
-        printf("\nIteration %d:\n", i);
-        printf("t[%d]: %016llx\n", i, t.d[i]);
-        printf("m = (t[%d] * n0) mod 2^64: %016llx\n", i, m);
+        // printf("\nIteration %d:\n", i);
+        // printf("t[%d]: %016llx\n", i, t.d[i]);
+        // printf("m = (t[%d] * n0) mod 2^64: %016llx\n", i, m);
         
         // Compute mt = t + m*n starting at position i
         BN_ULONG c = 0;
-        printf("Computing m*n and adding to t starting at position %d:\n", i);
+        // printf("Computing m*n and adding to t starting at position %d:\n", i);
         for (int j = 0; j < nl; j++) {
             unsigned __int128 prod = (unsigned __int128)m * n->d[j] + t.d[i + j] + c;
             t.d[i + j] = (BN_ULONG)prod;
             c = (BN_ULONG)(prod >> 64);
-            printf("  j=%d: m*n[%d]=%016llx, t[%d]=%016llx, carry=%016llx\n", 
-                   j, j, n->d[j], i+j, t.d[i+j], c);
+            // printf("  j=%d: m*n[%d]=%016llx, t[%d]=%016llx, carry=%016llx\n", 
+            //        j, j, n->d[j], i+j, t.d[i+j], c);
         }
         
         // Add the carry to the higher words
@@ -189,11 +272,11 @@ __device__ void bn_mod_mul_montgomery(
         BN_ULONG old_v = t.d[i + nl];
         t.d[i + nl] = v;
         carry = (v < c) || ((v == c) && carry);
-        printf("Adding final carries: t[%d]=%016llx + c=%016llx + old_carry=%016llx = %016llx, new_carry=%d\n", 
-               i+nl, old_v, c, carry, v, carry);
+        // printf("Adding final carries: t[%d]=%016llx + c=%016llx + old_carry=%016llx = %016llx, new_carry=%d\n", 
+        //        i+nl, old_v, c, carry, v, carry);
     }
 
-    printf("\n=== Final Subtraction Phase ===\n");
+    // printf("\n=== Final Subtraction Phase ===\n");
     // Final subtraction phase
     BIGNUM_CUDA tmp;
     init_zero(&tmp);
@@ -203,35 +286,115 @@ __device__ void bn_mod_mul_montgomery(
         tmp.d[i] = t.d[i + nl];
     }
     tmp.top = nl;
-    printf("Value before final subtraction:\n");
-    bn_print_no_fuse("tmp (upper half of t): ", &tmp);
-    bn_print_no_fuse("n (modulus): ", n);
+    // printf("Value before final subtraction:\n");
+    // bn_print_no_fuse("tmp (upper half of t): ", &tmp);
+    // bn_print_no_fuse("n (modulus): ", n);
     
     BIGNUM_CUDA tmp2;
     init_zero(&tmp2);
     
     // Subtract and get borrow
     BN_ULONG borrow = bn_sub_words(tmp2.d, tmp.d, n->d, nl);
-    printf("After subtraction:\n");
-    bn_print_no_fuse("tmp2 (after subtraction): ", &tmp2);
-    printf("borrow from subtraction: %d\n", borrow);
+    // printf("After subtraction:\n");
+    // bn_print_no_fuse("tmp2 (after subtraction): ", &tmp2);
+    // printf("borrow from subtraction: %d\n", borrow);
     
     // Create final selection mask
     // BN_ULONG mask = 0 - borrow;  // If borrow then all 1s, else all 0s
     BN_ULONG mask = 0 - (borrow ^ 1);  // Corrected mask calculation
-    printf("Selection mask: %016llx\n", mask);
+    // printf("Selection mask: %016llx\n", mask);
     
     // Constant-time selection between original and subtracted values
-    printf("\n=== Final Selection ===\n");
+    // printf("\n=== Final Selection ===\n");
     for (int i = 0; i < nl; i++) {
         ret->d[i] = (mask & tmp.d[i]) | (~mask & tmp2.d[i]);
-        printf("Word %d: selecting between %016llx and %016llx -> %016llx\n",
-               i, tmp.d[i], tmp2.d[i], ret->d[i]);
+        // printf("Word %d: selecting between %016llx and %016llx -> %016llx\n",
+            //    i, tmp.d[i], tmp2.d[i], ret->d[i]);
     }
     
     ret->top = find_top_optimized(ret, nl);
-    printf("\n=== Final Result ===\n");
-    bn_print_no_fuse("Final result: ", ret);
+    // printf("\n=== Final Result ===\n");
+    // bn_print_no_fuse("Final result: ", ret);
+}
+
+__device__ void bn_mod_mul_montgomery(
+    const BIGNUM_CUDA *a, 
+    const BIGNUM_CUDA *b,
+    const BIGNUM_CUDA *n,
+    BIGNUM_CUDA *ret
+) {
+    // Multiply a and b
+    BIGNUM_CUDA r;
+    init_zero(&r);
+    bn_mul(a, b, &r);
+    
+    int nl = n->top;
+    int max = 2 * nl;
+
+    // Ensure r has enough space
+    BIGNUM_CUDA t;
+    init_zero(&t);
+    for (int i = 0; i < max; i++) {
+        t.d[i] = (i < r.top) ? r.d[i] : 0;
+    }
+    t.top = max;
+    
+    // Montgomery reduction
+    BN_ULONG n0 = N0_VALUE;
+    BN_ULONG carry = 0;
+    
+    // Main Montgomery reduction loop
+    for (int i = 0; i < nl; i++) {
+        // Calculate m = (t[i] * n0) mod word_size
+        BN_ULONG m = (t.d[i] * n0) & BN_MASK2;
+        
+        // Compute m*n and add to t
+        BN_ULONG c = 0;
+        for (int j = 0; j < nl; j++) {
+            unsigned __int128 prod = (unsigned __int128)m * n->d[j] + t.d[i + j] + c;
+            t.d[i + j] = (BN_ULONG)prod;
+            c = (BN_ULONG)(prod >> 64);
+        }
+        
+        // Add carries
+        BN_ULONG v = t.d[i + nl] + c + carry;
+        t.d[i + nl] = v;
+        carry = (v < c) || ((v == c) && carry);
+    }
+
+    // Copy upper half to temporary variables and ensure proper initialization
+    BIGNUM_CUDA tmp, tmp2;
+    init_zero(&tmp);
+    init_zero(&tmp2);
+    
+    // Copy the upper half properly, maintaining word count
+    for (int i = 0; i < nl; i++) {
+        tmp.d[i] = t.d[i + nl];
+    }
+    tmp.top = find_top_optimized(&tmp, nl);
+    
+    // Perform subtraction
+    BN_ULONG borrow = bn_sub_words(tmp2.d, tmp.d, n->d, nl);
+    tmp2.top = find_top_optimized(&tmp2, nl);
+    
+    // Initialize return value
+    init_zero(ret);
+    
+    // Determine if subtraction is needed
+    if (carry || bn_cmp(&tmp, n) >= 0) {
+        // Use subtracted value, ensuring all words are copied
+        for (int i = 0; i < nl; i++) {
+            ret->d[i] = tmp2.d[i];
+        }
+    } else {
+        // Use original value, ensuring all words are copied
+        for (int i = 0; i < nl; i++) {
+            ret->d[i] = tmp.d[i];
+        }
+    }
+    
+    // Ensure proper top value for result
+    ret->top = find_top_optimized(ret, nl);
 }
 
 __device__ bool ossl_bn_mod_mul_montgomery(

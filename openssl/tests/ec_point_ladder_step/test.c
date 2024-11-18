@@ -131,8 +131,6 @@ int main(void) {
     print_point("[1] Initial point: s", group, s, ctx);
     print_point("[1] Initial point: p (generator)", group, p, ctx);
 
-    // exit(0); // TODO: Remove
-
     // Perform ladder step
     if (!ec_point_ladder_step(group, r, s, p, ctx)) {
         fprintf(stderr, "ec_point_ladder_step failed\n");
