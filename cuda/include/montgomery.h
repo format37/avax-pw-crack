@@ -1,9 +1,5 @@
-// #include "bignum.h"
-// #include "point.h"
-
 #define TABLE_SIZE 32 // Maximum precomputation table size for sliding windows
 #define N0_VALUE 0xd838091dd2253531ULL
-// #define BN_MASK2        (BN_MASK >> BN_BITS4) // Lower half bits set
 #define BN_MASK2 0xFFFFFFFFFFFFFFFFULL
 
 
@@ -48,30 +44,6 @@ __device__ void bn_mask_bits(BIGNUM_CUDA *r, int bits) {
         r->top--;
 }
 
-__device__ BN_ULONG compute_n0(const BIGNUM_CUDA *n) {
-    BN_ULONG n_mod = n->d[0]; // n mod 2^64
-    BN_ULONG n0 = 1;
-
-    // Newton-Raphson iteration to compute inverse modulo 2^64
-    for (int i = 0; i < 6; i++) {
-        n0 = n0 * (2 - n_mod * n0);
-    }
-
-    // Negate n0 to get -n^{-1} mod 2^64
-    n0 = (BN_ULONG)(0 - n0);
-
-    return n0;
-}
-
-__device__ BN_ULONG compute_n0_alter(const BIGNUM_CUDA *n) {
-    BN_ULONG n0 = n->d[0];
-    BN_ULONG v = 1;
-    for (int i = 0; i < 64; i++) {
-        v = v * (2 - n0 * v);
-    }
-    return (BN_ULONG)(0 - v);
-}
-
 // Multiply a BIGNUM_CUDA by a BN_ULONG word
 __device__ void bn_mul_word(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, BN_ULONG w) {
     BN_ULONG carry = 0;
@@ -96,18 +68,6 @@ __device__ void bn_rshift_words(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, int words)
     r->top = a->top - words;
 }
 
-__device__ BN_ULONG bn_mul_add_words_alter(BN_ULONG *rp, const BN_ULONG *ap, int num, BN_ULONG w) {
-    BN_ULONG carry = 0;
-    for (int i = 0; i < num; i++) {
-        unsigned __int128 mul = (unsigned __int128)ap[i] * w;
-        mul += carry;
-        mul += rp[i];
-        rp[i] = (BN_ULONG)mul;
-        carry = (BN_ULONG)(mul >> 64);
-    }
-    return carry;
-}
-
 __device__ BN_ULONG bn_mul_add_words(BN_ULONG *rp, const BN_ULONG *ap, int num, BN_ULONG w) {
     BN_ULONG carry = 0;
     for (int i = 0; i < num; i++) {
@@ -116,16 +76,6 @@ __device__ BN_ULONG bn_mul_add_words(BN_ULONG *rp, const BN_ULONG *ap, int num, 
         carry = (BN_ULONG)(mul >> BN_BITS2);
     }
     return carry;
-}
-
-__device__ BN_ULONG bn_sub_words_02(BN_ULONG *r, const BN_ULONG *a, const BN_ULONG *b, int n) {
-    BN_ULONG borrow = 0;
-    for (int i = 0; i < n; i++) {
-        BN_ULONG temp = a[i] - b[i] - borrow;
-        borrow = (a[i] < b[i] + borrow) || (borrow && a[i] == b[i]);
-        r[i] = temp;
-    }
-    return borrow;
 }
 
 __device__ BN_ULONG bn_sub_words(BN_ULONG *r, const BN_ULONG *a, const BN_ULONG *b, int n) {
@@ -139,182 +89,6 @@ __device__ BN_ULONG bn_sub_words(BN_ULONG *r, const BN_ULONG *a, const BN_ULONG 
         r[i] = ai - bi_borrow;
     }
     return borrow;
-}
-
-__device__ void bn_mod_mul_montgomery_A(
-    const BIGNUM_CUDA *a, 
-    const BIGNUM_CUDA *b,
-    const BIGNUM_CUDA *n,
-    BIGNUM_CUDA *ret
-) {
-    // First do standard multiplication
-    BIGNUM_CUDA r;
-    init_zero(&r);
-    bn_mul(a, b, &r);
-    
-    int nl = n->top;
-    int max = 2 * nl;
-
-    // Ensure r has enough space
-    BIGNUM_CUDA t;
-    init_zero(&t);
-    for (int i = 0; i < max; i++) {
-        t.d[i] = (i < r.top) ? r.d[i] : 0;
-    }
-    t.top = max;
-    
-    // Montgomery reduction
-    BN_ULONG n0 = N0_VALUE;
-    BN_ULONG carry = 0;
-    
-    for (int i = 0; i < nl; i++) {
-        BN_ULONG v;
-        // Calculate m = (r[i] * n0) mod word_size
-        BN_ULONG m = (t.d[i] * n0) & BN_MASK2;
-        // r[i:i+nl] += m * n
-        v = bn_mul_add_words(&t.d[i], n->d, nl, m);
-        v = (v + carry + t.d[i + nl]) & BN_MASK2;
-        carry |= (v != t.d[i + nl]);
-        carry &= (v <= t.d[i + nl]);
-        t.d[i + nl] = v;
-    }
-
-    // Ensure ret has enough space
-    init_zero(ret);
-    
-    // Final subtraction
-    BIGNUM_CUDA tmp;
-    init_zero(&tmp);
-    
-    // Copy higher words
-    for (int i = 0; i < nl; i++) {
-        tmp.d[i] = t.d[i + nl];
-    }
-    tmp.top = nl;
-    
-    // Subtract if necessary
-    if (carry || bn_cmp(&tmp, n) >= 0) {
-        bn_sub(&tmp, &tmp, n);
-    }    
-    bn_copy(ret, &tmp);
-    // Find top - can start search from n->top since result < n
-    ret->top = find_top_optimized(ret, n->top);    
-}
-
-__device__ BN_ULONG bn_sub_words_01(BN_ULONG *r, const BN_ULONG *a, const BN_ULONG *b, int n) {
-    BN_ULONG borrow = 0;
-    for (int i = 0; i < n; i++) {
-        BN_ULONG ai = a[i];
-        BN_ULONG bi = b[i];
-        BN_ULONG bi_borrow = bi + borrow;
-        borrow = (bi_borrow < bi) ? 1 : 0; // Check for overflow in bi + borrow
-        borrow += (ai < bi_borrow) ? 1 : 0;
-        r[i] = ai - bi_borrow;
-    }
-    return borrow;
-}
-
-__device__ void bn_mod_mul_montgomery_B(
-    const BIGNUM_CUDA *a, 
-    const BIGNUM_CUDA *b,
-    const BIGNUM_CUDA *n,
-    BIGNUM_CUDA *ret
-) {
-    // printf("\n=== Starting Montgomery Multiplication ===\n");
-    
-    // Multiply a and b
-    BIGNUM_CUDA r;
-    init_zero(&r);
-    bn_mul(a, b, &r);
-    // printf("Initial multiplication (a * b):\n");
-    // bn_print_no_fuse("r = a * b: ", &r);
-    
-    int nl = n->top;
-    int max = 2 * nl;
-    // printf("nl (modulus limbs): %d, max limbs needed: %d\n", nl, max);
-
-    // Ensure r has enough space
-    BIGNUM_CUDA t;
-    init_zero(&t);
-    for (int i = 0; i < max; i++) {
-        t.d[i] = (i < r.top) ? r.d[i] : 0;
-    }
-    t.top = max;
-    // printf("Initial t value (padded r):\n");
-    // bn_print_no_fuse("t: ", &t);
-    
-    // Montgomery reduction
-    BN_ULONG n0 = N0_VALUE;
-    // printf("n0 (Montgomery parameter): %016llx\n", n0);
-    BN_ULONG carry = 0;
-    
-    // printf("\n=== Starting Montgomery Reduction Loop ===\n");
-    for (int i = 0; i < nl; i++) {
-        // Calculate m = (t[i] * n0) mod word_size
-        BN_ULONG m = (t.d[i] * n0) & BN_MASK2;
-        // printf("\nIteration %d:\n", i);
-        // printf("t[%d]: %016llx\n", i, t.d[i]);
-        // printf("m = (t[%d] * n0) mod 2^64: %016llx\n", i, m);
-        
-        // Compute mt = t + m*n starting at position i
-        BN_ULONG c = 0;
-        // printf("Computing m*n and adding to t starting at position %d:\n", i);
-        for (int j = 0; j < nl; j++) {
-            unsigned __int128 prod = (unsigned __int128)m * n->d[j] + t.d[i + j] + c;
-            t.d[i + j] = (BN_ULONG)prod;
-            c = (BN_ULONG)(prod >> 64);
-            // printf("  j=%d: m*n[%d]=%016llx, t[%d]=%016llx, carry=%016llx\n", 
-            //        j, j, n->d[j], i+j, t.d[i+j], c);
-        }
-        
-        // Add the carry to the higher words
-        BN_ULONG v = t.d[i + nl] + c + carry;
-        BN_ULONG old_v = t.d[i + nl];
-        t.d[i + nl] = v;
-        carry = (v < c) || ((v == c) && carry);
-        // printf("Adding final carries: t[%d]=%016llx + c=%016llx + old_carry=%016llx = %016llx, new_carry=%d\n", 
-        //        i+nl, old_v, c, carry, v, carry);
-    }
-
-    // printf("\n=== Final Subtraction Phase ===\n");
-    // Final subtraction phase
-    BIGNUM_CUDA tmp;
-    init_zero(&tmp);
-    
-    // Copy higher words
-    for (int i = 0; i < nl; i++) {
-        tmp.d[i] = t.d[i + nl];
-    }
-    tmp.top = nl;
-    // printf("Value before final subtraction:\n");
-    // bn_print_no_fuse("tmp (upper half of t): ", &tmp);
-    // bn_print_no_fuse("n (modulus): ", n);
-    
-    BIGNUM_CUDA tmp2;
-    init_zero(&tmp2);
-    
-    // Subtract and get borrow
-    BN_ULONG borrow = bn_sub_words(tmp2.d, tmp.d, n->d, nl);
-    // printf("After subtraction:\n");
-    // bn_print_no_fuse("tmp2 (after subtraction): ", &tmp2);
-    // printf("borrow from subtraction: %d\n", borrow);
-    
-    // Create final selection mask
-    // BN_ULONG mask = 0 - borrow;  // If borrow then all 1s, else all 0s
-    BN_ULONG mask = 0 - (borrow ^ 1);  // Corrected mask calculation
-    // printf("Selection mask: %016llx\n", mask);
-    
-    // Constant-time selection between original and subtracted values
-    // printf("\n=== Final Selection ===\n");
-    for (int i = 0; i < nl; i++) {
-        ret->d[i] = (mask & tmp.d[i]) | (~mask & tmp2.d[i]);
-        // printf("Word %d: selecting between %016llx and %016llx -> %016llx\n",
-            //    i, tmp.d[i], tmp2.d[i], ret->d[i]);
-    }
-    
-    ret->top = find_top_optimized(ret, nl);
-    // printf("\n=== Final Result ===\n");
-    // bn_print_no_fuse("Final result: ", ret);
 }
 
 __device__ void bn_mod_mul_montgomery(
@@ -413,70 +187,7 @@ __device__ bool ossl_bn_mod_mul_montgomery(
     return true;  // Since CUDA version returns void, we return true for success
 }
 
-// __device__ void bn_mod_mul_montgomery_proto(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, const BIGNUM_CUDA *m, const BN_MONT_CTX_CUDA *mont) {
-//     bool debug = false;
-
-//     if (debug) {
-//         printf("++ bn_mod_mul_montgomery ++\n");
-//         bn_print_no_fuse("r: ", r);
-//         bn_print_no_fuse("a: ", a);
-//         bn_print_no_fuse("b: ", b);
-//         bn_print_no_fuse("m: ", m);
-//         printf("mont:\n");
-//         bn_print_no_fuse("  R: ", &mont->R);
-//         bn_print_no_fuse("  n: ", &mont->n);
-//         bn_print_no_fuse("  n_prime: ", &mont->n_prime);
-//         bn_print_no_fuse("  R2: ", &mont->R2);
-//     }
-//     BIGNUM_CUDA t, u, product;
-//     init_zero(&t);
-//     init_zero(&u);
-//     init_zero(&product);
-
-
-//     // 1. t = a * b
-//     bn_mul(a, b, &t);
-//     if (debug) bn_print_no_fuse("1. t = a * b: ", &t); // OK
-
-//     // 2. u = (t * n_prime) % R
-//     bn_mul(&t, &mont->n_prime, &u);
-//     if (debug) bn_print_no_fuse("2. u = (t * n_prime): ", &u); // OK
-//     BIGNUM_CUDA remainder_u;
-//     init_zero(&remainder_u);
-//     bn_div(&product, &remainder_u, &u, &mont->R);
-//     if (debug) bn_print_no_fuse("2. remainder_u: ", &remainder_u);
-//     bn_copy(&u, &remainder_u);
-    
-//     if (debug) bn_print_no_fuse("2. u = (t * n_prime) % R: ", &u);
-
-//     // 3. product = (t + u * m) / R
-//     bn_mul(&u, m, &product);
-//     if (debug) bn_print_no_fuse("3. product = u * m: ", &product);
-//     init_zero(&u); // reuse u variable to store t + product value
-//     bn_add(&u, &t, &product);
-//     if (debug) bn_print_no_fuse("3. u = t + product: ", &u); // OK
-//     init_zero(&product); // reuse variable to store quotient
-//     BIGNUM_CUDA remainder;
-//     init_zero(&remainder);    
-//     bn_div(&product, &remainder, &u, &mont->R);
-//     if (debug) bn_print_no_fuse("3. product = (t + u * m) / R: ", &product);
-
-//     // 4. if product >= m: product -= m;
-//     if (bn_cmp(&product, m) >= 0) {
-//         bn_sub(&t, &product, m);
-//         bn_copy(&product, &t);
-//     }
-//     if (debug) bn_print_no_fuse("4. product = (t + u * m) / R (after sub): ", &product);
-//     bn_copy(r, &product);
-
-//     if (debug) {
-//         bn_print_no_fuse("<< r: ", r);
-//         printf("-- bn_mod_mul_montgomery --\n");
-//     }
-// }
-
 __device__ void bn_to_montgomery(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BN_MONT_CTX_CUDA *mont, BIGNUM_CUDA *m) {
-    // bn_mod_mul_montgomery_proto(r, a, &mont->R2, m, mont);
     bn_mod_mul_montgomery(r, a, &mont->R2, m);
 }
 
@@ -652,9 +363,6 @@ __device__ int BN_mod_exp_mont(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNU
     init_zero(&d);
     init_zero(&val[0]);
 
-
-    // if (a->neg || BN_ucmp(a, m) >= 0) {
-    // use bn_cmp_abs instead
     if (a->neg || bn_cmp_abs(a, m) >= 0) {
         bn_mod(&aa, a, m);
     } else {
@@ -662,18 +370,15 @@ __device__ int BN_mod_exp_mont(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNU
     }
 
     // 1
-    // bn_mod_mul_montgomery_proto(&val[0], &aa, &mont.R2, m, &mont);
     bn_mod_mul_montgomery(&val[0], &aa, &mont.R2, m);
 
     window = BN_window_bits_for_exponent_size(bits);
     if (window > 1) {
         // 2
-        // bn_mod_mul_montgomery_proto(&d, &val[0], &val[0], m, &mont);
         bn_mod_mul_montgomery(&d, &val[0], &val[0], m);
         int j = 1 << (window - 1);
         for (i = 1; i < j; i++) {
             init_zero(&val[i]);
-            // bn_mod_mul_montgomery_proto(&val[i], &val[i - 1], &d, m, &mont);
             bn_mod_mul_montgomery(&val[i], &val[i - 1], &d, m);
         }
     }
@@ -684,8 +389,7 @@ __device__ int BN_mod_exp_mont(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNU
     wstart = bits - 1;          
     wend = 0;   
 
-    // init_one(&rr);
-    // Initialize rr by converting 1 to Montgomery form instead of using init_one
+    // Initialize rr by converting 1 to Montgomery form
     BIGNUM_CUDA one;
     init_one(&one);
     bn_to_montgomery(&rr, &one, &mont, m);
@@ -696,7 +400,6 @@ __device__ int BN_mod_exp_mont(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNU
 
         if (BN_is_bit_set(p, wstart) == 0) {
             if (!start) {
-                // bn_mod_mul_montgomery_proto(&rr, &rr, &rr, m, &mont);
                 bn_mod_mul_montgomery(&rr, &rr, &rr, m);
             }
             if (wstart == 0)
@@ -720,12 +423,10 @@ __device__ int BN_mod_exp_mont(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNU
         int j = wend + 1;
         if (!start) {
             for (i = 0; i < j; i++) {
-                // bn_mod_mul_montgomery_proto(&rr, &rr, &rr, m, &mont);
                 bn_mod_mul_montgomery(&rr, &rr, &rr, m);
             }
         }
 
-        // bn_mod_mul_montgomery_proto(&rr, &rr, &val[wvalue >> 1], m, &mont);
         bn_mod_mul_montgomery(&rr, &rr, &val[wvalue >> 1], m);
 
         wstart -= wend + 1;
@@ -737,7 +438,6 @@ __device__ int BN_mod_exp_mont(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNU
     // Montgomery reduction
     // BIGNUM_CUDA one;
     init_one(&one);
-    // bn_mod_mul_montgomery_proto(r, &rr, &one, m, &mont);
     bn_mod_mul_montgomery(r, &rr, &one, m);
     ret = 1;
     if (debug) {
