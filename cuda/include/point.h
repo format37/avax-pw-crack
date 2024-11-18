@@ -1110,68 +1110,76 @@ __device__ int ec_point_ladder_step(
     print_jacobian_point(">> s", s);
     printf("** field_mul **\n");
     // TODO: Remove ++
-    int ret = (
-    ossl_bn_mod_mul_montgomery(&t6, &r->X, &s->X, &group->field) &&
-    ossl_bn_mod_mul_montgomery(&t0, &r->Z, &s->Z, &group->field) &&
-    ossl_bn_mod_mul_montgomery(&t4, &r->X, &s->Z, &group->field) &&
-    ossl_bn_mod_mul_montgomery(&t3, &r->Z, &s->X, &group->field) &&
-    ossl_bn_mod_mul_montgomery(&t5, &group->a, &t0, &group->field) &&
-    bn_mod_add_quick(&t5, &t6, &t5, &group->field) &&
-    bn_mod_add_quick(&t6, &t3, &t4, &group->field) &&
-    ossl_bn_mod_mul_montgomery(&t5, &t6, &t5, &group->field) &&
-    ossl_bn_mod_sqr_montgomery(&t0, &t0, &group->field)
-    );
+    // int ret = (
+    // ossl_bn_mod_mul_montgomery(&t6, &r->X, &s->X, &group->field) &&
+    // ossl_bn_mod_mul_montgomery(&t0, &r->Z, &s->Z, &group->field) &&
+    // ossl_bn_mod_mul_montgomery(&t4, &r->X, &s->Z, &group->field) &&
+    // ossl_bn_mod_mul_montgomery(&t3, &r->Z, &s->X, &group->field) &&
+    // ossl_bn_mod_mul_montgomery(&t5, &group->a, &t0, &group->field) &&
+    // bn_mod_add_quick(&t5, &t6, &t5, &group->field) &&
+    // bn_mod_add_quick(&t6, &t3, &t4, &group->field) &&
+    // ossl_bn_mod_mul_montgomery(&t5, &t6, &t5, &group->field) &&
+    // ossl_bn_mod_sqr_montgomery(&t0, &t0, &group->field)
+    // );
+    // bn_mod_lshift_quick(&t2, &group->b, 2, &group->field);
+    // bn_print_no_fuse("* after bn_mod_lshift_quick t2: ", &t2);
+    // ossl_bn_mod_mul_montgomery(&t0, &t2, &t0, &group->field);
+    // bn_mod_lshift1_quick(&t5, &t5, &group->field);
+    // bn_print_no_fuse("* after bn_mod_lshift1_quick t5: ", &t5);
+    // bn_mod_sub_quick(&t3, &t4, &t3, &group->field);
+    // bn_print_no_fuse("* after bn_mod_sub_quick t3: ", &t3);
+    
     // exit(0);
     // TODO: Remove --
 
-    // // Follow OpenSSL's OR logic order
-    // int ret = (
-    //     // Initial steps
-    //     ossl_bn_mod_mul_montgomery(&t6, &r->X, &s->X, &group->field) &&
-    //     ossl_bn_mod_mul_montgomery(&t0, &r->Y, &s->Y, &group->field) &&
-    //     ossl_bn_mod_mul_montgomery(&t4, &r->X, &s->Y, &group->field) &&
-    //     ossl_bn_mod_mul_montgomery(&t3, &r->Y, &s->X, &group->field) &&
-    //     ossl_bn_mod_mul_montgomery(&t5, &group->a, &t0, &group->field) &&
-    //     bn_mod_add_quick(&t5, &t6, &t5, &group->field) &&
-    //     bn_mod_add_quick(&t6, &t3, &t4, &group->field) &&
-    //     ossl_bn_mod_mul_montgomery(&t5, &t6, &t5, &group->field) &&
-    //     ossl_bn_mod_sqr_montgomery(&t0, &t0, &group->field) &&
-    //     bn_mod_lshift_quick(&t2, &group->b, 2, &group->field) &&
-    //     ossl_bn_mod_mul_montgomery(&t0, &t2, &t0, &group->field) &&
-    //     bn_mod_lshift1_quick(&t5, &t5, &group->field) &&
-    //     bn_mod_sub_quick(&t3, &t4, &t3, &group->field) &&
+    // Follow OpenSSL's OR logic order
+    int ret = (
+        // Initial steps
+        ossl_bn_mod_mul_montgomery(&t6, &r->X, &s->X, &group->field) &&
+        ossl_bn_mod_mul_montgomery(&t0, &r->Z, &s->Z, &group->field) &&
+        ossl_bn_mod_mul_montgomery(&t4, &r->X, &s->Z, &group->field) &&
+        ossl_bn_mod_mul_montgomery(&t3, &r->Z, &s->X, &group->field) &&
+        ossl_bn_mod_mul_montgomery(&t5, &group->a, &t0, &group->field) &&
+        bn_mod_add_quick(&t5, &t6, &t5, &group->field) &&
+        bn_mod_add_quick(&t6, &t3, &t4, &group->field) &&
+        ossl_bn_mod_mul_montgomery(&t5, &t6, &t5, &group->field) &&
+        ossl_bn_mod_sqr_montgomery(&t0, &t0, &group->field)&&
+        bn_mod_lshift_quick(&t2, &group->b, 2, &group->field)&&
+        ossl_bn_mod_mul_montgomery(&t0, &t2, &t0, &group->field)&&
+        bn_mod_lshift1_quick(&t5, &t5, &group->field)&&
+        bn_mod_sub_quick(&t3, &t4, &t3, &group->field)&&
 
-    //     // s->Z coord output
-    //     ossl_bn_mod_sqr_montgomery(&s->Y, &t3, &group->field) &&
-    //     ossl_bn_mod_mul_montgomery(&t4, &s->Y, &p->X, &group->field) &&
-    //     bn_mod_add_quick(&t0, &t0, &t5, &group->field) &&
+        // s->Z coord output
+        ossl_bn_mod_sqr_montgomery(&s->Y, &t3, &group->field) &&
+        ossl_bn_mod_mul_montgomery(&t4, &s->Y, &p->X, &group->field) &&
+        bn_mod_add_quick(&t0, &t0, &t5, &group->field) &&
 
-    //     // s->X coord output
-    //     bn_mod_sub_quick(&s->X, &t0, &t4, &group->field) &&
-    //     ossl_bn_mod_sqr_montgomery(&t4, &r->X, &group->field) &&
-    //     ossl_bn_mod_sqr_montgomery(&t5, &r->Y, &group->field) &&
-    //     ossl_bn_mod_mul_montgomery(&t6, &t5, &group->a, &group->field) &&
-    //     bn_mod_add_quick(&t1, &r->X, &r->Y, &group->field) &&
-    //     ossl_bn_mod_sqr_montgomery(&t1, &t1, &group->field) &&
-    //     bn_mod_sub_quick(&t1, &t1, &t4, &group->field) &&
-    //     bn_mod_sub_quick(&t1, &t1, &t5, &group->field) &&
-    //     bn_mod_sub_quick(&t3, &t4, &t6, &group->field) &&
-    //     ossl_bn_mod_sqr_montgomery(&t3, &t3, &group->field) &&
-    //     ossl_bn_mod_mul_montgomery(&t0, &t5, &t1, &group->field) &&
-    //     ossl_bn_mod_mul_montgomery(&t0, &t2, &t0, &group->field) &&
+        // s->X coord output
+        bn_mod_sub_quick(&s->X, &t0, &t4, &group->field) &&
+        ossl_bn_mod_sqr_montgomery(&t4, &r->X, &group->field) &&
+        ossl_bn_mod_sqr_montgomery(&t5, &r->Y, &group->field) &&
+        ossl_bn_mod_mul_montgomery(&t6, &t5, &group->a, &group->field) &&
+        bn_mod_add_quick(&t1, &r->X, &r->Y, &group->field) &&
+        ossl_bn_mod_sqr_montgomery(&t1, &t1, &group->field) &&
+        bn_mod_sub_quick(&t1, &t1, &t4, &group->field) &&
+        bn_mod_sub_quick(&t1, &t1, &t5, &group->field) &&
+        bn_mod_sub_quick(&t3, &t4, &t6, &group->field) &&
+        ossl_bn_mod_sqr_montgomery(&t3, &t3, &group->field) &&
+        ossl_bn_mod_mul_montgomery(&t0, &t5, &t1, &group->field) &&
+        ossl_bn_mod_mul_montgomery(&t0, &t2, &t0, &group->field) &&
 
-    //     // r->X coord output 
-    //     bn_mod_sub_quick(&r->X, &t3, &t0, &group->field) &&
-    //     bn_mod_add_quick(&t3, &t4, &t6, &group->field) &&
-    //     ossl_bn_mod_sqr_montgomery(&t4, &t5, &group->field) &&
-    //     ossl_bn_mod_mul_montgomery(&t4, &t4, &t2, &group->field) &&
-    //     ossl_bn_mod_mul_montgomery(&t1, &t1, &t3, &group->field) &&
-    //     bn_mod_lshift1_quick(&t1, &t1, &group->field) &&
+        // r->X coord output 
+        bn_mod_sub_quick(&r->X, &t3, &t0, &group->field) &&
+        bn_mod_add_quick(&t3, &t4, &t6, &group->field) &&
+        ossl_bn_mod_sqr_montgomery(&t4, &t5, &group->field) &&
+        ossl_bn_mod_mul_montgomery(&t4, &t4, &t2, &group->field) &&
+        ossl_bn_mod_mul_montgomery(&t1, &t1, &t3, &group->field) &&
+        bn_mod_lshift1_quick(&t1, &t1, &group->field) &&
 
-    //     // r->Z coord output
-    //     bn_mod_add_quick(&r->Y, &t4, &t1, &group->field)
-    // );
+        // r->Z coord output
+        bn_mod_add_quick(&r->Y, &t4, &t1, &group->field)
+    );
 
-    // return ret;
-    return 0; // TODO: Remove
+    return ret;
+    // return 0; // TODO: Remove
 }
