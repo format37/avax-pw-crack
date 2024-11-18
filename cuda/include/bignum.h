@@ -240,6 +240,21 @@ __device__ int bn_cmp_abs(const BIGNUM_CUDA *a, const BIGNUM_CUDA *b) {
     return 0;
 }
 
+__device__ int bn_ucmp(const BIGNUM_CUDA *a, const BIGNUM_CUDA *b) {
+    if (a->top > b->top)
+        return 1;
+    if (b->top > a->top)
+        return -1;
+
+    for (int i = a->top - 1; i >= 0; i--) {
+        if (a->d[i] > b->d[i])
+            return 1;
+        if (b->d[i] > a->d[i])
+            return -1;
+    }
+    return 0;
+}
+
 // Helper function to perform a deep copy of BIGNUM_CUDA
 __device__ void bn_copy(BIGNUM_CUDA * __restrict__ dest, const BIGNUM_CUDA *src) {
     // if (dest == NULL || src == NULL) {

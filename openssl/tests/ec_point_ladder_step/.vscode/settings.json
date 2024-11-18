@@ -4,6 +4,15 @@
         "queue": "cpp",
         "functional": "cpp",
         "__locale": "cpp",
-        "stack": "cpp"
+        "stack": "cpp",
+        "random": "cpp",
+        "algorithm": "cpp",
+        "compare": "cpp",
+        "cstdint": "cpp",
+        "chrono": "cpp",
+        "limits": "cpp",
+        "semaphore": "cpp",
+        "ratio": "cpp",
+        "cstdlib": "c"
     }
 }
