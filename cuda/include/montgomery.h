@@ -180,10 +180,10 @@ __device__ bool ossl_bn_mod_mul_montgomery(
 ) {
     bn_print_no_fuse("\nbn_mod_mul_montgomery >> a: ", a);
     bn_print_no_fuse("bn_mod_mul_montgomery >> b: ", b);
-    bn_print_no_fuse("bn_mod_mul_montgomery >> n: ", n);
+    // bn_print_no_fuse("bn_mod_mul_montgomery >> n: ", n);
     // Call CUDA's bn_mod_mul_montgomery with reordered parameters
     bn_mod_mul_montgomery(a, b, n, result);
-    bn_print_no_fuse("bn_mod_mul_montgomery << result: ", result);
+    bn_print_no_fuse("bn_mod_mul_montgomery << r: ", result);
     return true;  // Since CUDA version returns void, we return true for success
 }
 

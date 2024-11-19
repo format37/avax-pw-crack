@@ -23,8 +23,7 @@ folders = [
     # "~/projects/avax-pw-crack/openssl/tests/ec_point_ladder_step/run.log",
     
     
-    # "~/projects/avax-pw-crack/openssl/tests/ec_point_ladder_step/test.c",
-    # "~/projects/avax-pw-crack/openssl/tests/ec_point_ladder_step/run.log",
+    
     # "~/projects/avax-pw-crack/openssl/tests/bn_mod_add_fixed_top/test.c",
     # "~/projects/avax-pw-crack/openssl/tests/bn_mod_add_fixed_top/build.log",
     # "~/projects/avax-pw-crack/openssl/tests/BN_mod_add_quick/test.c",
@@ -70,8 +69,7 @@ folders = [
     # "~/projects/avax-pw-crack/cuda/prompts/121_ossl_ec_GFp_mont_field_inv_base.md",
     # "~/projects/avax-pw-crack/openssl/tests/ec_point_ladder_step/test.c",
     # "~/projects/avax-pw-crack/openssl/tests/ec_point_ladder_step/run.log",
-    # "~/projects/avax-pw-crack/cuda/tests/ec_point_ladder_step/test.cu",
-    # "~/projects/avax-pw-crack/cuda/tests/ec_point_ladder_step/run.log",
+    
     
     # "~/projects/openssl_original/crypto/bn/bn_asm.c",
     # "~/projects/openssl_original/crypto/bn/bn_mont.c",
@@ -86,6 +84,10 @@ folders = [
     # "~/projects/avax-pw-crack/cuda/tests/BN_mod_mul_montgomery_cuda/test.cu",
     # "~/projects/avax-pw-crack/openssl/tests/BN_mod_mul_montgomery/run.log",    
     # "~/projects/avax-pw-crack/cuda/tests/BN_mod_mul_montgomery_cuda/run.log",
+    # "~/projects/avax-pw-crack/openssl/tests/ec_point_ladder_step/test.c",
+    # "~/projects/avax-pw-crack/openssl/tests/ec_point_ladder_step/run.log",
+    "~/projects/avax-pw-crack/cuda/tests/ec_point_ladder_step/test.cu",
+    "~/projects/avax-pw-crack/cuda/tests/ec_point_ladder_step/run.log",
     "~/projects/avax-pw-crack/openssl/tests/ec_point_scalar_mul_montgomery/test.c",
     "~/projects/avax-pw-crack/openssl/tests/ec_point_scalar_mul_montgomery/run.log",
     "~/projects/avax-pw-crack/cuda/tests/ec_point_scalar_mul_montgomery/test.cu"
