@@ -24,5 +24,10 @@ rm -rf run.log
 echo "Checking which libcrypto is being used:" >> run.log 2>&1
 ldd program | grep libcrypto >> run.log 2>&1
 
-valgrind --tool=callgrind ./program >> run.log 2>&1
+echo "### Running the program:" >> run.log 2>&1
+# valgrind \
+#     --tool=callgrind \
+#     --callgrind-out-file=callgrind.out.15134 \
+    ./program \
+    >> run.log 2>&1
 cat run.log

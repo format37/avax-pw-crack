@@ -6,11 +6,27 @@
 #include <openssl/obj_mac.h>
 // #include "crypto/ec.h"
 
+BN_CTX* create_deterministic_ctx() {
+    BN_CTX* ctx = BN_CTX_new();
+    BN_CTX_start(ctx);
+    // Pre-allocate enough BIGNUMs for ladder_step's t0-t6 and other operations
+    BIGNUM *t0 = BN_CTX_get(ctx);
+    BIGNUM *t1 = BN_CTX_get(ctx);
+    BIGNUM *t2 = BN_CTX_get(ctx);
+    BIGNUM *t3 = BN_CTX_get(ctx);
+    BIGNUM *t4 = BN_CTX_get(ctx);
+    BIGNUM *t5 = BN_CTX_get(ctx);
+    BIGNUM *t6 = BN_CTX_get(ctx);
+    // Add more as needed for other operations
+    BN_CTX_end(ctx);
+    return ctx;
+}
 
 int main(void) {
     printf("Starting...\n");
     // Initialize BN_CTX
-    BN_CTX *ctx = BN_CTX_new();
+    // BN_CTX *ctx = BN_CTX_new();
+    BN_CTX *ctx = create_deterministic_ctx();
     if (!ctx) {
         fprintf(stderr, "Failed to create BN_CTX\n");
         return 1;

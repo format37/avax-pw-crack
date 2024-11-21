@@ -1,7 +1,8 @@
 #include "jacobian_point.h"
 
-// __device__ bool compute_mont_nprime(BIGNUM_CUDA *n_prime, const BIGNUM_CUDA *n, const BIGNUM_CUDA *R);
-// __device__ void bn_mod_mul_montgomery(const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, const BIGNUM_CUDA *n, BIGNUM_CUDA * __restrict__ result_of_multiplication);
+#define WINDOW_SIZE 5
+#define MAX_WNAF_LENGTH 256  // Adjust as per your needs
+#define NUM_PRECOMPUTED_POINTS (1 << (WINDOW_SIZE - 1))
 
 // limit to 256 bits
 __device__ void bignum_to_bit_array(BIGNUM_CUDA *n, unsigned int *bits) {
@@ -1161,73 +1162,549 @@ __device__ void init_jacobian_point(EC_POINT_JACOBIAN *point) {
     init_zero(&point->X);
     init_zero(&point->Y);
     init_zero(&point->Z);
-    point->Z.d[0] = 1;  // Set Z = 1 by default
-    point->Z.top = 1;
+    // point->Z.d[0] = 1;  // Set Z = 1 by default
+    // point->Z.top = 1;
+}
+
+typedef struct {
+    BIGNUM_CUDA p;       // Prime field modulus
+    BIGNUM_CUDA a;       // Curve parameter 'a'
+    BIGNUM_CUDA b;       // Curve parameter 'b'
+    BIGNUM_CUDA Gx;      // x-coordinate of the base point G
+    BIGNUM_CUDA Gy;      // y-coordinate of the base point G
+    BIGNUM_CUDA n;       // Order of the base point G
+    BIGNUM_CUDA h;       // Cofactor
+} CurveParameters;
+
+__device__ int bn_is_odd(const BIGNUM_CUDA *a) {
+    if (a->top == 0) {
+        return 0;  // Zero is even
+    }
+    return a->d[0] & 1;
+}
+
+__device__ void bn_and_word(const BIGNUM_CUDA *a, BN_ULONG w, BIGNUM_CUDA *result) {
+    init_zero(result);
+
+    if (a->top == 0) {
+        return;
+    }
+
+    result->d[0] = a->d[0] & w;
+    result->top = 1;
+    result->neg = a->neg;
+}
+
+__device__ int bn_hex2bn(BIGNUM_CUDA *bn, const char *hex_str) {
+    init_zero(bn);
+
+    int hex_len = 0;
+    while (hex_str[hex_len] != '\0') {
+        hex_len++;
+    }
+
+    int byte_len = (hex_len + 1) / 2;
+    int num_words = (byte_len + sizeof(BN_ULONG) - 1) / sizeof(BN_ULONG);
+
+    if (num_words > MAX_BIGNUM_SIZE) {
+        // Exceeds maximum size
+        return 0;
+    }
+
+    int hex_index = 0;
+    int word_index = 0;
+    BN_ULONG current_word = 0;
+    int bits_in_current_word = 0;
+
+    // Start from the end of the hex string
+    for (int i = hex_len - 1; i >= 0; i--) {
+        char c = hex_str[i];
+        int value = 0;
+
+        if (c >= '0' && c <= '9') {
+            value = c - '0';
+        } else if (c >= 'A' && c <= 'F') {
+            value = 10 + c - 'A';
+        } else if (c >= 'a' && c <= 'f') {
+            value = 10 + c - 'a';
+        } else {
+            // Invalid character
+            return 0;
+        }
+
+        current_word |= ((BN_ULONG)value) << bits_in_current_word;
+        bits_in_current_word += 4;
+
+        if (bits_in_current_word >= BN_ULONG_NUM_BITS) {
+            bn->d[word_index++] = current_word;
+            current_word = 0;
+            bits_in_current_word = 0;
+        }
+    }
+
+    if (bits_in_current_word > 0) {
+        bn->d[word_index++] = current_word;
+    }
+
+    bn->top = word_index;
+    bn->neg = false;
+
+    // Remove leading zeros
+    while (bn->top > 1 && bn->d[bn->top - 1] == 0) {
+        bn->top--;
+    }
+
+    return 1;  // Success
+}
+
+__device__ int compute_wNAF(const BIGNUM_CUDA *scalar, int w, signed char *wNAF) {
+    BIGNUM_CUDA k;
+    bn_copy(&k, scalar);
+
+    int width = w;
+    int bits = bn_bit_length(&k);
+    int sign = 1;
+    int index = 0;
+    int mask = (1 << width) - 1;
+
+    if (bn_is_zero(&k)) {
+        wNAF[0] = 0;
+        return 1;
+    }
+
+    if (k.neg) {
+        sign = -1;
+        k.neg = 0;  // Make k positive
+    }
+
+    while (!bn_is_zero(&k)) {
+        if (bn_is_odd(&k)) {
+            BIGNUM_CUDA remainder;
+            init_zero(&remainder);
+
+            bn_and_word(&k, mask, &remainder);
+
+            int digit = remainder.d[0];
+            if (digit & (1 << (width - 1))) {
+                digit -= (1 << width);
+            }
+
+            wNAF[index++] = (signed char)(digit * sign);
+
+            BIGNUM_CUDA temp;
+            init_zero(&temp);
+            bn_set_word(&temp, abs(digit));
+            bn_sub(&k, &k, &temp);
+        } else {
+            wNAF[index++] = 0;
+        }
+        bn_rshift1(&k);
+    }
+    return index;  // Returns the length of wNAF representation
+}
+
+__device__ void point_double_cuda(
+    const EC_POINT_CUDA *P,
+    EC_POINT_CUDA *result,
+    const CurveParameters *curve_params
+) {
+    // Implement point doubling in affine coordinates or Jacobian coordinates.
+    // For better performance, use Jacobian coordinates.
+    // Here is a simplified version using affine coordinates:
+
+    if (point_is_at_infinity(P)) {
+        set_point_at_infinity(result);
+        return;
+    }
+
+    BIGNUM_CUDA lambda, numerator, denominator, temp;
+    init_zero(&lambda);
+    init_zero(&numerator);
+    init_zero(&denominator);
+    init_zero(&temp);
+
+    // numerator = 3 * x^2 + a
+    bn_mod_sqr(&temp, &P->x, &curve_params->p);
+    bn_set_word(&numerator, 3);
+    bn_mod_mul(&numerator, &numerator, &temp, &curve_params->p);
+    bn_mod_add(&numerator, &numerator, &curve_params->a, &curve_params->p);
+
+    // denominator = 2 * y
+    bn_set_word(&denominator, 2);
+    bn_mod_mul(&denominator, &denominator, &P->y, &curve_params->p);
+
+    // lambda = numerator / denominator mod p
+    bn_mod_inverse(&denominator, &denominator, &curve_params->p);
+    bn_mod_mul(&lambda, &numerator, &denominator, &curve_params->p);
+
+    // x_r = lambda^2 - 2 * x
+    bn_mod_sqr(&temp, &lambda, &curve_params->p);
+    bn_mod_sub(&temp, &temp, &P->x, &curve_params->p);
+    bn_mod_sub(&result->x, &temp, &P->x, &curve_params->p);
+
+    // y_r = lambda * (x - x_r) - y
+    bn_mod_sub(&temp, &P->x, &result->x, &curve_params->p);
+    bn_mod_mul(&temp, &lambda, &temp, &curve_params->p);
+    bn_mod_sub(&result->y, &temp, &P->y, &curve_params->p);
+}
+
+__device__ void point_add_cuda(
+    EC_POINT_CUDA *result,
+    const EC_POINT_CUDA *P,
+    const EC_POINT_CUDA *Q,
+    const CurveParameters *curve_params
+) {
+    // Handle special cases
+    if (point_is_at_infinity(P)) {
+        bn_copy(&result->x, &Q->x);
+        bn_copy(&result->y, &Q->y);
+        return;
+    }
+    if (point_is_at_infinity(Q)) {
+        bn_copy(&result->x, &P->x);
+        bn_copy(&result->y, &P->y);
+        return;
+    }
+
+    if (bn_cmp(&P->x, &Q->x) == 0) {
+        if (bn_cmp(&P->y, &Q->y) != 0) {
+            // P + (-P) = 0
+            set_point_at_infinity(result);
+            return;
+        } else {
+            // P + P = 2P
+            point_double_cuda(P, result, curve_params);
+            return;
+        }
+    }
+
+    BIGNUM_CUDA lambda, numerator, denominator, temp;
+    init_zero(&lambda);
+    init_zero(&numerator);
+    init_zero(&denominator);
+    init_zero(&temp);
+
+    // numerator = y_Q - y_P
+    bn_mod_sub(&numerator, &Q->y, &P->y, &curve_params->p);
+
+    // denominator = x_Q - x_P
+    bn_mod_sub(&denominator, &Q->x, &P->x, &curve_params->p);
+
+    // lambda = numerator / denominator mod p
+    bn_mod_inverse(&denominator, &denominator, &curve_params->p);
+    bn_mod_mul(&lambda, &numerator, &denominator, &curve_params->p);
+
+    // x_r = lambda^2 - x_P - x_Q
+    bn_mod_sqr(&temp, &lambda, &curve_params->p);
+    bn_mod_sub(&temp, &temp, &P->x, &curve_params->p);
+    bn_mod_sub(&result->x, &temp, &Q->x, &curve_params->p);
+
+    // y_r = lambda * (x_P - x_r) - y_P
+    bn_mod_sub(&temp, &P->x, &result->x, &curve_params->p);
+    bn_mod_mul(&temp, &lambda, &temp, &curve_params->p);
+    bn_mod_sub(&result->y, &temp, &P->y, &curve_params->p);
+}
+
+__device__ void precompute_multiples(
+    const EC_POINT_CUDA *point,
+    EC_POINT_CUDA *precomputed_points,
+    const CurveParameters *curve_params
+) {
+    // precomputed_points[0] = point
+    bn_copy(&precomputed_points[0].x, &point->x);
+    bn_copy(&precomputed_points[0].y, &point->y);
+
+    EC_POINT_CUDA twoP;
+    point_double_cuda(point, &twoP, curve_params);
+
+    for (int i = 1; i < NUM_PRECOMPUTED_POINTS; i++) {
+        point_add_cuda(&precomputed_points[i], &precomputed_points[i - 1], &twoP, curve_params);
+    }
+}
+
+__device__ void point_negate(
+    const EC_POINT_CUDA *P,
+    EC_POINT_CUDA *result,
+    const CurveParameters *curve_params
+) {
+    bn_copy(&result->x, &P->x);
+    bn_mod_sub(&result->y, &curve_params->p, &P->y, &curve_params->p);
+}
+
+__device__ void ec_point_scalar_mul_wnaf(
+    EC_POINT_CUDA *result,
+    const EC_POINT_CUDA *point,
+    const BIGNUM_CUDA *scalar,
+    const CurveParameters *curve_params
+) {
+    // Print inputs
+    printf("++ ec_point_scalar_mul_wnaf ++\n");
+    bn_print_no_fuse(">> scalar: ", scalar);
+    bn_print_no_fuse(">> point.x: ", &point->x);
+    bn_print_no_fuse(">> point.y: ", &point->y);
+    bn_print_no_fuse(">> curve_params->p: ", &curve_params->p);
+    bn_print_no_fuse(">> curve_params->a: ", &curve_params->a);
+    bn_print_no_fuse(">> curve_params->b: ", &curve_params->b);
+    bn_print_no_fuse(">> curve_params->Gx: ", &curve_params->Gx);
+    bn_print_no_fuse(">> curve_params->Gy: ", &curve_params->Gy);
+    bn_print_no_fuse(">> curve_params->n: ", &curve_params->n);
+    bn_print_no_fuse(">> curve_params->h: ", &curve_params->h);
+    
+    // Step 1: Convert scalar to wNAF
+    signed char wNAF[MAX_WNAF_LENGTH];
+    int wNAF_len = compute_wNAF(scalar, WINDOW_SIZE, wNAF);
+
+    // Step 2: Precompute point multiples
+    EC_POINT_CUDA precomputed[NUM_PRECOMPUTED_POINTS];
+    precompute_multiples(point, precomputed, curve_params);
+
+    // Step 3: Initialize result to point at infinity
+    set_point_at_infinity(result);
+
+    // Step 4: Main loop
+    for (int i = wNAF_len - 1; i >= 0; i--) {
+        // Double the result point
+        point_double_cuda(result, result, curve_params);
+
+        if (wNAF[i] != 0) {
+            if (wNAF[i] > 0) {
+                int idx = (wNAF[i] - 1) / 2;
+                point_add_cuda(result, result, &precomputed[idx], curve_params);
+            } else {
+                int idx = (-wNAF[i] - 1) / 2;
+                EC_POINT_CUDA neg_point;
+                point_negate(&precomputed[idx], &neg_point, curve_params);
+                point_add_cuda(result, result, &neg_point, curve_params);
+            }
+        }
+    }
+}
+
+__device__ void init_curve_parameters(CurveParameters *curve_params) {
+    // Initialize the curve parameters for secp256k1, for example
+    // Set p, a, b, Gx, Gy, n, h
+
+    // Example for p:
+    bn_hex2bn(&curve_params->p, "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F");
+
+    // Similarly for other parameters
+
 }
 
 __device__ void ec_point_scalar_mul_montgomery(
+    const EC_POINT_CUDA *point,
+    const BIGNUM_CUDA *scalar,
+    MONT_CTX_CUDA *mont_ctx,
+    EC_POINT_CUDA *result
+) {
+
+    bool debug = true;
+    if (debug) {
+        printf("++ ec_point_scalar_mul_montgomery ++\n");
+        bn_print_no_fuse(">> point.x: ", &point->x);
+        bn_print_no_fuse(">> point.y: ", &point->y);
+        bn_print_no_fuse(">> scalar: ", scalar);
+        bn_print_no_fuse(">> mont_ctx->R: ", &mont_ctx->R);
+        bn_print_no_fuse(">> mont_ctx->n: ", &mont_ctx->n);
+        bn_print_no_fuse(">> mont_ctx->n_prime: ", &mont_ctx->n_prime);
+    }
+
+    // Initialize curve parameters
+    CurveParameters curve_params;
+    init_curve_parameters(&curve_params);
+
+    // Convert curve parameters to Montgomery form if necessary
+    // For this example, let's assume that curve_params are already in Montgomery form
+
+    // Call the wNAF scalar multiplication function
+    ec_point_scalar_mul_wnaf(result, point, scalar, &curve_params);
+
+    if (debug) {
+        bn_print_no_fuse("<< result.x: ", &result->x);
+        bn_print_no_fuse("<< result.y: ", &result->y);
+        printf("-- ec_point_scalar_mul_montgomery --\n");
+    }
+}
+
+__device__ void ec_point_scalar_mul_montgomery_proto(
+    const EC_POINT_CUDA *point, 
+    const BIGNUM_CUDA *scalar,
+    MONT_CTX_CUDA *mont_ctx,
+    EC_POINT_CUDA *result
+) {
+    bool debug = true;
+    if (debug) {
+        printf("++ ec_point_scalar_mul_montgomery ++\n");
+        bn_print_no_fuse(">> point.x: ", &point->x);
+        bn_print_no_fuse(">> point.y: ", &point->y);
+        bn_print_no_fuse(">> scalar: ", scalar);
+        bn_print_no_fuse(">> mont_ctx->R: ", &mont_ctx->R);
+        bn_print_no_fuse(">> mont_ctx->n: ", &mont_ctx->n);
+        bn_print_no_fuse(">> mont_ctx->n_prime: ", &mont_ctx->n_prime);
+    }
+
+    // Initialize group parameters
+    EC_GROUP_CUDA group;
+    init_zero(&group.field);
+    init_zero(&group.a);
+    init_zero(&group.b);
+    init_zero(&group.order);
+    bn_copy(&group.field, &mont_ctx->n);
+    bn_set_word(&group.a, 0);
+    bn_set_word(&group.b, 7);
+    
+    // Set field to modulus
+    bn_copy(&group.field, &mont_ctx->n);
+
+    // Set curve parameters (for secp256k1)
+    bn_set_word(&group.a, 0);         // a = 0
+    bn_set_word(&group.b, 7);         // b = 7
+    
+    // Convert curve parameters to Montgomery form
+    BIGNUM_CUDA mont_b;
+    init_zero(&mont_b);
+    bn_mod_mul_montgomery(&mont_b, &group.b, &mont_ctx->R2, &mont_ctx->n);
+    bn_copy(&group.b, &mont_b);
+
+    // Initialize R[0] = point at infinity, R[1] = input point in Jacobian coordinates
+    EC_POINT_JACOBIAN R[2];
+    init_jacobian_point(&R[0]);
+    init_jacobian_point(&R[1]);
+
+    // Convert input point to Montgomery domain and then to Jacobian coordinates
+    EC_POINT_CUDA mont_point;
+    init_zero(&mont_point.x);
+    init_zero(&mont_point.y);
+    point_to_montgomery(&mont_point, point, mont_ctx);
+    affine_to_jacobian(&mont_point, &R[1]);
+    
+    // Keep track of current index (bit value)
+    int index = 0;
+
+    // Start from the most significant bit
+    int bits = bn_bit_length(scalar);
+    
+    // Montgomery ladder main loop
+    for (int i = bits - 1; i >= 0; i--) {
+        int bit = BN_is_bit_set(scalar, i);
+        
+        // Conditional swap if current bit differs from index
+        if (bit != index) {
+            EC_POINT_JACOBIAN temp = R[0];
+            R[0] = R[1];
+            R[1] = temp;
+            index = bit;
+        }
+
+        // Always perform ladder step
+        if (!ec_point_ladder_step(&group, &R[0], &R[1], &R[1])) {
+            printf("Error in ladder step\n");
+            return;
+        }
+    }
+
+    // Final conditional swap if necessary
+    if (index != 0) {
+        EC_POINT_JACOBIAN temp = R[0];
+        R[0] = R[1];
+        R[1] = temp;
+    }
+
+    // Convert result from Jacobian coordinates back to affine
+    EC_POINT_CUDA mont_result;
+    init_zero(&mont_result.x);
+    init_zero(&mont_result.y);
+    jacobian_to_affine(&R[0], &mont_result, &mont_ctx->n);
+
+    // Convert result from Montgomery domain back to normal domain
+    point_from_montgomery(result, &mont_result, mont_ctx);
+
+    if (debug) {
+        bn_print_no_fuse("<< result.x: ", &result->x);
+        bn_print_no_fuse("<< result.y: ", &result->y);
+        printf("-- ec_point_scalar_mul_montgomery --\n");
+    }
+}
+
+__device__ void ec_point_scalar_mul_montgomery_x(
     const EC_POINT_CUDA *point, 
     const BIGNUM_CUDA *scalar,
     const MONT_CTX_CUDA *mont_ctx,
     EC_POINT_CUDA *result
 ) {
+    bn_print_no_fuse(">> ec_point_scalar_mul_montgomery >> point.x: ", &point->x);
+    bn_print_no_fuse(">> ec_point_scalar_mul_montgomery >> point.y: ", &point->y);
+    // scalar
+    bn_print_no_fuse(">> ec_point_scalar_mul_montgomery >> scalar: ", scalar);
+    // mont_ctx
+    bn_print_no_fuse(">> ec_point_scalar_mul_montgomery >> mont_ctx->R: ", &mont_ctx->R);
+    bn_print_no_fuse(">> ec_point_scalar_mul_montgomery >> mont_ctx->n: ", &mont_ctx->n);
+    bn_print_no_fuse(">> ec_point_scalar_mul_montgomery >> mont_ctx->n_prime: ", &mont_ctx->n_prime);
+
     // Convert input point to Montgomery form
     EC_POINT_CUDA mont_point;
     init_zero(&mont_point.x);
     init_zero(&mont_point.y);
     point_to_montgomery(&mont_point, point, mont_ctx);
 
-    // Create EC_GROUP_CUDA structure for ladder step
+    // Initialize group parameters
     EC_GROUP_CUDA group;
     init_zero(&group.field);
     init_zero(&group.a);
     init_zero(&group.b);
     init_zero(&group.order);
-    
-    // Set the field modulus
     bn_copy(&group.field, &mont_ctx->n);
-    
-    // Convert curve parameter a to Montgomery form (0 for secp256k1)
-    init_zero(&group.a);
+
+    // Set curve parameters (for secp256k1, a = 0, b = 7)
+    init_zero(&group.a); // a = 0
+    bn_set_word(&group.b, 7); // b = 7
+    // Convert b to Montgomery form
+    bn_mod_mul_montgomery(&group.b, &group.b, &mont_ctx->R2, &group.field);
 
     // Initialize Jacobian points for ladder computation
-    EC_POINT_JACOBIAN R, S, mont_point_jacobian;
-    init_jacobian_point(&R);
-    init_jacobian_point(&S);
-    
-    // Convert Montgomery affine point to Jacobian
+    EC_POINT_JACOBIAN R[2];
+    int index = 0;
+
+    // Initialize R[0] = point at infinity
+    init_jacobian_point(&R[0]);
+
+    // Initialize R[1] = P in Jacobian coordinates
+    EC_POINT_JACOBIAN mont_point_jacobian;
+    init_jacobian_point(&mont_point_jacobian);
     affine_to_jacobian(&mont_point, &mont_point_jacobian);
+    copy_jacobian_point(&R[1], &mont_point_jacobian);
 
     // Get bit length of scalar
     int bit_len = bn_bit_length(scalar);
 
     // Montgomery ladder loop
     for (int i = bit_len - 1; i >= 0; i--) {
-        if (BN_is_bit_set(scalar, i)) {
-            EC_POINT_JACOBIAN temp = R;
-            R = S;
-            S = temp;
+        int bit = BN_is_bit_set(scalar, i);
+
+        if (bit != index) {
+            // Swap R[0] and R[1]
+            EC_POINT_JACOBIAN temp = R[0];
+            R[0] = R[1];
+            R[1] = temp;
+            index = bit;
         }
 
-        ec_point_ladder_step(&group, &R, &S, &mont_point_jacobian);
-
-        if (BN_is_bit_set(scalar, i)) {
-            EC_POINT_JACOBIAN temp = R;
-            R = S;
-            S = temp;
-        }
+        // Perform ladder step
+        ec_point_ladder_step(&group, &R[0], &R[1], &mont_point_jacobian);
     }
 
-    // Convert result back to affine coordinates
+    // Copy result
+    EC_POINT_JACOBIAN result_jacobian;
+    copy_jacobian_point(&result_jacobian, &R[index]);
+
+    // Convert result to affine coordinates
     EC_POINT_CUDA mont_result;
-    init_zero(&mont_result.x);
-    init_zero(&mont_result.y);
-    jacobian_to_affine(&R, &mont_result, &mont_ctx->n);
+    jacobian_to_affine(&result_jacobian, &mont_result, &mont_ctx->n);
 
     // Convert result from Montgomery form
     point_from_montgomery(result, &mont_result, mont_ctx);
 
     // Print result
-    bn_print_no_fuse("ec_point_scalar_mul_montgomery result.x: ", &result->x);
-    bn_print_no_fuse("ec_point_scalar_mul_montgomery result.y: ", &result->y);
+    bn_print_no_fuse("<< ec_point_scalar_mul_montgomery << result.x: ", &result->x);
+    bn_print_no_fuse("<< ec_point_scalar_mul_montgomery << result.y: ", &result->y);
 }

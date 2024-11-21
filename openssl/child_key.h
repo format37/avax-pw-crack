@@ -178,6 +178,46 @@ void print_bn(const char* label, const BIGNUM* bn) {
 	OPENSSL_free(bn_str);
 }
 
+void print_ec_group(const EC_GROUP *group) {
+    const EC_POINT *generator = EC_GROUP_get0_generator(group);
+    const BIGNUM *order = EC_GROUP_get0_order(group);
+    const BIGNUM *cofactor = EC_GROUP_get0_cofactor(group);
+    
+    if (generator == NULL || order == NULL || cofactor == NULL) {
+        fprintf(stderr, "Failed to retrieve EC_GROUP attributes\n");
+        return;
+    }
+    
+    char *gen_hex = EC_POINT_point2hex(group, generator, POINT_CONVERSION_UNCOMPRESSED, NULL);
+    char *order_hex = BN_bn2hex(order);
+    char *cofactor_hex = BN_bn2hex(cofactor);
+    
+    if (gen_hex != NULL) {
+        printf("Generator: %s\n", gen_hex);
+        OPENSSL_free(gen_hex);
+    }
+    
+    if (order_hex != NULL) {
+        printf("Order: %s\n", order_hex);
+        OPENSSL_free(order_hex);
+    }
+    
+    if (cofactor_hex != NULL) {
+        printf("Cofactor: %s\n", cofactor_hex);
+        OPENSSL_free(cofactor_hex);
+    }
+}
+
+void print_ec_point(const EC_GROUP *group, const EC_POINT *point) {
+    char *hex = EC_POINT_point2hex(group, point, POINT_CONVERSION_UNCOMPRESSED, NULL);
+    if (hex != NULL) {
+        printf("EC_POINT: %s\n", hex);
+        OPENSSL_free(hex);
+    } else {
+        fprintf(stderr, "Failed to convert EC_POINT to hex\n");
+    }
+}
+
 unsigned char *GetPublicKey(unsigned char *privateKeyBytes, size_t privateKeyLen, size_t *publicKeyLen) {
     printf("++ GetPublicKey ++\n");
     printf(">> privateKeyBytes: ");
@@ -219,6 +259,15 @@ unsigned char *GetPublicKey(unsigned char *privateKeyBytes, size_t privateKeyLen
         return NULL;
     }
 
+    // printf("## Before EC_POINT_mul ##\n");
+    // // Print curve
+    // printf(">> Curve: \n");
+    // print_ec_group(curve);
+    // // Print pub_key
+    // printf(">> pub_key: \n");
+    // print_ec_point(curve, pub_key);
+    // // privateKey
+    // printf(">> PrivateKey: %s\n", BN_bn2hex(privateKey));
     if (!EC_POINT_mul(curve, pub_key, privateKey, NULL, NULL, NULL)) {
         return NULL;
     }
