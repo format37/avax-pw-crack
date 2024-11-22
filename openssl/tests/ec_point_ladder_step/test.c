@@ -5,6 +5,9 @@
 #include <openssl/ec.h>
 #include <openssl/obj_mac.h>
 #include <openssl/err.h>
+
+// void print_group_rsp(const char *label, const EC_GROUP *group, EC_POINT *r, EC_POINT *s, EC_POINT *p); // build original lib is issues presists
+
 #include "ec_local.h"
 
 // Utility function to print EC_POINT in hex

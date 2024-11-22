@@ -113,12 +113,6 @@ int main(void) {
     //     fprintf(stderr, "Failed to set generator coordinates\n");
     //     goto cleanup;
     // }
-    
-
-    printf("Initial state:\n");
-    print_point("r", r, group, ctx);
-    print_point("s", s, group, ctx);
-    print_point("p", p, group, ctx);
 
     // Call the ladder_pre function
     if (!ec_point_ladder_pre(group, r, s, p, ctx)) {
@@ -127,9 +121,6 @@ int main(void) {
     }
 
     printf("\nAfter ladder_pre:\n");
-    print_point("r", r, group, ctx);
-    print_point("s", s, group, ctx);
-    print_point("p", p, group, ctx);
 
     ret = 1;
 

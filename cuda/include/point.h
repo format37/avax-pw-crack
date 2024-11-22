@@ -1526,185 +1526,71 @@ __device__ void ec_point_scalar_mul_montgomery(
     }
 }
 
-__device__ void ec_point_scalar_mul_montgomery_proto(
-    const EC_POINT_CUDA *point, 
-    const BIGNUM_CUDA *scalar,
-    MONT_CTX_CUDA *mont_ctx,
-    EC_POINT_CUDA *result
-) {
-    bool debug = true;
-    if (debug) {
-        printf("++ ec_point_scalar_mul_montgomery ++\n");
-        bn_print_no_fuse(">> point.x: ", &point->x);
-        bn_print_no_fuse(">> point.y: ", &point->y);
-        bn_print_no_fuse(">> scalar: ", scalar);
-        bn_print_no_fuse(">> mont_ctx->R: ", &mont_ctx->R);
-        bn_print_no_fuse(">> mont_ctx->n: ", &mont_ctx->n);
-        bn_print_no_fuse(">> mont_ctx->n_prime: ", &mont_ctx->n_prime);
+__device__ int ossl_ec_GFp_simple_ladder_pre(const EC_GROUP_CUDA *group,
+                                           EC_POINT_JACOBIAN *r,
+                                           EC_POINT_JACOBIAN *s,
+                                           EC_POINT_JACOBIAN *p) {
+    BIGNUM_CUDA t1, t2, t3, t4, t5;
+    init_zero(&t1);
+    init_zero(&t2); 
+    init_zero(&t3);
+    init_zero(&t4);
+    init_zero(&t5);
+
+    // Check if point p is at infinity
+    if (bn_is_zero(&p->Z)) {
+        init_zero(&r->X);
+        init_zero(&r->Y);
+        init_zero(&r->Z);
+        init_zero(&s->X);
+        init_zero(&s->Y); 
+        init_zero(&s->Z);
+        return 0;
     }
 
-    // Initialize group parameters
-    EC_GROUP_CUDA group;
-    init_zero(&group.field);
-    init_zero(&group.a);
-    init_zero(&group.b);
-    init_zero(&group.order);
-    bn_copy(&group.field, &mont_ctx->n);
-    bn_set_word(&group.a, 0);
-    bn_set_word(&group.b, 7);
-    
-    // Set field to modulus
-    bn_copy(&group.field, &mont_ctx->n);
+    // t3 = X1^2 
+    if (!bn_mod_sqr(&t3, &p->X, &group->field))
+        return 0;
 
-    // Set curve parameters (for secp256k1)
-    bn_set_word(&group.a, 0);         // a = 0
-    bn_set_word(&group.b, 7);         // b = 7
-    
-    // Convert curve parameters to Montgomery form
-    BIGNUM_CUDA mont_b;
-    init_zero(&mont_b);
-    bn_mod_mul_montgomery(&mont_b, &group.b, &mont_ctx->R2, &mont_ctx->n);
-    bn_copy(&group.b, &mont_b);
+    // t4 = t3 - a
+    if (!bn_mod_sub(&t4, &t3, &group->a, &group->field))
+        return 0;
 
-    // Initialize R[0] = point at infinity, R[1] = input point in Jacobian coordinates
-    EC_POINT_JACOBIAN R[2];
-    init_jacobian_point(&R[0]);
-    init_jacobian_point(&R[1]);
+    // t3 = t4^2
+    if (!bn_mod_sqr(&t3, &t4, &group->field))
+        return 0;
 
-    // Convert input point to Montgomery domain and then to Jacobian coordinates
-    EC_POINT_CUDA mont_point;
-    init_zero(&mont_point.x);
-    init_zero(&mont_point.y);
-    point_to_montgomery(&mont_point, point, mont_ctx);
-    affine_to_jacobian(&mont_point, &R[1]);
-    
-    // Keep track of current index (bit value)
-    int index = 0;
+    // t5 = X1 * b * 8
+    if (!bn_mod_mul(&t5, &p->X, &group->b, &group->field))
+        return 0;
+    if (!bn_mod_lshift(&t5, &t5, 3, &group->field))
+        return 0;
 
-    // Start from the most significant bit
-    int bits = bn_bit_length(scalar);
-    
-    // Montgomery ladder main loop
-    for (int i = bits - 1; i >= 0; i--) {
-        int bit = BN_is_bit_set(scalar, i);
-        
-        // Conditional swap if current bit differs from index
-        if (bit != index) {
-            EC_POINT_JACOBIAN temp = R[0];
-            R[0] = R[1];
-            R[1] = temp;
-            index = bit;
-        }
+    // r->X = t3 - t5
+    if (!bn_mod_sub(&r->X, &t3, &t5, &group->field))
+        return 0;
 
-        // Always perform ladder step
-        if (!ec_point_ladder_step(&group, &R[0], &R[1], &R[1])) {
-            printf("Error in ladder step\n");
-            return;
-        }
-    }
+    // t5 = X1^2 + a
+    if (!bn_mod_add(&t5, &t3, &group->a, &group->field))
+        return 0;
 
-    // Final conditional swap if necessary
-    if (index != 0) {
-        EC_POINT_JACOBIAN temp = R[0];
-        R[0] = R[1];
-        R[1] = temp;
-    }
+    // t2 = X1 * t5 + b
+    if (!bn_mod_mul(&t2, &p->X, &t5, &group->field))
+        return 0;
+    if (!bn_mod_add(&t2, &t2, &group->b, &group->field))
+        return 0;
 
-    // Convert result from Jacobian coordinates back to affine
-    EC_POINT_CUDA mont_result;
-    init_zero(&mont_result.x);
-    init_zero(&mont_result.y);
-    jacobian_to_affine(&R[0], &mont_result, &mont_ctx->n);
+    // r->Z = 4 * t2
+    if (!bn_mod_lshift(&r->Z, &t2, 2, &group->field))
+        return 0;
 
-    // Convert result from Montgomery domain back to normal domain
-    point_from_montgomery(result, &mont_result, mont_ctx);
+    // Set r->Y = 0
+    init_zero(&r->Y);
 
-    if (debug) {
-        bn_print_no_fuse("<< result.x: ", &result->x);
-        bn_print_no_fuse("<< result.y: ", &result->y);
-        printf("-- ec_point_scalar_mul_montgomery --\n");
-    }
-}
+    // Set s = p (copy input point)
+    bn_copy(&s->X, &p->X);
+    bn_copy(&s->Y, &p->Y);
+    bn_copy(&s->Z, &p->Z);
 
-__device__ void ec_point_scalar_mul_montgomery_x(
-    const EC_POINT_CUDA *point, 
-    const BIGNUM_CUDA *scalar,
-    const MONT_CTX_CUDA *mont_ctx,
-    EC_POINT_CUDA *result
-) {
-    bn_print_no_fuse(">> ec_point_scalar_mul_montgomery >> point.x: ", &point->x);
-    bn_print_no_fuse(">> ec_point_scalar_mul_montgomery >> point.y: ", &point->y);
-    // scalar
-    bn_print_no_fuse(">> ec_point_scalar_mul_montgomery >> scalar: ", scalar);
-    // mont_ctx
-    bn_print_no_fuse(">> ec_point_scalar_mul_montgomery >> mont_ctx->R: ", &mont_ctx->R);
-    bn_print_no_fuse(">> ec_point_scalar_mul_montgomery >> mont_ctx->n: ", &mont_ctx->n);
-    bn_print_no_fuse(">> ec_point_scalar_mul_montgomery >> mont_ctx->n_prime: ", &mont_ctx->n_prime);
-
-    // Convert input point to Montgomery form
-    EC_POINT_CUDA mont_point;
-    init_zero(&mont_point.x);
-    init_zero(&mont_point.y);
-    point_to_montgomery(&mont_point, point, mont_ctx);
-
-    // Initialize group parameters
-    EC_GROUP_CUDA group;
-    init_zero(&group.field);
-    init_zero(&group.a);
-    init_zero(&group.b);
-    init_zero(&group.order);
-    bn_copy(&group.field, &mont_ctx->n);
-
-    // Set curve parameters (for secp256k1, a = 0, b = 7)
-    init_zero(&group.a); // a = 0
-    bn_set_word(&group.b, 7); // b = 7
-    // Convert b to Montgomery form
-    bn_mod_mul_montgomery(&group.b, &group.b, &mont_ctx->R2, &group.field);
-
-    // Initialize Jacobian points for ladder computation
-    EC_POINT_JACOBIAN R[2];
-    int index = 0;
-
-    // Initialize R[0] = point at infinity
-    init_jacobian_point(&R[0]);
-
-    // Initialize R[1] = P in Jacobian coordinates
-    EC_POINT_JACOBIAN mont_point_jacobian;
-    init_jacobian_point(&mont_point_jacobian);
-    affine_to_jacobian(&mont_point, &mont_point_jacobian);
-    copy_jacobian_point(&R[1], &mont_point_jacobian);
-
-    // Get bit length of scalar
-    int bit_len = bn_bit_length(scalar);
-
-    // Montgomery ladder loop
-    for (int i = bit_len - 1; i >= 0; i--) {
-        int bit = BN_is_bit_set(scalar, i);
-
-        if (bit != index) {
-            // Swap R[0] and R[1]
-            EC_POINT_JACOBIAN temp = R[0];
-            R[0] = R[1];
-            R[1] = temp;
-            index = bit;
-        }
-
-        // Perform ladder step
-        ec_point_ladder_step(&group, &R[0], &R[1], &mont_point_jacobian);
-    }
-
-    // Copy result
-    EC_POINT_JACOBIAN result_jacobian;
-    copy_jacobian_point(&result_jacobian, &R[index]);
-
-    // Convert result to affine coordinates
-    EC_POINT_CUDA mont_result;
-    jacobian_to_affine(&result_jacobian, &mont_result, &mont_ctx->n);
-
-    // Convert result from Montgomery form
-    point_from_montgomery(result, &mont_result, mont_ctx);
-
-    // Print result
-    bn_print_no_fuse("<< ec_point_scalar_mul_montgomery << result.x: ", &result->x);
-    bn_print_no_fuse("<< ec_point_scalar_mul_montgomery << result.y: ", &result->y);
+    return 1;
 }

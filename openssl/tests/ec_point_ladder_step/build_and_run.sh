@@ -13,9 +13,9 @@ g++ \
     -lssl \
     -lcrypto \
     -I ../json \
-    -I /home/alex/projects/openssl_mod/crypto/bn/ \
-    -I /home/alex/projects/openssl_mod/crypto/ec/ \
-    -I /home/alex/projects/openssl_mod/include/ \
+    -I /home/alex/projects/openssl_original/crypto/bn/ \
+    -I /home/alex/projects/openssl_original/crypto/ec/ \
+    -I /home/alex/projects/openssl_original/include/ \
     -Wl,-rpath,/usr/local/openssl-debug/lib \
     -Wl,--enable-new-dtags \
     -l:libcrypto.so.3 \

@@ -89,12 +89,25 @@ folders = [
     # "~/projects/avax-pw-crack/cuda/tests/ec_point_scalar_mul_montgomery/run.log",
     # "~/projects/avax-pw-crack/cuda/prompts/128_ec_point_mont_mul_logs_cmp_alter.md",
 
-    # ossl_ec_GFp_simple_ladder_pre
-    
-    "~/projects/avax-pw-crack/cuda/prompts/EFD _ Genus-1 large-characteristic _ XZ coordinates for short Weierstrass curves.html",
+    # OSSL ossl_ec_GFp_simple_ladder_pre
+    # "~/projects/avax-pw-crack/cuda/prompts/EFD _ Genus-1 large-characteristic _ XZ coordinates for short Weierstrass curves.html",
+    # "~/projects/avax-pw-crack/cuda/prompts/130_ossl_ec_GFp_simple_ladder_pre_base.md",
+    # "~/projects/openssl_mod/crypto/ec/ecp_smpl.c",
+    # "~/projects/avax-pw-crack/cuda/prompts/131_ossl_ec_GFp_simple_ladder_pre_logs.md",    
+    # "~/projects/avax-pw-crack/openssl/tests/ossl_ec_GFp_simple_ladder_pre/test.c",
+    # "~/projects/avax-pw-crack/openssl/tests/ossl_ec_GFp_simple_ladder_pre/run.log",
+
+    # CUDA ec_point_ladder_pre
+    # "~/projects/avax-pw-crack/cuda/prompts/EFD _ Genus-1 large-characteristic _ XZ coordinates for short Weierstrass curves.html",
+    "~/projects/avax-pw-crack/cuda/include/bignum.h",
+    "~/projects/avax-pw-crack/cuda/include/montgomery.h",
+    "~/projects/avax-pw-crack/cuda/include/jacobian_point.h",
+    "~/projects/avax-pw-crack/cuda/include/point.h",
     "~/projects/avax-pw-crack/cuda/prompts/130_ossl_ec_GFp_simple_ladder_pre_base.md",
+    "~/projects/openssl_mod/crypto/ec/ec_local.h",
     "~/projects/openssl_mod/crypto/ec/ecp_smpl.c",
-    "~/projects/avax-pw-crack/cuda/prompts/131_ossl_ec_GFp_simple_ladder_pre_logs.md",    
-    "~/projects/avax-pw-crack/openssl/tests/ossl_ec_GFp_simple_ladder_pre/test.c",
-    "~/projects/avax-pw-crack/openssl/tests/ossl_ec_GFp_simple_ladder_pre/run.log",
+    "~/projects/avax-pw-crack/openssl/tests/ec_point_ladder_pre/test.c",
+    "~/projects/avax-pw-crack/openssl/tests/ec_point_ladder_pre/run.log",
+    "~/projects/avax-pw-crack/cuda/tests/ec_point_ladder_pre/test.cu",
+    "~/projects/avax-pw-crack/cuda/tests/ec_point_ladder_pre/run.log",
     ]

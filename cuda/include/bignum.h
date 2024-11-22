@@ -1309,22 +1309,24 @@ __device__ int bn_mod_mul(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNUM_CUD
     return ret;
 }
 
-__device__ void bn_mod_lshift(BIGNUM_CUDA *r, BIGNUM_CUDA *a, int shift, const BIGNUM_CUDA *p) {
+__device__ int bn_mod_lshift(BIGNUM_CUDA *r, BIGNUM_CUDA *a, int shift, const BIGNUM_CUDA *p) {
     BIGNUM_CUDA temp;
     init_zero(&temp);
     left_shift(a, shift);
     bn_mod(r, a, p);
+    return 1;
 }
 
-__device__ void bn_mod_add(BIGNUM_CUDA *result, const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, const BIGNUM_CUDA *n) {
+__device__ int bn_mod_add(BIGNUM_CUDA *result, const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, const BIGNUM_CUDA *n) {
     bn_add(result, a, b);
     BIGNUM_CUDA tmp;
     init_zero(&tmp);
     bn_copy(&tmp, result); // dest << src
     bn_mod(result, &tmp, n); // result = a mod n
+    return 1;
 }
 
-__device__ void bn_mod_sub(BIGNUM_CUDA *result, const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, const BIGNUM_CUDA *n) {
+__device__ int bn_mod_sub(BIGNUM_CUDA *result, const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, const BIGNUM_CUDA *n) {
     bn_sub(result, a, b);
     if (result->neg) {
         BIGNUM_CUDA tmp;
@@ -1333,6 +1335,7 @@ __device__ void bn_mod_sub(BIGNUM_CUDA *result, const BIGNUM_CUDA *a, const BIGN
         bn_add(result, &tmp, n); // result = a + b
         result->neg = 0;
     }
+    return 1;
 }
 
 // Computes the extended GCD of a and b
