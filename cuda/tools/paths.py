@@ -111,10 +111,22 @@ folders = [
     # "~/projects/avax-pw-crack/cuda/tests/ec_point_ladder_pre/test.cu",
     # "~/projects/avax-pw-crack/cuda/tests/ec_point_ladder_pre/run.log",
 
-    # BN_to_montgomery
+    # BN_to_montgomery OpenSSL
+    # "~/projects/avax-pw-crack/cuda/prompts/132_bn_to_montgomery_base.md",
+    # "~/projects/openssl_mod/crypto/bn/bn_mont.c",
+    # "~/projects/openssl_mod/crypto/bn/bn_lib.c",
+    # "~/projects/avax-pw-crack/openssl/tests/BN_mod_mul_montgomery/test.c",
+    # "~/projects/avax-pw-crack/openssl/tests/BN_mod_mul_montgomery/run.log"
+
+    # BN_to_montgomery CUDA
+    "~/projects/avax-pw-crack/cuda/include/bignum.h",
+    "~/projects/avax-pw-crack/cuda/include/montgomery.h",
+    "~/projects/avax-pw-crack/cuda/include/jacobian_point.h",
+    "~/projects/avax-pw-crack/cuda/include/point.h",
+    "~/projects/avax-pw-crack/cuda/tests/BN_mod_mul_montgomery_cuda/test.cu",
     "~/projects/avax-pw-crack/cuda/prompts/132_bn_to_montgomery_base.md",
     "~/projects/openssl_mod/crypto/bn/bn_mont.c",
     "~/projects/openssl_mod/crypto/bn/bn_lib.c",
-    "~/projects/avax-pw-crack/openssl/tests/BN_mod_mul_montgomery/test.c",
-    "~/projects/avax-pw-crack/openssl/tests/BN_mod_mul_montgomery/run.log"
+    "~/projects/avax-pw-crack/openssl/tests/BN_to_montgomery/test.c",
+    "~/projects/avax-pw-crack/openssl/tests/BN_to_montgomery/run.log"
     ]

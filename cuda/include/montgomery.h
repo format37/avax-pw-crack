@@ -196,18 +196,25 @@ __device__ void bn_to_montgomery(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BN_
 }
 
 __device__ void bn_to_montgomery_short(BIGNUM_CUDA *r, const BIGNUM_CUDA *a) {
-    BIGNUM_CUDA tmp;
-    init_zero(&tmp);
-
-    BIGNUM_CUDA RR;
+    BIGNUM_CUDA RR; // Pre-computed R^2 mod N value 
     init_zero(&RR);
-    // Define d as a constant 1000007a2000e90a1
-    RR.d[1] = 0x1;
-    RR.d[0] = 0x7a2000e90a1;
+    RR.d[1] = 0x1; // Upper 64 bits
+    RR.d[0] = 0x7a2000e90a1; // Lower 64 bits  
     RR.top = 2;
     RR.neg = 0;
 
-    bn_mod_mul_montgomery(a, &RR, &tmp, r);
+    BIGNUM_CUDA n; // Secp256k1 modulus
+    init_zero(&n);
+    // Set n to  FFFFFFFFFFFFFFFF FFFFFFFFFFFFFFFF FFFFFFFFFFFFFFFF FFFFFFFEFFFFFC2F
+    n.d[3] = 0xFFFFFFFFFFFFFFFF;
+    n.d[2] = 0xFFFFFFFFFFFFFFFF;
+    n.d[1] = 0xFFFFFFFFFFFFFFFF;
+    n.d[0] = 0xFFFFFFFEFFFFFC2F;
+    n.top = 4;
+    n.neg = 0;
+    
+    // Perform Montgomery multiplication: r = a * RR mod n
+    bn_mod_mul_montgomery(a, &RR, &n, r);
 }
 
 __device__ void BN_from_montgomery_CUDA(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, BN_MONT_CTX_CUDA *mont) {
