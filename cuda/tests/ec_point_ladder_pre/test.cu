@@ -22,9 +22,9 @@ __device__ void init_test_vectors(
     group->a.top = 1;
     group->a.neg = false;
 
-    // b = 7 
+    // b = 700001AB7
     init_zero(&group->b);
-    group->b.d[0] = 7;
+    group->b.d[0] = 0x700001AB7;
     group->b.top = 1;
     group->b.neg = false;
 
@@ -39,10 +39,15 @@ __device__ void init_test_vectors(
     
     // Initialize base point P (secp256k1 generator) in affine coordinates
     init_zero(&p_point->X);
-    p_point->X.d[3] = 0x79BE667EF9DCBBAC;
-    p_point->X.d[2] = 0x55A06295CE870B07;
-    p_point->X.d[1] = 0x029BFCDB2DCE28D9;  
-    p_point->X.d[0] = 0x59F2815B16F81798;
+    // p_point->X.d[3] = 0x79BE667EF9DCBBAC;
+    // p_point->X.d[2] = 0x55A06295CE870B07;
+    // p_point->X.d[1] = 0x029BFCDB2DCE28D9;  
+    // p_point->X.d[0] = 0x59F2815B16F81798;
+    // 9981E643E9089F48979F48C033FD129C231E295329BC66DBD7362E5A487E2097
+    p_point->X.d[3] = 0x9981E643E9089F48;
+    p_point->X.d[2] = 0x979F48C033FD129C;
+    p_point->X.d[1] = 0x231E295329BC66DB;
+    p_point->X.d[0] = 0xD7362E5A487E2097;
     p_point->X.top = 4;
     p_point->X.neg = false;
 

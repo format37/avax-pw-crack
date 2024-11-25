@@ -99,15 +99,22 @@ folders = [
 
     # CUDA ec_point_ladder_pre
     # "~/projects/avax-pw-crack/cuda/prompts/EFD _ Genus-1 large-characteristic _ XZ coordinates for short Weierstrass curves.html",
-    "~/projects/avax-pw-crack/cuda/include/bignum.h",
-    "~/projects/avax-pw-crack/cuda/include/montgomery.h",
-    "~/projects/avax-pw-crack/cuda/include/jacobian_point.h",
-    "~/projects/avax-pw-crack/cuda/include/point.h",
-    "~/projects/avax-pw-crack/cuda/prompts/130_ossl_ec_GFp_simple_ladder_pre_base.md",
-    "~/projects/openssl_mod/crypto/ec/ec_local.h",
-    "~/projects/openssl_mod/crypto/ec/ecp_smpl.c",
-    "~/projects/avax-pw-crack/openssl/tests/ec_point_ladder_pre/test.c",
-    "~/projects/avax-pw-crack/openssl/tests/ec_point_ladder_pre/run.log",
-    "~/projects/avax-pw-crack/cuda/tests/ec_point_ladder_pre/test.cu",
-    "~/projects/avax-pw-crack/cuda/tests/ec_point_ladder_pre/run.log",
+    # "~/projects/avax-pw-crack/cuda/include/bignum.h",
+    # "~/projects/avax-pw-crack/cuda/include/montgomery.h",
+    # "~/projects/avax-pw-crack/cuda/include/jacobian_point.h",
+    # "~/projects/avax-pw-crack/cuda/include/point.h",
+    # "~/projects/avax-pw-crack/cuda/prompts/130_ossl_ec_GFp_simple_ladder_pre_base.md",
+    # "~/projects/openssl_mod/crypto/ec/ec_local.h",
+    # "~/projects/openssl_mod/crypto/ec/ecp_smpl.c",
+    # "~/projects/avax-pw-crack/openssl/tests/ec_point_ladder_pre/test.c",
+    # "~/projects/avax-pw-crack/openssl/tests/ec_point_ladder_pre/run.log",
+    # "~/projects/avax-pw-crack/cuda/tests/ec_point_ladder_pre/test.cu",
+    # "~/projects/avax-pw-crack/cuda/tests/ec_point_ladder_pre/run.log",
+
+    # BN_to_montgomery
+    "~/projects/avax-pw-crack/cuda/prompts/132_bn_to_montgomery_base.md",
+    "~/projects/openssl_mod/crypto/bn/bn_mont.c",
+    "~/projects/openssl_mod/crypto/bn/bn_lib.c",
+    "~/projects/avax-pw-crack/openssl/tests/BN_mod_mul_montgomery/test.c",
+    "~/projects/avax-pw-crack/openssl/tests/BN_mod_mul_montgomery/run.log"
     ]

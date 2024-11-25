@@ -4,6 +4,15 @@
 #define MAX_WNAF_LENGTH 256  // Adjust as per your needs
 #define NUM_PRECOMPUTED_POINTS (1 << (WINDOW_SIZE - 1))
 
+typedef struct ec_group_st_cuda {
+    BIGNUM_CUDA field;  // Prime field modulus p
+    BIGNUM_CUDA a;      // Curve parameter a
+    BIGNUM_CUDA b;      // Curve parameter b
+    BIGNUM_CUDA order;  // Order of the base point
+} EC_GROUP_CUDA;
+
+__device__ void bn_to_montgomery(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BN_MONT_CTX_CUDA *mont, BIGNUM_CUDA *m);
+
 // limit to 256 bits
 __device__ void bignum_to_bit_array(BIGNUM_CUDA *n, unsigned int *bits) {
     #ifdef debug_print
@@ -1073,13 +1082,6 @@ __device__ int bn_mod_lshift_quick(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, int n, 
     return 1;
 }
 
-typedef struct ec_group_st_cuda {
-    BIGNUM_CUDA field;  // Prime field modulus p
-    BIGNUM_CUDA a;      // Curve parameter a
-    BIGNUM_CUDA b;      // Curve parameter b
-    BIGNUM_CUDA order;  // Order of the base point
-} EC_GROUP_CUDA;
-
 __device__ int ossl_ec_GFp_mont_field_mul(const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, BIGNUM_CUDA *r, BIGNUM_CUDA *p) {
     bn_mod_mul_montgomery(r, a, b, p);
     return 1;
@@ -1526,6 +1528,36 @@ __device__ void ec_point_scalar_mul_montgomery(
     }
 }
 
+__device__ int cuda_ec_GFp_mont_field_encode(const EC_GROUP_CUDA *group, 
+                                           BIGNUM_CUDA *r,
+                                           const BIGNUM_CUDA *a) {
+    BIGNUM_CUDA tmp;
+    init_zero(&tmp);
+
+    bn_print_no_fuse(">> cuda_ec_GFp_mont_field_encode >> a: ", a);
+    // bn_print_no_fuse(">> cuda_ec_GFp_mont_field_encode >> group.field: ", &group->field);
+    // bn_print_no_fuse(">> cuda_ec_GFp_mont_field_encode >> group.a: ", &group->a);
+    // bn_print_no_fuse(">> cuda_ec_GFp_mont_field_encode >> group.b: ", &group->b);
+    // bn_print_no_fuse(">> cuda_ec_GFp_mont_field_encode >> group.order: ", &group->order);
+    // bn_print_no_fuse(">> group->field: ", &group->field);
+    // bn_print_no_fuse(">> group->mont: ", &group->mont);
+
+    // BN_MONT_CTX_CUDA mont;
+    // // Initialize Montgomery context
+    // if (!BN_MONT_CTX_set(&mont, &tmp)) {
+    //     printf("BN_MONT_CTX_set failed\n");
+    //     return 0;
+    // }
+
+    // bn_to_montgomery(r, a, &mont, &tmp);
+
+    // bn_to_montgomery(r, a, RR);
+    bn_to_montgomery_short(r, a);
+
+    bn_print_no_fuse("<< cuda_ec_GFp_mont_field_encode << r: ", r);
+    return 1;
+}
+
 __device__ int ossl_ec_GFp_simple_ladder_pre(const EC_GROUP_CUDA *group,
                                            EC_POINT_JACOBIAN *r,
                                            EC_POINT_JACOBIAN *s,
@@ -1548,44 +1580,77 @@ __device__ int ossl_ec_GFp_simple_ladder_pre(const EC_GROUP_CUDA *group,
         return 0;
     }
 
-    // t3 = X1^2 
-    if (!bn_mod_sqr(&t3, &p->X, &group->field))
-        return 0;
+    bn_print_no_fuse(">> p->X = ", &p->X);
+    printf("Debug: Computed:\n");
 
-    // t4 = t3 - a
-    if (!bn_mod_sub(&t4, &t3, &group->a, &group->field))
+    if (!ossl_bn_mod_sqr_montgomery(&t3, &p->X, &group->field))
         return 0;
+    bn_print_no_fuse("[0] t3 = X^2 = ", &t3);
 
-    // t3 = t4^2
-    if (!bn_mod_sqr(&t3, &t4, &group->field))
+    if (!bn_mod_sub_quick(&t4, &t3, &group->a, &group->field))
         return 0;
+    bn_print_no_fuse("[1] t4 = t3 - a = ", &t4);
 
-    // t5 = X1 * b * 8
-    if (!bn_mod_mul(&t5, &p->X, &group->b, &group->field))
+    if (!ossl_bn_mod_sqr_montgomery(&t4, &t3, &group->field))
         return 0;
-    if (!bn_mod_lshift(&t5, &t5, 3, &group->field))
-        return 0;
+    bn_print_no_fuse("[2] t4 = t4^2 = ", &t4);
 
-    // r->X = t3 - t5
-    if (!bn_mod_sub(&r->X, &t3, &t5, &group->field))
+    if (!ossl_bn_mod_mul_montgomery(&t5, &p->X, &group->b, &group->field))
         return 0;
+    bn_print_no_fuse("[3] t5 = X * b = ", &t5);
 
-    // t5 = X1^2 + a
-    if (!bn_mod_add(&t5, &t3, &group->a, &group->field))
+    if (!bn_mod_lshift_quick(&t5, &t5, 3, &group->field))
         return 0;
+    bn_print_no_fuse("[4] t5 = t5 << 3 = ", &t5);
 
-    // t2 = X1 * t5 + b
-    if (!bn_mod_mul(&t2, &p->X, &t5, &group->field))
+    if (!bn_mod_sub_quick(&r->X, &t3, &t5, &group->field))
         return 0;
-    if (!bn_mod_add(&t2, &t2, &group->b, &group->field))
-        return 0;
+    bn_print_no_fuse("[5] r->X = (X^2 - a)^2 - X * b * 8 = ", &r->X);
 
-    // r->Z = 4 * t2
-    if (!bn_mod_lshift(&r->Z, &t2, 2, &group->field))
+    bn_print_no_fuse(">> t3 = ", &t3);
+    bn_print_no_fuse(">> group->a = ", &group->a);
+    if (!bn_mod_add_quick(&t1, &t3, &group->a, &group->field))
         return 0;
+    bn_print_no_fuse("[6] t1 = t3 + a = ", &t1);
 
-    // Set r->Y = 0
-    init_zero(&r->Y);
+    if (!ossl_bn_mod_mul_montgomery(&t2, &p->X, &t1, &group->field))
+        return 0;
+    bn_print_no_fuse("[7] t2 = X * t1 = ", &t2);
+
+    if (!bn_mod_add_quick(&t2, &t2, &group->b, &group->field))
+        return 0;
+    bn_print_no_fuse("[8] t2 = b + t2 = ", &t2);
+
+    if (!bn_mod_lshift_quick(&r->Z, &t2, 2, &group->field))    
+        return 0;
+    bn_print_no_fuse("[9] r->Z = t2 << 2 = ", &r->Z);
+
+    // Set the corresponding values
+    // t1 = s->Z;
+    // t2 = r->Z;
+    // t3 = s->X;
+    // t4 = r->X;
+    // t5 = s->Y;
+    bn_copy(&s->Z, &t1);
+    bn_copy(&r->Z, &t2);
+    bn_copy(&s->X, &t3);
+    bn_copy(&r->X, &t4);
+    bn_copy(&s->Y, &t5);
+
+    bn_print_no_fuse("[pre-field_encode] s->Z = ", &s->Z);
+    bn_print_no_fuse("[pre-field_encode] r->Z = ", &r->Z);
+    bn_print_no_fuse("[pre-field_encode] s->X = ", &s->X);
+    bn_print_no_fuse("[pre-field_encode] r->X = ", &r->X);
+    bn_print_no_fuse("[pre-field_encode] s->Y = ", &s->Y);
+    
+    // Place for blinding
+    // &r->Y becomes non-zero
+
+    /* if field_encode defined convert between representations */    
+    // Encode r->Y
+    cuda_ec_GFp_mont_field_encode(group, &r->Y, &r->Y);
+    // Encode s->Z
+    cuda_ec_GFp_mont_field_encode(group, &s->Z, &s->Z);
 
     // Set s = p (copy input point)
     bn_copy(&s->X, &p->X);

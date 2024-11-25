@@ -97,6 +97,9 @@ __device__ void bn_mod_mul_montgomery(
     const BIGNUM_CUDA *n,
     BIGNUM_CUDA *ret
 ) {
+    bn_print_no_fuse("\nbn_mod_mul_montgomery >> a: ", a);
+    bn_print_no_fuse("bn_mod_mul_montgomery >> b: ", b);
+    bn_print_no_fuse("bn_mod_mul_montgomery >> n: ", n);
     // Multiply a and b
     BIGNUM_CUDA r;
     init_zero(&r);
@@ -169,6 +172,7 @@ __device__ void bn_mod_mul_montgomery(
     
     // Ensure proper top value for result
     ret->top = find_top_optimized(ret, nl);
+    bn_print_no_fuse("bn_mod_mul_montgomery << r: ", ret);
 }
 
 __device__ bool ossl_bn_mod_mul_montgomery(
@@ -189,6 +193,21 @@ __device__ bool ossl_bn_mod_mul_montgomery(
 
 __device__ void bn_to_montgomery(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BN_MONT_CTX_CUDA *mont, BIGNUM_CUDA *m) {
     bn_mod_mul_montgomery(r, a, &mont->R2, m);
+}
+
+__device__ void bn_to_montgomery_short(BIGNUM_CUDA *r, const BIGNUM_CUDA *a) {
+    BIGNUM_CUDA tmp;
+    init_zero(&tmp);
+
+    BIGNUM_CUDA RR;
+    init_zero(&RR);
+    // Define d as a constant 1000007a2000e90a1
+    RR.d[1] = 0x1;
+    RR.d[0] = 0x7a2000e90a1;
+    RR.top = 2;
+    RR.neg = 0;
+
+    bn_mod_mul_montgomery(a, &RR, &tmp, r);
 }
 
 __device__ void BN_from_montgomery_CUDA(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, BN_MONT_CTX_CUDA *mont) {
