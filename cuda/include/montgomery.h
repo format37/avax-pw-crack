@@ -205,7 +205,6 @@ __device__ void bn_to_montgomery_short(BIGNUM_CUDA *r, const BIGNUM_CUDA *a) {
 
     BIGNUM_CUDA n; // Secp256k1 modulus
     init_zero(&n);
-    // Set n to  FFFFFFFFFFFFFFFF FFFFFFFFFFFFFFFF FFFFFFFFFFFFFFFF FFFFFFFEFFFFFC2F
     n.d[3] = 0xFFFFFFFFFFFFFFFF;
     n.d[2] = 0xFFFFFFFFFFFFFFFF;
     n.d[1] = 0xFFFFFFFFFFFFFFFF;

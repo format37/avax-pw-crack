@@ -1082,8 +1082,13 @@ __device__ int bn_mod_lshift_quick(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, int n, 
     return 1;
 }
 
-__device__ int ossl_ec_GFp_mont_field_mul(const BIGNUM_CUDA *a, const BIGNUM_CUDA *b, BIGNUM_CUDA *r, BIGNUM_CUDA *p) {
-    bn_mod_mul_montgomery(r, a, b, p);
+__device__ int ossl_ec_GFp_mont_field_mul(
+    const BIGNUM_CUDA *p,
+    BIGNUM_CUDA *r, 
+    const BIGNUM_CUDA *a, 
+    const BIGNUM_CUDA *b
+    ) {
+    bn_mod_mul_montgomery(a, b, p, r);
     return 1;
 }
 
@@ -1534,27 +1539,9 @@ __device__ int cuda_ec_GFp_mont_field_encode(const EC_GROUP_CUDA *group,
     BIGNUM_CUDA tmp;
     init_zero(&tmp);
 
-    bn_print_no_fuse(">> cuda_ec_GFp_mont_field_encode >> a: ", a);
-    // bn_print_no_fuse(">> cuda_ec_GFp_mont_field_encode >> group.field: ", &group->field);
-    // bn_print_no_fuse(">> cuda_ec_GFp_mont_field_encode >> group.a: ", &group->a);
-    // bn_print_no_fuse(">> cuda_ec_GFp_mont_field_encode >> group.b: ", &group->b);
-    // bn_print_no_fuse(">> cuda_ec_GFp_mont_field_encode >> group.order: ", &group->order);
-    // bn_print_no_fuse(">> group->field: ", &group->field);
-    // bn_print_no_fuse(">> group->mont: ", &group->mont);
-
-    // BN_MONT_CTX_CUDA mont;
-    // // Initialize Montgomery context
-    // if (!BN_MONT_CTX_set(&mont, &tmp)) {
-    //     printf("BN_MONT_CTX_set failed\n");
-    //     return 0;
-    // }
-
-    // bn_to_montgomery(r, a, &mont, &tmp);
-
-    // bn_to_montgomery(r, a, RR);
+    // bn_print_no_fuse(">> cuda_ec_GFp_mont_field_encode >> a: ", a);
     bn_to_montgomery_short(r, a);
-
-    bn_print_no_fuse("<< cuda_ec_GFp_mont_field_encode << r: ", r);
+    // bn_print_no_fuse("<< cuda_ec_GFp_mont_field_encode << r: ", r);
     return 1;
 }
 
@@ -1652,10 +1639,22 @@ __device__ int ossl_ec_GFp_simple_ladder_pre(const EC_GROUP_CUDA *group,
     // Encode s->Z
     cuda_ec_GFp_mont_field_encode(group, &s->Z, &s->Z);
 
-    // Set s = p (copy input point)
-    bn_copy(&s->X, &p->X);
-    bn_copy(&s->Y, &p->Y);
-    bn_copy(&s->Z, &p->Z);
+    // r->Z = r->Z * r->Y
+    ossl_ec_GFp_mont_field_mul(&group->field, &r->Z, &r->Z, &r->Y);
+    bn_print_no_fuse("[b] r->z = ", &r->Z);
+
+    // r->X = r->X * r->Y
+    ossl_ec_GFp_mont_field_mul(&group->field, &r->X, &r->X, &r->Y);
+    bn_print_no_fuse("[b] r->X = ", &r->X);
+
+    // s->X = p->X * s->Z
+    ossl_ec_GFp_mont_field_mul(&group->field, &s->X, &p->X, &s->Z);
+    bn_print_no_fuse("[b] s->X = ", &s->X);
+
+    // // Set s = p (copy input point)
+    // bn_copy(&s->X, &p->X);
+    // bn_copy(&s->Y, &p->Y);
+    // bn_copy(&s->Z, &p->Z);
 
     return 1;
 }

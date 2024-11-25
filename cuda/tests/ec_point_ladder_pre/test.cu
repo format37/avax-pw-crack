@@ -39,11 +39,6 @@ __device__ void init_test_vectors(
     
     // Initialize base point P (secp256k1 generator) in affine coordinates
     init_zero(&p_point->X);
-    // p_point->X.d[3] = 0x79BE667EF9DCBBAC;
-    // p_point->X.d[2] = 0x55A06295CE870B07;
-    // p_point->X.d[1] = 0x029BFCDB2DCE28D9;  
-    // p_point->X.d[0] = 0x59F2815B16F81798;
-    // 9981E643E9089F48979F48C033FD129C231E295329BC66DBD7362E5A487E2097
     p_point->X.d[3] = 0x9981E643E9089F48;
     p_point->X.d[2] = 0x979F48C033FD129C;
     p_point->X.d[1] = 0x231E295329BC66DB;
@@ -52,16 +47,17 @@ __device__ void init_test_vectors(
     p_point->X.neg = false;
 
     init_zero(&p_point->Y); 
-    p_point->Y.d[3] = 0x483ADA7726A3C465;
-    p_point->Y.d[2] = 0x5DA4FBFC0E1108A8;
-    p_point->Y.d[1] = 0xFD17B448A6855419; 
-    p_point->Y.d[0] = 0x9C47D08FFB10D4B8;
+    // CF3F851FD4A582D670B6B59AAC19C1368DFC5D5D1F1DC64DB15EA6D2D3DBABE2
+    p_point->Y.d[3] = 0xCF3F851FD4A582D6;
+    p_point->Y.d[2] = 0x70B6B59AAC19C136;
+    p_point->Y.d[1] = 0x8DFC5D5D1F1DC64D;
+    p_point->Y.d[0] = 0xB15EA6D2D3DBABE2;
     p_point->Y.top = 4;
     p_point->Y.neg = false;
 
     // Initialize Z coordinate to 1
     init_zero(&p_point->Z);
-    p_point->Z.d[0] = 1;
+    p_point->Z.d[0] = 0x1000003D1;
     p_point->Z.top = 1;
     p_point->Z.neg = false;
 }
