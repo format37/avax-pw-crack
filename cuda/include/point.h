@@ -12,6 +12,10 @@ typedef struct ec_group_st_cuda {
 } EC_GROUP_CUDA;
 
 __device__ void bn_to_montgomery(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BN_MONT_CTX_CUDA *mont, BIGNUM_CUDA *m);
+__device__ int ossl_ec_GFp_simple_ladder_pre(const EC_GROUP_CUDA *group,
+                                           EC_POINT_JACOBIAN *r,
+                                           EC_POINT_JACOBIAN *s,
+                                           const EC_POINT_JACOBIAN *p);
 
 // limit to 256 bits
 __device__ void bignum_to_bit_array(BIGNUM_CUDA *n, unsigned int *bits) {
@@ -1438,17 +1442,94 @@ __device__ void point_negate(
     bn_mod_sub(&result->y, &curve_params->p, &P->y, &curve_params->p);
 }
 
+__device__ void BN_consttime_swap(BN_ULONG condition, BIGNUM_CUDA *a, BIGNUM_CUDA *b) {
+    BN_ULONG t;
+    char max_top = max(a->top, b->top);
+    
+    condition = ((~condition & 1) - 1);
+
+    // Swap words
+    for (char i = 0; i < max_top; i++) {
+        t = condition & (a->d[i] ^ b->d[i]);
+        a->d[i] ^= t;
+        b->d[i] ^= t;
+    }
+
+    // Swap top values
+    char t_top = condition & (a->top ^ b->top);
+    a->top ^= t_top;
+    b->top ^= t_top;
+
+    // Swap neg flags
+    char t_neg = condition & (a->neg ^ b->neg);
+    a->neg ^= t_neg;
+    b->neg ^= t_neg;
+}
+
+__device__ void ossl_ec_scalar_mul_ladder(
+    const EC_GROUP_CUDA *group,
+    EC_POINT_JACOBIAN *r,
+    const BIGNUM_CUDA *scalar,
+    const EC_POINT_JACOBIAN *p)
+{
+    EC_POINT_JACOBIAN s;
+    init_zero(&s.X);
+    init_zero(&s.Y);
+    init_zero(&s.Z);
+    /* Initialize the Montgomery ladder */
+    if (!ossl_ec_GFp_simple_ladder_pre(group, r, &s, p)) {
+        printf("Ladder pre operation failed!\n");
+        return;
+    }
+    printf("\nAfter ladder pre: (Before ladder step:)\n");
+    print_jacobian_point("R", r);
+    print_jacobian_point("S", &s);
+    print_jacobian_point("P (base point)", p);
+
+    #define EC_POINT_CSWAP(c, a, b) do {          \
+        BN_consttime_swap(c, &(a)->X, &(b)->X);   \
+        BN_consttime_swap(c, &(a)->Y, &(b)->Y);   \
+        BN_consttime_swap(c, &(a)->Z, &(b)->Z);   \
+    } while(0)
+
+    // Add swapping logic - for testing use kbit=1 to ensure swap happens
+    int kbit = 1;  // This should come from scalar bit
+
+    int cardinality_bits = 256;
+
+    for (int i = cardinality_bits - 1; i >= 0; i--) {
+        EC_POINT_CSWAP(kbit, r, &s);
+
+        // printf("\nAfter swap:\n");
+        // print_jacobian_point("R", r);
+        // print_jacobian_point("S", &s);
+        // print_jacobian_point("P (base point)", p);
+
+        /* Perform a single step of the Montgomery ladder */
+        // if (!ossl_ec_GFp_simple_ladder_step(group, r, &s, p)) {
+        if (!ec_point_ladder_step(group, r, &s, p)) {
+            printf("Ladder step operation failed!\n");
+            return;
+        }
+    }
+    printf("\nAfter ladder loop:\n");
+    print_jacobian_point("R", r);
+    print_jacobian_point("S", &s);
+    print_jacobian_point("P (base point)", p);
+}
+
 __device__ void ec_point_scalar_mul_wnaf(
-    EC_POINT_CUDA *result,
-    const EC_POINT_CUDA *point,
+    EC_POINT_JACOBIAN *result,
+    const EC_POINT_JACOBIAN *point,
     const BIGNUM_CUDA *scalar,
     const CurveParameters *curve_params
 ) {
     // Print inputs
     printf("++ ec_point_scalar_mul_wnaf ++\n");
     bn_print_no_fuse(">> scalar: ", scalar);
-    bn_print_no_fuse(">> point.x: ", &point->x);
-    bn_print_no_fuse(">> point.y: ", &point->y);
+    bn_print_no_fuse(">> point.x: ", &point->X);
+    bn_print_no_fuse(">> point.y: ", &point->Y);
+    bn_print_no_fuse(">> point.z: ", &point->Z);
     bn_print_no_fuse(">> curve_params->p: ", &curve_params->p);
     bn_print_no_fuse(">> curve_params->a: ", &curve_params->a);
     bn_print_no_fuse(">> curve_params->b: ", &curve_params->b);
@@ -1457,34 +1538,90 @@ __device__ void ec_point_scalar_mul_wnaf(
     bn_print_no_fuse(">> curve_params->n: ", &curve_params->n);
     bn_print_no_fuse(">> curve_params->h: ", &curve_params->h);
     
-    // Step 1: Convert scalar to wNAF
-    signed char wNAF[MAX_WNAF_LENGTH];
-    int wNAF_len = compute_wNAF(scalar, WINDOW_SIZE, wNAF);
+    EC_GROUP_CUDA group;
+    // Initialize secp256k1 curve parameters
+    init_zero(&group.field);
+    group.field.d[3] = 0xFFFFFFFFFFFFFFFF;
+    group.field.d[2] = 0xFFFFFFFFFFFFFFFF;
+    group.field.d[1] = 0xFFFFFFFFFFFFFFFF;
+    group.field.d[0] = 0xFFFFFFFEFFFFFC2F;
+    group.field.top = 4;
+    group.field.neg = false;
 
-    // Step 2: Precompute point multiples
-    EC_POINT_CUDA precomputed[NUM_PRECOMPUTED_POINTS];
-    precompute_multiples(point, precomputed, curve_params);
+    // a = 0
+    init_zero(&group.a);
+    group.a.top = 1;
+    group.a.neg = false;
 
-    // Step 3: Initialize result to point at infinity
-    set_point_at_infinity(result);
+    // b = 700001AB7
+    init_zero(&group.b);
+    group.b.d[0] = 0x700001AB7;
+    group.b.top = 1;
+    group.b.neg = false;
 
-    // Step 4: Main loop
-    for (int i = wNAF_len - 1; i >= 0; i--) {
-        // Double the result point
-        point_double_cuda(result, result, curve_params);
+    // Initialize curve order
+    init_zero(&group.order);
+    group.order.d[3] = 0xFFFFFFFFFFFFFFFF;
+    group.order.d[2] = 0xFFFFFFFFFFFFFFFE;
+    group.order.d[1] = 0xBAAEDCE6AF48A03B;
+    group.order.d[0] = 0xBFD25E8CD0364141;
+    group.order.top = 4;
+    group.order.neg = false;
 
-        if (wNAF[i] != 0) {
-            if (wNAF[i] > 0) {
-                int idx = (wNAF[i] - 1) / 2;
-                point_add_cuda(result, result, &precomputed[idx], curve_params);
-            } else {
-                int idx = (-wNAF[i] - 1) / 2;
-                EC_POINT_CUDA neg_point;
-                point_negate(&precomputed[idx], &neg_point, curve_params);
-                point_add_cuda(result, result, &neg_point, curve_params);
-            }
-        }
-    }
+    ossl_ec_scalar_mul_ladder(&group, result, scalar, point);
+
+    printf("-- ec_point_scalar_mul_wnaf --\n");
+}
+
+// It was written for EC_POINT_CUDA types
+__device__ void ec_point_scalar_mul_wnaf_x(
+    EC_POINT_JACOBIAN *result,
+    const EC_POINT_JACOBIAN *point,
+    const BIGNUM_CUDA *scalar,
+    const CurveParameters *curve_params
+) {
+    // Print inputs
+    printf("++ ec_point_scalar_mul_wnaf ++\n");
+    bn_print_no_fuse(">> scalar: ", scalar);
+    bn_print_no_fuse(">> point.x: ", &point->X);
+    bn_print_no_fuse(">> point.y: ", &point->Y);
+    bn_print_no_fuse(">> point.z: ", &point->Z);
+    bn_print_no_fuse(">> curve_params->p: ", &curve_params->p);
+    bn_print_no_fuse(">> curve_params->a: ", &curve_params->a);
+    bn_print_no_fuse(">> curve_params->b: ", &curve_params->b);
+    bn_print_no_fuse(">> curve_params->Gx: ", &curve_params->Gx);
+    bn_print_no_fuse(">> curve_params->Gy: ", &curve_params->Gy);
+    bn_print_no_fuse(">> curve_params->n: ", &curve_params->n);
+    bn_print_no_fuse(">> curve_params->h: ", &curve_params->h);
+    
+    // // Step 1: Convert scalar to wNAF
+    // signed char wNAF[MAX_WNAF_LENGTH];
+    // int wNAF_len = compute_wNAF(scalar, WINDOW_SIZE, wNAF);
+
+    // // Step 2: Precompute point multiples
+    // EC_POINT_CUDA precomputed[NUM_PRECOMPUTED_POINTS];
+    // precompute_multiples(point, precomputed, curve_params);
+
+    // // Step 3: Initialize result to point at infinity
+    // set_point_at_infinity(result);
+
+    // // Step 4: Main loop
+    // for (int i = wNAF_len - 1; i >= 0; i--) {
+    //     // Double the result point
+    //     point_double_cuda(result, result, curve_params);
+
+    //     if (wNAF[i] != 0) {
+    //         if (wNAF[i] > 0) {
+    //             int idx = (wNAF[i] - 1) / 2;
+    //             point_add_cuda(result, result, &precomputed[idx], curve_params);
+    //         } else {
+    //             int idx = (-wNAF[i] - 1) / 2;
+    //             EC_POINT_CUDA neg_point;
+    //             point_negate(&precomputed[idx], &neg_point, curve_params);
+    //             point_add_cuda(result, result, &neg_point, curve_params);
+    //         }
+    //     }
+    // }
 }
 
 __device__ void init_curve_parameters(CurveParameters *curve_params) {
@@ -1499,17 +1636,18 @@ __device__ void init_curve_parameters(CurveParameters *curve_params) {
 }
 
 __device__ void ec_point_scalar_mul_montgomery(
-    const EC_POINT_CUDA *point,
+    const EC_POINT_JACOBIAN *point,
     const BIGNUM_CUDA *scalar,
     MONT_CTX_CUDA *mont_ctx,
-    EC_POINT_CUDA *result
+    EC_POINT_JACOBIAN *result
 ) {
 
     bool debug = true;
     if (debug) {
         printf("++ ec_point_scalar_mul_montgomery ++\n");
-        bn_print_no_fuse(">> point.x: ", &point->x);
-        bn_print_no_fuse(">> point.y: ", &point->y);
+        bn_print_no_fuse(">> point.x: ", &point->X);
+        bn_print_no_fuse(">> point.y: ", &point->Y);
+        bn_print_no_fuse(">> point.z: ", &point->Z);
         bn_print_no_fuse(">> scalar: ", scalar);
         bn_print_no_fuse(">> mont_ctx->R: ", &mont_ctx->R);
         bn_print_no_fuse(">> mont_ctx->n: ", &mont_ctx->n);
@@ -1527,8 +1665,9 @@ __device__ void ec_point_scalar_mul_montgomery(
     ec_point_scalar_mul_wnaf(result, point, scalar, &curve_params);
 
     if (debug) {
-        bn_print_no_fuse("<< result.x: ", &result->x);
-        bn_print_no_fuse("<< result.y: ", &result->y);
+        bn_print_no_fuse("<< result.x: ", &result->X);
+        bn_print_no_fuse("<< result.y: ", &result->Y);
+        bn_print_no_fuse("<< result.z: ", &result->Z);
         printf("-- ec_point_scalar_mul_montgomery --\n");
     }
 }
@@ -1548,7 +1687,7 @@ __device__ int cuda_ec_GFp_mont_field_encode(const EC_GROUP_CUDA *group,
 __device__ int ossl_ec_GFp_simple_ladder_pre(const EC_GROUP_CUDA *group,
                                            EC_POINT_JACOBIAN *r,
                                            EC_POINT_JACOBIAN *s,
-                                           EC_POINT_JACOBIAN *p) {
+                                           const EC_POINT_JACOBIAN *p) {
     BIGNUM_CUDA t1, t2, t3, t4, t5;
     init_zero(&t1);
     init_zero(&t2); 
@@ -1567,7 +1706,20 @@ __device__ int ossl_ec_GFp_simple_ladder_pre(const EC_GROUP_CUDA *group,
         return 0;
     }
 
-    bn_print_no_fuse(">> p->X = ", &p->X);
+    // typedef struct ec_group_st_cuda {
+    //     BIGNUM_CUDA field;  // Prime field modulus p
+    //     BIGNUM_CUDA a;      // Curve parameter a
+    //     BIGNUM_CUDA b;      // Curve parameter b
+    //     BIGNUM_CUDA order;  // Order of the base point
+    // } EC_GROUP_CUDA;
+    // print group
+    bn_print_no_fuse(">> ossl_ec_GFp_simple_ladder_pre group->field = ", &group->field);
+    bn_print_no_fuse(">> ossl_ec_GFp_simple_ladder_pre group->a = ", &group->a);
+    bn_print_no_fuse(">> ossl_ec_GFp_simple_ladder_pre group->b = ", &group->b);
+    bn_print_no_fuse(">> ossl_ec_GFp_simple_ladder_pre group->order = ", &group->order);
+    bn_print_no_fuse(">> ossl_ec_GFp_simple_ladder_pre p->X = ", &p->X);
+    bn_print_no_fuse(">> ossl_ec_GFp_simple_ladder_pre p->Y = ", &p->Y);
+    bn_print_no_fuse(">> ossl_ec_GFp_simple_ladder_pre p->Z = ", &p->Z);
     printf("Debug: Computed:\n");
 
     if (!ossl_bn_mod_sqr_montgomery(&t3, &p->X, &group->field))
@@ -1651,10 +1803,24 @@ __device__ int ossl_ec_GFp_simple_ladder_pre(const EC_GROUP_CUDA *group,
     ossl_ec_GFp_mont_field_mul(&group->field, &s->X, &p->X, &s->Z);
     bn_print_no_fuse("[b] s->X = ", &s->X);
 
-    // // Set s = p (copy input point)
-    // bn_copy(&s->X, &p->X);
-    // bn_copy(&s->Y, &p->Y);
-    // bn_copy(&s->Z, &p->Z);
+    
 
     return 1;
 }
+
+// __device__ int ec_point_ladder_pre(
+//     const EC_GROUP_CUDA *group,
+//     EC_POINT_JACOBIAN *r,
+//     EC_POINT_JACOBIAN *s,
+//     EC_POINT_JACOBIAN *p)
+//     {
+    
+//     return ossl_ec_GFp_simple_ladder_pre(group, r, s, p);
+    
+//     // // Set s = p (copy input point)
+//     // bn_copy(&s->X, &p->X);
+//     // bn_copy(&s->Y, &p->Y);
+//     // bn_copy(&s->Z, &p->Z);
+
+//     // jacobian_point_double(r, s, &group->field, &group->a);
+// }

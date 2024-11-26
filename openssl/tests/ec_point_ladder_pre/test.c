@@ -120,7 +120,8 @@ int main(void) {
         goto cleanup;
     }
 
-    printf("\nAfter ladder_pre:\n");
+    // printf("\nAfter ladder_pre:\n");
+    printf("\ntest complete")
 
     ret = 1;
 
