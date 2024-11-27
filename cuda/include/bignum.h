@@ -10,7 +10,7 @@
 // #define debug_top
 // #define function_profiler
 // #define use_jacobian_coordinates
-// #define use_montgomery_ec_point_multiplication // Not implemented yet. Work in progress..
+#define use_montgomery_ec_point_multiplication // Developing in progress..
 
 #ifdef BN_128
     #define BN_ULONG unsigned __int128

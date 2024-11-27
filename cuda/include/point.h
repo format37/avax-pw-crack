@@ -12,10 +12,17 @@ typedef struct ec_group_st_cuda {
 } EC_GROUP_CUDA;
 
 __device__ void bn_to_montgomery(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BN_MONT_CTX_CUDA *mont, BIGNUM_CUDA *m);
+
 __device__ int ossl_ec_GFp_simple_ladder_pre(const EC_GROUP_CUDA *group,
-                                           EC_POINT_JACOBIAN *r,
-                                           EC_POINT_JACOBIAN *s,
-                                           const EC_POINT_JACOBIAN *p);
+    EC_POINT_JACOBIAN *r,
+    EC_POINT_JACOBIAN *s,
+    const EC_POINT_JACOBIAN *p);
+
+__device__ int ossl_ec_GFp_simple_ladder_post(
+    const EC_GROUP_CUDA *group,
+    EC_POINT_JACOBIAN *r,
+    EC_POINT_JACOBIAN *s,
+    const EC_POINT_JACOBIAN *p);
 
 // limit to 256 bits
 __device__ void bignum_to_bit_array(BIGNUM_CUDA *n, unsigned int *bits) {
@@ -1512,7 +1519,19 @@ __device__ void ossl_ec_scalar_mul_ladder(
             return;
         }
     }
+    /* one final cswap to move the right value into r */
+    EC_POINT_CSWAP(kbit, r, &s);
     printf("\nAfter ladder loop:\n");
+    print_jacobian_point("R", r);
+    print_jacobian_point("S", &s);
+    print_jacobian_point("P (base point)", p);
+
+    /* Finalize ladder (and recover full point coordinates) */
+    if (!ossl_ec_GFp_simple_ladder_post(group, r, &s, p)) {
+        printf("Ladder post operation failed!\n");
+        return;
+    }
+    printf("\nAfter ossl_ec_GFp_simple_ladder_post:\n");
     print_jacobian_point("R", r);
     print_jacobian_point("S", &s);
     print_jacobian_point("P (base point)", p);
@@ -1573,8 +1592,8 @@ __device__ void ec_point_scalar_mul_wnaf(
     printf("-- ec_point_scalar_mul_wnaf --\n");
 }
 
-// It was written for EC_POINT_CUDA types
-__device__ void ec_point_scalar_mul_wnaf_x(
+// It was written for EC_POINT_CUDA types.
+__device__ void ec_point_scalar_mul_wnaf_deprecated(
     EC_POINT_JACOBIAN *result,
     const EC_POINT_JACOBIAN *point,
     const BIGNUM_CUDA *scalar,
@@ -1684,6 +1703,192 @@ __device__ int cuda_ec_GFp_mont_field_encode(const EC_GROUP_CUDA *group,
     return 1;
 }
 
+/* Helper function to generate random numbers of specified bit length */
+// __device__ bool bn_rand_words(BIGNUM_CUDA *rnd, int bits, int top, int bottom) {
+// __device__ bool bn_rand_words(BIGNUM_CUDA *rnd, int bits) {
+__device__ bool bnrand(BIGNUM_CUDA *rnd) {
+    // int top = -1;
+    // int bottom = 0;
+    int bits = 256;
+    bn_print_no_fuse(">> bn_rand_words >> rnd: ", rnd);
+    // printf(">> bn_rand_words >> bits: %d\n", bits);
+    // printf(">> bn_rand_words >> top: %d\n", top);
+    // printf(">> bn_rand_words >> bottom: %d\n", bottom);
+
+    const int BUFFER_SIZE = 32;  // 256 bits = 32 bytes
+    unsigned char buf[BUFFER_SIZE] = {0};
+
+    int bit = (bits - 1) % 8;
+    unsigned char mask = 0xff << (bit + 1);
+
+    // Fill buffer with random bytes
+    for (int i = 0; i < BUFFER_SIZE; i++) {
+        unsigned int seed = clock64() + threadIdx.x;
+        buf[i] = (unsigned char)(seed % 256);
+    }
+
+    buf[0] &= ~mask;
+    // if (bottom) {
+    //     buf[BUFFER_SIZE - 1] |= 1;
+    // }
+
+    // Convert bytes to BIGNUM_CUDA format
+    init_zero(rnd);
+    int word_offset = 0;
+    BN_ULONG current_word = 0;
+    int bits_in_word = 0;
+
+    for (int i = BUFFER_SIZE - 1; i >= 0; i--) {
+        current_word |= ((BN_ULONG)buf[i] << bits_in_word);
+        bits_in_word += 8;
+
+        if (bits_in_word >= BN_ULONG_NUM_BITS || i == 0) {
+            rnd->d[word_offset++] = current_word;
+            current_word = 0;
+            bits_in_word = 0;
+        }
+    }
+
+    rnd->top = word_offset;
+    if (rnd->top == 0)
+        rnd->top = 1;
+
+    bn_print_no_fuse("<< bn_rand_words << rnd: ", rnd);
+    return true;
+}
+// __device__ bool bn_rand_range_words(BIGNUM_CUDA *r, int bits) {
+//     bn_print_no_fuse(">> bn_rand_range_words >> r: ", r);
+//     // OpenSSL bnrand implementation
+//     int bytes = (bits + 7) / 8;  /* Convert bits to bytes, rounding up */
+//     int extra_bits = 8 - (bits % 8);  /* Bits in most significant byte */
+//     unsigned char *temp_buffer = NULL;
+    
+//     /* Allocate temporary buffer with enough space for random bytes */
+//     temp_buffer = (unsigned char*)malloc(bytes);
+//     if (!temp_buffer) {
+//         return false;
+//     }
+
+//     /* Fill with random bytes using cuRAND */
+//     for (int i = 0; i < bytes; i++) {
+//         /* Use thread index and clock for seeding - could be improved */
+//         unsigned int seed = clock64() + threadIdx.x;
+//         temp_buffer[i] = (unsigned char)(seed % 256);
+//     }
+
+//     /* Mask off extra bits in the most significant byte */
+//     if (extra_bits < 8)
+//         temp_buffer[0] &= ((1 << (8 - extra_bits)) - 1);
+
+//     /* Convert the bytes to BIGNUM_CUDA format */
+//     init_zero(r);
+//     int word_offset = 0;
+//     BN_ULONG current_word = 0;
+//     int bits_in_word = 0;
+
+//     for (int i = bytes - 1; i >= 0; i--) {
+//         current_word |= ((BN_ULONG)temp_buffer[i] << bits_in_word);
+//         bits_in_word += 8;
+
+//         if (bits_in_word >= BN_ULONG_NUM_BITS || i == 0) {
+//             r->d[word_offset++] = current_word;
+//             current_word = 0;
+//             bits_in_word = 0;
+//         }
+//     }
+
+//     r->top = word_offset;
+//     if (r->top == 0)
+//         r->top = 1;  /* Ensure at least one word */
+
+//     /* Clean up temporary buffer */
+//     free(temp_buffer);
+//     bn_print_no_fuse("<< bn_rand_range_words << r: ", r);
+//     return true;
+// }
+
+// __device__ bool BN_priv_rand_range_ex(BIGNUM_CUDA *r) {
+//     return bnrand_range(r);
+// }
+
+__device__ bool BN_priv_rand_range_ex(BIGNUM_CUDA *r, const BIGNUM_CUDA *range,
+                                     unsigned int strength, void *ctx) {
+    // OpenSSL bnrand_range implementation
+    int n;
+    int count = 100;
+
+    if (r == NULL) {
+        printf("Error: Null pointer passed as result\n");
+        return false;
+    }
+
+    if (range->neg || bn_is_zero(range)) {
+        printf("Error: Invalid range\n");
+        return false;
+    }
+
+    n = bn_num_bits(range);     /* n > 0 */
+
+    /* BN_is_bit_set(range, n - 1) always holds */
+
+    /* Single word? */
+    if (n == 1) {
+        init_zero(r);
+        return true;
+    } 
+    
+    /* Is range a power of 2? Special handling for improved uniformity */
+    if ((n & (n - 1)) == 0 && !BN_is_bit_set(range, n - 2) 
+        && !BN_is_bit_set(range, n - 3)) {
+        /*
+         * Range = 100..._2, so 3*range (= 11..._2) is exactly one bit longer
+         * than range
+         */
+        do {
+            /* Generate random number with one extra bit */
+            // if (!bn_rand_range_words(r, n + 1)) {
+            if (!bnrand(r)) {
+                return false;
+            }
+
+            /* 
+             * If r < 3*range, use r mod range (which is either r, r - range, 
+             * or r - 2*range). Since 3*range = 11..._2, each iteration 
+             * succeeds with probability >= .75
+             */
+            if (bn_cmp(r, range) >= 0) {
+                if (!bn_sub(r, r, range))
+                    return false;
+                if (bn_cmp(r, range) >= 0)
+                    if (!bn_sub(r, r, range))
+                        return false;
+            }
+
+            if (!--count) {
+                printf("Error: Too many iterations in random generation\n");
+                return false;
+            }
+
+        } while (bn_cmp(r, range) >= 0);
+    } else {
+        /* Standard case - keep generating until we get a value < range */
+        do {
+            // if (!bn_rand_range_words(r, n)) {
+            if (!bnrand(r)) {
+                return false;
+            }
+
+            if (!--count) {
+                printf("Error: Too many iterations in random generation\n");
+                return false;
+            }
+        } while (bn_cmp(r, range) >= 0);
+    }
+
+    r->neg = false;
+    return true;
+}
+
 __device__ int ossl_ec_GFp_simple_ladder_pre(const EC_GROUP_CUDA *group,
                                            EC_POINT_JACOBIAN *r,
                                            EC_POINT_JACOBIAN *s,
@@ -1782,8 +1987,38 @@ __device__ int ossl_ec_GFp_simple_ladder_pre(const EC_GROUP_CUDA *group,
     bn_print_no_fuse("[pre-field_encode] r->X = ", &r->X);
     bn_print_no_fuse("[pre-field_encode] s->Y = ", &s->Y);
     
-    // Place for blinding
+    
+    // Blinding ++
     // &r->Y becomes non-zero
+    bool perform_blinding = true;
+    if (perform_blinding) {
+        /* make sure lambda (r->Y here for storage) is not zero */
+        do {
+            // Use a private range function to generate non-zero random value
+            if (!BN_priv_rand_range_ex(&r->Y, &group->field, 0, NULL))
+                return 0;
+        } while (bn_is_zero(&r->Y));
+
+        /* make sure lambda (s->Z here for storage) is not zero */
+        do {
+            if (!BN_priv_rand_range_ex(&s->Z, &group->field, 0, NULL))
+                return 0;
+        } while (bn_is_zero(&s->Z));
+    }
+
+    // /* if field_encode defined convert between representations */
+    // if (group->meth->field_encode != NULL) {
+    //     if (!cuda_ec_GFp_mont_field_encode(group, &r->Y, &r->Y) ||
+    //         !cuda_ec_GFp_mont_field_encode(group, &s->Z, &s->Z))
+    //         return 0;
+    // }
+
+    // /* Blind r and s independently */
+    // if (!ossl_ec_GFp_mont_field_mul(&group->field, &r->Z, &r->Z, &r->Y) ||
+    //     !ossl_ec_GFp_mont_field_mul(&group->field, &r->X, &r->X, &r->Y) ||
+    //     !ossl_ec_GFp_mont_field_mul(&group->field, &s->X, &p->X, &s->Z))  /* s := p */
+    //     return 0;
+    // Blinding --
 
     /* if field_encode defined convert between representations */    
     // Encode r->Y
@@ -1808,19 +2043,111 @@ __device__ int ossl_ec_GFp_simple_ladder_pre(const EC_GROUP_CUDA *group,
     return 1;
 }
 
-// __device__ int ec_point_ladder_pre(
-//     const EC_GROUP_CUDA *group,
-//     EC_POINT_JACOBIAN *r,
-//     EC_POINT_JACOBIAN *s,
-//     EC_POINT_JACOBIAN *p)
-//     {
-    
-//     return ossl_ec_GFp_simple_ladder_pre(group, r, s, p);
-    
-//     // // Set s = p (copy input point)
-//     // bn_copy(&s->X, &p->X);
-//     // bn_copy(&s->Y, &p->Y);
-//     // bn_copy(&s->Z, &p->Z);
+__device__ int ossl_ec_GFp_simple_ladder_post(
+    const EC_GROUP_CUDA *group,
+    EC_POINT_JACOBIAN *r,
+    EC_POINT_JACOBIAN *s,
+    const EC_POINT_JACOBIAN *p
+) {
+    if (bn_is_zero(&r->Z)) {
+        // Set r to point at infinity
+        init_zero(&r->X);
+        init_zero(&r->Y);
+        init_zero(&r->Z);
+        return 1;
+    }
 
-//     // jacobian_point_double(r, s, &group->field, &group->a);
-// }
+    if (bn_is_zero(&s->Z)) {
+        // If s is infinity, r = -P
+        bn_copy(&r->X, &p->X);
+        // Negate Y coordinate: -Y = p - Y
+        bn_mod_sub(&r->Y, &group->field, &p->Y, &group->field);
+        init_one(&r->Z);
+        return 1;
+    }
+
+    // Initialize temporary variables
+    BIGNUM_CUDA t0, t1, t2, t3, t4, t5, t6;
+    init_zero(&t0);
+    init_zero(&t1);
+    init_zero(&t2);
+    init_zero(&t3);
+    init_zero(&t4);
+    init_zero(&t5);
+    init_zero(&t6);
+
+    // t4 = 2*Y1
+    bn_mod_lshift1_quick(&t4, &p->Y, &group->field);
+
+    // t6 = X2*t4*Z3*Z2
+    ossl_bn_mod_mul_montgomery(&t6, &r->X, &t4, &group->field);
+    ossl_bn_mod_mul_montgomery(&t6, &t6, &s->Z, &group->field);
+    ossl_bn_mod_mul_montgomery(&t5, &r->Z, &t6, &group->field);
+
+    // t1 = 2*b*Z3
+    bn_mod_lshift1_quick(&t1, &group->b, &group->field);
+    ossl_bn_mod_mul_montgomery(&t1, &t1, &s->Z, &group->field);
+
+    // t3 = Z2^2
+    ossl_bn_mod_sqr_montgomery(&t3, &r->Z, &group->field);
+
+    // t2 = t3*t1
+    ossl_bn_mod_mul_montgomery(&t2, &t3, &t1, &group->field);
+
+    // t6 = Z2*a
+    ossl_bn_mod_mul_montgomery(&t6, &r->Z, &group->a, &group->field);
+
+    // t1 = X1*X2 + t6
+    ossl_bn_mod_mul_montgomery(&t1, &p->X, &r->X, &group->field);
+    bn_mod_add_quick(&t1, &t1, &t6, &group->field);
+
+    // t1 = t1*Z3
+    ossl_bn_mod_mul_montgomery(&t1, &t1, &s->Z, &group->field);
+
+    // t0 = X1*Z2
+    ossl_bn_mod_mul_montgomery(&t0, &p->X, &r->Z, &group->field);
+
+    // t6 = X2 + t0
+    bn_mod_add_quick(&t6, &r->X, &t0, &group->field);
+
+    // t6 = t6*t1
+    ossl_bn_mod_mul_montgomery(&t6, &t6, &t1, &group->field);
+
+    // t6 = t6 + t2
+    bn_mod_add_quick(&t6, &t6, &t2, &group->field);
+
+    // t0 = t0 - X2
+    bn_mod_sub_quick(&t0, &t0, &r->X, &group->field);
+
+    // t0 = t0^2
+    ossl_bn_mod_sqr_montgomery(&t0, &t0, &group->field);
+
+    // t0 = t0*X3
+    ossl_bn_mod_mul_montgomery(&t0, &t0, &s->X, &group->field);
+
+    // t0 = t6 - t0
+    bn_mod_sub_quick(&t0, &t6, &t0, &group->field);
+
+    // t1 = Z3*t4
+    ossl_bn_mod_mul_montgomery(&t1, &s->Z, &t4, &group->field);
+
+    // t1 = t1*t3
+    ossl_bn_mod_mul_montgomery(&t1, &t1, &t3, &group->field);
+
+    // Compute final coordinates
+    // if (!ossl_ec_GFp_mont_field_inv(group, t1, &t1, &group->field)) {
+    if (!ossl_ec_GFp_mont_field_inv(&t1, &t1, &group->field)) {
+        return 0;
+    }
+
+    // Compute X coordinate
+    ossl_bn_mod_mul_montgomery(&r->X, &t5, &t1, &group->field);
+
+    // Compute Y coordinate
+    ossl_bn_mod_mul_montgomery(&r->Y, &t0, &t1, &group->field);
+
+    // Set Z coordinate to 1
+    init_one(&r->Z);
+
+    return 1;
+}
