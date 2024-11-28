@@ -1727,31 +1727,44 @@ __device__ bool bnrand(BIGNUM_CUDA *rnd) {
         buf[i] = (unsigned char)(seed % 256);
     }
 
+    // Set buf to deterministic values
+    for (int i = 0; i < BUFFER_SIZE; i++) {
+        buf[i] = 0x63; // Set all bytes to 0x63 for testing. TODO: disable this line
+    }
+
+    // print mask
+    printf("# bnrand mask: %d\n",mask);
     buf[0] &= ~mask;
     // if (bottom) {
     //     buf[BUFFER_SIZE - 1] |= 1;
     // }
+    // print buf
+    // for (int i = 0; i < BUFFER_SIZE; i++) {
+    //     printf("buf[%d] = %02x\n", i, buf[i]);
+    // } 
+    // print buf
+    for (int i = 0; i < BUFFER_SIZE; i++) {
+        printf("%02x ", buf[i]);
+    }
+    printf("\n");
 
-    // Convert bytes to BIGNUM_CUDA format
+    // Convert buf to BIGNUM_CUDA
     init_zero(rnd);
-    int word_offset = 0;
-    BN_ULONG current_word = 0;
-    int bits_in_word = 0;
+    int word_index = 0;
+    int i = BUFFER_SIZE - 1;
 
-    for (int i = BUFFER_SIZE - 1; i >= 0; i--) {
-        current_word |= ((BN_ULONG)buf[i] << bits_in_word);
-        bits_in_word += 8;
-
-        if (bits_in_word >= BN_ULONG_NUM_BITS || i == 0) {
-            rnd->d[word_offset++] = current_word;
-            current_word = 0;
-            bits_in_word = 0;
+    while (i >= 0) {
+        BN_ULONG word = 0;
+        int shift = 0;
+        int j;
+        for (j = 0; j < sizeof(BN_ULONG) && i >= 0; j++, i--) {
+            word |= ((BN_ULONG)buf[i]) << shift;
+            shift += 8;
         }
+        rnd->d[word_index++] = word;
     }
 
-    rnd->top = word_offset;
-    if (rnd->top == 0)
-        rnd->top = 1;
+    rnd->top = word_index;
 
     bn_print_no_fuse("<< bn_rand_words << rnd: ", rnd);
     return true;
@@ -1922,6 +1935,9 @@ __device__ int ossl_ec_GFp_simple_ladder_pre(const EC_GROUP_CUDA *group,
     bn_print_no_fuse(">> ossl_ec_GFp_simple_ladder_pre group->a = ", &group->a);
     bn_print_no_fuse(">> ossl_ec_GFp_simple_ladder_pre group->b = ", &group->b);
     bn_print_no_fuse(">> ossl_ec_GFp_simple_ladder_pre group->order = ", &group->order);
+    bn_print_no_fuse(">> ossl_ec_GFp_simple_ladder_pre s->X = ", &s->X);
+    bn_print_no_fuse(">> ossl_ec_GFp_simple_ladder_pre s->Y = ", &s->Y);
+    bn_print_no_fuse(">> ossl_ec_GFp_simple_ladder_pre s->Z = ", &s->Z);
     bn_print_no_fuse(">> ossl_ec_GFp_simple_ladder_pre p->X = ", &p->X);
     bn_print_no_fuse(">> ossl_ec_GFp_simple_ladder_pre p->Y = ", &p->Y);
     bn_print_no_fuse(">> ossl_ec_GFp_simple_ladder_pre p->Z = ", &p->Z);
@@ -1945,11 +1961,15 @@ __device__ int ossl_ec_GFp_simple_ladder_pre(const EC_GROUP_CUDA *group,
 
     if (!bn_mod_lshift_quick(&t5, &t5, 3, &group->field))
         return 0;
-    bn_print_no_fuse("[4] t5 = t5 << 3 = ", &t5);
+    bn_print_no_fuse("[4] t5 = t5 << 3 = ", &t5); 
 
-    if (!bn_mod_sub_quick(&r->X, &t3, &t5, &group->field))
+    bn_print_no_fuse(">> t4 = ", &t4);
+    bn_print_no_fuse(">> t5 = ", &t5);
+    bn_print_no_fuse(">> group->field = ", &group->field);
+    if (!bn_mod_sub_quick(&r->X, &t4, &t5, &group->field))
         return 0;
-    bn_print_no_fuse("[5] r->X = (X^2 - a)^2 - X * b * 8 = ", &r->X);
+    // bn_print_no_fuse("[5] r->X = (X^2 - a)^2 - X * b * 8 = ", &r->X); // ERR
+    bn_print_no_fuse("[5] r->X = t4 - t5 = ", &r->X);
 
     bn_print_no_fuse(">> t3 = ", &t3);
     bn_print_no_fuse(">> group->a = ", &group->a);
@@ -1975,18 +1995,27 @@ __device__ int ossl_ec_GFp_simple_ladder_pre(const EC_GROUP_CUDA *group,
     // t3 = s->X;
     // t4 = r->X;
     // t5 = s->Y;
+    
     bn_copy(&s->Z, &t1);
-    bn_copy(&r->Z, &t2);
+    // bn_copy(&r->Z, &t2);
     bn_copy(&s->X, &t3);
-    bn_copy(&r->X, &t4);
+    // bn_copy(&r->X, &t4);
     bn_copy(&s->Y, &t5);
 
-    bn_print_no_fuse("[pre-field_encode] s->Z = ", &s->Z);
-    bn_print_no_fuse("[pre-field_encode] r->Z = ", &r->Z);
-    bn_print_no_fuse("[pre-field_encode] s->X = ", &s->X);
-    bn_print_no_fuse("[pre-field_encode] r->X = ", &r->X);
-    bn_print_no_fuse("[pre-field_encode] s->Y = ", &s->Y);
-    
+    // bn_print_no_fuse("[pre-field_encode] s->Z = ", &s->Z);
+    // bn_print_no_fuse("[pre-field_encode] r->Z = ", &r->Z);
+    // bn_print_no_fuse("[pre-field_encode] s->X = ", &s->X);
+    // bn_print_no_fuse("[pre-field_encode] r->X = ", &r->X);
+    // bn_print_no_fuse("[pre-field_encode] s->Y = ", &s->Y);
+
+    printf(">> ossl_ec_GFp_simple_ladder_pre.before_blinding >>\n");
+    // r, s
+    bn_print_no_fuse(">> r->X = ", &r->X);
+    bn_print_no_fuse(">> r->Y = ", &r->Y);
+    bn_print_no_fuse(">> r->Z = ", &r->Z);
+    bn_print_no_fuse(">> s->X = ", &s->X);
+    bn_print_no_fuse(">> s->Y = ", &s->Y);
+    bn_print_no_fuse(">> s->Z = ", &s->Z);
     
     // Blinding ++
     // &r->Y becomes non-zero

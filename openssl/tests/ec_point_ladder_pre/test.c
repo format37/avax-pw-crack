@@ -121,7 +121,7 @@ int main(void) {
     }
 
     // printf("\nAfter ladder_pre:\n");
-    printf("\ntest complete")
+    printf("\ntest complete");
 
     ret = 1;
 

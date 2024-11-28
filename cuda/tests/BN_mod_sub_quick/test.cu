@@ -134,12 +134,16 @@ __global__ void test_kernel() {
     // Define test cases
     struct sub_quick_test_case test_cases[] = {
         // Test Case 1: OpenSSL example (128-bit numbers)
+        // {
+        //     "E10925726C3018DCB512F4EBF0A8835B",
+        //     "EB772E27B51120720C3913490298D9A7",
+        //     "FBB36E8A921F0B6E56E12B56CE3F0AD3"
+        // },
         {
-            "E10925726C3018DCB512F4EBF0A8835B",
-            "EB772E27B51120720C3913490298D9A7",
-            "FBB36E8A921F0B6E56E12B56CE3F0AD3"
+            "10E03C701DFA553A66DB72A6ED29AD445EF8C203C510FFFFCE794D92E07F7DDD",
+            "946A5EDAF9E2D7E12AD7EA0B5F5C1227AE990A312136801713DA23E0DB979EF9",
+            "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f"
         }
-        // Add more test cases here as needed
     };
 
     // Run test cases
