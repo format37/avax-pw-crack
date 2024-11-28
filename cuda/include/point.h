@@ -1173,6 +1173,7 @@ __device__ int ec_point_ladder_step(
         bn_mod_add_quick(&r->Z, &t4, &t1, &group->field)
     );
     print_jacobian_point("<< ladder_step << r", r);
+    print_jacobian_point("<< ladder_step << s", s);
     return ret;
 }
 
@@ -1479,10 +1480,37 @@ __device__ void ossl_ec_scalar_mul_ladder(
     const BIGNUM_CUDA *scalar,
     const EC_POINT_JACOBIAN *p)
 {
+    int cardinality_bits = 256;
+    BIGNUM_CUDA k;
+    init_zero(&k);
     EC_POINT_JACOBIAN s;
     init_zero(&s.X);
     init_zero(&s.Y);
     init_zero(&s.Z);
+
+    bn_copy(&k, scalar); // Copy scalar to local variable k
+
+
+    BIGNUM_CUDA lambda, cardinality;
+    init_zero(&lambda);
+    init_zero(&cardinality);
+    
+    bn_copy(&cardinality, &group->order);
+    bn_print_no_fuse("## cardinality:", &cardinality);
+
+    bn_add(&lambda, &k, &cardinality);
+    bn_print_no_fuse("## lambda [2]:", &lambda);
+    bn_print_no_fuse("# k [5]:", &k);
+    
+    bn_add(&k, &lambda, &cardinality);
+
+    bn_print_no_fuse("# k [6]:", &k);
+
+    int kbit = BN_is_bit_set(&lambda, cardinality_bits);
+    BN_consttime_swap(kbit, &k, &lambda);
+
+    bn_print_no_fuse("# k [7]:", &k);
+
     /* Initialize the Montgomery ladder */
     if (!ossl_ec_GFp_simple_ladder_pre(group, r, &s, p)) {
         printf("Ladder pre operation failed!\n");
@@ -1493,6 +1521,9 @@ __device__ void ossl_ec_scalar_mul_ladder(
     print_jacobian_point("S", &s);
     print_jacobian_point("P (base point)", p);
 
+    /* top bit is a 1, in a fixed pos */
+    int pbit = 0;
+
     #define EC_POINT_CSWAP(c, a, b) do {          \
         BN_consttime_swap(c, &(a)->X, &(b)->X);   \
         BN_consttime_swap(c, &(a)->Y, &(b)->Y);   \
@@ -1500,12 +1531,19 @@ __device__ void ossl_ec_scalar_mul_ladder(
     } while(0)
 
     // Add swapping logic - for testing use kbit=1 to ensure swap happens
-    int kbit = 1;  // This should come from scalar bit
+    // int kbit = 1;  // This should come from scalar bit
 
-    int cardinality_bits = 256;
+    // Perform the Montgomery ladder
+    bn_print_no_fuse("# k [8]:", &k);
+
+    
+
+    EC_POINT_CSWAP(kbit, r, &s);
 
     for (int i = cardinality_bits - 1; i >= 0; i--) {
-        EC_POINT_CSWAP(kbit, r, &s);
+        kbit = BN_is_bit_set(&k, i) ^ pbit;
+        printf(">> i: %d, kbit: %d\n", i, kbit);
+        // EC_POINT_CSWAP(kbit, r, &s);
 
         // printf("\nAfter swap:\n");
         // print_jacobian_point("R", r);
@@ -1513,11 +1551,16 @@ __device__ void ossl_ec_scalar_mul_ladder(
         // print_jacobian_point("P (base point)", p);
 
         /* Perform a single step of the Montgomery ladder */
-        // if (!ossl_ec_GFp_simple_ladder_step(group, r, &s, p)) {
         if (!ec_point_ladder_step(group, r, &s, p)) {
             printf("Ladder step operation failed!\n");
             return;
         }
+        /*
+         * pbit logic merges this cswap with that of the
+         * next iteration
+         */
+        pbit ^= kbit;
+        printf("<< i: %d, pbit: %d\n", i, pbit); // Debug print
     }
     /* one final cswap to move the right value into r */
     EC_POINT_CSWAP(kbit, r, &s);
