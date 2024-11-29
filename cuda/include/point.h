@@ -1507,7 +1507,9 @@ __device__ void ossl_ec_scalar_mul_ladder(
     bn_print_no_fuse("# k [6]:", &k);
 
     int kbit = BN_is_bit_set(&lambda, cardinality_bits);
+    printf("# kbit [0]: %d\n", kbit);
     BN_consttime_swap(kbit, &k, &lambda);
+    printf("# kbit [1]: %d\n", kbit);
 
     bn_print_no_fuse("# k [7]:", &k);
 
@@ -1522,7 +1524,7 @@ __device__ void ossl_ec_scalar_mul_ladder(
     print_jacobian_point("P (base point)", p);
 
     /* top bit is a 1, in a fixed pos */
-    int pbit = 0;
+    int pbit = 1;
 
     #define EC_POINT_CSWAP(c, a, b) do {          \
         BN_consttime_swap(c, &(a)->X, &(b)->X);   \
@@ -1538,12 +1540,15 @@ __device__ void ossl_ec_scalar_mul_ladder(
 
     
 
-    EC_POINT_CSWAP(kbit, r, &s);
+    // EC_POINT_CSWAP(kbit, r, &s);
 
     for (int i = cardinality_bits - 1; i >= 0; i--) {
-        kbit = BN_is_bit_set(&k, i) ^ pbit;
+        // kbit = BN_is_bit_set(&k, i) ^ pbit;
+        kbit = BN_is_bit_set(&k, i);
+        printf("** kbt: %d\n", i, kbit);
+        kbit = kbit ^ pbit;
         printf(">> i: %d, kbit: %d\n", i, kbit);
-        // EC_POINT_CSWAP(kbit, r, &s);
+        EC_POINT_CSWAP(kbit, r, &s);
 
         // printf("\nAfter swap:\n");
         // print_jacobian_point("R", r);
