@@ -2223,8 +2223,11 @@ __device__ int ossl_ec_GFp_simple_ladder_post(
     ossl_ec_GFp_mont_field_mul(&group->field, &t1, &t3, &t1);
     bn_print_no_fuse("[21] ossl_ec_GFp_simple_ladder_post: t1 = t3 * t1 =", &t1);
 
-    // ossl_ec_GFp_mont_field_decode(&group->field, &t1, &t1);
-    // bn_print_no_fuse("[22] ossl_ec_GFp_simple_ladder_post: t1 = decode(t1) =", &t1);
+    BIGNUM_CUDA t1_tmp;
+    init_zero(&t1_tmp);
+    bn_copy(&t1_tmp, &t1);
+    ossl_ec_GFp_mont_field_decode(group, &t1, &t1_tmp);
+    bn_print_no_fuse("[22] ossl_ec_GFp_simple_ladder_post: t1 = decode(t1) =", &t1);
 
     // ossl_ec_GFp_mont_field_inv(&group->field, &t1, &t1);
     // bn_print_no_fuse("[23] ossl_ec_GFp_simple_ladder_post: t1 = inv(t1) =", &t1);

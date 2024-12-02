@@ -11,6 +11,8 @@ typedef struct {
     BIGNUM_CUDA R2;      // R^2 mod n (used for Montgomery reduction)
 } BN_MONT_CTX_CUDA;
 
+__device__ bool BN_MONT_CTX_set(BN_MONT_CTX_CUDA *mont, const BIGNUM_CUDA *m);
+
 __device__ void bn_rshift(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, int shift) {
     if (shift == 0) {
         bn_copy(r, a);
@@ -315,81 +317,13 @@ __device__ int bn_from_montgomery_word(BIGNUM_CUDA *ret, BIGNUM_CUDA *r, const B
 
     return 1;
 }
-    
+
 
 __device__ int bn_from_mont_fixed_top(BIGNUM_CUDA *ret, const BIGNUM_CUDA *a, const BN_MONT_CTX_CUDA *mont) {
     BIGNUM_CUDA t;
     init_zero(&t);
     bn_copy(&t, a);
     return bn_from_montgomery_word(ret, &t, mont);
-    // // Based on the word-based Montgomery reduction algorithm from OpenSSL
-    // int nl = mont->n.top;  // Size of the modulus
-    // if (nl == 0) {
-    //     ret->top = 0;
-    //     return 1;
-    // }
-
-    // // Maximum size needed for the intermediate result (2 * nl)
-    // int max = 2 * nl;  // Carry is stored separately
-    
-    // // Temporary storage for calculations
-    // BIGNUM_CUDA r;
-    // init_zero(&r);
-    
-    // // Copy input value
-    // bn_copy(&r, a);
-    
-    // // Clear top words if any
-    // for (int i = r.top; i < max; i++) {
-    //     r.d[i] = 0;
-    // }
-    
-    // r.top = max;
-    // BN_ULONG n0 = N0_VALUE;  // Montgomery constant
-
-    // // Main reduction loop
-    // // At each iteration, add a multiple of N to make the bottom word zero
-    // BN_ULONG carry = 0;
-    // for (int i = 0; i < nl; i++) {
-    //     // Calculate m = r[i] * n0 mod BN_MASK2
-    //     BN_ULONG m = (r.d[i] * n0) & BN_MASK2;
-        
-    //     // Multiply m by N and add to r starting at position i
-    //     BN_ULONG v = bn_mul_add_words(&r.d[i], mont->n.d, nl, m);
-        
-    //     // Add the carry from the previous iteration
-    //     v = (v + carry + r.d[i + nl]) & BN_MASK2;
-    //     carry |= (v != r.d[i + nl]);  // Update carry if overflow
-    //     carry &= (v <= r.d[i + nl]);  // Clear carry if no overflow
-    //     r.d[i + nl] = v;
-    // }
-
-    // // Initialize return value
-    // if (bn_wexpand(ret, nl) == 0) {
-    //     return 0;
-    // }
-    // ret->top = nl;
-    // ret->neg = r.neg;
-
-    // // Shift nl words to divide by R
-    // BN_ULONG *rp = ret->d;
-    // BN_ULONG *ap = &r.d[nl];
-
-    // // Perform final subtraction and conditional copy
-    // carry -= bn_sub_words(rp, ap, mont->n.d, nl);
-    
-    // // Conditional copy based on carry
-    // // If carry is -1, use ap values, otherwise use subtracted values in rp
-    // for (int i = 0; i < nl; i++) {
-    //     rp[i] = (carry & ap[i]) | (~carry & rp[i]);
-    // }
-
-    // // Clear temporary values
-    // for (int i = 0; i < max; i++) {
-    //     r.d[i] = 0;
-    // }
-
-    // return 1;
 }
 
 __device__ int BN_from_montgomery(BIGNUM_CUDA *ret, const BIGNUM_CUDA *a, const BN_MONT_CTX_CUDA *mont) {
@@ -423,49 +357,73 @@ __device__ int BN_from_montgomery(BIGNUM_CUDA *ret, const BIGNUM_CUDA *a, const 
 //     return BN_from_montgomery(r, a, group->field_data1, ctx);
 // }
 
-__device__ void BN_from_montgomery_CUDA_prototype(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BN_MONT_CTX_CUDA *mont) {
-    // Montgomery reduction: computes r = a * R^{-1} mod n
-    BIGNUM_CUDA t;
-    init_zero(&t);
-    bn_copy(&t, a);
+// __device__ void BN_from_montgomery_CUDA_prototype(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BN_MONT_CTX_CUDA *mont) {
+//     // Montgomery reduction: computes r = a * R^{-1} mod n
+//     BIGNUM_CUDA t;
+//     init_zero(&t);
+//     bn_copy(&t, a);
 
-    // m = (t * mont->n_prime) mod mont->R
-    BIGNUM_CUDA m;
-    init_zero(&m);
-    bn_mod_mul(&m, &t, &mont->n_prime, &mont->R);
+//     // m = (t * mont->n_prime) mod mont->R
+//     BIGNUM_CUDA m;
+//     init_zero(&m);
+//     bn_mod_mul(&m, &t, &mont->n_prime, &mont->R);
 
-    // u = (t + m * mont->n) / mont->R
-    BIGNUM_CUDA mn_product;
-    init_zero(&mn_product);
-    bn_mul(&m, &mont->n, &mn_product);  // m * n
+//     // u = (t + m * mont->n) / mont->R
+//     BIGNUM_CUDA mn_product;
+//     init_zero(&mn_product);
+//     bn_mul(&m, &mont->n, &mn_product);  // m * n
 
-    BIGNUM_CUDA t_plus_mn;
-    init_zero(&t_plus_mn);
-    bn_add(&t_plus_mn, &t, &mn_product);  // t + m*n
+//     BIGNUM_CUDA t_plus_mn;
+//     init_zero(&t_plus_mn);
+//     bn_add(&t_plus_mn, &t, &mn_product);  // t + m*n
 
-    BIGNUM_CUDA u;
-    init_zero(&u);
-    bn_div(&u, NULL, &t_plus_mn, &mont->R); // u = (t + m * n) / R
+//     BIGNUM_CUDA u;
+//     init_zero(&u);
+//     bn_div(&u, NULL, &t_plus_mn, &mont->R); // u = (t + m * n) / R
 
-    // If u >= n, subtract n
-    if (bn_cmp(&u, &mont->n) >= 0) {
-        bn_sub(&u, &u, &mont->n);
-    }
+//     // If u >= n, subtract n
+//     if (bn_cmp(&u, &mont->n) >= 0) {
+//         bn_sub(&u, &u, &mont->n);
+//     }
 
-    bn_copy(r, &u);
-}
+//     bn_copy(r, &u);
+// }
 
-__device__ int ossl_ec_GFp_mont_field_decode(const BN_MONT_CTX_CUDA *field, BIGNUM_CUDA *r,
+__device__ int ossl_ec_GFp_mont_field_decode(const EC_GROUP_CUDA *group, BIGNUM_CUDA *r,
                                   const BIGNUM_CUDA *a)
 {
+    init_zero(r);
+    // print group
+    bn_print_no_fuse("ossl_ec_GFp_mont_field_decode >> group->field:", &group->field);
+    bn_print_no_fuse("ossl_ec_GFp_mont_field_decode >> r:", r);
+    bn_print_no_fuse("ossl_ec_GFp_mont_field_decode >> a:", a);
+
     // if (field == NULL) {
     //     ERR_raise(ERR_LIB_EC, EC_R_NOT_INITIALIZED);
     //     return 0;
     // }
 
     // return BN_from_montgomery(r, a, group->field_data1, ctx);
-    BN_from_montgomery_CUDA_prototype(r, a, field);
-    return 1;
+    // BN_from_montgomery_CUDA_prototype(r, a, field);
+
+    BIGNUM_CUDA n;
+    init_zero(&n);
+    bn_copy(&n, &group->field);
+
+    // Create Montgomery context
+    BN_MONT_CTX_CUDA mont; // Memory optimization is possible using BIGNUM instead of mont
+    BN_MONT_CTX_set(&mont, &n);
+
+    BIGNUM_CUDA n_prime;
+    init_zero(&n_prime);
+    n_prime.d[0] = 0xd838091dd2253531;
+    n_prime.top = 1;
+    n_prime.neg = 0;
+
+    // Set n_prime in montgomery context
+    mont.n_prime = n_prime;
+
+    return BN_from_montgomery(r, a, &mont);
 }
 
 // Function to count the number of bits in a BN_ULONG
