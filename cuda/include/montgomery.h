@@ -224,13 +224,96 @@ __device__ int bn_wexpand(BIGNUM_CUDA *bn, int words) {
     return 0;  // Cannot expand in this implementation
 }
 
-__device__ int bn_from_montgomery_word(BIGNUM_CUDA *ret, const BIGNUM_CUDA *r, const BN_MONT_CTX_CUDA *mont) {
+__device__ int bn_from_montgomery_word(BIGNUM_CUDA *ret, BIGNUM_CUDA *r, const BN_MONT_CTX_CUDA *mont) {
     bn_print_no_fuse("\n>> bn_from_montgomery_word >> ret:", ret);
     bn_print_no_fuse(">> bn_from_montgomery_word >> r:", r);
-    bn_print_no_fuse(">> bn_from_montgomery_word >> mont->R:", &mont->R);
     bn_print_no_fuse(">> bn_from_montgomery_word >> mont->n:", &mont->n);
     bn_print_no_fuse(">> bn_from_montgomery_word >> mont->n_prime:", &mont->n_prime);
-    bn_print_no_fuse(">> bn_from_montgomery_word >> mont->R2:", &mont->R2);    
+
+    // We need to modify 'r' directly as per the OpenSSL implementation.
+    // Ensure that 'r' has enough space to hold the computations.
+
+    BIGNUM_CUDA n;
+    init_zero(&n);
+    n = mont->n;
+    int nl = n.top;
+
+    if (nl == 0) {
+        ret->top = 0;
+        return 1;
+    }
+
+    int max = 2 * nl;
+
+    // Ensure 'r' and 'ret' have enough space
+    if (max > MAX_BIGNUM_SIZE) {
+        printf("Error: required size exceeds MAX_BIGNUM_SIZE\n");
+        return 0;
+    }
+
+    // Adjust 'r's sign
+    r->neg ^= n.neg;
+
+    BN_ULONG *np = n.d;
+    BN_ULONG *rp = r->d;
+
+    // Clear the top words of 'r'
+    for (int i = r->top; i < max; i++) {
+        rp[i] = 0;
+    }
+
+    r->top = max;
+
+    // Use the precomputed n0 from the Montgomery context
+    BN_ULONG n0 = mont->n_prime.d[0];  // Assuming mont->n_prime.d[0] holds the value of n0
+
+    BN_ULONG carry = 0;
+
+    // Main Montgomery reduction loop
+    for (int i = 0; i < nl; i++) {
+        // Compute m = (r->d[i] * n0) mod word_size
+        BN_ULONG m = (rp[i] * n0) & BN_MASK2;
+
+        // Compute m * n and add to r starting at position i
+        BN_ULONG c = 0;
+        for (int j = 0; j < nl; j++) {
+            unsigned __int128 prod = (unsigned __int128)m * np[j] + rp[i + j] + c;
+            rp[i + j] = (BN_ULONG)prod;
+            c = (BN_ULONG)(prod >> BN_ULONG_NUM_BITS);
+        }
+
+        // Add carries
+        unsigned __int128 sum = (unsigned __int128)rp[i + nl] + c + carry;
+        rp[i + nl] = (BN_ULONG)sum;
+        carry = (BN_ULONG)(sum >> BN_ULONG_NUM_BITS);
+    }
+
+    // Prepare 'ret' for the result
+    ret->top = nl;
+    ret->neg = r->neg;
+    BN_ULONG *ap = &rp[nl];
+    BN_ULONG *rp_ret = ret->d;
+
+    // Perform subtraction: rp_ret = ap - np
+    BN_ULONG borrow = bn_sub_words(rp_ret, ap, np, nl);
+
+    // Adjust carry
+    int carry_int = (int)carry - (int)borrow;  // carry and borrow are 0 or 1
+    BN_ULONG mask = (BN_ULONG)(0) - (BN_ULONG)(carry_int & 1);  // All bits set if carry_int == -1
+
+    // Conditional copy based on carry
+    for (int i = 0; i < nl; i++) {
+        rp_ret[i] = (mask & ap[i]) | (~mask & rp_ret[i]);
+        ap[i] = 0;  // Clear the used words
+    }
+
+    // Correct the top of 'ret'
+    ret->top = find_top_optimized(ret, nl);
+
+    bn_print_no_fuse("\nbn_from_montgomery_word << ret:", ret);
+    printf("\n");
+
+    return 1;
 }
     
 
