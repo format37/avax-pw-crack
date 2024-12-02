@@ -2126,6 +2126,10 @@ __device__ int ossl_ec_GFp_simple_ladder_post(
     EC_POINT_JACOBIAN *s,
     const EC_POINT_JACOBIAN *p
 ) {
+    printf(">> [0] ossl_ec_GFp_simple_ladder_post >>");
+    print_jacobian_point("R", r);
+    print_jacobian_point("S", s);
+    print_jacobian_point("P (base point)", p);
     if (bn_is_zero(&r->Z)) {
         // Set r to point at infinity
         init_zero(&r->X);
@@ -2143,6 +2147,11 @@ __device__ int ossl_ec_GFp_simple_ladder_post(
         return 1;
     }
 
+    printf(">> [1] ossl_ec_GFp_simple_ladder_post >>");
+    print_jacobian_point("R", r);
+    print_jacobian_point("S", s);
+    print_jacobian_point("P (base point)", p);
+
     // Initialize temporary variables
     BIGNUM_CUDA t0, t1, t2, t3, t4, t5, t6;
     init_zero(&t0);
@@ -2153,78 +2162,97 @@ __device__ int ossl_ec_GFp_simple_ladder_post(
     init_zero(&t5);
     init_zero(&t6);
 
-    // t4 = 2*Y1
     bn_mod_lshift1_quick(&t4, &p->Y, &group->field);
+    bn_print_no_fuse("[0] ossl_ec_GFp_simple_ladder_post: t4 = p->Y << 1 =", &t4);
 
-    // t6 = X2*t4*Z3*Z2
-    ossl_bn_mod_mul_montgomery(&t6, &r->X, &t4, &group->field);
-    ossl_bn_mod_mul_montgomery(&t6, &t6, &s->Z, &group->field);
-    ossl_bn_mod_mul_montgomery(&t5, &r->Z, &t6, &group->field);
+    ossl_ec_GFp_mont_field_mul(&group->field, &t6, &r->X, &t4);
+    bn_print_no_fuse("[1] ossl_ec_GFp_simple_ladder_post: t6 = r->X * p->Y =", &t6);
 
-    // t1 = 2*b*Z3
+    ossl_ec_GFp_mont_field_mul(&group->field, &t6, &t6, &s->Z);
+    bn_print_no_fuse("[2] ossl_ec_GFp_simple_ladder_post: t6 = t6 * s->Z =", &t6);
+
+    ossl_ec_GFp_mont_field_mul(&group->field, &t5, &r->Z, &t6);
+    bn_print_no_fuse("[3] ossl_ec_GFp_simple_ladder_post: t5 = r->Z * t6 =", &t5);
+
     bn_mod_lshift1_quick(&t1, &group->b, &group->field);
-    ossl_bn_mod_mul_montgomery(&t1, &t1, &s->Z, &group->field);
+    bn_print_no_fuse("[4] ossl_ec_GFp_simple_ladder_post: t1 = group->b << 1 =", &t1);
+    
+    ossl_ec_GFp_mont_field_mul(&group->field, &t1, &s->Z, &t1);
+    bn_print_no_fuse("[5] ossl_ec_GFp_simple_ladder_post: t1 = t1 * s->Z =", &t1);
 
-    // t3 = Z2^2
     ossl_bn_mod_sqr_montgomery(&t3, &r->Z, &group->field);
+    bn_print_no_fuse("[6] ossl_ec_GFp_simple_ladder_post: t3 = r->Z^2 =", &t3);
 
-    // t2 = t3*t1
-    ossl_bn_mod_mul_montgomery(&t2, &t3, &t1, &group->field);
+    // << -- Need to complete according to OpenSSL implementation -- >>
 
-    // t6 = Z2*a
-    ossl_bn_mod_mul_montgomery(&t6, &r->Z, &group->a, &group->field);
+    ossl_ec_GFp_mont_field_mul(&group->field, &t2, &t3, &t1);
+    bn_print_no_fuse("[7] ossl_ec_GFp_simple_ladder_post: t2 = t3 * t1 =", &t2);
 
-    // t1 = X1*X2 + t6
-    ossl_bn_mod_mul_montgomery(&t1, &p->X, &r->X, &group->field);
+    ossl_ec_GFp_mont_field_mul(&group->field, &t6, &r->Z, &group->a);
+    bn_print_no_fuse("[8] ossl_ec_GFp_simple_ladder_post: t6 = r->Z * group->a =", &t6);
+
+    ossl_ec_GFp_mont_field_mul(&group->field, &t1, &p->X, &r->X);
+    bn_print_no_fuse("[9] ossl_ec_GFp_simple_ladder_post: t1 = p->X * r->X =", &t1);
+
     bn_mod_add_quick(&t1, &t1, &t6, &group->field);
+    bn_print_no_fuse("[10] ossl_ec_GFp_simple_ladder_post: t1 = t1 + t6 =", &t1);
 
-    // t1 = t1*Z3
-    ossl_bn_mod_mul_montgomery(&t1, &t1, &s->Z, &group->field);
+    ossl_ec_GFp_mont_field_mul(&group->field, &t1, &s->Z, &t1);
+    bn_print_no_fuse("[11] ossl_ec_GFp_simple_ladder_post: t1 = t1 * s->Z =", &t1);
 
-    // t0 = X1*Z2
-    ossl_bn_mod_mul_montgomery(&t0, &p->X, &r->Z, &group->field);
+    ossl_ec_GFp_mont_field_mul(&group->field, &t0, &p->X, &r->Z);
+    bn_print_no_fuse("[12] ossl_ec_GFp_simple_ladder_post: t0 = p->X * r->Z =", &t0);
 
-    // t6 = X2 + t0
     bn_mod_add_quick(&t6, &r->X, &t0, &group->field);
+    bn_print_no_fuse("[13] ossl_ec_GFp_simple_ladder_post: t6 = r->X + t0 =", &t6);
 
-    // t6 = t6*t1
-    ossl_bn_mod_mul_montgomery(&t6, &t6, &t1, &group->field);
+    ossl_ec_GFp_mont_field_mul(&group->field, &t6, &t6, &t1);
+    bn_print_no_fuse("[14] ossl_ec_GFp_simple_ladder_post: t6 = t6 * t1 =", &t6);
 
-    // t6 = t6 + t2
     bn_mod_add_quick(&t6, &t6, &t2, &group->field);
+    bn_print_no_fuse("[15] ossl_ec_GFp_simple_ladder_post: t6 = t6 + t2 =", &t6);
 
-    // t0 = t0 - X2
     bn_mod_sub_quick(&t0, &t0, &r->X, &group->field);
+    bn_print_no_fuse("[16] ossl_ec_GFp_simple_ladder_post: t0 = t0 - r->X =", &t0);
 
-    // t0 = t0^2
     ossl_bn_mod_sqr_montgomery(&t0, &t0, &group->field);
+    bn_print_no_fuse("[17] ossl_ec_GFp_simple_ladder_post: t0 = t0^2 =", &t0);
 
-    // t0 = t0*X3
-    ossl_bn_mod_mul_montgomery(&t0, &t0, &s->X, &group->field);
+    ossl_ec_GFp_mont_field_mul(&group->field, &t0, &t0, &s->X);
+    bn_print_no_fuse("[18] ossl_ec_GFp_simple_ladder_post: t0 = t0 * s->X =", &t0);
 
-    // t0 = t6 - t0
     bn_mod_sub_quick(&t0, &t6, &t0, &group->field);
+    bn_print_no_fuse("[19] ossl_ec_GFp_simple_ladder_post: t0 = t6 - t0 =", &t0);
 
-    // t1 = Z3*t4
-    ossl_bn_mod_mul_montgomery(&t1, &s->Z, &t4, &group->field);
+    ossl_ec_GFp_mont_field_mul(&group->field, &t1, &s->Z, &t4);
+    bn_print_no_fuse("[20] ossl_ec_GFp_simple_ladder_post: t1 = s->Z * t4 =", &t1);
 
-    // t1 = t1*t3
-    ossl_bn_mod_mul_montgomery(&t1, &t1, &t3, &group->field);
+    ossl_ec_GFp_mont_field_mul(&group->field, &t1, &t3, &t1);
+    bn_print_no_fuse("[21] ossl_ec_GFp_simple_ladder_post: t1 = t3 * t1 =", &t1);
 
-    // Compute final coordinates
-    // if (!ossl_ec_GFp_mont_field_inv(group, t1, &t1, &group->field)) {
-    if (!ossl_ec_GFp_mont_field_inv(&t1, &t1, &group->field)) {
-        return 0;
-    }
+    // ossl_ec_GFp_mont_field_decode(&group->field, &t1, &t1);
+    // bn_print_no_fuse("[22] ossl_ec_GFp_simple_ladder_post: t1 = decode(t1) =", &t1);
 
-    // Compute X coordinate
-    ossl_bn_mod_mul_montgomery(&r->X, &t5, &t1, &group->field);
+    // ossl_ec_GFp_mont_field_inv(&group->field, &t1, &t1);
+    // bn_print_no_fuse("[23] ossl_ec_GFp_simple_ladder_post: t1 = inv(t1) =", &t1);
 
-    // Compute Y coordinate
-    ossl_bn_mod_mul_montgomery(&r->Y, &t0, &t1, &group->field);
+    // cuda_ec_GFp_mont_field_encode(&group->field, &t1, &t1);
+    // bn_print_no_fuse("[24] ossl_ec_GFp_simple_ladder_post: t1 = encode(t1) =", &t1);
+
+    // ossl_ec_GFp_mont_field_mul(&group->field, &r->X, &t5, &t1);
+    // bn_print_no_fuse("[25] ossl_ec_GFp_simple_ladder_post: r->X = t5 * t1 =", &r->X);
+
+    // ossl_ec_GFp_mont_field_mul(&group->field, &r->Y, &t0, &t1);
+    // bn_print_no_fuse("[26] ossl_ec_GFp_simple_ladder_post: r->Y = t0 * t1 =", &r->Y);
+
+    printf(">> [y] ossl_ec_GFp_simple_ladder_post >>");
+    print_jacobian_point("R", r);
+    print_jacobian_point("S", s);
+    print_jacobian_point("P (base point)", p);
 
     // Set Z coordinate to 1
     init_one(&r->Z);
 
     return 1;
 }
+

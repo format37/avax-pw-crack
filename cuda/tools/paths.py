@@ -182,14 +182,20 @@ folders = [
     # "~/projects/avax-pw-crack/cuda/include/point.h",
 
     # OSSL blinding test
-    "~/projects/avax-pw-crack/cuda/prompts/135_blinding_base.md",
-    "~/projects/openssl_mod/crypto/ec/ecp_smpl.c",
-    "~/projects/openssl_mod/crypto/bn/bn_rand.c",
+    # "~/projects/avax-pw-crack/cuda/prompts/135_blinding_base.md",
+    # "~/projects/openssl_mod/crypto/ec/ecp_smpl.c",
+    # "~/projects/openssl_mod/crypto/bn/bn_rand.c",
     # "~/projects/openssl_mod/crypto/ec/ecp_mont.c",
     # "~/projects/openssl_mod/crypto/bn/bn_lib.c",
     # "~/projects/openssl_mod/crypto/bn/bn_mont.c",
     # "~/projects/avax-pw-crack/cuda/include/bignum.h",
     # "~/projects/avax-pw-crack/cuda/include/montgomery.h",
     # "~/projects/avax-pw-crack/cuda/include/jacobian_point.h",
-    "~/projects/avax-pw-crack/cuda/include/point.h",
+    # "~/projects/avax-pw-crack/cuda/include/point.h",
+
+    # OSSL bn_from_montgomery_word test
+    "~/projects/avax-pw-crack/cuda/prompts/136_bn_from_montgomery_word_base.md",
+    "~/projects/openssl_mod/crypto/bn/bn_mont.c",
+    "~/projects/avax-pw-crack/openssl/tests/BN_mod_exp_mont/test.c",
+    "~/projects/avax-pw-crack/openssl/tests/BN_to_montgomery/test.c",
     ]

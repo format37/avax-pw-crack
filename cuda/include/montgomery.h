@@ -216,7 +216,117 @@ __device__ void bn_to_montgomery_short(BIGNUM_CUDA *r, const BIGNUM_CUDA *a) {
     bn_mod_mul_montgomery(a, &RR, &n, r);
 }
 
-__device__ void BN_from_montgomery_CUDA(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, BN_MONT_CTX_CUDA *mont) {
+// Helper function to expand BIGNUM_CUDA to a given word size
+__device__ int bn_wexpand(BIGNUM_CUDA *bn, int words) {
+    if (words <= MAX_BIGNUM_SIZE) {
+        return 1;  // Already large enough
+    }
+    return 0;  // Cannot expand in this implementation
+}
+
+__device__ int bn_from_mont_fixed_top(BIGNUM_CUDA *ret, const BIGNUM_CUDA *a, const BN_MONT_CTX_CUDA *mont) {
+    // Based on the word-based Montgomery reduction algorithm from OpenSSL
+    int nl = mont->n.top;  // Size of the modulus
+    if (nl == 0) {
+        ret->top = 0;
+        return 1;
+    }
+
+    // Maximum size needed for the intermediate result (2 * nl)
+    int max = 2 * nl;  // Carry is stored separately
+    
+    // Temporary storage for calculations
+    BIGNUM_CUDA r;
+    init_zero(&r);
+    
+    // Copy input value
+    bn_copy(&r, a);
+    
+    // Clear top words if any
+    for (int i = r.top; i < max; i++) {
+        r.d[i] = 0;
+    }
+    
+    r.top = max;
+    BN_ULONG n0 = N0_VALUE;  // Montgomery constant
+
+    // Main reduction loop
+    // At each iteration, add a multiple of N to make the bottom word zero
+    BN_ULONG carry = 0;
+    for (int i = 0; i < nl; i++) {
+        // Calculate m = r[i] * n0 mod BN_MASK2
+        BN_ULONG m = (r.d[i] * n0) & BN_MASK2;
+        
+        // Multiply m by N and add to r starting at position i
+        BN_ULONG v = bn_mul_add_words(&r.d[i], mont->n.d, nl, m);
+        
+        // Add the carry from the previous iteration
+        v = (v + carry + r.d[i + nl]) & BN_MASK2;
+        carry |= (v != r.d[i + nl]);  // Update carry if overflow
+        carry &= (v <= r.d[i + nl]);  // Clear carry if no overflow
+        r.d[i + nl] = v;
+    }
+
+    // Initialize return value
+    if (bn_wexpand(ret, nl) == 0) {
+        return 0;
+    }
+    ret->top = nl;
+    ret->neg = r.neg;
+
+    // Shift nl words to divide by R
+    BN_ULONG *rp = ret->d;
+    BN_ULONG *ap = &r.d[nl];
+
+    // Perform final subtraction and conditional copy
+    carry -= bn_sub_words(rp, ap, mont->n.d, nl);
+    
+    // Conditional copy based on carry
+    // If carry is -1, use ap values, otherwise use subtracted values in rp
+    for (int i = 0; i < nl; i++) {
+        rp[i] = (carry & ap[i]) | (~carry & rp[i]);
+    }
+
+    // Clear temporary values
+    for (int i = 0; i < max; i++) {
+        r.d[i] = 0;
+    }
+
+    return 1;
+}
+
+__device__ int BN_from_montgomery(BIGNUM_CUDA *ret, const BIGNUM_CUDA *a, const BN_MONT_CTX_CUDA *mont) {
+    int retn;
+
+    // First do the fixed top conversion
+    retn = bn_from_mont_fixed_top(ret, a, mont);
+
+    // Correct the top by removing leading zeros
+    if (retn) {
+        while (ret->top > 0 && ret->d[ret->top - 1] == 0)
+            ret->top--;
+    }
+
+    // Handle zero case 
+    if (ret->top == 0) {
+        ret->neg = 0;  // Zero is always positive
+    }
+
+    return retn;
+}
+
+int ossl_ec_GFp_mont_field_decode(const EC_GROUP *group, BIGNUM *r,
+                                  const BIGNUM *a, BN_CTX *ctx)
+{
+    // if (group->field_data1 == NULL) {
+    //     ERR_raise(ERR_LIB_EC, EC_R_NOT_INITIALIZED);
+    //     return 0;
+    // }
+
+    return BN_from_montgomery(r, a, group->field_data1, ctx);
+}
+
+__device__ void BN_from_montgomery_CUDA_prototype(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BN_MONT_CTX_CUDA *mont) {
     // Montgomery reduction: computes r = a * R^{-1} mod n
     BIGNUM_CUDA t;
     init_zero(&t);
@@ -246,6 +356,19 @@ __device__ void BN_from_montgomery_CUDA(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, BN
     }
 
     bn_copy(r, &u);
+}
+
+__device__ int ossl_ec_GFp_mont_field_decode(const BN_MONT_CTX_CUDA *field, BIGNUM_CUDA *r,
+                                  const BIGNUM_CUDA *a)
+{
+    // if (field == NULL) {
+    //     ERR_raise(ERR_LIB_EC, EC_R_NOT_INITIALIZED);
+    //     return 0;
+    // }
+
+    // return BN_from_montgomery(r, a, group->field_data1, ctx);
+    BN_from_montgomery_CUDA(r, a, field);
+    return 1;
 }
 
 // Function to count the number of bits in a BN_ULONG
