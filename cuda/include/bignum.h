@@ -34,6 +34,13 @@ typedef struct bignum_st {
     bool neg;
 } BIGNUM_CUDA;
 
+typedef struct ec_group_st_cuda {
+    BIGNUM_CUDA field;  // Prime field modulus p
+    BIGNUM_CUDA a;      // Curve parameter a
+    BIGNUM_CUDA b;      // Curve parameter b
+    BIGNUM_CUDA order;  // Order of the base point
+} EC_GROUP_CUDA;
+
 // Define the number of bits in BN_ULONG
 #define BN_BITS2 (sizeof(BN_ULONG) * 8)  // This will be 64
 // #define TABLE_SIZE 32 // Maximum precomputation table size for sliding windows

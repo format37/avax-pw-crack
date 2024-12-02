@@ -4,13 +4,6 @@
 #define MAX_WNAF_LENGTH 256  // Adjust as per your needs
 #define NUM_PRECOMPUTED_POINTS (1 << (WINDOW_SIZE - 1))
 
-typedef struct ec_group_st_cuda {
-    BIGNUM_CUDA field;  // Prime field modulus p
-    BIGNUM_CUDA a;      // Curve parameter a
-    BIGNUM_CUDA b;      // Curve parameter b
-    BIGNUM_CUDA order;  // Order of the base point
-} EC_GROUP_CUDA;
-
 __device__ void bn_to_montgomery(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BN_MONT_CTX_CUDA *mont, BIGNUM_CUDA *m);
 
 __device__ int ossl_ec_GFp_simple_ladder_pre(const EC_GROUP_CUDA *group,
