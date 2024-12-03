@@ -5,6 +5,7 @@
 #define NUM_PRECOMPUTED_POINTS (1 << (WINDOW_SIZE - 1))
 
 __device__ void bn_to_montgomery(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BN_MONT_CTX_CUDA *mont, BIGNUM_CUDA *m);
+__device__ int BN_mod_exp_mont(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNUM_CUDA *p, BIGNUM_CUDA *m);
 
 __device__ int ossl_ec_GFp_simple_ladder_pre(const EC_GROUP_CUDA *group,
     EC_POINT_JACOBIAN *r,
@@ -976,9 +977,43 @@ __device__ void bn_mod_lshift1(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNU
     bn_mod(r, &temp, n);
 }
 
+__device__ int ossl_ec_GFp_mont_field_inv(
+    const BIGNUM_CUDA *group_field, 
+    BIGNUM_CUDA *r, 
+    const BIGNUM_CUDA *a
+    ) {    
+    bn_print_no_fuse(">> ossl_ec_GFp_mont_field_inv >> group->field =", group_field);
+    bn_print_no_fuse(">> ossl_ec_GFp_mont_field_inv >> r =", r);
+    bn_print_no_fuse(">> ossl_ec_GFp_mont_field_inv >> a =", a);
 
+    BIGNUM_CUDA e, two, group_field_tmp;
+    init_zero(&e);
+    init_zero(&two);
+    init_zero(&group_field_tmp);
+    two.d[0] = 2;
+    
+    /* Inverse in constant time with Fermats Little Theorem */
+    if (!bn_sub(&e, group_field, &two)) {
+        return 0;
+    }
+    
+    bn_copy(&group_field_tmp, group_field);
+    /*-
+     * Exponent e is public.
+     * No need for scatter-gather or BN_FLG_CONSTTIME.
+     */
+    if (!BN_mod_exp_mont(r, a, &e, &group_field_tmp)) return 0;
+    
+    /* throw an error on zero */
+    if (bn_is_zero(r)) {
+        return 0;
+    }
 
-__device__ int ossl_ec_GFp_mont_field_inv(const BIGNUM_CUDA *a, BIGNUM_CUDA *result, const BIGNUM_CUDA *p) {    
+    bn_print_no_fuse("<< r:", r);
+    return 1;
+}
+
+__device__ int ossl_ec_GFp_mont_field_inv_proto(const BIGNUM_CUDA *a, BIGNUM_CUDA *result, const BIGNUM_CUDA *p) {    
     printf("++ ossl_ec_GFp_mont_field_inv ++\n");
     bn_print_no_fuse(">> a: ", a);
     bn_print_no_fuse(">> p: ", p);
@@ -2229,8 +2264,11 @@ __device__ int ossl_ec_GFp_simple_ladder_post(
     ossl_ec_GFp_mont_field_decode(group, &t1, &t1_tmp);
     bn_print_no_fuse("[22] ossl_ec_GFp_simple_ladder_post: t1 = decode(t1) =", &t1);
 
-    // ossl_ec_GFp_mont_field_inv(&group->field, &t1, &t1);
-    // bn_print_no_fuse("[23] ossl_ec_GFp_simple_ladder_post: t1 = inv(t1) =", &t1);
+    init_zero(&t1_tmp);
+    bn_copy(&t1_tmp, &t1);
+    init_zero(&t1);
+    ossl_ec_GFp_mont_field_inv(&group->field, &t1, &t1_tmp);
+    bn_print_no_fuse("[23] ossl_ec_GFp_simple_ladder_post: t1 = inv(t1) =", &t1);
 
     // cuda_ec_GFp_mont_field_encode(&group->field, &t1, &t1);
     // bn_print_no_fuse("[24] ossl_ec_GFp_simple_ladder_post: t1 = encode(t1) =", &t1);

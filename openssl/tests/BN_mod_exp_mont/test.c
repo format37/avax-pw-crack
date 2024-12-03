@@ -28,7 +28,7 @@ int main(void) {
     }
 
     /* Set values for a, p, and m */
-    if (!BN_hex2bn(&a, "2D71E2130231F67E5AD4AB26B4E02EEDE79F749144E6119E36C99EB4227BCE35")) {
+    if (!BN_hex2bn(&a, "852D23DB15B6EFB341C5D19B0E5448E2E4DD7D7602B8885C1BA859400BFC27D7")) {
         fprintf(stderr, "Error setting base 'a'.\n");
         goto cleanup;
     }
