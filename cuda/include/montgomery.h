@@ -184,12 +184,12 @@ __device__ bool ossl_bn_mod_mul_montgomery(
     const BIGNUM_CUDA *n           // OpenSSL: mont->N
     
 ) {
-    bn_print_no_fuse("\nbn_mod_mul_montgomery >> a: ", a);
-    bn_print_no_fuse("bn_mod_mul_montgomery >> b: ", b);
+    // bn_print_no_fuse("\nbn_mod_mul_montgomery >> a: ", a);
+    // bn_print_no_fuse("bn_mod_mul_montgomery >> b: ", b);
     // bn_print_no_fuse("bn_mod_mul_montgomery >> n: ", n);
     // Call CUDA's bn_mod_mul_montgomery with reordered parameters
     bn_mod_mul_montgomery(a, b, n, result);
-    bn_print_no_fuse("bn_mod_mul_montgomery << r: ", result);
+    // bn_print_no_fuse("bn_mod_mul_montgomery << r: ", result);
     return true;  // Since CUDA version returns void, we return true for success
 }
 
@@ -522,7 +522,7 @@ __device__ bool BN_MONT_CTX_set(BN_MONT_CTX_CUDA *mont, const BIGNUM_CUDA *m) {
 
 // Montgomery exponentiation
 __device__ int BN_mod_exp_mont(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNUM_CUDA *p, BIGNUM_CUDA *m) {
-    bool debug = true;
+    bool debug = false;
 
     if (debug) {
         printf("++ BN_mod_exp_mont ++\n");
@@ -551,7 +551,7 @@ __device__ int BN_mod_exp_mont(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNU
     BIGNUM_CUDA val[TABLE_SIZE];
 
     bits = bn_num_bits(p);
-    printf(">> BN_mod_exp_mont >> bits = %d\n", bits);
+    if (debug) printf(">> BN_mod_exp_mont >> bits = %d\n", bits);
     if (bits == 0) {
         // ret = BN_one(r); // init_one instead
         init_one(r);
@@ -573,35 +573,39 @@ __device__ int BN_mod_exp_mont(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNU
     }
 
     // 1
-    bn_print_no_fuse("# BN_mod_exp_mont [1] >> val[0]: ", &val[0]);
-    bn_print_no_fuse("# BN_mod_exp_mont [1] >> aa: ", &aa);
-    bn_print_no_fuse("# BN_mod_exp_mont [1] >> mont.R2: ", &mont.R2);
-    bn_print_no_fuse("# BN_mod_exp_mont [1] >> m: ", m);
-    // bn_mod_mul_montgomery(&val[0], &aa, &mont.R2, m);
+    if (debug) {
+        bn_print_no_fuse("# BN_mod_exp_mont [1] >> val[0]: ", &val[0]);
+        bn_print_no_fuse("# BN_mod_exp_mont [1] >> aa: ", &aa);
+        bn_print_no_fuse("# BN_mod_exp_mont [1] >> mont.R2: ", &mont.R2);
+        bn_print_no_fuse("# BN_mod_exp_mont [1] >> m: ", m);
+    }
     ossl_bn_mod_mul_montgomery(&val[0], &aa, &mont.R2, m);
-    bn_print_no_fuse("# BN_mod_exp_mont [1] << val[0]: ", &val[0]);
+    if (debug) bn_print_no_fuse("# BN_mod_exp_mont [1] << val[0]: ", &val[0]);
 
     window = BN_window_bits_for_exponent_size(bits);
     int j = 0;
     if (window > 1) {
         // 2
-        bn_print_no_fuse("# BN_mod_exp_mont [2] >> d: ", &d);
-        bn_print_no_fuse("# BN_mod_exp_mont [2] >> val[0]: ", &val[0]);
+        if (debug) {
+            bn_print_no_fuse("# BN_mod_exp_mont [2] >> d: ", &d);
+            bn_print_no_fuse("# BN_mod_exp_mont [2] >> val[0]: ", &val[0]);
+        }
         ossl_bn_mod_mul_montgomery(&d, &val[0], &val[0], m);
-        bn_print_no_fuse("# BN_mod_exp_mont [2] << d: ", &d);
+        if (debug) bn_print_no_fuse("# BN_mod_exp_mont [2] << d: ", &d);
         j = 1 << (window - 1);
         for (i = 1; i < j; i++) {
             init_zero(&val[i]);
             ossl_bn_mod_mul_montgomery(&val[i], &val[i - 1], &d, m);
         }
     }
-    if (debug) printf("BN_mod_exp_mont: precompute done\n");
-    bn_print_no_fuse("BN_mod_exp_mont [2.post_loop] >> d: ", &d);
-    for (i = 1; i < j; i++) {
-        printf("BN_mod_exp_mont [2.post_loop] >> val[%d]: ", i);
-        bn_print_no_fuse("", &val[i]);
+    if (debug) {
+        printf("BN_mod_exp_mont: precompute done\n");
+        bn_print_no_fuse("BN_mod_exp_mont [2.post_loop] >> d: ", &d);
+        for (i = 1; i < j; i++) {
+            printf("BN_mod_exp_mont [2.post_loop] >> val[%d]: ", i);
+            bn_print_no_fuse("", &val[i]);
+        }
     }
-    // Tests passed until here
 
     start = 1;                  
     wstart = bits - 1;          
@@ -610,13 +614,15 @@ __device__ int BN_mod_exp_mont(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNU
     // Initialize rr by converting 1 to Montgomery form
     BIGNUM_CUDA one;
     init_one(&one);
-    bn_print_no_fuse("BN_mod_exp_mont [2.a] >> rr:", &rr);
-    bn_print_no_fuse("BN_mod_exp_mont [2.a] >> one:", &one);
-    bn_print_no_fuse("BN_mod_exp_mont [2.a] >> mont.R2:", &mont.R2);
-    bn_print_no_fuse("BN_mod_exp_mont [2.a] >> m:", m);
-    // bn_to_montgomery(&rr, &one, &mont, m);
+    if (debug) {
+        bn_print_no_fuse("BN_mod_exp_mont [2.a] >> rr:", &rr);
+        bn_print_no_fuse("BN_mod_exp_mont [2.a] >> one:", &one);
+        bn_print_no_fuse("BN_mod_exp_mont [2.a] >> mont.R2:", &mont.R2);
+        bn_print_no_fuse("BN_mod_exp_mont [2.a] >> m:", m);
+    }
     ossl_bn_mod_mul_montgomery(&rr, &one, &mont.R2, m);
-    bn_print_no_fuse("BN_mod_exp_mont [2.a] << rr:", &rr);
+    if (debug) bn_print_no_fuse("BN_mod_exp_mont [2.a] << rr:", &rr);
+    
     int debug_counter = -1;
     for (;;) {
         debug_counter++;
@@ -624,11 +630,15 @@ __device__ int BN_mod_exp_mont(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNU
 
         if (BN_is_bit_set(p, wstart) == 0) {
             if (!start) {
-                printf("BN_mod_exp_mont >> [2.b.%d]  >> rr:", debug_counter);
-                bn_print_no_fuse("", &rr);
+                if (debug) {
+                    printf("BN_mod_exp_mont >> [2.b.%d]  >> rr:", debug_counter);
+                    bn_print_no_fuse("", &rr);
+                }
                 ossl_bn_mod_mul_montgomery(&rr, &rr, &rr, m);
-                printf("BN_mod_exp_montr >> [2.b.%d]  << rr:", debug_counter);
-                bn_print_no_fuse("", &rr);
+                if (debug) {
+                    printf("BN_mod_exp_montr >> [2.b.%d]  << rr:", debug_counter);
+                    bn_print_no_fuse("", &rr);
+                }
             }
             if (wstart == 0)
                 break;
@@ -647,20 +657,28 @@ __device__ int BN_mod_exp_mont(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNU
                 wend = i;
             }
         }
-        printf("BN_mod_exp_mont >> [2.c.%d] >> rr: ", debug_counter);
-        bn_print_no_fuse("", &rr); // WRONG
+        if (debug) {
+            printf("BN_mod_exp_mont >> [2.c.%d] >> rr: ", debug_counter);
+            bn_print_no_fuse("", &rr);
+        }
         int j = wend + 1;
         if (!start) {
             for (i = 0; i < j; i++) {
-                printf("BN_mod_exp_mont >> [2.d.%d.%d] >> rr:", debug_counter, i);
-                bn_print_no_fuse("", &rr);
+                if (debug) {
+                    printf("BN_mod_exp_mont >> [2.d.%d.%d] >> rr:", debug_counter, i);
+                    bn_print_no_fuse("", &rr);
+                }
                 ossl_bn_mod_mul_montgomery(&rr, &rr, &rr, m);
-                printf("BN_mod_exp_mont >> [2.d.%d.%d] << rr:", debug_counter, i);
-                bn_print_no_fuse("", &rr);
+                if (debug) {
+                    printf("BN_mod_exp_mont >> [2.d.%d.%d] << rr:", debug_counter, i);
+                    bn_print_no_fuse("", &rr);
+                }
             }
         }
-        printf("BN_mod_exp_mont >> [2.e.%d.%d] << rr:", debug_counter, i);
-        bn_print_no_fuse("", &rr);
+        if (debug) {
+            printf("BN_mod_exp_mont >> [2.e.%d.%d] << rr:", debug_counter, i);
+            bn_print_no_fuse("", &rr);
+        }
 
         ossl_bn_mod_mul_montgomery(&rr, &rr, &val[wvalue >> 1], m);
 
