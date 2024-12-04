@@ -414,7 +414,7 @@ __device__ EC_POINT_CUDA ec_point_scalar_mul(
     #ifdef function_profiler
         unsigned long long start_time = clock64();
     #endif
-    bool debug = 0;
+    bool debug = 1;
     if (debug) {
         debug_printf("++ ec_point_scalar_mul ++\n");
         bn_print_no_fuse(">> scalar: ", scalar);
@@ -1508,6 +1508,18 @@ __device__ void ossl_ec_scalar_mul_ladder(
     const BIGNUM_CUDA *scalar,
     const EC_POINT_JACOBIAN *p)
 {
+    // print group: field, a, b, order
+    bn_print_no_fuse("ossl_ec_scalar_mul_ladder >> group->field: ", &group->field);
+    bn_print_no_fuse("ossl_ec_scalar_mul_ladder >> group->a: ", &group->a);
+    bn_print_no_fuse("ossl_ec_scalar_mul_ladder >> group->b: ", &group->b);
+    bn_print_no_fuse("ossl_ec_scalar_mul_ladder >> group->order: ", &group->order);
+    // print r
+    print_jacobian_point("ossl_ec_scalar_mul_ladder >> r: ", r);
+    // print scalar
+    bn_print_no_fuse("ossl_ec_scalar_mul_ladder >> scalar: ", scalar);
+    // print p
+    print_jacobian_point("ossl_ec_scalar_mul_ladder >> p: ", p);
+
     int cardinality_bits = 256;
     BIGNUM_CUDA k;
     init_zero(&k);
@@ -1607,6 +1619,8 @@ __device__ void ossl_ec_scalar_mul_ladder(
         printf("Ladder post operation failed!\n");
         return;
     }
+    // Set r->Z = 01000003D1
+    r->Z.d[0] = 0x01000003D1;
     printf("\nAfter ossl_ec_GFp_simple_ladder_post:\n");
     print_jacobian_point("R", r);
     print_jacobian_point("S", &s);
@@ -1620,18 +1634,18 @@ __device__ void ec_point_scalar_mul_wnaf(
     const CurveParameters *curve_params
 ) {
     // Print inputs
-    printf("++ ec_point_scalar_mul_wnaf ++\n");
-    bn_print_no_fuse(">> scalar: ", scalar);
-    bn_print_no_fuse(">> point.x: ", &point->X);
-    bn_print_no_fuse(">> point.y: ", &point->Y);
-    bn_print_no_fuse(">> point.z: ", &point->Z);
-    bn_print_no_fuse(">> curve_params->p: ", &curve_params->p);
-    bn_print_no_fuse(">> curve_params->a: ", &curve_params->a);
-    bn_print_no_fuse(">> curve_params->b: ", &curve_params->b);
-    bn_print_no_fuse(">> curve_params->Gx: ", &curve_params->Gx);
-    bn_print_no_fuse(">> curve_params->Gy: ", &curve_params->Gy);
-    bn_print_no_fuse(">> curve_params->n: ", &curve_params->n);
-    bn_print_no_fuse(">> curve_params->h: ", &curve_params->h);
+    // printf("++ ec_point_scalar_mul_wnaf ++\n");
+    bn_print_no_fuse("ec_point_scalar_mul_wnaf >> scalar: ", scalar);
+    bn_print_no_fuse("ec_point_scalar_mul_wnaf >> point.x: ", &point->X);
+    bn_print_no_fuse("ec_point_scalar_mul_wnaf >> point.y: ", &point->Y);
+    bn_print_no_fuse("ec_point_scalar_mul_wnaf >> point.z: ", &point->Z);
+    bn_print_no_fuse("ec_point_scalar_mul_wnaf >> curve_params->p: ", &curve_params->p);
+    bn_print_no_fuse("ec_point_scalar_mul_wnaf >> curve_params->a: ", &curve_params->a);
+    bn_print_no_fuse("ec_point_scalar_mul_wnaf >> curve_params->b: ", &curve_params->b);
+    bn_print_no_fuse("ec_point_scalar_mul_wnaf >> curve_params->Gx: ", &curve_params->Gx);
+    bn_print_no_fuse("ec_point_scalar_mul_wnaf >> curve_params->Gy: ", &curve_params->Gy);
+    bn_print_no_fuse("ec_point_scalar_mul_wnaf >> curve_params->n: ", &curve_params->n);
+    bn_print_no_fuse("ec_point_scalar_mul_wnaf >> curve_params->h: ", &curve_params->h);
     
     EC_GROUP_CUDA group;
     // Initialize secp256k1 curve parameters
@@ -1759,10 +1773,13 @@ __device__ void ec_point_scalar_mul_montgomery(
     // Call the wNAF scalar multiplication function
     ec_point_scalar_mul_wnaf(result, point, scalar, &curve_params);
 
+    // bn_print_no_fuse("EC_POINT_mul << ossl_ec_wNAF_mul << result->X: ", &result->X);
+    // bn_print_no_fuse("EC_POINT_mul << ossl_ec_wNAF_mul << result->Y: ", &result->Y);
+
     if (debug) {
-        bn_print_no_fuse("<< result.x: ", &result->X);
-        bn_print_no_fuse("<< result.y: ", &result->Y);
-        bn_print_no_fuse("<< result.z: ", &result->Z);
+        bn_print_no_fuse("EC_POINT_mul << ossl_ec_wNAF_mul << result->X: ", &result->X);
+        bn_print_no_fuse("EC_POINT_mul << ossl_ec_wNAF_mul << result->Y: ", &result->Y);
+        bn_print_no_fuse("EC_POINT_mul << ossl_ec_wNAF_mul << result->Z: ", &result->Z);
         printf("-- ec_point_scalar_mul_montgomery --\n");
     }
 }
@@ -2270,14 +2287,14 @@ __device__ int ossl_ec_GFp_simple_ladder_post(
     ossl_ec_GFp_mont_field_inv(&group->field, &t1, &t1_tmp);
     bn_print_no_fuse("[23] ossl_ec_GFp_simple_ladder_post: t1 = inv(t1) =", &t1);
 
-    // cuda_ec_GFp_mont_field_encode(&group->field, &t1, &t1);
-    // bn_print_no_fuse("[24] ossl_ec_GFp_simple_ladder_post: t1 = encode(t1) =", &t1);
+    cuda_ec_GFp_mont_field_encode(group, &t1, &t1);
+    bn_print_no_fuse("[24] ossl_ec_GFp_simple_ladder_post: t1 = encode(t1) =", &t1);
 
-    // ossl_ec_GFp_mont_field_mul(&group->field, &r->X, &t5, &t1);
-    // bn_print_no_fuse("[25] ossl_ec_GFp_simple_ladder_post: r->X = t5 * t1 =", &r->X);
+    ossl_ec_GFp_mont_field_mul(&group->field, &r->X, &t5, &t1);
+    bn_print_no_fuse("[25] ossl_ec_GFp_simple_ladder_post: r->X = t5 * t1 =", &r->X);
 
-    // ossl_ec_GFp_mont_field_mul(&group->field, &r->Y, &t0, &t1);
-    // bn_print_no_fuse("[26] ossl_ec_GFp_simple_ladder_post: r->Y = t0 * t1 =", &r->Y);
+    ossl_ec_GFp_mont_field_mul(&group->field, &r->Y, &t0, &t1);
+    bn_print_no_fuse("[26] ossl_ec_GFp_simple_ladder_post: r->Y = t0 * t1 =", &r->Y);
 
     printf(">> [y] ossl_ec_GFp_simple_ladder_post >>");
     print_jacobian_point("R", r);

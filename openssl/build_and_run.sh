@@ -1,3 +1,4 @@
+clear
 export LD_LIBRARY_PATH=/usr/lib64:$LD_LIBRARY_PATH
 # To determine this path, build your openssl library with
 # sudo ./Configure --prefix=/usr --debug --openssldir=/usr/lib/ssl shared zlib

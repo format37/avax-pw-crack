@@ -217,14 +217,28 @@ folders = [
     # "~/projects/avax-pw-crack/cuda/tests/BN_mod_mul_montgomery_cuda/test.cu",
     # "~/projects/avax-pw-crack/cuda/tests/BN_mod_mul_montgomery_cuda/run.log",
 
-    # CUDA BN_mod_exp_mont
-    "~/projects/openssl_original/crypto/bn/bn_exp.c",
-    "~/projects/avax-pw-crack/openssl/tests/BN_mod_exp_mont/test.c",
-    "~/projects/avax-pw-crack/openssl/tests/BN_mod_exp_mont/run.log",
-    "~/projects/avax-pw-crack/cuda/prompts/137_BN_mod_exp_mont_base.md",
-    "~/projects/avax-pw-crack/cuda/include/bignum.h",
+    # # CUDA BN_mod_exp_mont
+    # "~/projects/openssl_original/crypto/bn/bn_exp.c",
+    # "~/projects/avax-pw-crack/openssl/tests/BN_mod_exp_mont/test.c",
+    # "~/projects/avax-pw-crack/openssl/tests/BN_mod_exp_mont/run.log",
+    # "~/projects/avax-pw-crack/cuda/prompts/137_BN_mod_exp_mont_base.md",
+    # "~/projects/avax-pw-crack/cuda/include/bignum.h",
+    # "~/projects/avax-pw-crack/cuda/include/point.h",
+    # "~/projects/avax-pw-crack/cuda/include/montgomery.h",
+    # "~/projects/avax-pw-crack/cuda/tests/BN_mod_exp_mont/test.cu",
+    # "~/projects/avax-pw-crack/cuda/tests/BN_mod_exp_mont/run.log",
+
+    # OSSL print_ec_point_internal
+    # "~/projects/avax-pw-crack/cuda/include/bignum.h",
+    # "~/projects/avax-pw-crack/cuda/include/public_key.h",
     "~/projects/avax-pw-crack/cuda/include/point.h",
     "~/projects/avax-pw-crack/cuda/include/montgomery.h",
-    "~/projects/avax-pw-crack/cuda/tests/BN_mod_exp_mont/test.cu",
-    "~/projects/avax-pw-crack/cuda/tests/BN_mod_exp_mont/run.log",
+    "~/projects/avax-pw-crack/cuda/prompts/138_print_ec_point_internal_base.md",
+    "~/projects/openssl_mod/crypto/ec/ec_print.c",
+    # "~/projects/openssl_mod/crypto/o_str.c",
+    # "~/projects/avax-pw-crack/openssl/main.c",
+    # "~/projects/avax-pw-crack/openssl/child_key.h",
+    "~/projects/avax-pw-crack/openssl/run.log",
+    "~/projects/avax-pw-crack/cuda/main.cu",
+    "~/projects/avax-pw-crack/cuda/logs/run.log",
     ]

@@ -93,6 +93,9 @@ int main(void) {
         return 1;
     }
 
+    // bn_print_no_fuse("EC_POINT_mul << result->X: ", &result->X);
+    // bn_print_no_fuse("EC_POINT_mul << result->Y: ", result->Y);
+
     // Prepare BIGNUMs to hold the affine coordinates
     BIGNUM *x = BN_new();
     BIGNUM *y = BN_new();

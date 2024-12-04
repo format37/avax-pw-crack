@@ -271,6 +271,11 @@ unsigned char *GetPublicKey(unsigned char *privateKeyBytes, size_t privateKeyLen
     if (!EC_POINT_mul(curve, pub_key, privateKey, NULL, NULL, NULL)) {
         return NULL;
     }
+    // print public key
+    printf("## After EC_POINT_mul ##\n");
+    // print_bn_hex("pub_key->X", pub_key.X);
+    printf(">> pub_key: \n");
+    print_ec_point(curve, pub_key);
 
     int nid = EC_GROUP_get_curve_name(curve);
     if (nid != NID_undef) {

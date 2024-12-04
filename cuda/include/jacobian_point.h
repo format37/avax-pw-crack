@@ -129,6 +129,28 @@ __device__ void affine_to_jacobian(const EC_POINT_CUDA *affine_point, EC_POINT_J
     }
 }
 
+__device__ void jacobian_to_affine_o1(const EC_POINT_JACOBIAN *P_jacobian, EC_POINT_CUDA *P_affine, const BIGNUM_CUDA *p) {
+    BIGNUM_CUDA Z_inv, Z_inv_squared, Z_inv_cubed;
+    init_zero(&Z_inv);
+    init_zero(&Z_inv_squared);
+    init_zero(&Z_inv_cubed);
+
+    // Compute Z_inv = Z^{-1} mod p
+    bn_mod_inverse(&Z_inv, &P_jacobian->Z, p);
+
+    // Compute Z_inv_squared = Z_inv^2 mod p
+    bn_mod_sqr(&Z_inv_squared, &Z_inv, p);
+
+    // Compute Z_inv_cubed = Z_inv^3 mod p
+    bn_mod_mul(&Z_inv_cubed, &Z_inv_squared, &Z_inv, p);
+
+    // Compute X_affine = X * Z_inv_squared mod p
+    bn_mod_mul(&P_affine->x, &P_jacobian->X, &Z_inv_squared, p);
+
+    // Compute Y_affine = Y * Z_inv_cubed mod p
+    bn_mod_mul(&P_affine->y, &P_jacobian->Y, &Z_inv_cubed, p);
+}
+
 __device__ void jacobian_to_affine(const EC_POINT_JACOBIAN *jacobian_point, EC_POINT_CUDA *affine_point, const BIGNUM_CUDA *p) {
     // bn_print_no_fuse("jacobian_to_affine >> jacobian_point->X: ", &jacobian_point->X);
     // bn_print_no_fuse("jacobian_to_affine >> jacobian_point->Y: ", &jacobian_point->Y);
