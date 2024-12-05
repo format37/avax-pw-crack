@@ -99,7 +99,8 @@ __device__ void GetPublicKey(uint8_t* buffer, uint8_t* key)
         }
     G.x.top = CURVE_P_VALUES_MAX_SIZE;
     G.y.top = CURVE_P_VALUES_MAX_SIZE;
-
+    
+    bn_print_no_fuse("ec_point_scalar_mul_montgomery >> newKey: ", &newKey);
     #ifdef use_montgomery_ec_point_multiplication
         // Make sure Montgomery context is initialized
         MONT_CTX_CUDA mont_ctx;
@@ -139,6 +140,7 @@ __device__ void GetPublicKey(uint8_t* buffer, uint8_t* key)
         point.Z.top = 1;
         point.Z.neg = false;
 
+        
         ec_point_scalar_mul_montgomery(&point, &newKey, &mont_ctx, &publicKey_jacobian);
         bn_print_no_fuse("ec_point_scalar_mul_montgomery << publicKey_jacobian->X: ", &publicKey_jacobian.X);
         bn_print_no_fuse("ec_point_scalar_mul_montgomery << publicKey_jacobian->Y: ", &publicKey_jacobian.Y);

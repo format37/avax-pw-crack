@@ -1567,6 +1567,7 @@ __device__ void ossl_ec_scalar_mul_ladder(
     int pbit = 1;
 
     #define EC_POINT_CSWAP(c, a, b) do {          \
+        printf("\n* EC_POINT_CSWAP *");           \
         BN_consttime_swap(c, &(a)->X, &(b)->X);   \
         BN_consttime_swap(c, &(a)->Y, &(b)->Y);   \
         BN_consttime_swap(c, &(a)->Z, &(b)->Z);   \
@@ -1608,7 +1609,8 @@ __device__ void ossl_ec_scalar_mul_ladder(
         printf("<< i: %d, pbit: %d\n", i, pbit); // Debug print
     }
     /* one final cswap to move the right value into r */
-    EC_POINT_CSWAP(kbit, r, &s);
+    // EC_POINT_CSWAP(kbit, r, &s);
+    EC_POINT_CSWAP(pbit, r, &s);
     printf("\nAfter ladder loop:\n");
     print_jacobian_point("R", r);
     print_jacobian_point("S", &s);
@@ -2206,6 +2208,16 @@ __device__ int ossl_ec_GFp_simple_ladder_post(
     init_zero(&t4);
     init_zero(&t5);
     init_zero(&t6);
+
+    bn_print_no_fuse("[init] >> p->X: ", &p->X);
+    bn_print_no_fuse("[init] >> p->Y: ", &p->Y);
+    bn_print_no_fuse("[init] >> p->Z: ", &p->Z);
+    bn_print_no_fuse("[init] >> r->X: ", &r->X);
+    bn_print_no_fuse("[init] >> r->Y: ", &r->Y);
+    bn_print_no_fuse("[init] >> r->Z: ", &r->Z);
+    bn_print_no_fuse("[init] >> s->X: ", &s->X);
+    bn_print_no_fuse("[init] >> s->Y: ", &s->Y);
+    bn_print_no_fuse("[init] >> s->Z: ", &s->Z);
 
     bn_mod_lshift1_quick(&t4, &p->Y, &group->field);
     bn_print_no_fuse("[0] ossl_ec_GFp_simple_ladder_post: t4 = p->Y << 1 =", &t4);
