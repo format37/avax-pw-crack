@@ -100,7 +100,7 @@ __device__ void GetPublicKey(uint8_t* buffer, uint8_t* key)
     G.x.top = CURVE_P_VALUES_MAX_SIZE;
     G.y.top = CURVE_P_VALUES_MAX_SIZE;
     
-    bn_print_no_fuse("ec_point_scalar_mul_montgomery >> newKey: ", &newKey);
+    // bn_print_no_fuse("ec_point_scalar_mul_montgomery >> newKey: ", &newKey);
     #ifdef use_montgomery_ec_point_multiplication
         // Make sure Montgomery context is initialized
         MONT_CTX_CUDA mont_ctx;
@@ -142,9 +142,9 @@ __device__ void GetPublicKey(uint8_t* buffer, uint8_t* key)
 
         
         ec_point_scalar_mul_montgomery(&point, &newKey, &mont_ctx, &publicKey_jacobian);
-        bn_print_no_fuse("ec_point_scalar_mul_montgomery << publicKey_jacobian->X: ", &publicKey_jacobian.X);
-        bn_print_no_fuse("ec_point_scalar_mul_montgomery << publicKey_jacobian->Y: ", &publicKey_jacobian.Y);
-        bn_print_no_fuse("ec_point_scalar_mul_montgomery << publicKey_jacobian->Z: ", &publicKey_jacobian.Z);
+        // bn_print_no_fuse("ec_point_scalar_mul_montgomery << publicKey_jacobian->X: ", &publicKey_jacobian.X);
+        // bn_print_no_fuse("ec_point_scalar_mul_montgomery << publicKey_jacobian->Y: ", &publicKey_jacobian.Y);
+        // bn_print_no_fuse("ec_point_scalar_mul_montgomery << publicKey_jacobian->Z: ", &publicKey_jacobian.Z);
 
         // Convert Jacobian point to affine
         // ec_point_jacobian_to_affine(&publicKey_jacobian, &publicKey, &mont_ctx);
@@ -158,11 +158,11 @@ __device__ void GetPublicKey(uint8_t* buffer, uint8_t* key)
         EC_GROUP_CUDA group;
         init_zero(&group.field);
         group.field = CURVE_P;
-        bn_print_no_fuse("ossl_ec_GFp_mont_field_decode >> group->field: ", &group.field);
+        // bn_print_no_fuse("ossl_ec_GFp_mont_field_decode >> group->field: ", &group.field);
         ossl_ec_GFp_mont_field_decode(&group, &publicKey.x, &publicKey_jacobian.X);
         ossl_ec_GFp_mont_field_decode(&group, &publicKey.y, &publicKey_jacobian.Y);
-        bn_print_no_fuse("ossl_ec_GFp_mont_field_decode << publicKey->X: ", &publicKey.x);
-        bn_print_no_fuse("ossl_ec_GFp_mont_field_decode << publicKey->Y: ", &publicKey.y);
+        // bn_print_no_fuse("ossl_ec_GFp_mont_field_decode << publicKey->X: ", &publicKey.x);
+        // bn_print_no_fuse("ossl_ec_GFp_mont_field_decode << publicKey->Y: ", &publicKey.y);
         // char * hex;
         // ec_point_to_hex(&publicKey, hex);
         // printf("jacobian_to_affine << Public key: %s\n", hex);
@@ -227,11 +227,11 @@ __device__ void GetPublicKey(uint8_t* buffer, uint8_t* key)
     buffer[0] = prefix;
 
     // Print public key
-    printf("GetPublicKey << Public key: ");
-    for (int i = 0; i < 65; i++) {
-        printf("%02x", buffer[i]);
-    }
-    printf("\n");
+    // printf("GetPublicKey << Public key: ");
+    // for (int i = 0; i < 65; i++) {
+    //     printf("%02x", buffer[i]);
+    // }
+    // printf("\n");
 
 
     #ifdef function_profiler

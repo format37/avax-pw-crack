@@ -105,12 +105,12 @@ __device__ int point_add_affine(
         bn_print(">> p: ", p);
         bn_print(">> a: ", a);
     }
-    // bn_print_no_fuse(">> p1.x: ", &p1->x);
-    // bn_print_no_fuse(">> p1.y: ", &p1->y);
-    // bn_print_no_fuse(">> p2.x: ", &p2->x);
-    // bn_print_no_fuse(">> p2.y: ", &p2->y);
-    // bn_print_no_fuse(">> p: ", p);
-    // bn_print_no_fuse(">> a: ", a);
+    // // bn_print_no_fuse(">> p1.x: ", &p1->x);
+    // // bn_print_no_fuse(">> p1.y: ", &p1->y);
+    // // bn_print_no_fuse(">> p2.x: ", &p2->x);
+    // // bn_print_no_fuse(">> p2.y: ", &p2->y);
+    // // bn_print_no_fuse(">> p: ", p);
+    // // bn_print_no_fuse(">> a: ", a);
     debug = 0;
     // Handle the point at infinity cases
     if (point_is_at_infinity(p1)) {
@@ -414,21 +414,21 @@ __device__ EC_POINT_CUDA ec_point_scalar_mul(
     #ifdef function_profiler
         unsigned long long start_time = clock64();
     #endif
-    bool debug = 1;
+    bool debug = 0;
     if (debug) {
         debug_printf("++ ec_point_scalar_mul ++\n");
-        bn_print_no_fuse(">> scalar: ", scalar);
-        bn_print_no_fuse(">> point x: ", &point->x);
-        bn_print_no_fuse(">> point y: ", &point->y);        
-        bn_print_no_fuse(">> curve_prime: ", curve_prime);
-        bn_print_no_fuse(">> curve_a: ", curve_a);
+        // bn_print_no_fuse(">> scalar: ", scalar);
+        // bn_print_no_fuse(">> point x: ", &point->x);
+        // bn_print_no_fuse(">> point y: ", &point->y);        
+        // bn_print_no_fuse(">> curve_prime: ", curve_prime);
+        // bn_print_no_fuse(">> curve_a: ", curve_a);
     }
     printf("++ ec_point_scalar_mul ++\n");
-    bn_print_no_fuse(">> Scalar: ", scalar);
-    bn_print_no_fuse(">> point x: ", &point->x);
-    bn_print_no_fuse(">> point y: ", &point->y);
-    bn_print_no_fuse(">> curve_prime: ", curve_prime);
-    bn_print_no_fuse(">> curve_a: ", curve_a);
+    // bn_print_no_fuse(">> Scalar: ", scalar);
+    // bn_print_no_fuse(">> point x: ", &point->x);
+    // bn_print_no_fuse(">> point y: ", &point->y);
+    // bn_print_no_fuse(">> curve_prime: ", curve_prime);
+    // bn_print_no_fuse(">> curve_a: ", curve_a);
     
     EC_POINT_CUDA current = *point; // This initializes the current point with the input point
     EC_POINT_CUDA result; // Initialize the result variable, which accumulates the result
@@ -458,33 +458,33 @@ __device__ EC_POINT_CUDA ec_point_scalar_mul(
             
             // printf("\n\n[%d]\n", i);
             #ifdef use_jacobian_coordinates
-                // bn_print_no_fuse(">> point_add current.x: ", &current.x);
-                // bn_print_no_fuse(">> point_add current.y: ", &current.y);
-                // bn_print_no_fuse(">> point_add result.x: ", &result.x);
-                // bn_print_no_fuse(">> point_add result.y: ", &result.y);
+                // // bn_print_no_fuse(">> point_add current.x: ", &current.x);
+                // // bn_print_no_fuse(">> point_add current.y: ", &current.y);
+                // // bn_print_no_fuse(">> point_add result.x: ", &result.x);
+                // // bn_print_no_fuse(">> point_add result.y: ", &result.y);
                 affine_to_jacobian(&result, &P_jacobian);
                 affine_to_jacobian(&current, &Q_jacobian);
-                // bn_print_no_fuse(">> point_add P_jacobian.x: ", &P_jacobian.X);
-                // bn_print_no_fuse(">> point_add P_jacobian.y: ", &P_jacobian.Y);
-                // bn_print_no_fuse(">> point_add P_jacobian.z: ", &P_jacobian.Z);
-                // bn_print_no_fuse(">> point_add Q_jacobian.x: ", &Q_jacobian.X);
-                // bn_print_no_fuse(">> point_add Q_jacobian.y: ", &Q_jacobian.Y);
-                // bn_print_no_fuse(">> point_add Q_jacobian.z: ", &Q_jacobian.Z);
+                // // bn_print_no_fuse(">> point_add P_jacobian.x: ", &P_jacobian.X);
+                // // bn_print_no_fuse(">> point_add P_jacobian.y: ", &P_jacobian.Y);
+                // // bn_print_no_fuse(">> point_add P_jacobian.z: ", &P_jacobian.Z);
+                // // bn_print_no_fuse(">> point_add Q_jacobian.x: ", &Q_jacobian.X);
+                // // bn_print_no_fuse(">> point_add Q_jacobian.y: ", &Q_jacobian.Y);
+                // // bn_print_no_fuse(">> point_add Q_jacobian.z: ", &Q_jacobian.Z);
                 point_add_jacobian(&resultAdd_jacobian, &Q_jacobian, &P_jacobian, curve_prime, curve_a);
-                // bn_print_no_fuse("<< point_add resultAdd_jacobian.x: ", &resultAdd_jacobian.X);
-                // bn_print_no_fuse("<< point_add resultAdd_jacobian.y: ", &resultAdd_jacobian.Y);
-                // bn_print_no_fuse("<< point_add resultAdd_jacobian.z: ", &resultAdd_jacobian.Z);
+                // // bn_print_no_fuse("<< point_add resultAdd_jacobian.x: ", &resultAdd_jacobian.X);
+                // // bn_print_no_fuse("<< point_add resultAdd_jacobian.y: ", &resultAdd_jacobian.Y);
+                // // bn_print_no_fuse("<< point_add resultAdd_jacobian.z: ", &resultAdd_jacobian.Z);
                 jacobian_to_affine(&resultAdd_jacobian, &result, curve_prime);
-                // bn_print_no_fuse("<< point_add result.x: ", &result.x);
-                // bn_print_no_fuse("<< point_add result.y: ", &result.y);
+                // // bn_print_no_fuse("<< point_add result.x: ", &result.x);
+                // // bn_print_no_fuse("<< point_add result.y: ", &result.y);
             #else
-                // bn_print_no_fuse(">> point_add current.x: ", &current.x);
-                // bn_print_no_fuse(">> point_add current.y: ", &current.y);
-                // bn_print_no_fuse(">> point_add result.x: ", &result.x);
-                // bn_print_no_fuse(">> point_add result.y: ", &result.y);
+                // // bn_print_no_fuse(">> point_add current.x: ", &current.x);
+                // // bn_print_no_fuse(">> point_add current.y: ", &current.y);
+                // // bn_print_no_fuse(">> point_add result.x: ", &result.x);
+                // // bn_print_no_fuse(">> point_add result.y: ", &result.y);
                 point_add_affine(&tmp_result, &result, &current, curve_prime, curve_a);  // Add current to the result
-                // bn_print_no_fuse("<< point_add tmp_result.x: ", &tmp_result.x);
-                // bn_print_no_fuse("<< point_add tmp_result.y: ", &tmp_result.y);
+                // // bn_print_no_fuse("<< point_add tmp_result.x: ", &tmp_result.x);
+                // // bn_print_no_fuse("<< point_add tmp_result.y: ", &tmp_result.y);
                 // if (debug) printf("[%d] step 3\n", i);
                 init_point_at_infinity(&result); // Reset result
                 // if (debug) printf("[%d] step 4\n", i);
@@ -499,8 +499,8 @@ __device__ EC_POINT_CUDA ec_point_scalar_mul(
                 bn_copy(&result.y, &tmp_result.y);   
             #endif
             // printf("[%d] ", i);
-            // bn_print_no_fuse("point_add result.x: ", &result.x);
-            // bn_print_no_fuse("point_add result.y: ", &result.y);
+            // // bn_print_no_fuse("point_add result.x: ", &result.x);
+            // // bn_print_no_fuse("point_add result.y: ", &result.y);
         }
         if (debug) printf("[%d] step 6\n", i);
         // init tmp_result
@@ -555,15 +555,15 @@ __device__ EC_POINT_CUDA ec_point_scalar_mul(
         
         if (debug) printf("[%d] passed\n", i);
         // printf("i: %d\n", i);
-        // bn_print_no_fuse("point_add result.x: ", &result.x);
-        // bn_print_no_fuse("point_add result.y: ", &result.y);
+        // // bn_print_no_fuse("point_add result.x: ", &result.x);
+        // // bn_print_no_fuse("point_add result.y: ", &result.y);
         // break; // TODO: Remove this break
     }    
     // Copy current to result
     if (debug) bn_print("3 result.x: ", &result.x);
     if (debug) bn_print("3 result.y: ", &result.y);
-    bn_print_no_fuse("<< result.x: ", &result.x);
-    bn_print_no_fuse("<< result.y: ", &result.y);
+    // bn_print_no_fuse("<< result.x: ", &result.x);
+    // bn_print_no_fuse("<< result.y: ", &result.y);
     printf("-- ec_point_scalar_mul --\n");
     #ifdef function_profiler
         record_function(FN_EC_POINT_SCALAR_MUL, start_time);
@@ -861,8 +861,8 @@ __device__ bool init_curve_montgomery_context(const BIGNUM_CUDA *curve_p, const 
     bool debug = false;
     if (debug) {
         printf("++ init_curve_montgomery_context ++\n");
-        bn_print_no_fuse(">> curve_p: ", curve_p);
-        bn_print_no_fuse(">> curve_a: ", curve_a);
+        // bn_print_no_fuse(">> curve_p: ", curve_p);
+        // bn_print_no_fuse(">> curve_a: ", curve_a);
     }    
     if (bn_is_zero(curve_p)) {
         printf("Error: curve modulus cannot be zero\n");
@@ -956,11 +956,11 @@ __device__ bool ossl_bn_mod_sqr_montgomery(
     const BIGNUM_CUDA *a,     // OpenSSL: input to square
     const BIGNUM_CUDA *n      // OpenSSL: modulus from group->field
 ) {
-    bn_print_no_fuse("ossl_bn_mod_sqr_montgomery >> a: ", a);
-    bn_print_no_fuse("ossl_bn_mod_sqr_montgomery >> n: ", n);
+    // bn_print_no_fuse("ossl_bn_mod_sqr_montgomery >> a: ", a);
+    // bn_print_no_fuse("ossl_bn_mod_sqr_montgomery >> n: ", n);
     // Call CUDA's bn_mod_sqr_montgomery with reordered parameters
     bn_mod_mul_montgomery(a, a, n, r);
-    bn_print_no_fuse("ossl_bn_mod_sqr_montgomery << r: ", r);
+    // bn_print_no_fuse("ossl_bn_mod_sqr_montgomery << r: ", r);
     return true;  // Return true for success to match OpenSSL's behavior
 }
 
@@ -982,9 +982,9 @@ __device__ int ossl_ec_GFp_mont_field_inv(
     BIGNUM_CUDA *r, 
     const BIGNUM_CUDA *a
     ) {    
-    bn_print_no_fuse(">> ossl_ec_GFp_mont_field_inv >> group->field =", group_field);
-    bn_print_no_fuse(">> ossl_ec_GFp_mont_field_inv >> r =", r);
-    bn_print_no_fuse(">> ossl_ec_GFp_mont_field_inv >> a =", a);
+    // bn_print_no_fuse(">> ossl_ec_GFp_mont_field_inv >> group->field =", group_field);
+    // bn_print_no_fuse(">> ossl_ec_GFp_mont_field_inv >> r =", r);
+    // bn_print_no_fuse(">> ossl_ec_GFp_mont_field_inv >> a =", a);
 
     BIGNUM_CUDA e, two, group_field_tmp;
     init_zero(&e);
@@ -1009,14 +1009,14 @@ __device__ int ossl_ec_GFp_mont_field_inv(
         return 0;
     }
 
-    bn_print_no_fuse("<< r:", r);
+    // bn_print_no_fuse("<< r:", r);
     return 1;
 }
 
 __device__ int ossl_ec_GFp_mont_field_inv_proto(const BIGNUM_CUDA *a, BIGNUM_CUDA *result, const BIGNUM_CUDA *p) {    
     printf("++ ossl_ec_GFp_mont_field_inv ++\n");
-    bn_print_no_fuse(">> a: ", a);
-    bn_print_no_fuse(">> p: ", p);
+    // bn_print_no_fuse(">> a: ", a);
+    // bn_print_no_fuse(">> p: ", p);
     // Check for invalid input
     if (bn_is_zero(a)) {
         return 0; // Cannot invert zero
@@ -1117,7 +1117,7 @@ __device__ int bn_mod_lshift_quick(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, int n, 
         }
     }
     // print result
-    bn_print_no_fuse("<< [L] BN_mod_lshift_quick r: ", r);
+    // bn_print_no_fuse("<< [L] BN_mod_lshift_quick r: ", r);
     return 1;
 }
 
@@ -1148,10 +1148,10 @@ __device__ int ec_point_ladder_step(
     init_zero(&t5);
     init_zero(&t6);
 
-    printf("\n## ladder_step ##\n");
-    print_jacobian_point(">> r", r);
-    print_jacobian_point(">> s", s);
-    print_jacobian_point(">> p", p);
+    // printf("\n## ladder_step ##\n");
+    // print_jacobian_point(">> r", r);
+    // print_jacobian_point(">> s", s);
+    // print_jacobian_point(">> p", p);
 
     // Follow OpenSSL's OR logic order
     int ret = (
@@ -1200,8 +1200,8 @@ __device__ int ec_point_ladder_step(
         // r->Z coord output
         bn_mod_add_quick(&r->Z, &t4, &t1, &group->field)
     );
-    print_jacobian_point("<< ladder_step << r", r);
-    print_jacobian_point("<< ladder_step << s", s);
+    // print_jacobian_point("<< ladder_step << r", r);
+    // print_jacobian_point("<< ladder_step << s", s);
     return ret;
 }
 
@@ -1509,16 +1509,16 @@ __device__ void ossl_ec_scalar_mul_ladder(
     const EC_POINT_JACOBIAN *p)
 {
     // print group: field, a, b, order
-    bn_print_no_fuse("ossl_ec_scalar_mul_ladder >> group->field: ", &group->field);
-    bn_print_no_fuse("ossl_ec_scalar_mul_ladder >> group->a: ", &group->a);
-    bn_print_no_fuse("ossl_ec_scalar_mul_ladder >> group->b: ", &group->b);
-    bn_print_no_fuse("ossl_ec_scalar_mul_ladder >> group->order: ", &group->order);
+    // bn_print_no_fuse("ossl_ec_scalar_mul_ladder >> group->field: ", &group->field);
+    // bn_print_no_fuse("ossl_ec_scalar_mul_ladder >> group->a: ", &group->a);
+    // bn_print_no_fuse("ossl_ec_scalar_mul_ladder >> group->b: ", &group->b);
+    // bn_print_no_fuse("ossl_ec_scalar_mul_ladder >> group->order: ", &group->order);
     // print r
-    print_jacobian_point("ossl_ec_scalar_mul_ladder >> r: ", r);
+    // print_jacobian_point("ossl_ec_scalar_mul_ladder >> r: ", r);
     // print scalar
-    bn_print_no_fuse("ossl_ec_scalar_mul_ladder >> scalar: ", scalar);
+    // bn_print_no_fuse("ossl_ec_scalar_mul_ladder >> scalar: ", scalar);
     // print p
-    print_jacobian_point("ossl_ec_scalar_mul_ladder >> p: ", p);
+    // print_jacobian_point("ossl_ec_scalar_mul_ladder >> p: ", p);
 
     int cardinality_bits = 256;
     BIGNUM_CUDA k;
@@ -1536,38 +1536,37 @@ __device__ void ossl_ec_scalar_mul_ladder(
     init_zero(&cardinality);
     
     bn_copy(&cardinality, &group->order);
-    bn_print_no_fuse("## cardinality:", &cardinality);
+    // bn_print_no_fuse("## cardinality:", &cardinality);
 
     bn_add(&lambda, &k, &cardinality);
-    bn_print_no_fuse("## lambda [2]:", &lambda);
-    bn_print_no_fuse("# k [5]:", &k);
+    // bn_print_no_fuse("## lambda [2]:", &lambda);
+    // bn_print_no_fuse("# k [5]:", &k);
     
     bn_add(&k, &lambda, &cardinality);
 
-    bn_print_no_fuse("# k [6]:", &k);
+    // bn_print_no_fuse("# k [6]:", &k);
 
     int kbit = BN_is_bit_set(&lambda, cardinality_bits);
-    printf("# kbit [0]: %d\n", kbit);
+    // printf("# kbit [0]: %d\n", kbit);
     BN_consttime_swap(kbit, &k, &lambda);
-    printf("# kbit [1]: %d\n", kbit);
+    // printf("# kbit [1]: %d\n", kbit);
 
-    bn_print_no_fuse("# k [7]:", &k);
+    // bn_print_no_fuse("# k [7]:", &k);
 
     /* Initialize the Montgomery ladder */
     if (!ossl_ec_GFp_simple_ladder_pre(group, r, &s, p)) {
         printf("Ladder pre operation failed!\n");
         return;
     }
-    printf("\nAfter ladder pre: (Before ladder step:)\n");
-    print_jacobian_point("R", r);
-    print_jacobian_point("S", &s);
-    print_jacobian_point("P (base point)", p);
+    // printf("\nAfter ladder pre: (Before ladder step:)\n");
+    // print_jacobian_point("R", r);
+    // print_jacobian_point("S", &s);
+    // print_jacobian_point("P (base point)", p);
 
     /* top bit is a 1, in a fixed pos */
     int pbit = 1;
 
     #define EC_POINT_CSWAP(c, a, b) do {          \
-        printf("\n* EC_POINT_CSWAP *");           \
         BN_consttime_swap(c, &(a)->X, &(b)->X);   \
         BN_consttime_swap(c, &(a)->Y, &(b)->Y);   \
         BN_consttime_swap(c, &(a)->Z, &(b)->Z);   \
@@ -1577,7 +1576,7 @@ __device__ void ossl_ec_scalar_mul_ladder(
     // int kbit = 1;  // This should come from scalar bit
 
     // Perform the Montgomery ladder
-    bn_print_no_fuse("# k [8]:", &k);
+    // bn_print_no_fuse("# k [8]:", &k);
 
     
 
@@ -1586,9 +1585,9 @@ __device__ void ossl_ec_scalar_mul_ladder(
     for (int i = cardinality_bits - 1; i >= 0; i--) {
         // kbit = BN_is_bit_set(&k, i) ^ pbit;
         kbit = BN_is_bit_set(&k, i);
-        printf("** kbt: %d\n", i, kbit);
+        // printf("** kbt: %d\n", i, kbit);
         kbit = kbit ^ pbit;
-        printf(">> i: %d, kbit: %d\n", i, kbit);
+        // printf(">> i: %d, kbit: %d\n", i, kbit);
         EC_POINT_CSWAP(kbit, r, &s);
 
         // printf("\nAfter swap:\n");
@@ -1606,15 +1605,15 @@ __device__ void ossl_ec_scalar_mul_ladder(
          * next iteration
          */
         pbit ^= kbit;
-        printf("<< i: %d, pbit: %d\n", i, pbit); // Debug print
+        // printf("<< i: %d, pbit: %d\n", i, pbit); // Debug print
     }
     /* one final cswap to move the right value into r */
     // EC_POINT_CSWAP(kbit, r, &s);
     EC_POINT_CSWAP(pbit, r, &s);
-    printf("\nAfter ladder loop:\n");
-    print_jacobian_point("R", r);
-    print_jacobian_point("S", &s);
-    print_jacobian_point("P (base point)", p);
+    // printf("\nAfter ladder loop:\n");
+    // print_jacobian_point("R", r);
+    // print_jacobian_point("S", &s);
+    // print_jacobian_point("P (base point)", p);
 
     /* Finalize ladder (and recover full point coordinates) */
     if (!ossl_ec_GFp_simple_ladder_post(group, r, &s, p)) {
@@ -1623,10 +1622,10 @@ __device__ void ossl_ec_scalar_mul_ladder(
     }
     // Set r->Z = 01000003D1
     r->Z.d[0] = 0x01000003D1;
-    printf("\nAfter ossl_ec_GFp_simple_ladder_post:\n");
-    print_jacobian_point("R", r);
-    print_jacobian_point("S", &s);
-    print_jacobian_point("P (base point)", p);
+    // printf("\nAfter ossl_ec_GFp_simple_ladder_post:\n");
+    // print_jacobian_point("R", r);
+    // print_jacobian_point("S", &s);
+    // print_jacobian_point("P (base point)", p);
 }
 
 __device__ void ec_point_scalar_mul_wnaf(
@@ -1637,17 +1636,17 @@ __device__ void ec_point_scalar_mul_wnaf(
 ) {
     // Print inputs
     // printf("++ ec_point_scalar_mul_wnaf ++\n");
-    bn_print_no_fuse("ec_point_scalar_mul_wnaf >> scalar: ", scalar);
-    bn_print_no_fuse("ec_point_scalar_mul_wnaf >> point.x: ", &point->X);
-    bn_print_no_fuse("ec_point_scalar_mul_wnaf >> point.y: ", &point->Y);
-    bn_print_no_fuse("ec_point_scalar_mul_wnaf >> point.z: ", &point->Z);
-    bn_print_no_fuse("ec_point_scalar_mul_wnaf >> curve_params->p: ", &curve_params->p);
-    bn_print_no_fuse("ec_point_scalar_mul_wnaf >> curve_params->a: ", &curve_params->a);
-    bn_print_no_fuse("ec_point_scalar_mul_wnaf >> curve_params->b: ", &curve_params->b);
-    bn_print_no_fuse("ec_point_scalar_mul_wnaf >> curve_params->Gx: ", &curve_params->Gx);
-    bn_print_no_fuse("ec_point_scalar_mul_wnaf >> curve_params->Gy: ", &curve_params->Gy);
-    bn_print_no_fuse("ec_point_scalar_mul_wnaf >> curve_params->n: ", &curve_params->n);
-    bn_print_no_fuse("ec_point_scalar_mul_wnaf >> curve_params->h: ", &curve_params->h);
+    // bn_print_no_fuse("ec_point_scalar_mul_wnaf >> scalar: ", scalar);
+    // bn_print_no_fuse("ec_point_scalar_mul_wnaf >> point.x: ", &point->X);
+    // bn_print_no_fuse("ec_point_scalar_mul_wnaf >> point.y: ", &point->Y);
+    // bn_print_no_fuse("ec_point_scalar_mul_wnaf >> point.z: ", &point->Z);
+    // bn_print_no_fuse("ec_point_scalar_mul_wnaf >> curve_params->p: ", &curve_params->p);
+    // bn_print_no_fuse("ec_point_scalar_mul_wnaf >> curve_params->a: ", &curve_params->a);
+    // bn_print_no_fuse("ec_point_scalar_mul_wnaf >> curve_params->b: ", &curve_params->b);
+    // bn_print_no_fuse("ec_point_scalar_mul_wnaf >> curve_params->Gx: ", &curve_params->Gx);
+    // bn_print_no_fuse("ec_point_scalar_mul_wnaf >> curve_params->Gy: ", &curve_params->Gy);
+    // bn_print_no_fuse("ec_point_scalar_mul_wnaf >> curve_params->n: ", &curve_params->n);
+    // bn_print_no_fuse("ec_point_scalar_mul_wnaf >> curve_params->h: ", &curve_params->h);
     
     EC_GROUP_CUDA group;
     // Initialize secp256k1 curve parameters
@@ -1681,7 +1680,7 @@ __device__ void ec_point_scalar_mul_wnaf(
 
     ossl_ec_scalar_mul_ladder(&group, result, scalar, point);
 
-    printf("-- ec_point_scalar_mul_wnaf --\n");
+    // printf("-- ec_point_scalar_mul_wnaf --\n");
 }
 
 // It was written for EC_POINT_CUDA types.
@@ -1692,18 +1691,18 @@ __device__ void ec_point_scalar_mul_wnaf_deprecated(
     const CurveParameters *curve_params
 ) {
     // Print inputs
-    printf("++ ec_point_scalar_mul_wnaf ++\n");
-    bn_print_no_fuse(">> scalar: ", scalar);
-    bn_print_no_fuse(">> point.x: ", &point->X);
-    bn_print_no_fuse(">> point.y: ", &point->Y);
-    bn_print_no_fuse(">> point.z: ", &point->Z);
-    bn_print_no_fuse(">> curve_params->p: ", &curve_params->p);
-    bn_print_no_fuse(">> curve_params->a: ", &curve_params->a);
-    bn_print_no_fuse(">> curve_params->b: ", &curve_params->b);
-    bn_print_no_fuse(">> curve_params->Gx: ", &curve_params->Gx);
-    bn_print_no_fuse(">> curve_params->Gy: ", &curve_params->Gy);
-    bn_print_no_fuse(">> curve_params->n: ", &curve_params->n);
-    bn_print_no_fuse(">> curve_params->h: ", &curve_params->h);
+    // printf("++ ec_point_scalar_mul_wnaf ++\n");
+    // bn_print_no_fuse(">> scalar: ", scalar);
+    // bn_print_no_fuse(">> point.x: ", &point->X);
+    // bn_print_no_fuse(">> point.y: ", &point->Y);
+    // bn_print_no_fuse(">> point.z: ", &point->Z);
+    // bn_print_no_fuse(">> curve_params->p: ", &curve_params->p);
+    // bn_print_no_fuse(">> curve_params->a: ", &curve_params->a);
+    // bn_print_no_fuse(">> curve_params->b: ", &curve_params->b);
+    // bn_print_no_fuse(">> curve_params->Gx: ", &curve_params->Gx);
+    // bn_print_no_fuse(">> curve_params->Gy: ", &curve_params->Gy);
+    // bn_print_no_fuse(">> curve_params->n: ", &curve_params->n);
+    // bn_print_no_fuse(">> curve_params->h: ", &curve_params->h);
     
     // // Step 1: Convert scalar to wNAF
     // signed char wNAF[MAX_WNAF_LENGTH];
@@ -1753,16 +1752,16 @@ __device__ void ec_point_scalar_mul_montgomery(
     EC_POINT_JACOBIAN *result
 ) {
 
-    bool debug = true;
+    bool debug = false;
     if (debug) {
-        printf("++ ec_point_scalar_mul_montgomery ++\n");
-        bn_print_no_fuse(">> point.x: ", &point->X);
-        bn_print_no_fuse(">> point.y: ", &point->Y);
-        bn_print_no_fuse(">> point.z: ", &point->Z);
-        bn_print_no_fuse(">> scalar: ", scalar);
-        bn_print_no_fuse(">> mont_ctx->R: ", &mont_ctx->R);
-        bn_print_no_fuse(">> mont_ctx->n: ", &mont_ctx->n);
-        bn_print_no_fuse(">> mont_ctx->n_prime: ", &mont_ctx->n_prime);
+        // printf("++ ec_point_scalar_mul_montgomery ++\n");
+        // bn_print_no_fuse(">> point.x: ", &point->X);
+        // bn_print_no_fuse(">> point.y: ", &point->Y);
+        // bn_print_no_fuse(">> point.z: ", &point->Z);
+        // bn_print_no_fuse(">> scalar: ", scalar);
+        // bn_print_no_fuse(">> mont_ctx->R: ", &mont_ctx->R);
+        // bn_print_no_fuse(">> mont_ctx->n: ", &mont_ctx->n);
+        // bn_print_no_fuse(">> mont_ctx->n_prime: ", &mont_ctx->n_prime);
     }
 
     // Initialize curve parameters
@@ -1775,13 +1774,13 @@ __device__ void ec_point_scalar_mul_montgomery(
     // Call the wNAF scalar multiplication function
     ec_point_scalar_mul_wnaf(result, point, scalar, &curve_params);
 
-    // bn_print_no_fuse("EC_POINT_mul << ossl_ec_wNAF_mul << result->X: ", &result->X);
-    // bn_print_no_fuse("EC_POINT_mul << ossl_ec_wNAF_mul << result->Y: ", &result->Y);
+    // // bn_print_no_fuse("EC_POINT_mul << ossl_ec_wNAF_mul << result->X: ", &result->X);
+    // // bn_print_no_fuse("EC_POINT_mul << ossl_ec_wNAF_mul << result->Y: ", &result->Y);
 
     if (debug) {
-        bn_print_no_fuse("EC_POINT_mul << ossl_ec_wNAF_mul << result->X: ", &result->X);
-        bn_print_no_fuse("EC_POINT_mul << ossl_ec_wNAF_mul << result->Y: ", &result->Y);
-        bn_print_no_fuse("EC_POINT_mul << ossl_ec_wNAF_mul << result->Z: ", &result->Z);
+        // bn_print_no_fuse("EC_POINT_mul << ossl_ec_wNAF_mul << result->X: ", &result->X);
+        // bn_print_no_fuse("EC_POINT_mul << ossl_ec_wNAF_mul << result->Y: ", &result->Y);
+        // bn_print_no_fuse("EC_POINT_mul << ossl_ec_wNAF_mul << result->Z: ", &result->Z);
         printf("-- ec_point_scalar_mul_montgomery --\n");
     }
 }
@@ -1792,9 +1791,9 @@ __device__ int cuda_ec_GFp_mont_field_encode(const EC_GROUP_CUDA *group,
     BIGNUM_CUDA tmp;
     init_zero(&tmp);
 
-    // bn_print_no_fuse(">> cuda_ec_GFp_mont_field_encode >> a: ", a);
+    // // bn_print_no_fuse(">> cuda_ec_GFp_mont_field_encode >> a: ", a);
     bn_to_montgomery_short(r, a);
-    // bn_print_no_fuse("<< cuda_ec_GFp_mont_field_encode << r: ", r);
+    // // bn_print_no_fuse("<< cuda_ec_GFp_mont_field_encode << r: ", r);
     return 1;
 }
 
@@ -1805,7 +1804,7 @@ __device__ bool bnrand(BIGNUM_CUDA *rnd) {
     // int top = -1;
     // int bottom = 0;
     int bits = 256;
-    bn_print_no_fuse(">> bn_rand_words >> rnd: ", rnd);
+    // bn_print_no_fuse(">> bn_rand_words >> rnd: ", rnd);
     // printf(">> bn_rand_words >> bits: %d\n", bits);
     // printf(">> bn_rand_words >> top: %d\n", top);
     // printf(">> bn_rand_words >> bottom: %d\n", bottom);
@@ -1828,7 +1827,7 @@ __device__ bool bnrand(BIGNUM_CUDA *rnd) {
     }
 
     // print mask
-    printf("# bnrand mask: %d\n",mask);
+    // printf("# bnrand mask: %d\n",mask);
     buf[0] &= ~mask;
     // if (bottom) {
     //     buf[BUFFER_SIZE - 1] |= 1;
@@ -1838,10 +1837,10 @@ __device__ bool bnrand(BIGNUM_CUDA *rnd) {
     //     printf("buf[%d] = %02x\n", i, buf[i]);
     // } 
     // print buf
-    for (int i = 0; i < BUFFER_SIZE; i++) {
-        printf("%02x ", buf[i]);
-    }
-    printf("\n");
+    // for (int i = 0; i < BUFFER_SIZE; i++) {
+    //     printf("%02x ", buf[i]);
+    // }
+    // printf("\n");
 
     // Convert buf to BIGNUM_CUDA
     init_zero(rnd);
@@ -1861,11 +1860,11 @@ __device__ bool bnrand(BIGNUM_CUDA *rnd) {
 
     rnd->top = word_index;
 
-    bn_print_no_fuse("<< bn_rand_words << rnd: ", rnd);
+    // bn_print_no_fuse("<< bn_rand_words << rnd: ", rnd);
     return true;
 }
 // __device__ bool bn_rand_range_words(BIGNUM_CUDA *r, int bits) {
-//     bn_print_no_fuse(">> bn_rand_range_words >> r: ", r);
+//     // bn_print_no_fuse(">> bn_rand_range_words >> r: ", r);
 //     // OpenSSL bnrand implementation
 //     int bytes = (bits + 7) / 8;  /* Convert bits to bytes, rounding up */
 //     int extra_bits = 8 - (bits % 8);  /* Bits in most significant byte */
@@ -1911,7 +1910,7 @@ __device__ bool bnrand(BIGNUM_CUDA *rnd) {
 
 //     /* Clean up temporary buffer */
 //     free(temp_buffer);
-//     bn_print_no_fuse("<< bn_rand_range_words << r: ", r);
+//     // bn_print_no_fuse("<< bn_rand_range_words << r: ", r);
 //     return true;
 // }
 
@@ -2026,63 +2025,63 @@ __device__ int ossl_ec_GFp_simple_ladder_pre(const EC_GROUP_CUDA *group,
     //     BIGNUM_CUDA order;  // Order of the base point
     // } EC_GROUP_CUDA;
     // print group
-    bn_print_no_fuse(">> ossl_ec_GFp_simple_ladder_pre group->field = ", &group->field);
-    bn_print_no_fuse(">> ossl_ec_GFp_simple_ladder_pre group->a = ", &group->a);
-    bn_print_no_fuse(">> ossl_ec_GFp_simple_ladder_pre group->b = ", &group->b);
-    bn_print_no_fuse(">> ossl_ec_GFp_simple_ladder_pre group->order = ", &group->order);
-    bn_print_no_fuse(">> ossl_ec_GFp_simple_ladder_pre s->X = ", &s->X);
-    bn_print_no_fuse(">> ossl_ec_GFp_simple_ladder_pre s->Y = ", &s->Y);
-    bn_print_no_fuse(">> ossl_ec_GFp_simple_ladder_pre s->Z = ", &s->Z);
-    bn_print_no_fuse(">> ossl_ec_GFp_simple_ladder_pre p->X = ", &p->X);
-    bn_print_no_fuse(">> ossl_ec_GFp_simple_ladder_pre p->Y = ", &p->Y);
-    bn_print_no_fuse(">> ossl_ec_GFp_simple_ladder_pre p->Z = ", &p->Z);
-    printf("Debug: Computed:\n");
+    // bn_print_no_fuse(">> ossl_ec_GFp_simple_ladder_pre group->field = ", &group->field);
+    // bn_print_no_fuse(">> ossl_ec_GFp_simple_ladder_pre group->a = ", &group->a);
+    // bn_print_no_fuse(">> ossl_ec_GFp_simple_ladder_pre group->b = ", &group->b);
+    // bn_print_no_fuse(">> ossl_ec_GFp_simple_ladder_pre group->order = ", &group->order);
+    // bn_print_no_fuse(">> ossl_ec_GFp_simple_ladder_pre s->X = ", &s->X);
+    // bn_print_no_fuse(">> ossl_ec_GFp_simple_ladder_pre s->Y = ", &s->Y);
+    // bn_print_no_fuse(">> ossl_ec_GFp_simple_ladder_pre s->Z = ", &s->Z);
+    // bn_print_no_fuse(">> ossl_ec_GFp_simple_ladder_pre p->X = ", &p->X);
+    // bn_print_no_fuse(">> ossl_ec_GFp_simple_ladder_pre p->Y = ", &p->Y);
+    // bn_print_no_fuse(">> ossl_ec_GFp_simple_ladder_pre p->Z = ", &p->Z);
+    // printf("Debug: Computed:\n");
 
     if (!ossl_bn_mod_sqr_montgomery(&t3, &p->X, &group->field))
         return 0;
-    bn_print_no_fuse("[0] t3 = X^2 = ", &t3);
+    // bn_print_no_fuse("[0] t3 = X^2 = ", &t3);
 
     if (!bn_mod_sub_quick(&t4, &t3, &group->a, &group->field))
         return 0;
-    bn_print_no_fuse("[1] t4 = t3 - a = ", &t4);
+    // bn_print_no_fuse("[1] t4 = t3 - a = ", &t4);
 
     if (!ossl_bn_mod_sqr_montgomery(&t4, &t3, &group->field))
         return 0;
-    bn_print_no_fuse("[2] t4 = t4^2 = ", &t4);
+    // bn_print_no_fuse("[2] t4 = t4^2 = ", &t4);
 
     if (!ossl_bn_mod_mul_montgomery(&t5, &p->X, &group->b, &group->field))
         return 0;
-    bn_print_no_fuse("[3] t5 = X * b = ", &t5);
+    // bn_print_no_fuse("[3] t5 = X * b = ", &t5);
 
     if (!bn_mod_lshift_quick(&t5, &t5, 3, &group->field))
         return 0;
-    bn_print_no_fuse("[4] t5 = t5 << 3 = ", &t5); 
+    // bn_print_no_fuse("[4] t5 = t5 << 3 = ", &t5); 
 
-    bn_print_no_fuse(">> t4 = ", &t4);
-    bn_print_no_fuse(">> t5 = ", &t5);
-    bn_print_no_fuse(">> group->field = ", &group->field);
+    // bn_print_no_fuse(">> t4 = ", &t4);
+    // bn_print_no_fuse(">> t5 = ", &t5);
+    // bn_print_no_fuse(">> group->field = ", &group->field);
     if (!bn_mod_sub_quick(&r->X, &t4, &t5, &group->field))
         return 0;
-    // bn_print_no_fuse("[5] r->X = (X^2 - a)^2 - X * b * 8 = ", &r->X); // ERR
-    bn_print_no_fuse("[5] r->X = t4 - t5 = ", &r->X);
+    // // bn_print_no_fuse("[5] r->X = (X^2 - a)^2 - X * b * 8 = ", &r->X); // ERR
+    // bn_print_no_fuse("[5] r->X = t4 - t5 = ", &r->X);
 
-    bn_print_no_fuse(">> t3 = ", &t3);
-    bn_print_no_fuse(">> group->a = ", &group->a);
+    // bn_print_no_fuse(">> t3 = ", &t3);
+    // bn_print_no_fuse(">> group->a = ", &group->a);
     if (!bn_mod_add_quick(&t1, &t3, &group->a, &group->field))
         return 0;
-    bn_print_no_fuse("[6] t1 = t3 + a = ", &t1);
+    // bn_print_no_fuse("[6] t1 = t3 + a = ", &t1);
 
     if (!ossl_bn_mod_mul_montgomery(&t2, &p->X, &t1, &group->field))
         return 0;
-    bn_print_no_fuse("[7] t2 = X * t1 = ", &t2);
+    // bn_print_no_fuse("[7] t2 = X * t1 = ", &t2);
 
     if (!bn_mod_add_quick(&t2, &t2, &group->b, &group->field))
         return 0;
-    bn_print_no_fuse("[8] t2 = b + t2 = ", &t2);
+    // bn_print_no_fuse("[8] t2 = b + t2 = ", &t2);
 
     if (!bn_mod_lshift_quick(&r->Z, &t2, 2, &group->field))    
         return 0;
-    bn_print_no_fuse("[9] r->Z = t2 << 2 = ", &r->Z);
+    // bn_print_no_fuse("[9] r->Z = t2 << 2 = ", &r->Z);
 
     // Set the corresponding values
     // t1 = s->Z;
@@ -2097,20 +2096,20 @@ __device__ int ossl_ec_GFp_simple_ladder_pre(const EC_GROUP_CUDA *group,
     // bn_copy(&r->X, &t4);
     bn_copy(&s->Y, &t5);
 
-    // bn_print_no_fuse("[pre-field_encode] s->Z = ", &s->Z);
-    // bn_print_no_fuse("[pre-field_encode] r->Z = ", &r->Z);
-    // bn_print_no_fuse("[pre-field_encode] s->X = ", &s->X);
-    // bn_print_no_fuse("[pre-field_encode] r->X = ", &r->X);
-    // bn_print_no_fuse("[pre-field_encode] s->Y = ", &s->Y);
+    // // bn_print_no_fuse("[pre-field_encode] s->Z = ", &s->Z);
+    // // bn_print_no_fuse("[pre-field_encode] r->Z = ", &r->Z);
+    // // bn_print_no_fuse("[pre-field_encode] s->X = ", &s->X);
+    // // bn_print_no_fuse("[pre-field_encode] r->X = ", &r->X);
+    // // bn_print_no_fuse("[pre-field_encode] s->Y = ", &s->Y);
 
-    printf(">> ossl_ec_GFp_simple_ladder_pre.before_blinding >>\n");
+    // printf(">> ossl_ec_GFp_simple_ladder_pre.before_blinding >>\n");
     // r, s
-    bn_print_no_fuse(">> r->X = ", &r->X);
-    bn_print_no_fuse(">> r->Y = ", &r->Y);
-    bn_print_no_fuse(">> r->Z = ", &r->Z);
-    bn_print_no_fuse(">> s->X = ", &s->X);
-    bn_print_no_fuse(">> s->Y = ", &s->Y);
-    bn_print_no_fuse(">> s->Z = ", &s->Z);
+    // bn_print_no_fuse(">> r->X = ", &r->X);
+    // bn_print_no_fuse(">> r->Y = ", &r->Y);
+    // bn_print_no_fuse(">> r->Z = ", &r->Z);
+    // bn_print_no_fuse(">> s->X = ", &s->X);
+    // bn_print_no_fuse(">> s->Y = ", &s->Y);
+    // bn_print_no_fuse(">> s->Z = ", &s->Z);
     
     // Blinding ++
     // &r->Y becomes non-zero
@@ -2152,15 +2151,15 @@ __device__ int ossl_ec_GFp_simple_ladder_pre(const EC_GROUP_CUDA *group,
 
     // r->Z = r->Z * r->Y
     ossl_ec_GFp_mont_field_mul(&group->field, &r->Z, &r->Z, &r->Y);
-    bn_print_no_fuse("[b] r->z = ", &r->Z);
+    // bn_print_no_fuse("[b] r->z = ", &r->Z);
 
     // r->X = r->X * r->Y
     ossl_ec_GFp_mont_field_mul(&group->field, &r->X, &r->X, &r->Y);
-    bn_print_no_fuse("[b] r->X = ", &r->X);
+    // bn_print_no_fuse("[b] r->X = ", &r->X);
 
     // s->X = p->X * s->Z
     ossl_ec_GFp_mont_field_mul(&group->field, &s->X, &p->X, &s->Z);
-    bn_print_no_fuse("[b] s->X = ", &s->X);
+    // bn_print_no_fuse("[b] s->X = ", &s->X);
 
     
 
@@ -2173,10 +2172,10 @@ __device__ int ossl_ec_GFp_simple_ladder_post(
     EC_POINT_JACOBIAN *s,
     const EC_POINT_JACOBIAN *p
 ) {
-    printf(">> [0] ossl_ec_GFp_simple_ladder_post >>");
-    print_jacobian_point("R", r);
-    print_jacobian_point("S", s);
-    print_jacobian_point("P (base point)", p);
+    // printf(">> [0] ossl_ec_GFp_simple_ladder_post >>");
+    // print_jacobian_point("R", r);
+    // print_jacobian_point("S", s);
+    // print_jacobian_point("P (base point)", p);
     if (bn_is_zero(&r->Z)) {
         // Set r to point at infinity
         init_zero(&r->X);
@@ -2194,10 +2193,10 @@ __device__ int ossl_ec_GFp_simple_ladder_post(
         return 1;
     }
 
-    printf(">> [1] ossl_ec_GFp_simple_ladder_post >>");
-    print_jacobian_point("R", r);
-    print_jacobian_point("S", s);
-    print_jacobian_point("P (base point)", p);
+    // printf(">> [1] ossl_ec_GFp_simple_ladder_post >>");
+    // print_jacobian_point("R", r);
+    // print_jacobian_point("S", s);
+    // print_jacobian_point("P (base point)", p);
 
     // Initialize temporary variables
     BIGNUM_CUDA t0, t1, t2, t3, t4, t5, t6;
@@ -2209,109 +2208,109 @@ __device__ int ossl_ec_GFp_simple_ladder_post(
     init_zero(&t5);
     init_zero(&t6);
 
-    bn_print_no_fuse("[init] >> p->X: ", &p->X);
-    bn_print_no_fuse("[init] >> p->Y: ", &p->Y);
-    bn_print_no_fuse("[init] >> p->Z: ", &p->Z);
-    bn_print_no_fuse("[init] >> r->X: ", &r->X);
-    bn_print_no_fuse("[init] >> r->Y: ", &r->Y);
-    bn_print_no_fuse("[init] >> r->Z: ", &r->Z);
-    bn_print_no_fuse("[init] >> s->X: ", &s->X);
-    bn_print_no_fuse("[init] >> s->Y: ", &s->Y);
-    bn_print_no_fuse("[init] >> s->Z: ", &s->Z);
+    // bn_print_no_fuse("[init] >> p->X: ", &p->X);
+    // bn_print_no_fuse("[init] >> p->Y: ", &p->Y);
+    // bn_print_no_fuse("[init] >> p->Z: ", &p->Z);
+    // bn_print_no_fuse("[init] >> r->X: ", &r->X);
+    // bn_print_no_fuse("[init] >> r->Y: ", &r->Y);
+    // bn_print_no_fuse("[init] >> r->Z: ", &r->Z);
+    // bn_print_no_fuse("[init] >> s->X: ", &s->X);
+    // bn_print_no_fuse("[init] >> s->Y: ", &s->Y);
+    // bn_print_no_fuse("[init] >> s->Z: ", &s->Z);
 
     bn_mod_lshift1_quick(&t4, &p->Y, &group->field);
-    bn_print_no_fuse("[0] ossl_ec_GFp_simple_ladder_post: t4 = p->Y << 1 =", &t4);
+    // bn_print_no_fuse("[0] ossl_ec_GFp_simple_ladder_post: t4 = p->Y << 1 =", &t4);
 
     ossl_ec_GFp_mont_field_mul(&group->field, &t6, &r->X, &t4);
-    bn_print_no_fuse("[1] ossl_ec_GFp_simple_ladder_post: t6 = r->X * p->Y =", &t6);
+    // bn_print_no_fuse("[1] ossl_ec_GFp_simple_ladder_post: t6 = r->X * p->Y =", &t6);
 
     ossl_ec_GFp_mont_field_mul(&group->field, &t6, &t6, &s->Z);
-    bn_print_no_fuse("[2] ossl_ec_GFp_simple_ladder_post: t6 = t6 * s->Z =", &t6);
+    // bn_print_no_fuse("[2] ossl_ec_GFp_simple_ladder_post: t6 = t6 * s->Z =", &t6);
 
     ossl_ec_GFp_mont_field_mul(&group->field, &t5, &r->Z, &t6);
-    bn_print_no_fuse("[3] ossl_ec_GFp_simple_ladder_post: t5 = r->Z * t6 =", &t5);
+    // bn_print_no_fuse("[3] ossl_ec_GFp_simple_ladder_post: t5 = r->Z * t6 =", &t5);
 
     bn_mod_lshift1_quick(&t1, &group->b, &group->field);
-    bn_print_no_fuse("[4] ossl_ec_GFp_simple_ladder_post: t1 = group->b << 1 =", &t1);
+    // bn_print_no_fuse("[4] ossl_ec_GFp_simple_ladder_post: t1 = group->b << 1 =", &t1);
     
     ossl_ec_GFp_mont_field_mul(&group->field, &t1, &s->Z, &t1);
-    bn_print_no_fuse("[5] ossl_ec_GFp_simple_ladder_post: t1 = t1 * s->Z =", &t1);
+    // bn_print_no_fuse("[5] ossl_ec_GFp_simple_ladder_post: t1 = t1 * s->Z =", &t1);
 
     ossl_bn_mod_sqr_montgomery(&t3, &r->Z, &group->field);
-    bn_print_no_fuse("[6] ossl_ec_GFp_simple_ladder_post: t3 = r->Z^2 =", &t3);
+    // bn_print_no_fuse("[6] ossl_ec_GFp_simple_ladder_post: t3 = r->Z^2 =", &t3);
 
     // << -- Need to complete according to OpenSSL implementation -- >>
 
     ossl_ec_GFp_mont_field_mul(&group->field, &t2, &t3, &t1);
-    bn_print_no_fuse("[7] ossl_ec_GFp_simple_ladder_post: t2 = t3 * t1 =", &t2);
+    // bn_print_no_fuse("[7] ossl_ec_GFp_simple_ladder_post: t2 = t3 * t1 =", &t2);
 
     ossl_ec_GFp_mont_field_mul(&group->field, &t6, &r->Z, &group->a);
-    bn_print_no_fuse("[8] ossl_ec_GFp_simple_ladder_post: t6 = r->Z * group->a =", &t6);
+    // bn_print_no_fuse("[8] ossl_ec_GFp_simple_ladder_post: t6 = r->Z * group->a =", &t6);
 
     ossl_ec_GFp_mont_field_mul(&group->field, &t1, &p->X, &r->X);
-    bn_print_no_fuse("[9] ossl_ec_GFp_simple_ladder_post: t1 = p->X * r->X =", &t1);
+    // bn_print_no_fuse("[9] ossl_ec_GFp_simple_ladder_post: t1 = p->X * r->X =", &t1);
 
     bn_mod_add_quick(&t1, &t1, &t6, &group->field);
-    bn_print_no_fuse("[10] ossl_ec_GFp_simple_ladder_post: t1 = t1 + t6 =", &t1);
+    // bn_print_no_fuse("[10] ossl_ec_GFp_simple_ladder_post: t1 = t1 + t6 =", &t1);
 
     ossl_ec_GFp_mont_field_mul(&group->field, &t1, &s->Z, &t1);
-    bn_print_no_fuse("[11] ossl_ec_GFp_simple_ladder_post: t1 = t1 * s->Z =", &t1);
+    // bn_print_no_fuse("[11] ossl_ec_GFp_simple_ladder_post: t1 = t1 * s->Z =", &t1);
 
     ossl_ec_GFp_mont_field_mul(&group->field, &t0, &p->X, &r->Z);
-    bn_print_no_fuse("[12] ossl_ec_GFp_simple_ladder_post: t0 = p->X * r->Z =", &t0);
+    // bn_print_no_fuse("[12] ossl_ec_GFp_simple_ladder_post: t0 = p->X * r->Z =", &t0);
 
     bn_mod_add_quick(&t6, &r->X, &t0, &group->field);
-    bn_print_no_fuse("[13] ossl_ec_GFp_simple_ladder_post: t6 = r->X + t0 =", &t6);
+    // bn_print_no_fuse("[13] ossl_ec_GFp_simple_ladder_post: t6 = r->X + t0 =", &t6);
 
     ossl_ec_GFp_mont_field_mul(&group->field, &t6, &t6, &t1);
-    bn_print_no_fuse("[14] ossl_ec_GFp_simple_ladder_post: t6 = t6 * t1 =", &t6);
+    // bn_print_no_fuse("[14] ossl_ec_GFp_simple_ladder_post: t6 = t6 * t1 =", &t6);
 
     bn_mod_add_quick(&t6, &t6, &t2, &group->field);
-    bn_print_no_fuse("[15] ossl_ec_GFp_simple_ladder_post: t6 = t6 + t2 =", &t6);
+    // bn_print_no_fuse("[15] ossl_ec_GFp_simple_ladder_post: t6 = t6 + t2 =", &t6);
 
     bn_mod_sub_quick(&t0, &t0, &r->X, &group->field);
-    bn_print_no_fuse("[16] ossl_ec_GFp_simple_ladder_post: t0 = t0 - r->X =", &t0);
+    // bn_print_no_fuse("[16] ossl_ec_GFp_simple_ladder_post: t0 = t0 - r->X =", &t0);
 
     ossl_bn_mod_sqr_montgomery(&t0, &t0, &group->field);
-    bn_print_no_fuse("[17] ossl_ec_GFp_simple_ladder_post: t0 = t0^2 =", &t0);
+    // bn_print_no_fuse("[17] ossl_ec_GFp_simple_ladder_post: t0 = t0^2 =", &t0);
 
     ossl_ec_GFp_mont_field_mul(&group->field, &t0, &t0, &s->X);
-    bn_print_no_fuse("[18] ossl_ec_GFp_simple_ladder_post: t0 = t0 * s->X =", &t0);
+    // bn_print_no_fuse("[18] ossl_ec_GFp_simple_ladder_post: t0 = t0 * s->X =", &t0);
 
     bn_mod_sub_quick(&t0, &t6, &t0, &group->field);
-    bn_print_no_fuse("[19] ossl_ec_GFp_simple_ladder_post: t0 = t6 - t0 =", &t0);
+    // bn_print_no_fuse("[19] ossl_ec_GFp_simple_ladder_post: t0 = t6 - t0 =", &t0);
 
     ossl_ec_GFp_mont_field_mul(&group->field, &t1, &s->Z, &t4);
-    bn_print_no_fuse("[20] ossl_ec_GFp_simple_ladder_post: t1 = s->Z * t4 =", &t1);
+    // bn_print_no_fuse("[20] ossl_ec_GFp_simple_ladder_post: t1 = s->Z * t4 =", &t1);
 
     ossl_ec_GFp_mont_field_mul(&group->field, &t1, &t3, &t1);
-    bn_print_no_fuse("[21] ossl_ec_GFp_simple_ladder_post: t1 = t3 * t1 =", &t1);
+    // bn_print_no_fuse("[21] ossl_ec_GFp_simple_ladder_post: t1 = t3 * t1 =", &t1);
 
     BIGNUM_CUDA t1_tmp;
     init_zero(&t1_tmp);
     bn_copy(&t1_tmp, &t1);
     ossl_ec_GFp_mont_field_decode(group, &t1, &t1_tmp);
-    bn_print_no_fuse("[22] ossl_ec_GFp_simple_ladder_post: t1 = decode(t1) =", &t1);
+    // bn_print_no_fuse("[22] ossl_ec_GFp_simple_ladder_post: t1 = decode(t1) =", &t1);
 
     init_zero(&t1_tmp);
     bn_copy(&t1_tmp, &t1);
     init_zero(&t1);
     ossl_ec_GFp_mont_field_inv(&group->field, &t1, &t1_tmp);
-    bn_print_no_fuse("[23] ossl_ec_GFp_simple_ladder_post: t1 = inv(t1) =", &t1);
+    // bn_print_no_fuse("[23] ossl_ec_GFp_simple_ladder_post: t1 = inv(t1) =", &t1);
 
     cuda_ec_GFp_mont_field_encode(group, &t1, &t1);
-    bn_print_no_fuse("[24] ossl_ec_GFp_simple_ladder_post: t1 = encode(t1) =", &t1);
+    // bn_print_no_fuse("[24] ossl_ec_GFp_simple_ladder_post: t1 = encode(t1) =", &t1);
 
     ossl_ec_GFp_mont_field_mul(&group->field, &r->X, &t5, &t1);
-    bn_print_no_fuse("[25] ossl_ec_GFp_simple_ladder_post: r->X = t5 * t1 =", &r->X);
+    // bn_print_no_fuse("[25] ossl_ec_GFp_simple_ladder_post: r->X = t5 * t1 =", &r->X);
 
     ossl_ec_GFp_mont_field_mul(&group->field, &r->Y, &t0, &t1);
-    bn_print_no_fuse("[26] ossl_ec_GFp_simple_ladder_post: r->Y = t0 * t1 =", &r->Y);
+    // bn_print_no_fuse("[26] ossl_ec_GFp_simple_ladder_post: r->Y = t0 * t1 =", &r->Y);
 
-    printf(">> [y] ossl_ec_GFp_simple_ladder_post >>");
-    print_jacobian_point("R", r);
-    print_jacobian_point("S", s);
-    print_jacobian_point("P (base point)", p);
+    // printf(">> [y] ossl_ec_GFp_simple_ladder_post >>");
+    // print_jacobian_point("R", r);
+    // print_jacobian_point("S", s);
+    // print_jacobian_point("P (base point)", p);
 
     // Set Z coordinate to 1
     init_one(&r->Z);

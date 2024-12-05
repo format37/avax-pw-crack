@@ -166,8 +166,8 @@ int main() {
     // int blocksPerGrid = 128;
     // int blocksPerGrid = 4096;
  
-    int threadsPerBlock = 1;
-    int blocksPerGrid = 1;
+    // int threadsPerBlock = 1;
+    // int blocksPerGrid = 1;
 
     // Get the current stack size limit
     size_t currentLimit;
@@ -199,6 +199,13 @@ int main() {
     
     nlohmann::json config;
     config_file >> config;
+
+    // Read CUDA configuration parameters
+    int threadsPerBlock = config["cuda"]["threadsPerBlock"];
+    int blocksPerGrid = config["cuda"]["blocksPerGrid"];
+    std::cout << "Using CUDA configuration:" << std::endl;
+    std::cout << "  Threads per block: " << threadsPerBlock << std::endl;
+    std::cout << "  Blocks per grid: " << blocksPerGrid << std::endl;
 
     std::string mnemonic = config["mnemonic"];
     std::string start_passphrase = config["start_passphrase"];
