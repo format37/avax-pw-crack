@@ -312,14 +312,14 @@ int main() {
     memset(passphrase, 0, sizeof(passphrase));
     
     // Recursive approach
-    for (int length = 1; length <= MAX_PASSPHRASE_LENGTH; length++) {
-        generate_passphrases(passphrase, 0, length, start_passphrase.c_str(), end_passphrase.c_str(), 
-                             mnemonic.c_str(), expected_p_chain_address.c_str());
-    }
-    printf("Passphrase: %s\n", passphrase);
+    // for (int length = 1; length <= MAX_PASSPHRASE_LENGTH; length++) {
+    //     generate_passphrases(passphrase, 0, length, start_passphrase.c_str(), end_passphrase.c_str(), 
+    //                          mnemonic.c_str(), expected_p_chain_address.c_str());
+    // }
+    // printf("Passphrase: %s\n", passphrase);
 
     // Iterative approach
-    // generate_passphrases_iterative(start_passphrase, end_passphrase, mnemonic, expected_p_chain_address);
+    generate_passphrases_iterative(start_passphrase, end_passphrase, mnemonic, expected_p_chain_address);
     
     printf("P-chain address not found within the given range.\n");
     return 0;

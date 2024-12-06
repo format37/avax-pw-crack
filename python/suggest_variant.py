@@ -33,7 +33,8 @@ def find_letter_variant(n):
 # variant_number = 65536 # crxp # P-avax1yj5pwqc0fcx9q0jawsuqfq2e6x9mjw4z5exyp4
 # variant_number = 131072 # gkwf # P-avax1hkq2jc35k4m8llchp5lpklmg2l3yw2emy4afng
 # variant_number = 262144 # nwtl # P-avax1vl2vfvvpm79fnrtxuvcryx9wgfj95gpkl7r3g8
-variant_number = 128 # dx # P-avax10mr7jsu2x87p5dfmrslrl2fjz6gau2hcncmqer
+# variant_number = 128 # dx # P-avax10mr7jsu2x87p5dfmrslrl2fjz6gau2hcncmqer
+variant_number = 14
 
 result = find_letter_variant(variant_number)
 print(f"The letter variant corresponding to {variant_number} is: {result}")

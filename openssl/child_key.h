@@ -544,7 +544,17 @@ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uint32_t index
         #ifdef debug_print
             printf("C GetChildKeyDerivation: The key at this index is invalid, so we increment the index and try again\n");
         #endif
-        // Recursive call or loop to retry with incremented index
+        
+        // Ensure we don't loop infinitely. We can stop if index is at max or after a certain number of retries.
+        if (index == UINT32_MAX) {
+            // We've reached the maximum index; handle this as an error scenario.
+            BIP32Info invalidInfo;
+            memset(&invalidInfo, 0, sizeof(invalidInfo));
+            return invalidInfo; // Or handle this error in a way that suits your code.
+        }
+
+        // Increment index and try again
+        return GetChildKeyDerivation(key, chainCode, index + 1);
     }	
 
     // Free OpenSSL big numbers
