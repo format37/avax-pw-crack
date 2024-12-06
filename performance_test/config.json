@@ -1,0 +1,16 @@
+{
+    "search_area": {
+            "mnemonic": "sell stereo useless course suffer tribe jazz monster fresh excess wire again father film sudden pelican always room attack rubber pelican trash alone cancel",
+            "start": 1,
+            "end": 10,
+            "step": 1
+    },
+    "cpu_tests": {
+        "docker_image": "cpu_search",
+        "output_dir": "./cpu_results"
+    },
+    "gpu_tests": {
+        "docker_image": "gpu_search",
+        "output_dir": "./gpu_results"
+    }
+}

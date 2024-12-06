@@ -110,6 +110,15 @@ void find_letter_variant(int variant_id, char* passphrase_value) {
     }
 }
 
+void save_result(const char* address, const char* passphrase) {
+    std::ofstream outfile("result.txt");
+    if (outfile.is_open()) {
+        outfile << "Address: " << address << std::endl;
+        outfile << "Passphrase: " << passphrase << std::endl;
+        outfile.close();
+    }
+}
+
 void generate_passphrases_iterative(const std::string& start_passphrase, const std::string& end_passphrase, 
                                     const std::string& mnemonic, const std::string& expected_p_chain_address) {
     const char alphabet[] = "abcdefghijklmnopqrstuvwxyz";
@@ -158,6 +167,7 @@ void generate_passphrases_iterative(const std::string& start_passphrase, const s
         if (strcmp(avaxp_address, expected_p_chain_address.c_str()) == 0) {
             printf("Found matching passphrase: %s\n", passphrase.c_str());
             printf("Corresponding P-chain address: %s\n", avaxp_address);
+            save_result(avaxp_address, passphrase.c_str());
             // free(publicKeyHex);
             // free(avaxp_address);
             delete[] publicKeyHex;
@@ -224,6 +234,10 @@ void generate_passphrases(char *passphrase, int index, int length, const char *s
         if (strcmp(avaxp_address, expected_p_chain_address) == 0) {
             printf("Found matching passphrase: %s\n", passphrase);
             printf("Corresponding P-chain address: %s\n", avaxp_address);
+            save_result(avaxp_address, passphrase);
+            delete[] publicKeyHex;
+            delete[] avaxp_address;
+            delete[] publicKeyBytes;
             exit(0);  // Exit the program after finding the match
         }
         else {

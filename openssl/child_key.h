@@ -219,11 +219,11 @@ void print_ec_point(const EC_GROUP *group, const EC_POINT *point) {
 }
 
 unsigned char *GetPublicKey(unsigned char *privateKeyBytes, size_t privateKeyLen, size_t *publicKeyLen) {
-    printf("++ GetPublicKey ++\n");
-    printf(">> privateKeyBytes: ");
-    print_as_hex_char(privateKeyBytes, privateKeyLen);
-    printf(">> privateKeyLen: %zu\n", privateKeyLen);
-    printf(">> publicKeyLen: %zu\n", *publicKeyLen);
+    // printf("++ GetPublicKey ++\n");
+    // printf(">> privateKeyBytes: ");
+    // print_as_hex_char(privateKeyBytes, privateKeyLen);
+    // printf(">> privateKeyLen: %zu\n", privateKeyLen);
+    // printf(">> publicKeyLen: %zu\n", *publicKeyLen);
     EC_GROUP *curve = NULL;
     EC_KEY *eckey = NULL;
     BIGNUM *privateKey = NULL;
@@ -272,17 +272,18 @@ unsigned char *GetPublicKey(unsigned char *privateKeyBytes, size_t privateKeyLen
         return NULL;
     }
     // print public key
-    printf("## After EC_POINT_mul ##\n");
+    // printf("## After EC_POINT_mul ##\n");
     // print_bn_hex("pub_key->X", pub_key.X);
-    printf(">> pub_key: \n");
-    print_ec_point(curve, pub_key);
+    // printf(">> pub_key: \n");
+    // print_ec_point(curve, pub_key);
 
     int nid = EC_GROUP_get_curve_name(curve);
     if (nid != NID_undef) {
         const char *curve_name = OBJ_nid2sn(nid);
-        printf("Curve NID: %d, Name: %s\n", nid, curve_name);
+        // printf("Curve NID: %d, Name: %s\n", nid, curve_name);
     } else {
-        printf("Curve does not have a NID.\n");
+        // printf("Curve does not have a NID.\n");
+        ;
     }
 
     EC_KEY_set_public_key(eckey, pub_key);
@@ -302,9 +303,9 @@ unsigned char *GetPublicKey(unsigned char *privateKeyBytes, size_t privateKeyLen
     EC_POINT_free(pub_key);
     BN_free(privateKey);
 
-    printf("<< publicKeyBytes: ");
-    print_as_hex_char(publicKeyBytes, *publicKeyLen);
-    printf("-- GetPublicKey --\n");
+    // printf("<< publicKeyBytes: ");
+    // print_as_hex_char(publicKeyBytes, *publicKeyLen);
+    // printf("-- GetPublicKey --\n");
 
     return publicKeyBytes;
 }

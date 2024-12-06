@@ -157,6 +157,7 @@ __global__ void variant_kernel(ThreadFunctionProfile *d_threadFunctionProfiles_p
 }
 
 int main() {
+    // 131072 # gkwf # P-avax1hkq2jc35k4m8llchp5lpklmg2l3yw2emy4afng
     // int threadsPerBlock = 1024;
     // int blocksPerGrid = 4;
     // int blocksPerGrid = 80;

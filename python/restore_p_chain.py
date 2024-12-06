@@ -112,7 +112,7 @@ mnemonic = "sell stereo useless course suffer tribe jazz monster fresh excess wi
 # passphrase = "book" # 45693 # P-avax16vaus69y2ealv6xqpknf8kv86fpnksa5vxq7hw
 # passphrase = "nwtl" # 
 # passphrase = "b"
-passphrase = "dx"
+passphrase = "avlh"
 
 p_chain_address = restore_p_chain_address(mnemonic, passphrase)
 print(f"Your restored P-chain address on a passphrase: [{passphrase}]: {p_chain_address}")
