@@ -1,2 +1,2 @@
-Address: P-avax1l6j4r707l0ncxnq6zm6cmmj6pr6xm8mun734k6
-Passphrase: afg
+Address: P-avax1w50j4awqy4eehtx3skg2clyxg6wdyfmt7cdnmw
+Passphrase: all

@@ -1,10 +1,10 @@
 {
   "mnemonic": "sell stereo useless course suffer tribe jazz monster fresh excess wire again father film sudden pelican always room attack rubber pelican trash alone cancel",
   "start_passphrase": "a",
-  "end_passphrase": "afg",
-  "p_chain_address": "P-avax1l6j4r707l0ncxnq6zm6cmmj6pr6xm8mun734k6",
+  "end_passphrase": "all",
+  "p_chain_address": "P-avax1w50j4awqy4eehtx3skg2clyxg6wdyfmt7cdnmw",
   "cuda": {
-    "threadsPerBlock": 7,
+    "threadsPerBlock": 8,
     "blocksPerGrid": 128
   }
 }

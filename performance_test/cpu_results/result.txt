@@ -1,2 +1,2 @@
-Address: P-avax1f60y2wq0q9yut8krwhytt4l2xvwp89jtjz86qs
-Passphrase: et
+Address: P-avax1xsaw6m8vj0gzk92hqut59m74zfyd0l5phqtpkz
+Passphrase: wd
