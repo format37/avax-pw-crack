@@ -242,9 +242,17 @@ folders = [
     # "~/projects/avax-pw-crack/cuda/main.cu",
     # "~/projects/avax-pw-crack/cuda/logs/run.log",
 
-    # EC_POINT_CSWAP
-    "~/projects/openssl_original/crypto/ec/ec_mult.c",
-    "~/projects/avax-pw-crack/cuda/include/point.h",
-    # "~/projects/avax-pw-crack/openssl/run.log",
-    # "~/projects/avax-pw-crack/cuda/logs/run.log",
+    # # EC_POINT_CSWAP
+    # "~/projects/openssl_original/crypto/ec/ec_mult.c",
+    # "~/projects/avax-pw-crack/cuda/include/point.h",
+    # # "~/projects/avax-pw-crack/openssl/run.log",
+    # # "~/projects/avax-pw-crack/cuda/logs/run.log",
+
+    # OSSL issue 14
+    "~/projects/avax-pw-crack/config.json",
+    "~/projects/avax-pw-crack/cuda/main.cu",
+    "~/projects/avax-pw-crack/openssl/main.c",
+    "~/projects/avax-pw-crack/openssl/child_key.h",
+    "~/projects/avax-pw-crack/cuda/logs/run.log",
+    "~/projects/avax-pw-crack/openssl/run.log",
     ]

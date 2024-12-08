@@ -56,9 +56,9 @@ class TestRunner:
         print(f">> config: {self.output_dir.absolute()}/config.json")
         print(f">> result: {self.output_dir.absolute()}/result.txt")
         cmd.extend([
-            "--cpus=1",
-            "--cpuset-cpus=0",
-            "-e", "OMP_NUM_THREADS=1",
+            # "--cpus=1",
+            # "--cpuset-cpus=0",
+            # "-e", "OMP_NUM_THREADS=1",
             "-v", f"{self.output_dir.absolute()}/config.json:/config.json:ro",
             "-v", f"{self.output_dir.absolute()}/result.txt:/app/result.txt",
             "-v", f"{self.output_dir.absolute()}/time.txt:/app/time.txt",
@@ -88,6 +88,8 @@ class TestRunner:
         # Compare {self.output_dir.absolute()}/result.txt with p_chain_address
         with open(f"{self.output_dir.absolute()}/result.txt") as f:
             result_p_chain_address = f.read().strip()
+        # Extract word from second line of result
+        result_word = result_p_chain_address.split('\n')[1]
         # Extract first line from result
         result_p_chain_address = result_p_chain_address.split('\n')[0]
         result_p_chain_address = result_p_chain_address.replace("Address: ", "")
@@ -98,7 +100,7 @@ class TestRunner:
             print(f'Actual: "{result_p_chain_address}"')
         
         return {
-            "success": result.returncode == 0,
+            "success": success,
             "output": result.stdout,
             "error": result.stderr,
             # "duration": (end_time - start_time).total_seconds()

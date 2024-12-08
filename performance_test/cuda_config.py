@@ -9,7 +9,7 @@ def calculate_cuda_config(search_area):
         dict: Dictionary containing threadsPerBlock and blocksPerGrid values
     """
     # Constants
-    THREADS_PER_BLOCK_MAX = 1024
+    THREADS_PER_BLOCK_MAX = 256
     BLOCKS_PER_GRID_MAX = 128
     
     # Case 1: If search_area is larger than maximum capacity

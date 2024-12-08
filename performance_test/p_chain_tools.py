@@ -71,6 +71,7 @@ def main():
     print(f"The variant ID corresponding to '{word}' is: {identifier}")
 
     variant_id = 128 # dx
+    variant_id = 480001
     word = id_to_word(variant_id)
     print(f"The letter variant corresponding to {variant_id} is: {word}")
 

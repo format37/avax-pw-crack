@@ -168,7 +168,7 @@ class PerformanceAnalyzer:
 # Example usage
 if __name__ == "__main__":
     # Initialize analyzer with folders
-    folders = ['./gpu_results']
+    folders = ['./gpu_results', './cpu_results']
     analyzer = PerformanceAnalyzer(folders)
     
     # Load and analyze data

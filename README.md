@@ -13,6 +13,12 @@ Finally, you need either your p-chain address to match against.
 ##### Output:
 * 25th word
 
+#### Set max word length
+It is crucial to set the max word length in the main.cu
+```
+#define MAX_PASSPHRASE_LENGTH 8 // 7-letter word + null terminator.
+```
+
 #### Simple docker example
 Clone the repo
 ```

@@ -44,6 +44,5 @@ echo "### Running the program:" >> run.log 2>&1
 #     --tool=callgrind \
 #     --callgrind-out-file=callgrind.out.15134 \
 
-    # ./program \
-    # >> run.log 2>&1
+./program run.log 2>&1
 cat run.log

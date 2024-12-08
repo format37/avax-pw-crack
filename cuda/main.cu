@@ -5,14 +5,14 @@
 #include <stdio.h>
 #include <cuda.h>
 #include "bignum.h"
-#define MAX_PASSPHRASE_LENGTH 5 // "book" test word + null terminator. DON'T FORGET TO INCREASE
+#define MAX_PASSPHRASE_LENGTH 8 // 7-letter word + null terminator. DON'T FORGET TO INCREASE
 #include "p_chain.h"
 #include "nlohmann/json.hpp"
 #include <cstring>
 #include <string.h>
 #include <limits.h>
 // #include <nvtx3/nvToolsExt.h>
-#include <cuda_profiler_api.h>
+// #include <cuda_profiler_api.h>
 
 #define P_CHAIN_ADDRESS_LENGTH 45  // Assuming the p-chain address is 45 characters long
 
@@ -113,20 +113,21 @@ __device__ int my_strncmp(const char* s1, const char* s2, size_t n) {
     return 0;
 }
 
-__global__ void variant_kernel(ThreadFunctionProfile *d_threadFunctionProfiles_param) 
+// __global__ void variant_kernel(ThreadFunctionProfile *d_threadFunctionProfiles_param) 
+__global__ void variant_kernel()
 {
-    #ifdef function_profiler
-        unsigned long long start_time = clock64();
-    #endif
+    // #ifdef function_profiler
+    //     unsigned long long start_time = clock64();
+    // #endif
     int blockId = blockIdx.x;
     int threadId = threadIdx.x;
     int globalIdx = blockId * blockDim.x + threadId;
     unsigned long long variant_id = d_start_variant_id + globalIdx;
     
-    #ifdef function_profiler
-        // Set the device global variable
-        d_threadFunctionProfiles = d_threadFunctionProfiles_param;
-    #endif
+    // #ifdef function_profiler
+    //     // Set the device global variable
+    //     d_threadFunctionProfiles = d_threadFunctionProfiles_param;
+    // #endif
     
     while (variant_id <= d_end_variant_id && !d_address_found) {
         char local_passphrase_value[MAX_PASSPHRASE_LENGTH] = {0};
@@ -151,9 +152,9 @@ __global__ void variant_kernel(ThreadFunctionProfile *d_threadFunctionProfiles_p
         
         variant_id += gridDim.x * blockDim.x;
     }
-    #ifdef function_profiler
-        record_function(FN_MAIN, start_time);
-    #endif
+    // #ifdef function_profiler
+    //     record_function(FN_MAIN, start_time);
+    // #endif
 }
 
 int main() {
@@ -248,21 +249,25 @@ int main() {
     // Start NVTX range
     // nvtxRangePush("KernelExecution");
 
-    // Start profiling
-    cudaProfilerStart();
+    // // Start profiling
+    // cudaProfilerStart();
 
-    // #ifdef function_profiler
-        // Function profiling
-        int totalThreads = blocksPerGrid * threadsPerBlock;
-        // Allocate per-thread function profiling data
-        ThreadFunctionProfile *h_threadFunctionProfiles = new ThreadFunctionProfile[totalThreads];
-        ThreadFunctionProfile *d_threadFunctionProfiles;
-        cudaMalloc(&d_threadFunctionProfiles, totalThreads * sizeof(ThreadFunctionProfile));
-        cudaMemset(d_threadFunctionProfiles, 0, totalThreads * sizeof(ThreadFunctionProfile));
-    // #endif
+    // // #ifdef function_profiler
+    //     // Function profiling
+    //     int totalThreads = blocksPerGrid * threadsPerBlock;
+    //     // Allocate per-thread function profiling data
+    //     ThreadFunctionProfile *h_threadFunctionProfiles = new ThreadFunctionProfile[totalThreads];
+    //     ThreadFunctionProfile *d_threadFunctionProfiles;
+    //     cudaMalloc(&d_threadFunctionProfiles, totalThreads * sizeof(ThreadFunctionProfile));
+    //     cudaMemset(d_threadFunctionProfiles, 0, totalThreads * sizeof(ThreadFunctionProfile));
+    // // #endif
+
+    // printf("Total threads: %d\n", totalThreads);
+    // printf("Launching kernel with %d blocks and %d threads per block\n", blocksPerGrid, threadsPerBlock);
 
     // Launch kernel
-    variant_kernel<<<blocksPerGrid, threadsPerBlock>>>(d_threadFunctionProfiles);
+    // variant_kernel<<<blocksPerGrid, threadsPerBlock>>>(d_threadFunctionProfiles);
+    variant_kernel<<<blocksPerGrid, threadsPerBlock>>>();
 
     // End NVTX range
     // nvtxRangePop();
@@ -276,8 +281,8 @@ int main() {
 
     cudaDeviceSynchronize();
 
-    // Stop profiling
-    cudaProfilerStop();
+    // // Stop profiling
+    // cudaProfilerStop();
 
     err = cudaGetLastError();
     if (err != cudaSuccess) {
@@ -308,15 +313,15 @@ int main() {
         printf("\nAddress not found\n");
     }
 
-    #ifdef function_profiler
-        // After kernel execution, copy profiling data back to host
-        cudaMemcpy(h_threadFunctionProfiles, d_threadFunctionProfiles, totalThreads * sizeof(ThreadFunctionProfile), cudaMemcpyDeviceToHost);
-        // After kernel execution and copying profiling data back to host
-        write_function_profile_to_csv("performance/functions_data/profile.csv", h_threadFunctionProfiles, totalThreads, threadsPerBlock);
-    #endif
-    // Clean up
-    delete[] h_threadFunctionProfiles;
-    cudaFree(d_threadFunctionProfiles);
+    // #ifdef function_profiler
+    //     // After kernel execution, copy profiling data back to host
+    //     cudaMemcpy(h_threadFunctionProfiles, d_threadFunctionProfiles, totalThreads * sizeof(ThreadFunctionProfile), cudaMemcpyDeviceToHost);
+    //     // After kernel execution and copying profiling data back to host
+    //     write_function_profile_to_csv("performance/functions_data/profile.csv", h_threadFunctionProfiles, totalThreads, threadsPerBlock);
+    // #endif
+    // // Clean up
+    // delete[] h_threadFunctionProfiles;
+    // cudaFree(d_threadFunctionProfiles);
 
     // Clean up
     cudaFree(d_mnemonic);

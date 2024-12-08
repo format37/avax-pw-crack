@@ -34,7 +34,7 @@
 // // Initialize a, b, mont as needed
 // BN_mod_mul_montgomery(r, a, b, mont, ctx);
 
-#define MAX_PASSPHRASE_LENGTH 4 // TODO: Change this to the maximum passphrase length
+#define MAX_PASSPHRASE_LENGTH 8 // TODO: Change this to the maximum passphrase length
 #define P_CHAIN_ADDRESS_LENGTH 45
 #define OVERFLOW_FLAG ULLONG_MAX
 

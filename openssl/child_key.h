@@ -505,22 +505,21 @@ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uint32_t index
             printf("  * public:");
         #endif
 		
-        size_t publicKeyLen = 0;
+        // size_t publicKeyLen = 0;
         // if (index != 0) {
-        //     printf(" [1] GetPublicKey >>\n");
-            // unsigned char *publicKeyBytes = GetPublicKey(newKeyBytes, 32, &publicKeyLen);
-            // unsigned char *publicKeyBytes = getCachedPublicKey(key, 32, &publicKeyLen); // 3 times
+        //     // printf(" [1] GetPublicKey >>\n");
+        //     // unsigned char *publicKeyBytes = GetPublicKey(newKeyBytes, 32, &publicKeyLen);
+        //     unsigned char *publicKeyBytes = getCachedPublicKey(key, 32, &publicKeyLen); // 3 times
+        //     #ifdef debug_print
+        //         print_as_hex_char(publicKeyBytes, publicKeyLen);
+        //         // print public key as uint32_t array
+        //         printf("  * public key as uint32_t array: ");
+        //         for (int i = 0; i < 8; ++i) {
+        //             printf("%08x-", publicKeyBytes[i]);
+        //         }
+        //         printf("\n");
+        //     #endif
         // }
-		
-        #ifdef debug_print
-            print_as_hex_char(publicKeyBytes, publicKeyLen);
-            // print public key as uint32_t array
-            printf("  * public key as uint32_t array: ");
-            for (int i = 0; i < 8; ++i) {
-                printf("%08x-", publicKeyBytes[i]);
-            }
-            printf("\n");
-        #endif
 
         // Add the current index to the path
         char index_str[12];  // Assuming index won't exceed 10 digits
