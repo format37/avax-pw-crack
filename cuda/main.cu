@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <cuda.h>
 #include "bignum.h"
-#define MAX_PASSPHRASE_LENGTH 8 // 7-letter word + null terminator. DON'T FORGET TO INCREASE
+// #define MAX_PASSPHRASE_LENGTH 8 // 7-letter word + null terminator. DON'T FORGET TO INCREASE
 #include "p_chain.h"
 #include "nlohmann/json.hpp"
 #include <cstring>
@@ -14,7 +14,13 @@
 // #include <nvtx3/nvToolsExt.h>
 // #include <cuda_profiler_api.h>
 
+#define MAX_PASSPHRASE_LENGTH 8
+#define MAX_ALPHABET_LENGTH 256  // Maximum possible alphabet length
 #define P_CHAIN_ADDRESS_LENGTH 45  // Assuming the p-chain address is 45 characters long
+
+// Global variables to store config
+__device__ __constant__ char d_alphabet[MAX_ALPHABET_LENGTH];
+__device__ __constant__ int d_alphabet_length;  // Store alphabet length in constant memory
 
 __device__ bool d_address_found = false;
 __device__ char d_address_value[P_CHAIN_ADDRESS_LENGTH + 1];
@@ -29,7 +35,7 @@ __device__ __constant__ unsigned long long d_end_variant_id;
 
 #define OVERFLOW_FLAG ULLONG_MAX
 
-unsigned long long find_variant_id(const char* s) {
+unsigned long long find_variant_id_a(const char* s) {
     // const char* alphabet = "abcdefghijklmnopqrstuvwxyz";
     // const char* alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 !@#$%^&*()-_=+[]{};:'",.<>?/\\|~";
     // const char* alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
@@ -68,7 +74,35 @@ unsigned long long find_variant_id(const char* s) {
     return result;
 }
 
-__device__ void find_letter_variant(int variant_id, char* passphrase_value) {
+unsigned long long get_variant_id(const char* s, const char* alphabet, int alphabet_length) {
+    int base = alphabet_length;
+    int length = (int)strlen(s);
+
+    unsigned long long offset = 0;
+    unsigned long long value = 0;
+
+    // Compute offsets for all shorter lengths
+    for (int i = 1; i < length; i++) {
+        unsigned long long count = 1;
+        for (int j = 0; j < i; j++) {
+            count *= base;
+        }
+        offset += count;
+    }
+
+    // Convert the current string to a base-N number
+    for (int i = 0; i < length; i++) {
+        const char* pos = strchr(alphabet, s[i]);
+        if (pos != NULL) {
+            int index = (int)(pos - alphabet);
+            value = value * base + index;
+        }
+    }
+
+    return offset + value;
+}
+
+__device__ void find_letter_variant_a(int variant_id, char* passphrase_value) {
     // Define alphabet as a constant array
     // const char alphabet[] = "abcdefghijklmnopqrstuvwxyz";
     // const int alphabet_length = 26;
@@ -119,8 +153,109 @@ __device__ int my_strncmp(const char* s1, const char* s2, size_t n) {
     return 0;
 }
 
+__device__ void find_letter_variant(unsigned long long variant_id, char* result) {
+    extern __constant__ char d_alphabet[];
+    extern __constant__ int d_alphabet_length;
+
+    // Clear result
+    for (int i = 0; i < MAX_PASSPHRASE_LENGTH; i++) {
+        result[i] = '\0';
+    }
+
+    // Determine length by finding which range variant_id falls into
+    int length = 1;
+    unsigned long long total_count = 0;
+    while (true) {
+        unsigned long long count = 1;
+        for (int j = 0; j < length; j++) {
+            count *= d_alphabet_length;
+        }
+        
+        if (variant_id < total_count + count) {
+            variant_id -= total_count;
+            break;
+        } else {
+            total_count += count;
+            length++;
+            if (length > MAX_PASSPHRASE_LENGTH) {
+                length = MAX_PASSPHRASE_LENGTH;
+                break;
+            }
+        }
+    }
+
+    // Decode variant_id as a base-N number into 'length' characters
+    unsigned long long temp = variant_id;
+    for (int i = length - 1; i >= 0; i--) {
+        int remainder = (int)(temp % d_alphabet_length);
+        temp /= d_alphabet_length;
+        result[i] = d_alphabet[remainder];
+        if (i == 0) break;
+    }
+}
+
 // __global__ void variant_kernel(ThreadFunctionProfile *d_threadFunctionProfiles_param) 
 __global__ void variant_kernel()
+{
+    // #ifdef function_profiler
+    //     unsigned long long start_time = clock64();
+    // #endif
+    int blockId = blockIdx.x;
+    int threadId = threadIdx.x;
+    int globalIdx = blockId * blockDim.x + threadId;
+    unsigned long long variant_id = d_start_variant_id + globalIdx;
+    
+    // #ifdef function_profiler
+    //     // Set the device global variable
+    //     d_threadFunctionProfiles = d_threadFunctionProfiles_param;
+    // #endif
+    
+    // while (variant_id <= d_end_variant_id && !d_address_found) {
+    //     char local_passphrase_value[MAX_PASSPHRASE_LENGTH] = {0};
+    //     find_letter_variant(variant_id, local_passphrase_value);
+
+    while (variant_id <= d_end_variant_id) {
+        char local_passphrase_value[MAX_PASSPHRASE_LENGTH];
+        find_letter_variant(variant_id, local_passphrase_value);        
+
+        // // Print the local_passphrase_value
+        // printf("\nlocal_passphrase_value: ");
+        // for (int i = 0; i < MAX_PASSPHRASE_LENGTH; i++) {
+        //     printf("%c", local_passphrase_value[i]);
+        //     if (local_passphrase_value[i] == '\0') {
+        //         break;
+        //     }
+        // }
+        // printf("\n");
+        
+        // Calculate p-chain address
+        P_CHAIN_ADDRESS_STRUCT p_chain_address = restore_p_chain_address((uint8_t*)d_mnemonic, local_passphrase_value);
+        
+        if (my_strncmp(p_chain_address.data, d_expected_p_chain_address, P_CHAIN_ADDRESS_LENGTH+1) == 0) {
+            d_address_found = true;
+            for (int i = 0; i < P_CHAIN_ADDRESS_LENGTH; i++) {
+                d_address_value[i] = p_chain_address.data[i];
+            }
+            // Set the passphrase value
+            for (int i = 0; i < MAX_PASSPHRASE_LENGTH; i++) {
+                d_passphrase_value[i] = local_passphrase_value[i];
+            }
+            d_address_value[P_CHAIN_ADDRESS_LENGTH] = '\0';
+        }
+        // Early exit if address is found
+        if (d_address_found) break;
+        
+        variant_id += gridDim.x * blockDim.x;
+
+        // printf("%s\n", result);
+        // current_id++;
+    }
+    // #ifdef function_profiler
+    //     record_function(FN_MAIN, start_time);
+    // #endif
+}
+
+__global__ void variant_kernel_a()
 {
     // #ifdef function_profiler
     //     unsigned long long start_time = clock64();
@@ -226,9 +361,20 @@ int main() {
     std::cout << "  Blocks per grid: " << blocksPerGrid << std::endl;
 
     std::string mnemonic = config["mnemonic"];
+    std::string alphabet = config["alphabet"];
     std::string start_passphrase = config["start_passphrase"];
     std::string end_passphrase = config["end_passphrase"];
     std::string expected_p_chain_address = config["p_chain_address"];
+
+    // Get alphabet length
+    int alphabet_length = alphabet.length();
+
+    // Verify alphabet length doesn't exceed maximum
+    if (alphabet_length >= MAX_ALPHABET_LENGTH) {
+        std::cerr << "Alphabet length exceeds maximum allowed length of " 
+                  << MAX_ALPHABET_LENGTH - 1 << std::endl;
+        return -1;
+    }
 
     if (expected_p_chain_address.length() != P_CHAIN_ADDRESS_LENGTH) {
         std::cerr << "Invalid p_chain_address length in config.json" << std::endl;
@@ -239,9 +385,23 @@ int main() {
         return -1;
     }
 
-    // Calculate search area
-    unsigned long long start_variant_id = find_variant_id(start_passphrase.c_str());
-    unsigned long long end_variant_id = find_variant_id(end_passphrase.c_str());
+    // Convert strings to variant IDs on host
+    unsigned long long start_variant_id = get_variant_id(start_passphrase.c_str(), 
+                                               alphabet.c_str(), 
+                                               alphabet_length);
+    unsigned long long end_variant_id = get_variant_id(end_passphrase.c_str(), 
+                                             alphabet.c_str(), 
+                                             alphabet_length);
+    
+    // Copy alphabet and its length to constant memory
+    cudaMemcpyToSymbol(d_alphabet, alphabet.c_str(), alphabet_length + 1);
+    cudaMemcpyToSymbol(d_alphabet_length, &alphabet_length, sizeof(int));
+    
+    printf("Starting variant generation from ID %llu to %llu\n", start_variant_id, end_variant_id);
+
+    // // Calculate search area
+    // unsigned long long start_variant_id = find_variant_id(start_passphrase.c_str());
+    // unsigned long long end_variant_id = find_variant_id(end_passphrase.c_str());
 
     if (start_variant_id == OVERFLOW_FLAG || end_variant_id == OVERFLOW_FLAG) {
         std::cerr << "Passphrase overflow detected. The maximum passphrase is gkgwbylwrxtlpn" << std::endl;

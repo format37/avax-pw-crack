@@ -5,8 +5,8 @@
 #include "nlohmann/json.hpp"
 #include <string>
 
-#define MAX_PASSPHRASE_LENGTH 8
-#define MAX_ALPHABET_LENGTH 256  // Maximum possible alphabet length
+#define MAX_PASSPHRASE_LENGTH 100
+#define MAX_ALPHABET_LENGTH 100  // Maximum possible alphabet length
 
 // Global variables to store config
 __device__ __constant__ char d_alphabet[MAX_ALPHABET_LENGTH];
