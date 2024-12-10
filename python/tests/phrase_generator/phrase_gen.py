@@ -25,6 +25,7 @@ def get_next_variant(current, alphabet):
 def generate_variants(start_passphrase, end_passphrase, alphabet):
     current = start_passphrase
     with open("passphrases.txt", "w") as file:
+        file.write(f"Starting variant generation from {start_passphrase} to {end_passphrase}\n")
         while True:
             # print(current)
             # Append current to file
@@ -37,8 +38,8 @@ def generate_variants(start_passphrase, end_passphrase, alphabet):
     print("Done")
 
 # Read from config
-alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 !@#$%^&*()-_=+[]{};:'\",.<>?/\\|~"
+alphabet = "ABCDFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 !@#$%^&*()-_=+[]{};:'\",.<>?/\\|~"
 start_passphrase = "A"
-end_passphrase = "BC"
+end_passphrase = "AB"
 
 generate_variants(start_passphrase, end_passphrase, alphabet)

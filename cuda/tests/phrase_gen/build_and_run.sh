@@ -9,6 +9,7 @@ nvcc \
     test.cu \
     -arch=sm_86 \
     -I ../../include \
+    -I ../../../json \
     -o program 2> build.log
 
 cat build.log

@@ -1,11 +1,17 @@
 #include <cuda_runtime.h>
 #include <stdio.h>
+#include <fstream>
+#include <iostream>
+#include "nlohmann/json.hpp"
+#include <string>
 
 #define MAX_PASSPHRASE_LENGTH 8
 
-unsigned long long get_variant_id(const char* s) {
-    const char* alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 !@#$%^&*()-_=+[]{};:'\",.<>?/\\|~";
-    int base = 94;
+// Global variables to store config
+__device__ __constant__ char d_alphabet[95]; // 94 characters + null terminator
+
+unsigned long long get_variant_id(const char* s, const char* alphabet) {
+    int base = strlen(alphabet);
     int length = (int)strlen(s);
 
     unsigned long long offset = 0;
@@ -20,7 +26,7 @@ unsigned long long get_variant_id(const char* s) {
         offset += count;
     }
 
-    // Convert the current string to a base-94 number
+    // Convert the current string to a base-N number
     for (int i = 0; i < length; i++) {
         const char* pos = strchr(alphabet, s[i]);
         if (pos != NULL) {
@@ -29,13 +35,12 @@ unsigned long long get_variant_id(const char* s) {
         }
     }
 
-    // Final ID is offset + computed base-94 value
     return offset + value;
 }
 
 __device__ void find_letter_variant(unsigned long long variant_id, char* result) {
-    const char alphabet[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 !@#$%^&*()-_=+[]{};:'\",.<>?/\\|~";
-    const int base = 94;
+    extern __constant__ char d_alphabet[];
+    const int base = 93; // Length of alphabet
 
     // Clear result
     for (int i = 0; i < MAX_PASSPHRASE_LENGTH; i++) {
@@ -58,20 +63,19 @@ __device__ void find_letter_variant(unsigned long long variant_id, char* result)
             total_count += count;
             length++;
             if (length > MAX_PASSPHRASE_LENGTH) {
-                // Safety check: if too large, clamp
                 length = MAX_PASSPHRASE_LENGTH;
                 break;
             }
         }
     }
 
-    // Decode variant_id as a base-94 number into 'length' characters
+    // Decode variant_id as a base-N number into 'length' characters
     unsigned long long temp = variant_id;
     for (int i = length - 1; i >= 0; i--) {
         int remainder = (int)(temp % base);
         temp /= base;
-        result[i] = alphabet[remainder];
-        if (i == 0) break; // to avoid infinite loop since i is unsigned
+        result[i] = d_alphabet[remainder];
+        if (i == 0) break;
     }
 }
 
@@ -87,12 +91,27 @@ __global__ void generate_variants_kernel(unsigned long long start_id, unsigned l
 }
 
 int main() {
-    const char* start_phrase = "A";
-    const char* end_phrase = "CC";
+    // Read config file
+    std::ifstream config_file("../../../config.json");
+    if (!config_file.is_open()) {
+        std::cerr << "Failed to open config.json" << std::endl;
+        return -1;
+    }
+    
+    nlohmann::json config;
+    config_file >> config;
+
+    // Get configuration values
+    std::string alphabet = config["alphabet"];
+    std::string start_phrase = config["start_passphrase"];
+    std::string end_phrase = config["end_passphrase"];
     
     // Convert strings to variant IDs on host
-    unsigned long long start_id = get_variant_id(start_phrase);
-    unsigned long long end_id = get_variant_id(end_phrase);
+    unsigned long long start_id = get_variant_id(start_phrase.c_str(), alphabet.c_str());
+    unsigned long long end_id = get_variant_id(end_phrase.c_str(), alphabet.c_str());
+    
+    // Copy alphabet to constant memory
+    cudaMemcpyToSymbol(d_alphabet, alphabet.c_str(), alphabet.length() + 1);
     
     printf("Starting variant generation from ID %llu to %llu\n", start_id, end_id);
     
