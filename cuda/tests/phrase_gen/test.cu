@@ -6,12 +6,14 @@
 #include <string>
 
 #define MAX_PASSPHRASE_LENGTH 8
+#define MAX_ALPHABET_LENGTH 256  // Maximum possible alphabet length
 
 // Global variables to store config
-__device__ __constant__ char d_alphabet[95]; // 94 characters + null terminator
+__device__ __constant__ char d_alphabet[MAX_ALPHABET_LENGTH];
+__device__ __constant__ int d_alphabet_length;  // Store alphabet length in constant memory
 
-unsigned long long get_variant_id(const char* s, const char* alphabet) {
-    int base = strlen(alphabet);
+unsigned long long get_variant_id(const char* s, const char* alphabet, int alphabet_length) {
+    int base = alphabet_length;
     int length = (int)strlen(s);
 
     unsigned long long offset = 0;
@@ -40,7 +42,7 @@ unsigned long long get_variant_id(const char* s, const char* alphabet) {
 
 __device__ void find_letter_variant(unsigned long long variant_id, char* result) {
     extern __constant__ char d_alphabet[];
-    const int base = 93; // Length of alphabet
+    extern __constant__ int d_alphabet_length;
 
     // Clear result
     for (int i = 0; i < MAX_PASSPHRASE_LENGTH; i++) {
@@ -53,7 +55,7 @@ __device__ void find_letter_variant(unsigned long long variant_id, char* result)
     while (true) {
         unsigned long long count = 1;
         for (int j = 0; j < length; j++) {
-            count *= base;
+            count *= d_alphabet_length;
         }
         
         if (variant_id < total_count + count) {
@@ -72,8 +74,8 @@ __device__ void find_letter_variant(unsigned long long variant_id, char* result)
     // Decode variant_id as a base-N number into 'length' characters
     unsigned long long temp = variant_id;
     for (int i = length - 1; i >= 0; i--) {
-        int remainder = (int)(temp % base);
-        temp /= base;
+        int remainder = (int)(temp % d_alphabet_length);
+        temp /= d_alphabet_length;
         result[i] = d_alphabet[remainder];
         if (i == 0) break;
     }
@@ -106,16 +108,29 @@ int main() {
     std::string start_phrase = config["start_passphrase"];
     std::string end_phrase = config["end_passphrase"];
     
-    // Convert strings to variant IDs on host
-    unsigned long long start_id = get_variant_id(start_phrase.c_str(), alphabet.c_str());
-    unsigned long long end_id = get_variant_id(end_phrase.c_str(), alphabet.c_str());
+    // Get alphabet length
+    int alphabet_length = alphabet.length();
     
-    // Copy alphabet to constant memory
-    cudaMemcpyToSymbol(d_alphabet, alphabet.c_str(), alphabet.length() + 1);
+    // Verify alphabet length doesn't exceed maximum
+    if (alphabet_length >= MAX_ALPHABET_LENGTH) {
+        std::cerr << "Alphabet length exceeds maximum allowed length of " 
+                  << MAX_ALPHABET_LENGTH - 1 << std::endl;
+        return -1;
+    }
+    
+    // Convert strings to variant IDs on host
+    unsigned long long start_id = get_variant_id(start_phrase.c_str(), 
+                                               alphabet.c_str(), 
+                                               alphabet_length);
+    unsigned long long end_id = get_variant_id(end_phrase.c_str(), 
+                                             alphabet.c_str(), 
+                                             alphabet_length);
+    
+    // Copy alphabet and its length to constant memory
+    cudaMemcpyToSymbol(d_alphabet, alphabet.c_str(), alphabet_length + 1);
+    cudaMemcpyToSymbol(d_alphabet_length, &alphabet_length, sizeof(int));
     
     printf("Starting variant generation from ID %llu to %llu\n", start_id, end_id);
-    
-    // Launch kernel with 1 block and 1 thread for testing
     generate_variants_kernel<<<1, 1>>>(start_id, end_id);
     
     // Wait for kernel to finish

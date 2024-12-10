@@ -40,6 +40,6 @@ def generate_variants(start_passphrase, end_passphrase, alphabet):
 # Read from config
 alphabet = "ABCDFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 !@#$%^&*()-_=+[]{};:'\",.<>?/\\|~"
 start_passphrase = "A"
-end_passphrase = "AB"
+end_passphrase = "BF"
 
 generate_variants(start_passphrase, end_passphrase, alphabet)
