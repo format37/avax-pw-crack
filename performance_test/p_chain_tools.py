@@ -7,8 +7,13 @@ from bip_utils import (
 )
 from Crypto.Hash import RIPEMD160
 
+def get_alphabet():
+    # alphabet = 'abcdefghijklmnopqrstuvwxyz'
+    alphabet = """ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 !@#$%^&*()-_=+[]{};:'",.<>?/\|~"""
+    return alphabet
+
 def word_to_id(s):
-    alphabet = 'abcdefghijklmnopqrstuvwxyz'
+    alphabet = get_alphabet()
     base = len(alphabet)
     result = 0
     
@@ -18,7 +23,7 @@ def word_to_id(s):
     return result
 
 def id_to_word(n):
-    alphabet = 'abcdefghijklmnopqrstuvwxyz'
+    alphabet = get_alphabet()
     base = len(alphabet)
     result = []
     
@@ -65,13 +70,13 @@ def restore_p_chain_address(mnemonic, passphrase):
 def main():
     mnemonic = "sell stereo useless course suffer tribe jazz monster fresh excess wire again father film sudden pelican always room attack rubber pelican trash alone cancel"
 
-    word = "dx" # 128
+    # word = "z"
+    # for i in range(1, 32):
+    #     identifier = word_to_id(word)
+    #     print(f"[{i}] : {identifier} :  : {word}")
+    #     word += "z"
 
-    identifier = word_to_id(word)
-    print(f"The variant ID corresponding to '{word}' is: {identifier}")
-
-    variant_id = 128 # dx
-    variant_id = 480001
+    variant_id = 1
     word = id_to_word(variant_id)
     print(f"The letter variant corresponding to {variant_id} is: {word}")
 

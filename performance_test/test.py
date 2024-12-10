@@ -119,10 +119,11 @@ class TestRunner:
         for search_area in range(search_config["start"], 
                                search_config["end"] + 1, 
                                search_config["step"]):
-            print(f"Running test with search_area: {search_area}")
+            
             
             # Generate config for this test
             expected_p_chain_address = self.generate_config(search_config["mnemonic"], search_area)
+            print(f"Running test with search_area: {search_area}. Word: {id_to_word(search_area)}")
             
             # Run test
             result = self.run_docker_test(expected_p_chain_address)

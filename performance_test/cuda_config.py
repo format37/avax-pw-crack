@@ -10,7 +10,7 @@ def calculate_cuda_config(search_area):
     """
     # Constants
     THREADS_PER_BLOCK_MAX = 256
-    BLOCKS_PER_GRID_MAX = 128
+    BLOCKS_PER_GRID_MAX = 256
     
     # Case 1: If search_area is larger than maximum capacity
     if search_area > THREADS_PER_BLOCK_MAX * BLOCKS_PER_GRID_MAX:

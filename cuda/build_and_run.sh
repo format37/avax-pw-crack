@@ -42,6 +42,8 @@ echo "Building the program"
 ccache nvcc \
     --threads $(nproc) \
     main.cu \
+    --ptxas-options=-v \
+    -lineinfo \
     -arch=sm_86 \
     -std=c++17 \
     -O3 \

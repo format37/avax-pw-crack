@@ -30,7 +30,11 @@ __device__ __constant__ unsigned long long d_end_variant_id;
 #define OVERFLOW_FLAG ULLONG_MAX
 
 unsigned long long find_variant_id(const char* s) {
-    const char* alphabet = "abcdefghijklmnopqrstuvwxyz";
+    // const char* alphabet = "abcdefghijklmnopqrstuvwxyz";
+    // const char* alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 !@#$%^&*()-_=+[]{};:'",.<>?/\\|~";
+    // const char* alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+    //                       " !\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~";
+    const char* alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 !@#$%^&*()-_=+[]{};:'\",.<>?/\\|~";
     int base = strlen(alphabet);
     unsigned long long result = 0;
     unsigned long long prev_result = 0;
@@ -66,8 +70,10 @@ unsigned long long find_variant_id(const char* s) {
 
 __device__ void find_letter_variant(int variant_id, char* passphrase_value) {
     // Define alphabet as a constant array
-    const char alphabet[] = "abcdefghijklmnopqrstuvwxyz";
-    const int alphabet_length = 26;
+    // const char alphabet[] = "abcdefghijklmnopqrstuvwxyz";
+    // const int alphabet_length = 26;
+    const char alphabet[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 !@#$%^&*()-_=+[]{};:'\",.<>?/\\|~";
+    const int alphabet_length = 94;
 
     // Initialize first character to null terminator, rest will be filled as needed
     passphrase_value[0] = '\0';
@@ -132,6 +138,16 @@ __global__ void variant_kernel()
     while (variant_id <= d_end_variant_id && !d_address_found) {
         char local_passphrase_value[MAX_PASSPHRASE_LENGTH] = {0};
         find_letter_variant(variant_id, local_passphrase_value);
+
+        // // Print the local_passphrase_value
+        // printf("\nlocal_passphrase_value: ");
+        // for (int i = 0; i < MAX_PASSPHRASE_LENGTH; i++) {
+        //     printf("%c", local_passphrase_value[i]);
+        //     if (local_passphrase_value[i] == '\0') {
+        //         break;
+        //     }
+        // }
+        // printf("\n");
         
         // Calculate p-chain address
         P_CHAIN_ADDRESS_STRUCT p_chain_address = restore_p_chain_address((uint8_t*)d_mnemonic, local_passphrase_value);

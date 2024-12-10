@@ -1,2 +1,2 @@
-Address: P-avax1mxml8a8q239tqnydn5ma8cwkl8cyu75vuma22h
-Passphrase: yoqs
+Address: P-avax1tm25cyd9ewfw7fqe4pvadlk87w9p8s95s2sf5z
+Passphrase: Gwei
