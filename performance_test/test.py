@@ -8,29 +8,46 @@ from datetime import datetime
 from p_chain_tools import id_to_word, restore_p_chain_address
 from cuda_config import calculate_cuda_config
 
+# def get_next_variant(current, alphabet):
+#     chars = list(current)
+#     pos = len(chars) - 1
+    
+#     while pos >= 0:
+#         current_char_index = alphabet.index(chars[pos])
+#         if current_char_index < len(alphabet) - 1:
+#             chars[pos] = alphabet[current_char_index + 1]
+#             return ''.join(chars)
+#         else:
+#             chars[pos] = alphabet[0]
+#             pos -= 1
+    
+#     return alphabet[0] * (len(current) + 1)
+
 class TestRunner:
     def __init__(self, config_path, test_type):
         with open(config_path) as f:
-            self.config = json.load(f)[f"{test_type}_tests"]
-        with open(config_path) as f:
-            self.config["search_area"] = json.load(f)["search_area"]
+            config_data = json.load(f)
+            self.config = config_data[f"{test_type}_tests"]
+            self.search_config = config_data["search_area"]
+            self.alphabet = self.search_config.get("alphabet")
         
         self.test_type = test_type
         self.output_dir = Path(self.config["output_dir"])
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
-    def generate_config(self, mnemonic, search_area):
+    def generate_config(self, mnemonic, start_word, end_word):
         """Generate config.json for a specific test"""
-        cuda = calculate_cuda_config(search_area)
-        end_passphrase = id_to_word(search_area)
-        p_chain_address = restore_p_chain_address(mnemonic, end_passphrase)
-        print(f"[{search_area}:{end_passphrase}] p-chain: {p_chain_address}")
+        cuda = calculate_cuda_config(self.search_config["end"])  # Using max search area for CUDA config
+        p_chain_address = restore_p_chain_address(mnemonic, end_word)
+        print(f"[{end_word}] p-chain: {p_chain_address}")
+        
         config = {
             "mnemonic": mnemonic,
-            "start_passphrase": "a",
-            "end_passphrase": end_passphrase,
+            "start_passphrase": start_word,
+            "end_passphrase": end_word,
             "p_chain_address": p_chain_address,
-            "cuda": cuda
+            "cuda": cuda,
+            "alphabet": self.alphabet
         }
         
         config_path = self.output_dir / "config.json"
@@ -45,20 +62,15 @@ class TestRunner:
             "sudo",
             "docker",
             "run",
-            "--rm",  # Remove container after completion
+            "--rm",
         ]
         
-        # Add GPU parameters if needed
         if self.test_type == "gpu":
             cmd.extend(["--gpus", "all"])
         
-        # Add volume mount and image name
         print(f">> config: {self.output_dir.absolute()}/config.json")
         print(f">> result: {self.output_dir.absolute()}/result.txt")
         cmd.extend([
-            # "--cpus=1",
-            # "--cpuset-cpus=0",
-            # "-e", "OMP_NUM_THREADS=1",
             "-v", f"{self.output_dir.absolute()}/config.json:/config.json:ro",
             "-v", f"{self.output_dir.absolute()}/result.txt:/app/result.txt",
             "-v", f"{self.output_dir.absolute()}/time.txt:/app/time.txt",
@@ -67,32 +79,28 @@ class TestRunner:
 
         print(f'# Running command: {" ".join(cmd)}')
         
-        # Execute and capture output
         start_time = datetime.now()
         result = subprocess.run(
             cmd, 
             capture_output=True, 
             text=True,
             env=dict(os.environ, SUDO_ASKPASS='/usr/bin/ssh-askpass')
-            )
+        )
         end_time = datetime.now()
 
         print(f"result.returncode: {result.returncode}")
         print(f"result.stderr: {result.stderr}")
         print(f"result.stdout: {result.stdout}")
 
-        # Read duration from {self.output_dir.absolute()}/time.txt
         with open(f"{self.output_dir.absolute()}/time.txt") as f:
             duration = float(f.read())
 
-        # Compare {self.output_dir.absolute()}/result.txt with p_chain_address
         with open(f"{self.output_dir.absolute()}/result.txt") as f:
             result_p_chain_address = f.read().strip()
-        # Extract word from second line of result
         result_word = result_p_chain_address.split('\n')[1]
-        # Extract first line from result
         result_p_chain_address = result_p_chain_address.split('\n')[0]
         result_p_chain_address = result_p_chain_address.replace("Address: ", "")
+        
         success = result_p_chain_address == expected_p_chain_address
         if not success:
             print("Test failed!")
@@ -103,46 +111,87 @@ class TestRunner:
             "success": success,
             "output": result.stdout,
             "error": result.stderr,
-            # "duration": (end_time - start_time).total_seconds()
-            "duration": duration
+            "duration": duration,
+            "word": result_word
         }
 
+    def id_to_word(self, alphabet, n):
+        base = len(alphabet)
+        result = []
+        n += 1  # Adjust for 1-based indexing
+        while n > 0:
+            n -= 1  # Adjust for 0-based indexing
+            result.append(alphabet[n % base])
+            n //= base
+        
+        return ''.join(reversed(result))
+    
     def run_all_tests(self):
         """Run all tests based on configuration"""
         results = []
-        search_config = self.config["search_area"]
-
-        # Create self.output_dir / f"tmp" directory if it doesn't exist
         tmp_dir = self.output_dir / "tmp"
         tmp_dir.mkdir(parents=True, exist_ok=True)
         
-        for search_area in range(search_config["start"], 
-                               search_config["end"] + 1, 
-                               search_config["step"]):
+        start_passphrase = self.id_to_word(
+            self.search_config["alphabet"], 
+            self.search_config["start"]
+            )
+        test_count = 0
+        for end_id in range(
+            self.search_config["start"], 
+            self.search_config["end"], 
+            self.search_config["step"]
+            ):
+            end_passphrase = self.id_to_word(self.search_config["alphabet"], end_id)
+            # start_word = self.id_to_word(self.alphabet, self.search_config["start"])
+            # print(f"Starting test from {start_word}")
+            # current_word = self.alphabet[0]  # Start with first character
+            # test_count = self.search_config["start"]  # Start from configured start value
             
+            # while test_count < self.search_config["end"]:
+            #     # First test should use current_word as both start and end
+            #     if test_count == self.search_config["start"]:
+            #         next_word = current_word
+            #     else:
+            #         next_word = get_next_variant(current_word, self.alphabet)
             
             # Generate config for this test
-            expected_p_chain_address = self.generate_config(search_config["mnemonic"], search_area)
-            print(f"Running test with search_area: {search_area}. Word: {id_to_word(search_area)}")
+            expected_p_chain_address = self.generate_config(
+                self.search_config["mnemonic"],
+                start_passphrase,
+                end_passphrase,
+            )
+            
+            # print(f"Running test {test_count + 1}. Current word: {current_word}, Next word: {next_word}")
             
             # Run test
             result = self.run_docker_test(expected_p_chain_address)
             
             # Collect results
             results.append({
-                "search_area": search_area,
+                "test_number": test_count,
+                "start_word": start_passphrase,
+                "end_word": end_passphrase,
                 "duration": result["duration"],
-                "success": result["success"]
+                "success": result["success"],
+                "found_word": result["word"]
             })
             
             # Save individual test report
             df = pd.DataFrame([results[-1]])
-            df.to_csv(self.output_dir / f"tmp/report_{search_area}.csv", index=False)
+            df.to_csv(self.output_dir / f"tmp/report_{test_count}.csv", index=False)
+            
+            # Move to next word
+            # current_word = next_word
+            test_count += 1
+            
+            # Use step to determine how many tests to skip
+            # if (test_count - self.search_config["start"]) % self.search_config["step"] != 0:
+            #     test_count += self.search_config["step"] - ((test_count - self.search_config["start"]) % self.search_config["step"])
         
         # Generate combined report
         df = pd.DataFrame(results)
         df.to_csv(self.output_dir / f"report_{self.test_type}.csv", index=False)
-        results = []
         return results
 
 if __name__ == "__main__":

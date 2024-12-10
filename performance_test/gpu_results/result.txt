@@ -1,2 +1,2 @@
-Address: P-avax1tm25cyd9ewfw7fqe4pvadlk87w9p8s95s2sf5z
-Passphrase: Gwei
+Address: P-avax1uf234puq6sak3s8q7uvfglmeapj9y8ssx65j3y
+Passphrase: LC%|
