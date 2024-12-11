@@ -252,27 +252,28 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
         b.neg = 0;
         b.top = 4;  // We're using 4 64-bit words
     #endif
-    bn_print("B: ", &b);
-    
-    bn_print("Debug Cuda newKey (Before add): ", &newKey);
+    #ifdef debug_print
+        bn_print("B: ", &b);
+        
+        bn_print("Debug Cuda newKey (Before add): ", &newKey);
+    #endif
 	
     bn_add(&newKey, &a, &b);
 
-    // Print A + B
-    bn_print("Debug Cuda newKey (After add): ", &newKey);
-
-    // Print curve order
-    bn_print("Debug Cuda curveOrder: ", &CURVE_ORDER);
-
     #ifdef debug_print
+        // Print A + B
+        bn_print("Debug Cuda newKey (After add): ", &newKey);
+
+        // Print curve order
+        bn_print("Debug Cuda curveOrder: ", &CURVE_ORDER);
         printf("Calling bn_mod\n");
     #endif
     bn_mod(&newKey, &newKey, &CURVE_ORDER);
 
     #ifdef debug_print
         printf("After bn_mod\n");
-    #endif
-    bn_print("Debug Cuda newKey (After mod): ", &newKey);
+        bn_print("Debug Cuda newKey (After mod): ", &newKey);
+    #endif    
 
     #ifdef BN_128
         // 128-bit case

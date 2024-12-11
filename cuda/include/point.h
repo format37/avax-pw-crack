@@ -95,8 +95,7 @@ __device__ int point_add_affine(
     const BIGNUM_CUDA *p, 
     const BIGNUM_CUDA *a
 ) {
-    bool debug = 0;
-    if (debug) {
+    #ifdef debug_print
         printf("++ point_add ++\n");
         bn_print(">> p1.x: ", &p1->x);
         bn_print(">> p1.y: ", &p1->y);
@@ -104,18 +103,21 @@ __device__ int point_add_affine(
         bn_print(">> p2.y: ", &p2->y);
         bn_print(">> p: ", p);
         bn_print(">> a: ", a);
-    }
-    debug = 0;
+    #endif
     // Handle the point at infinity cases
     if (point_is_at_infinity(p1)) {
         copy_point(result, p2);
-        if (debug) printf("p1 point at infinity\n");
+        #ifdef debug_print
+            printf("p1 point at infinity\n");
+        #endif
         return 0;
     }
 
     if (point_is_at_infinity(p2)) {
         copy_point(result, p1);
-        if (debug) printf("p2 point at infinity\n");
+        #ifdef debug_print
+            printf("p2 point at infinity\n");
+        #endif
         return 0;
     }
 
@@ -133,7 +135,9 @@ __device__ int point_add_affine(
     // Case 1: p1 = p2 && p1.y != p2.y
     if (bn_cmp(&p1->x, &p2->x) == 0 && bn_cmp(&p1->y, &p2->y) != 0) {
         // The points are inverses to one another, return point at infinity
-        if (debug) printf("The points are inverses to one another\n");
+        #ifdef debug_print
+            printf("The points are inverses to one another\n");
+        #endif
         set_point_at_infinity(result);
         return 0;
     }
@@ -153,14 +157,14 @@ __device__ int point_add_affine(
             printf("point_add: bn_copy(tmp1, p1->x)\n");
         #endif
         bn_copy(&tmp1, &p1->x); // dst << src
-        if (debug) {
+        #ifdef debug_print
             bn_print("\n[0] >> bn_mul p1.x: ", &p1->x);
             bn_print("[0] >> bn_mul tmp1: ", &tmp1);
-        }
+        #endif
         bn_mul(&p1->x, &tmp1, &tmp1_squared);     // tmp1_squared = p1.x^2 // a * b = product
-        if (debug) {
+        #ifdef debug_print
             bn_print("[0] << bn_mul tmp1: ", &tmp1_squared);
-        }
+        #endif
 
         init_zero(&tmp1);
         #ifdef debug_bn_copy
@@ -171,29 +175,40 @@ __device__ int point_add_affine(
         init_zero(&tmp2);
         bn_set_word(&tmp2, 3);
         bn_mul(&tmp1, &tmp2, &tmp1_squared);     // a * b = product
-        if (debug) bn_print("\n[1] << bn_mul tmp1_squared: ", &tmp1_squared); // OK
-
-        if (debug) bn_print("\n[2] << bn_add tmp1_squared: ", &tmp1_squared); // 
+        #ifdef debug_print
+            bn_print("\n[1] << bn_mul tmp1_squared: ", &tmp1_squared);
+            bn_print("\n[2] << bn_add tmp1_squared: ", &tmp1_squared);
+        #endif
 
         init_zero(&tmp1);
-        if (debug) bn_print("\n# [3] >> bn_mod tmp1_squared: ", &tmp1_squared);
+        #ifdef debug_print
+            bn_print("\n# [3] >> bn_mod tmp1_squared: ", &tmp1_squared);
+        #endif
         #ifdef debug_bn_copy
             printf("point_add: bn_copy(tmp1, tmp1_squared)\n");
         #endif
         bn_copy(&tmp1, &tmp1_squared); // dst << src        
-        if (debug) bn_print("# [3] >> bn_mod tmp1: ", &tmp1);
+        #ifdef debug_print
+            bn_print("# [3] >> bn_mod tmp1: ", &tmp1);
+        #endif
         init_zero(&tmp1_squared);
-        if (debug) bn_print("[3] >> bn_mod tmp1_squared: ", &tmp1_squared);
-        if (debug) bn_print("[3] >> bn_mod tmp1: ", &tmp1);
-        if (debug) bn_print("[3] >> bn_mod p: ", p);
+        #ifdef debug_print
+            bn_print("[3] >> bn_mod tmp1_squared: ", &tmp1_squared);
+            bn_print("[3] >> bn_mod tmp1: ", &tmp1);
+            bn_print("[3] >> bn_mod p: ", p);
+        #endif
         bn_mod(&tmp1_squared, &tmp1, p);           // tmp1_squared = tmp1 mod p
-        if (debug) bn_print("[3] << bn_mod tmp1_squared: ", &tmp1_squared); // OK
-        if (debug) bn_print("[3] << bn_mod tmp1: ", &tmp1);
+        #ifdef debug_print
+            bn_print("[3] << bn_mod tmp1_squared: ", &tmp1_squared); // OK
+            bn_print("[3] << bn_mod tmp1: ", &tmp1);
+        #endif
         
         init_zero(&tmp2);
         bn_set_word(&two, 2);
         bn_mul(&p1->y, &two, &tmp2);  // tmp2 = 2 * p1.y
-        if (debug) bn_print("\n[4] << bn_mul tmp2: ", &tmp2); // OK
+        #ifdef debug_print
+            bn_print("\n[4] << bn_mul tmp2: ", &tmp2); // OK
+        #endif
 
         init_zero(&tmp3);
         #ifdef debug_bn_copy
@@ -201,7 +216,9 @@ __device__ int point_add_affine(
         #endif
         bn_copy(&tmp3, &tmp2); // dst << src
         bn_mod(&tmp2, &tmp3, p);           // tmp2 = tmp3 mod p
-        if (debug) bn_print("\n[5] << bn_mod tmp2: ", &tmp2); // OK
+        #ifdef debug_print
+            bn_print("\n[5] << bn_mod tmp2: ", &tmp2); // OK
+        #endif
         
         init_zero(&tmp3);
         #ifdef debug_bn_copy
@@ -209,20 +226,28 @@ __device__ int point_add_affine(
         #endif
         bn_copy(&tmp3, &tmp2); // dst << src
         init_zero(&tmp2);
-        if (debug) bn_print("\n[6] >> bn_mod_inverse tmp2: ", &tmp2);
-        if (debug) bn_print("[6] >> bn_mod_inverse tmp3: ", &tmp3);
-        if (debug) bn_print("[6] >> bn_mod_inverse p: ", p);
+        #ifdef debug_print
+            bn_print("\n[6] >> bn_mod_inverse tmp2: ", &tmp2);
+            bn_print("[6] >> bn_mod_inverse tmp3: ", &tmp3);
+            bn_print("[6] >> bn_mod_inverse p: ", p);
+        #endif
         bn_mod_inverse(&tmp2, &tmp3, p);  // tmp2 = tmp3 mod p
-        if (debug) bn_print("[6] << bn_mod_inverse tmp2: ", &tmp2); // 
+        #ifdef debug_print
+            bn_print("[6] << bn_mod_inverse tmp2: ", &tmp2); // 
+        #endif
         init_zero(&tmp3);
         #ifdef debug_bn_copy
             printf("point_add: bn_copy(tmp3, tmp1_squared)\n");
         #endif
         bn_copy(&tmp3, &tmp1_squared); // dst << src
-        if (debug) bn_print("\n[7] >> bn_mul tmp3: ", &tmp3);
-        if (debug) bn_print("[7] >> bn_mul tmp2: ", &tmp2);
+        #ifdef debug_print
+            bn_print("\n[7] >> bn_mul tmp3: ", &tmp3);            
+            bn_print("[7] >> bn_mul tmp2: ", &tmp2);
+        #endif
         bn_mul(&tmp3, &tmp2, &s);  // tmp1 * tmp2 = s
-        if (debug) bn_print("[7] << bn_mul s: ", &s); //
+        #ifdef debug_print
+            bn_print("[7] << bn_mul s: ", &s); //
+        #endif
 
         init_zero(&tmp3);
         #ifdef debug_bn_copy
@@ -230,7 +255,9 @@ __device__ int point_add_affine(
         #endif
         bn_copy(&tmp3, &s); // dst << src
         bn_mod(&s, &tmp3, p);  // s = s mod p
-        if (debug) bn_print("\n[8] << bn_mod s: ", &s); //
+        #ifdef debug_print
+            bn_print("\n[8] << bn_mod s: ", &s); //
+        #endif
 
         init_zero(&tmp3);
         #ifdef debug_bn_copy
@@ -268,103 +295,154 @@ __device__ int point_add_affine(
         bn_mod(&y3, &tmp3, p);  // y3 = y3 mod p
     } else {
         // Case 2: p1 != p2
-        if (debug) printf("p1 != p2\n");
+        #ifdef debug_print
+            printf("p1 != p2\n");
+        #endif
         // Regular point addition
         bn_sub(&tmp1, &p2->y, &p1->y);
-        if (debug) printf("# 0\n");
+        #ifdef debug_print
+            printf("# 0\n");
+        #endif
         init_zero(&tmp3);
         #ifdef debug_bn_copy
             printf("point_add: bn_copy(tmp3, tmp1)\n");
         #endif
         bn_copy(&tmp3, &tmp1); // dst << src
-        if (debug) printf("# 1\n");
+        #ifdef debug_print
+            printf("# 1\n");
+        #endif
         init_zero(&tmp1);
         bn_mod(&tmp1, &tmp3, p);           // tmp1 = (p2.y - p1.y) mod p 
-        if (debug) printf("# 2\n");
+        #ifdef debug_print
+            printf("# 2\n");
+        #endif
         init_zero(&tmp2);
         bn_sub(&tmp2, &p2->x, &p1->x);
-        if (debug) printf("# 3\n");
+        #ifdef debug_print
+            printf("# 3\n");
+        #endif
         init_zero(&tmp3);
         #ifdef debug_bn_copy
             printf("point_add: bn_copy(tmp3, tmp2)\n");
         #endif
         bn_copy(&tmp3, &tmp2);
-        if (debug) printf("# 4\n");
+        #ifdef debug_print
+            printf("# 4\n");
+        #endif
         bn_mod(&tmp2, &tmp3, p);           // tmp2 = (p2.x - p1.x) mod p
-        if (debug) printf("# 5\n");
+        #ifdef debug_print
+            printf("# 5\n");
+        #endif
         init_zero(&tmp3);
         #ifdef debug_bn_copy
             printf("point_add: bn_copy(tmp3, tmp2)\n");
         #endif
         bn_copy(&tmp3, &tmp2);
-        if (debug) printf("# 6\n");
+        #ifdef debug_print
+            printf("# 6\n");
+        #endif
         init_zero(&tmp2);
-        bn_mod_inverse(&tmp2, &tmp3, p); // OK
-        if (debug) printf("# 7\n");
+        bn_mod_inverse(&tmp2, &tmp3, p);
+        #ifdef debug_print
+            printf("# 7\n");
+        #endif
         init_zero(&s);
         bn_mul(&tmp1, &tmp2, &s);
-        bn_print("### s:", &s); // Debug OK
-        if (debug) printf("# 8\n");
+        #ifdef debug_print
+            bn_print("### s:", &s);
+            printf("# 8\n");
+        #endif
+        
         init_zero(&tmp2);
         #ifdef debug_bn_copy
             printf("point_add: bn_copy(tmp2, s)\n");
         #endif
         bn_copy(&tmp2, &s);
-        if (debug) printf("# 9\n"); // tmp2 OK
+        #ifdef debug_print
+            printf("# 9\n"); // tmp2 OK
+        #endif
         init_zero(&s);
         bn_mod(&s, &tmp2, p);                 // s = (p2.y - p1.y) / (p2.x - p1.x) mod p
-        if (debug) printf("# 10\n");
+        #ifdef debug_print
+            printf("# 10\n");
+        #endif
         init_zero(&tmp2);
         #ifdef debug_bn_copy
             printf("point_add: bn_copy(tmp2, s)\n");
         #endif
         bn_copy(&tmp2, &s);
-        if (debug) printf("# 11\n");
+        #ifdef debug_print
+            printf("# 11\n");
+        #endif
         bn_mul(&s, &tmp2, &x3); // a * b = product // x3 = s^2
-        if (debug) printf("# 12\n");
+        #ifdef debug_print
+            printf("# 12\n");
+        #endif
         init_zero(&tmp2);
         #ifdef debug_bn_copy
             printf("point_add: bn_copy(tmp2, x3)\n");
         #endif
         bn_copy(&tmp2, &x3);
-        if (debug) printf("# 13\n");
+        #ifdef debug_print
+            printf("# 13\n");
+        #endif
         bn_sub(&x3, &tmp2, &p1->x); // result = a - b
-        if (debug) printf("# 14\n");
+        #ifdef debug_print
+            printf("# 14\n");
+        #endif
         bn_sub(&x3, &x3, &p2->x);          // x3 = s^2 - p1.x - p2.x
-        if (debug) printf("# 15\n");
+        #ifdef debug_print
+            printf("# 15\n");
+        #endif
         init_zero(&tmp2);
         #ifdef debug_bn_copy
             printf("point_add: bn_copy(tmp2, x3)\n");
         #endif
         bn_copy(&tmp2, &x3);
-        if (debug) printf("# 16\n");
+        #ifdef debug_print
+            printf("# 16\n");
+        #endif
         bn_mod(&x3, &tmp2, p); // x3 = tmp2 mod p // OK
-        if (debug) printf("# 17\n");
+        #ifdef debug_print
+            printf("# 17\n");
+        #endif
         bn_sub(&tmp1, &p1->x, &x3);
-        if (debug) printf("# 18\n");
+        #ifdef debug_print
+            printf("# 18\n");
+        #endif
         bn_mul(&s, &tmp1, &y3); // a * b = product
-        if (debug) printf("# 19\n");
+        #ifdef debug_print
+            printf("# 19\n");
+        #endif
         init_zero(&tmp2);
         #ifdef debug_bn_copy
             printf("point_add: bn_copy(tmp2, y3)\n");
         #endif
         bn_copy(&tmp2, &y3);
-        if (debug) printf("# 20\n");
+        #ifdef debug_print
+            printf("# 20\n");
+        #endif
         bn_sub(&y3, &tmp2, &p1->y);          // y3 = s * (p1.x - x3) - p1.y
-        if (debug) printf("# 21\n");
+        #ifdef debug_print
+            printf("# 21\n");
+        #endif
         init_zero(&tmp2);
         #ifdef debug_bn_copy
             printf("point_add: bn_copy(tmp2, y3)\n");
         #endif
         bn_copy(&tmp2, &y3);
-        if (debug) printf("# 22\n");
+        #ifdef debug_print
+            printf("# 22\n");
+        #endif
         bn_mod(&y3, &tmp2, p);               // y3 = tmp2 mod p
-        if (debug) printf("# 23\n");
+        #ifdef debug_print
+            printf("# 23\n");
+        #endif
     }
 
-    if (debug) {
+    #ifdef debug_print
         printf("copy result to x3\n");
-    }
+    #endif
     // Assign the computed coordinates to the result
     #ifdef debug_bn_copy
         printf("point_add: bn_copy(result->x, x3)\n");
@@ -374,11 +452,11 @@ __device__ int point_add_affine(
         printf("point_add: bn_copy(result->y, y3)\n");
     #endif
     bn_copy(&result->y, &y3);
-    debug = 1;
-    if (debug) {
+    
+    #ifdef debug_print
         bn_print("<< x3: ", &x3);
         bn_print("<< y3: ", &y3);
-    }
+    #endif
 
     return 0;
 }
@@ -408,11 +486,9 @@ __device__ EC_POINT_CUDA ec_point_scalar_mul(
     #ifdef function_profiler
         unsigned long long start_time = clock64();
     #endif
-    bool debug = 0;
-    if (debug) {
-        debug_printf("++ ec_point_scalar_mul ++\n");
-    }
-    printf("++ ec_point_scalar_mul ++\n");
+    #ifdef debug_print
+        printf("++ ec_point_scalar_mul ++\n");
+    #endif
     
     EC_POINT_CUDA current = *point; // This initializes the current point with the input point
     EC_POINT_CUDA result; // Initialize the result variable, which accumulates the result
@@ -428,7 +504,9 @@ __device__ EC_POINT_CUDA ec_point_scalar_mul(
     // Convert scalar BIGNUM_CUDA to an array of integers that's easy to iterate bit-wise
     unsigned int bits[256];                          // Assuming a 256-bit scalar
     bignum_to_bit_array(scalar, bits);    
-    if (debug) printf("[D] Starting scalar multiplication loop\n");
+    #ifdef debug_print
+        printf("[D] Starting scalar multiplication loop\n");
+    #endif
     #ifdef use_jacobian_coordinates
         EC_POINT_JACOBIAN P_jacobian, Q_jacobian, resultAdd_jacobian;
     #endif
@@ -448,27 +526,39 @@ __device__ EC_POINT_CUDA ec_point_scalar_mul(
                 bn_copy(&result.y, &tmp_result.y);   
             #endif
         }
-        if (debug) printf("[%d] step 6\n", i);
+        #ifdef debug_print
+            printf("[%d] step 6\n", i);
+        #endif
         // init tmp_result
         init_point_at_infinity(&tmp_result);
-        if (debug) printf("[%d] step 7\n", i);
+        #ifdef debug_print
+            printf("[%d] step 7\n", i);
+        #endif
         // init tmp_a
         init_point_at_infinity(&tmp_a);
-        if (debug) printf("[%d] step 8\n", i);
+        #ifdef debug_print
+            printf("[%d] step 8\n", i);
+        #endif
         // init tmp_b
         init_point_at_infinity(&tmp_b);
-        if (debug) printf("[%d] step 9\n", i);
+        #ifdef debug_print
+            printf("[%d] step 9\n", i);
+        #endif
         // Copy current to tmp_a
         #ifdef debug_bn_copy
             printf("ec_point_scalar_mul: bn_copy(tmp_a.x, current.x)\n");
         #endif
         bn_copy(&tmp_a.x, &current.x);
-        if (debug) printf("[%d] step 10\n", i);
+        #ifdef debug_print
+            printf("[%d] step 10\n", i);
+        #endif
         #ifdef debug_bn_copy
             printf("ec_point_scalar_mul: bn_copy(tmp_a.y, current.y)\n");
         #endif
         bn_copy(&tmp_a.y, &current.y);
-        if (debug) printf("[%d] step 11\n", i);
+        #ifdef debug_print
+            printf("[%d] step 11\n", i);
+        #endif
         // Copy current to tmp_b
         #ifdef debug_bn_copy
             printf("ec_point_scalar_mul: bn_copy(tmp_b.x, current.x)\n");
@@ -479,7 +569,9 @@ __device__ EC_POINT_CUDA ec_point_scalar_mul(
             jacobian_to_affine(&resultAdd_jacobian, &current, curve_prime);
         #else
             bn_copy(&tmp_b.x, &current.x);
-            if (debug) printf("[%d] step 12\n", i);
+            #ifdef debug_print
+                printf("[%d] step 12\n", i);
+            #endif
             #ifdef debug_bn_copy
                 printf("ec_point_scalar_mul: bn_copy(tmp_b.y, current.y)\n");
             #endif
@@ -490,19 +582,25 @@ __device__ EC_POINT_CUDA ec_point_scalar_mul(
                 printf("ec_point_scalar_mul: bn_copy(current.x, tmp_result.x)\n");
             #endif
             bn_copy(&current.x, &tmp_result.x);
-            if (debug) printf("[%d] step 15\n", i);
+            #ifdef debug_print
+                printf("[%d] step 15\n", i);
+            #endif
             #ifdef debug_bn_copy
                 printf("ec_point_scalar_mul: bn_copy(current.y, tmp_result.y)\n");
             #endif
             bn_copy(&current.y, &tmp_result.y);
         #endif
         
-        if (debug) printf("[%d] passed\n", i);
+        #ifdef debug_print
+            printf("[%d] passed\n", i);
+        #endif
     }    
     // Copy current to result
-    if (debug) bn_print("3 result.x: ", &result.x);
-    if (debug) bn_print("3 result.y: ", &result.y);
-    printf("-- ec_point_scalar_mul --\n");
+    #ifdef debug_print
+        bn_print("3 result.x: ", &result.x);
+        bn_print("3 result.y: ", &result.y);
+        printf("-- ec_point_scalar_mul --\n");
+    #endif
     #ifdef function_profiler
         record_function(FN_EC_POINT_SCALAR_MUL, start_time);
     #endif
@@ -612,12 +710,11 @@ typedef struct {
 
 // Montgomery initialization for curve parameters
 __device__ bool init_curve_montgomery_context(const BIGNUM_CUDA *curve_p, const BIGNUM_CUDA *curve_a, MONT_CTX_CUDA *ctx) {
-    bool debug = false;
-    if (debug) {
+    #ifdef debug_print
         printf("++ init_curve_montgomery_context ++\n");
-        // bn_print_no_fuse(">> curve_p: ", curve_p);
-        // bn_print_no_fuse(">> curve_a: ", curve_a);
-    }    
+        bn_print_no_fuse(">> curve_p: ", curve_p);
+        bn_print_no_fuse(">> curve_a: ", curve_a);
+    #endif
     if (bn_is_zero(curve_p)) {
         printf("Error: curve modulus cannot be zero\n");
         return false;
@@ -1179,9 +1276,7 @@ __device__ void ec_point_scalar_mul_montgomery(
     MONT_CTX_CUDA *mont_ctx,
     EC_POINT_JACOBIAN *result
 ) {
-
-    bool debug = false;
-    if (debug) {
+    #ifdef debug_print
         printf("++ ec_point_scalar_mul_montgomery ++\n");
         bn_print_no_fuse(">> point.x: ", &point->X);
         bn_print_no_fuse(">> point.y: ", &point->Y);
@@ -1190,7 +1285,7 @@ __device__ void ec_point_scalar_mul_montgomery(
         bn_print_no_fuse(">> mont_ctx->R: ", &mont_ctx->R);
         bn_print_no_fuse(">> mont_ctx->n: ", &mont_ctx->n);
         bn_print_no_fuse(">> mont_ctx->n_prime: ", &mont_ctx->n_prime);
-    }
+    #endif
 
     // Initialize curve parameters
     CurveParameters curve_params;
@@ -1202,12 +1297,12 @@ __device__ void ec_point_scalar_mul_montgomery(
     // Call the wNAF scalar multiplication function
     ec_point_scalar_mul_wnaf(result, point, scalar, &curve_params);
 
-    if (debug) {
+    #ifdef debug_print
         bn_print_no_fuse("EC_POINT_mul << ossl_ec_wNAF_mul << result->X: ", &result->X);
         bn_print_no_fuse("EC_POINT_mul << ossl_ec_wNAF_mul << result->Y: ", &result->Y);
         bn_print_no_fuse("EC_POINT_mul << ossl_ec_wNAF_mul << result->Z: ", &result->Z);
         printf("-- ec_point_scalar_mul_montgomery --\n");
-    }
+    #endif
 }
 
 __device__ int cuda_ec_GFp_mont_field_encode(const EC_GROUP_CUDA *group, 

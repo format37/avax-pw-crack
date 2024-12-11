@@ -302,12 +302,10 @@ __device__ int bn_num_bits(const BIGNUM_CUDA *a) {
 
 // Initialize Montgomery context
 __device__ bool BN_MONT_CTX_set(BN_MONT_CTX_CUDA *mont, const BIGNUM_CUDA *m) {
-    bool debug = false;
-
-    if (debug) {
+    #ifdef debug_print
         printf("++ BN_MONT_CTX_set ++\n");
         printf("mont: \n");
-    }
+    #endif
     int num_bits = bn_num_bits(m);
 
     if (num_bits == 0) {
@@ -337,20 +335,18 @@ __device__ bool BN_MONT_CTX_set(BN_MONT_CTX_CUDA *mont, const BIGNUM_CUDA *m) {
         return false;
     }
 
-    if (debug) {
+    #ifdef debug_print
         printf("mont: \n");
         printf("-- BN_MONT_CTX_set --\n");
-    }
+    #endif
     return true;
 }
 
 // Montgomery exponentiation
 __device__ int BN_mod_exp_mont(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNUM_CUDA *p, BIGNUM_CUDA *m) {
-    bool debug = false;
-
-    if (debug) {
+    #ifdef debug_print
         printf("++ BN_mod_exp_mont ++\n");
-    }    
+    #endif
 
     BN_MONT_CTX_CUDA mont;
     // Initialize Montgomery context
@@ -364,11 +360,15 @@ __device__ int BN_mod_exp_mont(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNU
     BIGNUM_CUDA val[TABLE_SIZE];
 
     bits = bn_num_bits(p);
-    if (debug) printf(">> BN_mod_exp_mont >> bits = %d\n", bits);
+    #ifdef debug_print
+        printf(">> BN_mod_exp_mont >> bits = %d\n", bits);
+    #endif
     if (bits == 0) {
         init_one(r);
         ret = 1;
-        if (debug) printf("-- [0] BN_mod_exp_mont --\n");
+        #ifdef debug_print
+            printf("-- [0] BN_mod_exp_mont --\n");
+        #endif
         return ret;
     }
 
@@ -385,37 +385,41 @@ __device__ int BN_mod_exp_mont(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNU
     }
 
     // 1
-    if (debug) {
+    #ifdef debug_print
         bn_print_no_fuse("# BN_mod_exp_mont [1] >> val[0]: ", &val[0]);
         bn_print_no_fuse("# BN_mod_exp_mont [1] >> aa: ", &aa);
         bn_print_no_fuse("# BN_mod_exp_mont [1] >> mont.R2: ", &mont.R2);
         bn_print_no_fuse("# BN_mod_exp_mont [1] >> m: ", m);
-    }
+    #endif
     ossl_bn_mod_mul_montgomery(&val[0], &aa, &mont.R2, m);
-    if (debug) bn_print_no_fuse("# BN_mod_exp_mont [1] << val[0]: ", &val[0]);
+    #ifdef debug_print
+        bn_print_no_fuse("# BN_mod_exp_mont [1] << val[0]: ", &val[0]);
+    #endif
 
     window = BN_window_bits_for_exponent_size(bits);
     int j = 0;
     if (window > 1) {
         // 2
-        if (debug) {
+        #ifdef debug_print
             bn_print_no_fuse("# BN_mod_exp_mont [2] >> d: ", &d);
             bn_print_no_fuse("# BN_mod_exp_mont [2] >> val[0]: ", &val[0]);
-        }
+        #endif
         ossl_bn_mod_mul_montgomery(&d, &val[0], &val[0], m);
-        if (debug) bn_print_no_fuse("# BN_mod_exp_mont [2] << d: ", &d);
+        #ifdef debug_print
+            bn_print_no_fuse("# BN_mod_exp_mont [2] << d: ", &d);
+        #endif
         j = 1 << (window - 1);
         for (i = 1; i < j; i++) {
             init_zero(&val[i]);
             ossl_bn_mod_mul_montgomery(&val[i], &val[i - 1], &d, m);
         }
     }
-    if (debug) {
+    #ifdef debug_print
         printf("BN_mod_exp_mont: precompute done\n");
         for (i = 1; i < j; i++) {
             printf("BN_mod_exp_mont [2.post_loop] >> val[%d]: ", i);
         }
-    }
+    #endif
 
     start = 1;                  
     wstart = bits - 1;          
@@ -424,28 +428,20 @@ __device__ int BN_mod_exp_mont(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNU
     // Initialize rr by converting 1 to Montgomery form
     BIGNUM_CUDA one;
     init_one(&one);
-    if (debug) {
+    #ifdef debug_print
         bn_print_no_fuse("BN_mod_exp_mont [2.a] >> rr:", &rr);
         bn_print_no_fuse("BN_mod_exp_mont [2.a] >> one:", &one);
         bn_print_no_fuse("BN_mod_exp_mont [2.a] >> mont.R2:", &mont.R2);
         bn_print_no_fuse("BN_mod_exp_mont [2.a] >> m:", m);
-    }
+    #endif
     ossl_bn_mod_mul_montgomery(&rr, &one, &mont.R2, m);
     
-    int debug_counter = -1;
     for (;;) {
-        debug_counter++;
         int wvalue;
 
         if (BN_is_bit_set(p, wstart) == 0) {
             if (!start) {
-                if (debug) {
-                    printf("BN_mod_exp_mont >> [2.b.%d]  >> rr:", debug_counter);
-                }
                 ossl_bn_mod_mul_montgomery(&rr, &rr, &rr, m);
-                if (debug) {
-                    printf("BN_mod_exp_montr >> [2.b.%d]  << rr:", debug_counter);
-                }
             }
             if (wstart == 0)
                 break;
@@ -464,23 +460,11 @@ __device__ int BN_mod_exp_mont(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNU
                 wend = i;
             }
         }
-        if (debug) {
-            printf("BN_mod_exp_mont >> [2.c.%d] >> rr: ", debug_counter);
-        }
         int j = wend + 1;
         if (!start) {
             for (i = 0; i < j; i++) {
-                if (debug) {
-                    printf("BN_mod_exp_mont >> [2.d.%d.%d] >> rr:", debug_counter, i);
-                }
                 ossl_bn_mod_mul_montgomery(&rr, &rr, &rr, m);
-                if (debug) {
-                    printf("BN_mod_exp_mont >> [2.d.%d.%d] << rr:", debug_counter, i);
-                }
             }
-        }
-        if (debug) {
-            printf("BN_mod_exp_mont >> [2.e.%d.%d] << rr:", debug_counter, i);
         }
 
         ossl_bn_mod_mul_montgomery(&rr, &rr, &val[wvalue >> 1], m);
@@ -495,8 +479,5 @@ __device__ int BN_mod_exp_mont(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNU
     init_one(&one);
     ossl_bn_mod_mul_montgomery(r, &rr, &one, m);
     ret = 1;
-    if (debug) {
-        printf("-- BN_mod_exp_mont --\n");
-    }
     return ret;
 }

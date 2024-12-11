@@ -178,12 +178,6 @@ __device__ void print_as_hex(const uint8_t *data, const uint32_t len) {
     printf("\n");
 }
 
-__device__ void debug_printf(const char *fmt, ...) {
-    #ifdef debug_print
-        printf(fmt);
-    #endif
-}
-
 __device__ int bn_cmp(const BIGNUM_CUDA* a, const BIGNUM_CUDA* b) {
     // -1: a < b
     // 0: a == b
@@ -536,17 +530,22 @@ __device__ void set_bn(BIGNUM_CUDA *dest, const BIGNUM_CUDA *src) {
 
     // Copy over the significant words from source to destination.
     for (int i = 0; i < src->top; ++i) {
-        debug_printf("set_bn 1.%d\n", i);
+        #ifdef debug_print
+            printf("set_bn 1.%d\n", i);
+        #endif
         dest->d[i] = src->d[i];
     }
 
     // Zero out any remaining entries in the array if the source 'top' is less than the dest 'dmax'
     for (int i = src->top; i < MAX_BIGNUM_SIZE; ++i) {
-        debug_printf("set_bn 2.%d\n", i);
+        #ifdef debug_print
+            printf("set_bn 2.%d\n", i);
+        #endif
         dest->d[i] = 0;
     }
-
-    debug_printf("set_bn 3\n");
+    #ifdef debug_print
+        printf("set_bn 3\n");
+    #endif
 
     // Set the 'top' and 'neg' flags after zeroing
     dest->top = src->top;
@@ -890,13 +889,12 @@ __device__ int bn_mod(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNUM_CUDA *n
     // r: Remainder (updated)
     // a: Dividend
     // n: Modulus
-    bool debug = 0;
-    if (debug) {
+    #ifdef debug_print
         printf("++ bn_mod ++\n");
         bn_print_no_fuse(">> r: ", r);
         bn_print_no_fuse(">> a: ", a);
         bn_print_no_fuse(">> n: ", n);
-    }
+    #endif
 
     BIGNUM_CUDA q;
     init_zero(&q);
@@ -915,11 +913,15 @@ __device__ int bn_mod(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNUM_CUDA *n
     init_zero(&tmp);
 
     if (r->neg) {
-        if (debug) printf("r is negative\n");
+        #ifdef debug_print
+            printf("r is negative\n");
+        #endif
         bool result;
         // If the remainder is negative, add the absolute value of the divisor
         if (n->neg) {
-            if (debug) printf("d is negative\n");
+            #ifdef debug_print
+                printf("d is negative\n");
+            #endif
             result = bn_sub(&tmp, r, n); // tmp = r - n
             if (!result) {
                 return 0;
@@ -930,7 +932,9 @@ __device__ int bn_mod(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNUM_CUDA *n
             // copy tmp to r
             bn_copy(r, &tmp);
         } else {
-            if (debug) printf("d is not negative\n");
+            #ifdef debug_top
+                printf("d is not negative\n");
+            #endif
             result = bn_add(&tmp, r, n); // tmp = r + n            
             if (!result) {
                 return 0;
@@ -942,25 +946,19 @@ __device__ int bn_mod(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNUM_CUDA *n
             bn_copy(r, &tmp);
         }
     }
-    if (debug) bn_print_no_fuse("<< q: ", &q);
-    if (debug) bn_print_no_fuse("<< r (out): ", r);
-    if (debug) printf("-- bn_mod --\n");
+    #ifdef debug_print
+        bn_print_no_fuse("<< q: ", &q);
+        bn_print_no_fuse("<< r (out): ", r);
+        printf("-- bn_mod --\n");
+    #endif
     return 1;
 }
 
 __device__ void mod_mul(BIGNUM_CUDA *a, BIGNUM_CUDA *b, BIGNUM_CUDA *mod, BIGNUM_CUDA *result) {
-    debug_printf("mod_mul 0\n");
     BIGNUM_CUDA product;
     init_zero(&product);
-    debug_printf("mod_mul 1\n");
-    // Now, you can call the bn_mul function and pass 'product' to it
     bn_mul(a, b, &product);
-    debug_printf("mod_mul 2\n");
-    
-    
     bn_mod(&product, mod, result);
-
-    debug_printf("mod_mul 3\n");
 }
 
 __device__ bool bn_is_zero(const BIGNUM_CUDA *a) {
@@ -1468,12 +1466,11 @@ __device__ void bn_mod_neg(BIGNUM_CUDA *result, const BIGNUM_CUDA *n, const BIGN
 }
 
 __device__ bool compute_mont_nprime(BIGNUM_CUDA *n_prime, const BIGNUM_CUDA *n, const BIGNUM_CUDA *R) {
-    bool debug = false;
-    if (debug) {
+    #ifdef debug_top
         printf("++ compute_mont_nprime ++\n");
         bn_print_no_fuse(">> n: ", n);
         bn_print_no_fuse(">> R: ", R);
-    }
+    #endif
 
     // Check for null pointers and invalid inputs
     if (bn_is_zero(n)) {
@@ -1490,7 +1487,9 @@ __device__ bool compute_mont_nprime(BIGNUM_CUDA *n_prime, const BIGNUM_CUDA *n, 
     BIGNUM_CUDA neg_n;
     init_zero(&neg_n);
     bn_mod_neg(&neg_n, n, R);
-    if (debug) bn_print_no_fuse("neg_n: ", &neg_n);
+    #ifdef debug_top
+        bn_print_no_fuse("neg_n: ", &neg_n);
+    #endif
 
     // Compute (-n)^(-1) mod R using bn_mod_inverse
     return bn_mod_inverse(n_prime, &neg_n, R);
