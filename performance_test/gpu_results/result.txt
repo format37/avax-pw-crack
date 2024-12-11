@@ -1,2 +1,2 @@
-Address: P-avax1uf234puq6sak3s8q7uvfglmeapj9y8ssx65j3y
-Passphrase: LC%|
+Address: P-avax1zk3kfsafxcqlg5xx7jsxv3g6327tnk2z5lmk5f
+Passphrase: AZke_
