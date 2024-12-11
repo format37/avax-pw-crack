@@ -191,16 +191,6 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
     // init_zero(&curveOrder);
     init_zero(&newKey);
     init_zero(&publicKey);
-
-	// Initialize curveOrder_d for secp256k1
-	// FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
-    // 
-    // curveOrder.d[0] = 0xBFD25E8CD0364141;
-    // curveOrder.d[1] = 0xBAAEDCE6AF48A03B;
-    // curveOrder.d[2] = 0xFFFFFFFFFFFFFFFE;
-    // curveOrder.d[3] = 0xFFFFFFFFFFFFFFFF;
-    // curveOrder.neg = 0;
-    // curveOrder.top = 4;
     
     // hash: uint8_t[64]
     // il: uint32_t il[8]
@@ -284,17 +274,6 @@ __device__ BIP32Info GetChildKeyDerivation(uint8_t* key, uint8_t* chainCode, uin
     #endif
     bn_print("Debug Cuda newKey (After mod): ", &newKey);
 
-    // Copy newKey to info.master_private_key
-    // for (int i = 0; i < 4; i++) {
-    //     info.master_private_key[8*i] = (newKey.d[3 - i] >> 56) & 0xFF;
-    //     info.master_private_key[8*i + 1] = (newKey.d[3 - i] >> 48) & 0xFF;
-    //     info.master_private_key[8*i + 2] = (newKey.d[3 - i] >> 40) & 0xFF;
-    //     info.master_private_key[8*i + 3] = (newKey.d[3 - i] >> 32) & 0xFF;
-    //     info.master_private_key[8*i + 4] = (newKey.d[3 - i] >> 24) & 0xFF;
-    //     info.master_private_key[8*i + 5] = (newKey.d[3 - i] >> 16) & 0xFF;
-    //     info.master_private_key[8*i + 6] = (newKey.d[3 - i] >> 8) & 0xFF;
-    //     info.master_private_key[8*i + 7] = newKey.d[3 - i] & 0xFF;
-    // }
     #ifdef BN_128
         // 128-bit case
         for (int i = 0; i < 2; i++) {

@@ -13,7 +13,6 @@ __device__ bool bn_mod_inverse(BIGNUM_CUDA *result, const BIGNUM_CUDA *a, const 
 __device__ void bignum_to_bit_array(BIGNUM_CUDA *n, unsigned int *bits);
 __device__ int point_is_at_infinity(const EC_POINT_CUDA *P);
 __device__ void bn_mod_lshift1(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, const BIGNUM_CUDA *n); // point.h
-__device__ void bn_mod_sqr_montgomery(BIGNUM_CUDA *r, const BIGNUM_CUDA *a, BIGNUM_CUDA *n);
 
 __device__ void print_jacobian_point(const char* label, const EC_POINT_JACOBIAN *point) {
     printf("%s:\n", label);
@@ -99,13 +98,6 @@ __device__ void jacobian_point_double(
     bn_mod_lshift1(&result->Z, &T6, p);
 }
 
-__device__ void jacobian_point_double_x(
-    EC_POINT_JACOBIAN *result,
-    const EC_POINT_JACOBIAN *P,
-    const BIGNUM_CUDA *p,
-    const BIGNUM_CUDA *a
-);
-
 #ifndef BN_128
     #define BN_UMULT_LOHI(h, l, a, b) \
     do { \
@@ -129,37 +121,10 @@ __device__ void affine_to_jacobian(const EC_POINT_CUDA *affine_point, EC_POINT_J
     }
 }
 
-__device__ void jacobian_to_affine_o1(const EC_POINT_JACOBIAN *P_jacobian, EC_POINT_CUDA *P_affine, const BIGNUM_CUDA *p) {
-    BIGNUM_CUDA Z_inv, Z_inv_squared, Z_inv_cubed;
-    init_zero(&Z_inv);
-    init_zero(&Z_inv_squared);
-    init_zero(&Z_inv_cubed);
-
-    // Compute Z_inv = Z^{-1} mod p
-    bn_mod_inverse(&Z_inv, &P_jacobian->Z, p);
-
-    // Compute Z_inv_squared = Z_inv^2 mod p
-    bn_mod_sqr(&Z_inv_squared, &Z_inv, p);
-
-    // Compute Z_inv_cubed = Z_inv^3 mod p
-    bn_mod_mul(&Z_inv_cubed, &Z_inv_squared, &Z_inv, p);
-
-    // Compute X_affine = X * Z_inv_squared mod p
-    bn_mod_mul(&P_affine->x, &P_jacobian->X, &Z_inv_squared, p);
-
-    // Compute Y_affine = Y * Z_inv_cubed mod p
-    bn_mod_mul(&P_affine->y, &P_jacobian->Y, &Z_inv_cubed, p);
-}
-
 __device__ void jacobian_to_affine(const EC_POINT_JACOBIAN *jacobian_point, EC_POINT_CUDA *affine_point, const BIGNUM_CUDA *p) {
-    // bn_print_no_fuse("jacobian_to_affine >> jacobian_point->X: ", &jacobian_point->X);
-    // bn_print_no_fuse("jacobian_to_affine >> jacobian_point->Y: ", &jacobian_point->Y);
-    // bn_print_no_fuse("jacobian_to_affine >> jacobian_point->Z: ", &jacobian_point->Z);
     if (bn_is_zero(&jacobian_point->Z)) {
-        // printf("jacobian_to_affine: Point at infinity\n");
         // Point at infinity
         set_point_at_infinity(affine_point);
-        // printf("jacobian_to_affine: return\n");
         return;
     }
 
@@ -324,247 +289,17 @@ __device__ void point_add_jacobian(
 
     
     // Z3 = H * Z1 * Z2 mod p
-    // bn_print_no_fuse("P->Z: ", &P->Z);
-    // bn_print_no_fuse("Q->Z: ", &Q->Z);
     bn_mul(&P->Z, &Q->Z, &result->Z); // a * b = product
-    // bn_print_no_fuse("After first mul, result->Z: ", &result->Z);
     
-    // init_zero(&temp);
     bn_copy(&temp, &result->Z); // dest << src
     bn_mod(&result->Z, &temp, p); // result = a % m
-    // bn_print_no_fuse("After first mod, result->Z: ", &result->Z);
     
-    // bn_print_no_fuse("H: ", &H);
-    // init_zero(&temp);
     bn_copy(&temp, &result->Z); // dest << src
     bn_mul(&temp, &H, &result->Z); // a * b = product
-    // bn_print_no_fuse("After second mul, result->Z: ", &result->Z);
 
     bn_copy(&temp, &result->Z); // dest << src
     bn_mod(&result->Z, &temp, p); // result = a % m
-    // bn_print_no_fuse("Final result->Z: ", &result->Z);
-
-
-    // Print results
-    // bn_print_no_fuse("point_add << X: ", &result->X);
-    // bn_print_no_fuse("point_add << Y: ", &result->Y);
-    // bn_print_no_fuse("point_add << Z: ", &result->Z);
 }
-
-__device__ void jacobian_point_double_x(
-    EC_POINT_JACOBIAN *result,
-    const EC_POINT_JACOBIAN *P,
-    const BIGNUM_CUDA *p,
-    const BIGNUM_CUDA *a
-) {
-    if (bn_is_zero(&P->Z) || bn_is_zero(&P->Y)) {
-        init_zero(&result->X);
-        init_zero(&result->Y);
-        init_zero(&result->Z);
-        return;
-    }
-    // bn_print_no_fuse("jacobian_point_double >> P->X: ", &P->X);
-    // bn_print_no_fuse("jacobian_point_double >> P->Y: ", &P->Y);
-    // bn_print_no_fuse("jacobian_point_double >> P->Z: ", &P->Z);
-    BIGNUM_CUDA S, M, tmp1, tmp2, tmp3, Y1_squared;
-    init_zero(&S);
-    init_zero(&M);
-    init_zero(&tmp1);
-    init_zero(&tmp2);
-    init_zero(&tmp3);
-    init_zero(&Y1_squared);
-
-    // S = 4 * X1 * Y1^2 mod p
-    bn_mod_sqr(&tmp1, &P->Y, p);  // tmp1 = Y1^2
-    bn_copy(&Y1_squared, &tmp1);
-    // bn_print_no_fuse("jacobian_point_double [0] Y1_squared: ", &Y1_squared);
-    bn_mod_mul(&tmp2, &P->X, &tmp1, p);  // tmp2 = X1 * Y1^2
-    // bn_print_no_fuse("jacobian_point_double [1] S: ", &tmp2);
-    bn_mod_lshift(&S, &tmp2, 2, p);  // S = 4 * X1 * Y1^2 mod p
-    // bn_print_no_fuse("jacobian_point_double [2] S: ", &S);
-
-    // M = 3 * X1^2 + a * Z1^4 mod p
-    bn_mod_sqr(&tmp1, &P->X, p);  // tmp1 = X1^2
-    // bn_print_no_fuse("jacobian_point_double [3a] X1_squared: ", &tmp1);
-    
-    // bn_mod_lshift(&tmp2, &tmp1, 1, p);  // tmp2 = 2 * X1^2 mod p
-    // bn_print_no_fuse("jacobian_point_double [3b] 2_X1_squared: ", &tmp2);
-    
-    // bn_mod_add(&tmp3, &tmp1, &tmp2, p); // tmp3 = 3 * X1^2 mod p
-    // bn_print_no_fuse("jacobian_point_double [4] 3_X1_squared M: ", &tmp3);
-
-    init_zero(&tmp2);
-    // Set 3 to tmp2
-    bn_set_word(&tmp2, 3);
-    bn_mod_mul(&M, &tmp1, &tmp2, p);  // M = 3 * X1^2 mod p
-    // bn_print_no_fuse("jacobian_point_double [4] 3_X1_squared M: ", &M);
-
-    // Compute X3 = M^2 - 2 * S mod p
-    bn_mod_sqr(&tmp1, &M, p);
-    // bn_print_no_fuse("jacobian_point_double [5a] Z1_squared: ", &tmp1);
-    bn_mod_sub(&tmp2, &tmp1, &S, p);  // tmp2 = M^2 - S mod p
-    // bn_print_no_fuse("jacobian_point_double [5b] M^2 - s: ", &tmp2);
-    bn_mod_sub(&result->X, &tmp2, &S, p);  // X3 = M^2 - 2*S mod p
-    // bn_print_no_fuse("jacobian_point_double [5c] X3: ", &result->X);
-
-    // Compute Y3 = M * (S - X3) - 8 * Y1^4 mod p
-    bn_mod_sub(&tmp1, &S, &result->X, p);  // tmp1 = S - X3 mod p
-    // bn_print_no_fuse("jacobian_point_double [6a] S - X3: ", &tmp1);
-    bn_mod_mul(&tmp2, &M, &tmp1, p);  // tmp2 = M * (S - X3) mod p
-    // bn_print_no_fuse("jacobian_point_double [6b] M * (S - X3): ", &tmp2);
-
-    // tmp1 = Y1^4 mod p
-    bn_mod_sqr(&tmp1, &Y1_squared, p);
-    // bn_print_no_fuse("jacobian_point_double [7a] Y1_fourth: ", &tmp1);
-    bn_mod_lshift(&tmp3, &tmp1, 3, p);  // tmp3 = 8 * Y1^4 mod p
-    // bn_print_no_fuse("jacobian_point_double [7b] 8_Y1_fourth: ", &tmp3);
-
-    // Y3 = M*(S - X3) - 8*Y1^4 mod p
-    bn_mod_sub(&result->Y, &tmp2, &tmp3, p);
-    // bn_print_no_fuse("jacobian_point_double [8] Y3: ", &result->Y);
-
-    // Compute Z3 = 2 * Y1 * Z1 mod p
-    bn_mod_mul(&tmp1, &P->Y, &P->Z, p);  // tmp1 = Y1 * Z1 mod p
-    // bn_print_no_fuse("jacobian_point_double [9a] Y1_Z1: ", &tmp1);
-    bn_mod_lshift(&result->Z, &tmp1, 1, p);  // Z3 = 2 * Y1 * Z1 mod p
-    // bn_print_no_fuse("jacobian_point_double [9b] 2_Y1_Z1: ", &result->Z);
-}
-
-__device__ EC_POINT_CUDA ec_point_scalar_mul_jacobian(
-    EC_POINT_CUDA *point, 
-    BIGNUM_CUDA *scalar, 
-    BIGNUM_CUDA *curve_prime, 
-    BIGNUM_CUDA *curve_a
-) {
-    EC_POINT_JACOBIAN current, result;
-    affine_to_jacobian(point, &current);
-    init_zero(&result.X);
-    init_zero(&result.Y);
-    init_zero(&result.Z);
-    init_one(&result.Z); // Initialize result as point at infinity in Jacobian coordinates (Z=0)
-
-    unsigned int bits[256];
-    bignum_to_bit_array(scalar, bits);
-
-    for (int i = 255; i >= 0; i--) {
-        // Point doubling
-        jacobian_point_double(&result, &result, curve_prime, curve_a);
-
-        if (bits[i]) {
-            // Point addition
-            point_add_jacobian(&result, &result, &current, curve_prime, curve_a);
-        }
-    }
-
-    // Convert result back to affine coordinates
-    EC_POINT_CUDA affine_result;
-    jacobian_to_affine(&result, &affine_result, curve_prime);
-
-    return affine_result;
-}
-
-// Montgomery point operations in Montgomery form ++
-#ifdef use_montgomery_ec_point_multiplication
-// __device__ void jacobian_point_double_montgomery_deprecated(
-//     EC_POINT_JACOBIAN *result,
-//     const EC_POINT_JACOBIAN *P,
-//     const BIGNUM_CUDA *p,
-//     const BIGNUM_CUDA *curve_a_mont,
-//     const BN_MONT_CTX_CUDA *mont_ctx
-// ) {
-//     if (bn_is_zero(&P->Z) || bn_is_zero(&P->Y)) {
-//         init_zero(&result->X);
-//         init_zero(&result->Y);
-//         init_zero(&result->Z);
-//         return;
-//     }
-
-//     BIGNUM_CUDA S, M, tmp1, tmp2, tmp3, Y1_squared;
-//     init_zero(&S);
-//     init_zero(&M);
-//     init_zero(&tmp1);
-//     init_zero(&tmp2);
-//     init_zero(&tmp3);
-//     init_zero(&Y1_squared);
-
-//     // S = 4 * X1 * Y1^2 mod p
-//     bn_mod_sqr_montgomery(&tmp1, &P->Y, p, mont_ctx);  // tmp1 = Y1^2
-//     bn_copy(&Y1_squared, &tmp1);
-//     bn_mod_mul_montgomery(&tmp2, &P->X, &tmp1, p, mont_ctx);  // tmp2 = X1 * Y1^2
-//     bn_mod_lshift(&S, &tmp2, 2, p);  // S = 4 * X1 * Y1^2 mod p
-
-//     // M = 3 * X1^2 + a * Z1^4 mod p
-//     bn_mod_sqr_montgomery(&tmp1, &P->X, p, mont_ctx);  // tmp1 = X1^2
-
-//     // Compute Z1^4
-//     bn_mod_sqr_montgomery(&tmp2, &P->Z, p, mont_ctx);  // tmp2 = Z1^2
-//     bn_mod_sqr_montgomery(&tmp2, &tmp2, p, mont_ctx);  // tmp2 = Z1^4
-
-//     // Multiply 'a' with Z1^4
-//     bn_mod_mul_montgomery(&tmp3, curve_a_mont, &tmp2, p, mont_ctx);
-
-//     // M = 3 * X1^2 + a * Z1^4
-//     BIGNUM_CUDA three;
-//     init_zero(&three);
-//     bn_set_word(&three, 3);
-//     bn_to_montgomery(&three, &three, mont_ctx);
-//     bn_mod_mul_montgomery(&M, &tmp1, &three, p, mont_ctx);
-//     bn_mod_add(&M, &M, &tmp3, p);
-
-//     // Continue with the rest of the function using Montgomery operations
-//     // ...
-// }
-
-// __device__ EC_POINT_CUDA ec_point_scalar_mul_jacobian_montgomery(
-//     EC_POINT_CUDA *point, 
-//     BIGNUM_CUDA *scalar, 
-//     const BIGNUM_CUDA *curve_p, 
-//     const BIGNUM_CUDA *curve_a,
-//     const BN_MONT_CTX_CUDA *mont_ctx
-// ) {
-//     EC_POINT_JACOBIAN current, result;
-//     affine_to_jacobian(point, &current);
-
-//     // Convert current point to Montgomery form
-//     bn_to_montgomery(&current.X, &current.X, mont_ctx);
-//     bn_to_montgomery(&current.Y, &current.Y, mont_ctx);
-//     bn_to_montgomery(&current.Z, &current.Z, mont_ctx);
-
-//     // Initialize result as point at infinity in Jacobian coordinates
-//     init_zero(&result.X);
-//     init_zero(&result.Y);
-//     init_zero(&result.Z);
-
-//     unsigned int bits[256];
-//     bignum_to_bit_array(scalar, bits);
-
-//     BIGNUM_CUDA curve_a_mont;
-//     init_zero(&curve_a_mont);
-//     bn_to_montgomery(&curve_a_mont, curve_a, mont_ctx);
-
-//     for (int i = 255; i >= 0; i--) {
-//         // Point doubling
-//         jacobian_point_double_montgomery(&result, &result, curve_p, &curve_a_mont, mont_ctx);
-
-//         if (bits[i]) {
-//             // Point addition
-//             point_add_jacobian_montgomery(&result, &result, &current, curve_p, &curve_a_mont, mont_ctx);
-//         }
-//     }
-
-//     // Convert result back from Montgomery form
-//     bn_from_montgomery(&result.X, &result.X, mont_ctx);
-//     bn_from_montgomery(&result.Y, &result.Y, mont_ctx);
-//     bn_from_montgomery(&result.Z, &result.Z, mont_ctx);
-
-//     // Convert result back to affine coordinates
-//     EC_POINT_CUDA affine_result;
-//     jacobian_to_affine(&result, &affine_result, curve_p);
-
-//     return affine_result;
-// }
-#endif
-// Montgomery point operations in Montgomery form --
 
 __device__ void copy_jacobian_point(EC_POINT_JACOBIAN *dest, const EC_POINT_JACOBIAN *src) {
     bn_copy(&dest->X, &src->X);

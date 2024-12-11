@@ -92,7 +92,6 @@ __device__ void GetPublicKey(uint8_t* buffer, uint8_t* key)
     EC_POINT_CUDA G;
     init_zero(&G.x);
     init_zero(&G.y);
-    // for (int j = 0; j < MAX_BIGNUM_SIZE; ++j) {
     for (int j = 0; j < CURVE_P_VALUES_MAX_SIZE; ++j) {
             G.x.d[j] = CURVE_GX_values[j];
             G.y.d[j] = CURVE_GY_values[j];
@@ -100,7 +99,6 @@ __device__ void GetPublicKey(uint8_t* buffer, uint8_t* key)
     G.x.top = CURVE_P_VALUES_MAX_SIZE;
     G.y.top = CURVE_P_VALUES_MAX_SIZE;
     
-    // bn_print_no_fuse("ec_point_scalar_mul_montgomery >> newKey: ", &newKey);
     #ifdef use_montgomery_ec_point_multiplication
         // Make sure Montgomery context is initialized
         MONT_CTX_CUDA mont_ctx;
@@ -142,48 +140,16 @@ __device__ void GetPublicKey(uint8_t* buffer, uint8_t* key)
 
         
         ec_point_scalar_mul_montgomery(&point, &newKey, &mont_ctx, &publicKey_jacobian);
-        // bn_print_no_fuse("ec_point_scalar_mul_montgomery << publicKey_jacobian->X: ", &publicKey_jacobian.X);
-        // bn_print_no_fuse("ec_point_scalar_mul_montgomery << publicKey_jacobian->Y: ", &publicKey_jacobian.Y);
-        // bn_print_no_fuse("ec_point_scalar_mul_montgomery << publicKey_jacobian->Z: ", &publicKey_jacobian.Z);
-
-        // Convert Jacobian point to affine
-        // ec_point_jacobian_to_affine(&publicKey_jacobian, &publicKey, &mont_ctx);
-        // for (int i = 0; i < CURVE_P_VALUES_MAX_SIZE; i++) {
-        //     publicKey.x.d[CURVE_P_VALUES_MAX_SIZE - 1 - i] = publicKey_jacobian.X.d[i];
-        //     publicKey.y.d[CURVE_P_VALUES_MAX_SIZE - 1 - i] = publicKey_jacobian.Y.d[i];
-        // }
-        // jacobian_to_affine_o1(&publicKey_jacobian, &publicKey, &CURVE_P);
 
         // init group
         EC_GROUP_CUDA group;
         init_zero(&group.field);
         group.field = CURVE_P;
-        // bn_print_no_fuse("ossl_ec_GFp_mont_field_decode >> group->field: ", &group.field);
         ossl_ec_GFp_mont_field_decode(&group, &publicKey.x, &publicKey_jacobian.X);
         ossl_ec_GFp_mont_field_decode(&group, &publicKey.y, &publicKey_jacobian.Y);
-        // bn_print_no_fuse("ossl_ec_GFp_mont_field_decode << publicKey->X: ", &publicKey.x);
-        // bn_print_no_fuse("ossl_ec_GFp_mont_field_decode << publicKey->Y: ", &publicKey.y);
-        // char * hex;
-        // ec_point_to_hex(&publicKey, hex);
-        // printf("jacobian_to_affine << Public key: %s\n", hex);
-        // Print the public key
-        // printf("## After EC_POINT_mul ##\n>> pub_key.x: ");
-        // for (int i = 0; i < CURVE_P_VALUES_MAX_SIZE; i++) {
-        //     buffer[8*i] = (publicKey.x.d[3 - i] >> 56) & 0xFF;
-        //     buffer[8*i + 1] = (publicKey.x.d[3 - i] >> 48) & 0xFF;
-        //     buffer[8*i + 2] = (publicKey.x.d[3 - i] >> 40) & 0xFF;
-        //     buffer[8*i + 3] = (publicKey.x.d[3 - i] >> 32) & 0xFF;
-        //     buffer[8*i + 4] = (publicKey.x.d[3 - i] >> 24) & 0xFF;
-        //     buffer[8*i + 5] = (publicKey.x.d[3 - i] >> 16) & 0xFF;
-        //     buffer[8*i + 6] = (publicKey.x.d[3 - i] >> 8) & 0xFF;
-        //     buffer[8*i + 7] = publicKey.x.d[3 - i] & 0xFF;
-        // }
-        
-        // printf(">> pub_key.y: ");
 
     #else
-        // TODO: Check do we need to define extra G. Or we are able to use __constant__ CURVE_GX_values and CURVE_GY_values as new EC_POINT_CUDA instead
-        EC_POINT_CUDA publicKey = ec_point_scalar_mul(&G, &newKey, &CURVE_P, &CURVE_A); // FAIL with index 0. CHECK newKey.
+        EC_POINT_CUDA publicKey = ec_point_scalar_mul(&G, &newKey, &CURVE_P, &CURVE_A);
     #endif
 
     
@@ -225,14 +191,6 @@ __device__ void GetPublicKey(uint8_t* buffer, uint8_t* key)
     
     // Add prefix before the buffer
     buffer[0] = prefix;
-
-    // Print public key
-    // printf("GetPublicKey << Public key: ");
-    // for (int i = 0; i < 65; i++) {
-    //     printf("%02x", buffer[i]);
-    // }
-    // printf("\n");
-
 
     #ifdef function_profiler
         record_function(FN_GET_PUBLIC_KEY, start_time);

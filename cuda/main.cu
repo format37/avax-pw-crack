@@ -5,16 +5,13 @@
 #include <stdio.h>
 #include <cuda.h>
 #include "bignum.h"
-// #define MAX_PASSPHRASE_LENGTH 8 // 7-letter word + null terminator. DON'T FORGET TO INCREASE
 #include "p_chain.h"
 #include "nlohmann/json.hpp"
 #include <cstring>
 #include <string.h>
 #include <limits.h>
-// #include <nvtx3/nvToolsExt.h>
-// #include <cuda_profiler_api.h>
 
-#define MAX_PASSPHRASE_LENGTH 8
+#define MAX_PASSPHRASE_LENGTH 100 // Ledger declaration
 #define MAX_ALPHABET_LENGTH 256  // Maximum possible alphabet length
 #define P_CHAIN_ADDRESS_LENGTH 45  // Assuming the p-chain address is 45 characters long
 
@@ -34,45 +31,6 @@ __device__ __constant__ unsigned long long d_start_variant_id;
 __device__ __constant__ unsigned long long d_end_variant_id;
 
 #define OVERFLOW_FLAG ULLONG_MAX
-
-unsigned long long find_variant_id_a(const char* s) {
-    // const char* alphabet = "abcdefghijklmnopqrstuvwxyz";
-    // const char* alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 !@#$%^&*()-_=+[]{};:'",.<>?/\\|~";
-    // const char* alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
-    //                       " !\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~";
-    const char* alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 !@#$%^&*()-_=+[]{};:'\",.<>?/\\|~";
-    int base = strlen(alphabet);
-    unsigned long long result = 0;
-    unsigned long long prev_result = 0;
-    
-    for (int i = 0; s[i] != '\0'; i++) {
-        const char* pos = strchr(alphabet, s[i]);
-        if (pos != NULL) {
-            int index = pos - alphabet;
-            
-            // Check for multiplication overflow
-            if (result > ULLONG_MAX / base) {
-                return OVERFLOW_FLAG;
-            }
-            result *= base;
-            
-            // Check for addition overflow
-            if (result > ULLONG_MAX - (index + 1)) {
-                return OVERFLOW_FLAG;
-            }
-            result += index + 1;
-            
-            // Check if the value wrapped around
-            if (result < prev_result) {
-                return OVERFLOW_FLAG;
-            }
-            
-            prev_result = result;
-        }
-    }
-    
-    return result;
-}
 
 unsigned long long get_variant_id(const char* s, const char* alphabet, int alphabet_length) {
     int base = alphabet_length;
@@ -100,45 +58,6 @@ unsigned long long get_variant_id(const char* s, const char* alphabet, int alpha
     }
 
     return offset + value;
-}
-
-__device__ void find_letter_variant_a(int variant_id, char* passphrase_value) {
-    // Define alphabet as a constant array
-    // const char alphabet[] = "abcdefghijklmnopqrstuvwxyz";
-    // const int alphabet_length = 26;
-    const char alphabet[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 !@#$%^&*()-_=+[]{};:'\",.<>?/\\|~";
-    const int alphabet_length = 94;
-
-    // Initialize first character to null terminator, rest will be filled as needed
-    passphrase_value[0] = '\0';
-
-    // Handle the special case for variant_id == 0
-    if (variant_id == 0) {
-        passphrase_value[0] = alphabet[0];
-        passphrase_value[1] = '\0';
-        return;
-    }
-
-    int result_length = 0;
-    
-    // Generate the passphrase
-    while (variant_id > 0 && result_length < MAX_PASSPHRASE_LENGTH - 1) {  // Leave room for null terminator
-        --variant_id;  // Adjust for 0-based indexing
-        passphrase_value[result_length++] = alphabet[variant_id % alphabet_length];
-        variant_id /= alphabet_length;
-    }
-    passphrase_value[result_length] = '\0';  // Ensure null termination
-
-    // Reverse the result in-place
-    int start = 0;
-    int end = result_length - 1;
-    while (start < end) {
-        char temp = passphrase_value[start];
-        passphrase_value[start] = passphrase_value[end];
-        passphrase_value[end] = temp;
-        ++start;
-        --end;
-    }
 }
 
 __device__ int my_strncmp(const char* s1, const char* s2, size_t n) {
@@ -194,39 +113,15 @@ __device__ void find_letter_variant(unsigned long long variant_id, char* result)
     }
 }
 
-// __global__ void variant_kernel(ThreadFunctionProfile *d_threadFunctionProfiles_param) 
-__global__ void variant_kernel()
-{
-    // #ifdef function_profiler
-    //     unsigned long long start_time = clock64();
-    // #endif
+__global__ void variant_kernel() {
     int blockId = blockIdx.x;
     int threadId = threadIdx.x;
     int globalIdx = blockId * blockDim.x + threadId;
     unsigned long long variant_id = d_start_variant_id + globalIdx;
     
-    // #ifdef function_profiler
-    //     // Set the device global variable
-    //     d_threadFunctionProfiles = d_threadFunctionProfiles_param;
-    // #endif
-    
-    // while (variant_id <= d_end_variant_id && !d_address_found) {
-    //     char local_passphrase_value[MAX_PASSPHRASE_LENGTH] = {0};
-    //     find_letter_variant(variant_id, local_passphrase_value);
-
     while (variant_id <= d_end_variant_id) {
         char local_passphrase_value[MAX_PASSPHRASE_LENGTH];
         find_letter_variant(variant_id, local_passphrase_value);        
-
-        // // Print the local_passphrase_value
-        // printf("\nlocal_passphrase_value: ");
-        // for (int i = 0; i < MAX_PASSPHRASE_LENGTH; i++) {
-        //     printf("%c", local_passphrase_value[i]);
-        //     if (local_passphrase_value[i] == '\0') {
-        //         break;
-        //     }
-        // }
-        // printf("\n");
         
         // Calculate p-chain address
         P_CHAIN_ADDRESS_STRUCT p_chain_address = restore_p_chain_address((uint8_t*)d_mnemonic, local_passphrase_value);
@@ -247,81 +142,10 @@ __global__ void variant_kernel()
         
         variant_id += gridDim.x * blockDim.x;
 
-        // printf("%s\n", result);
-        // current_id++;
     }
-    // #ifdef function_profiler
-    //     record_function(FN_MAIN, start_time);
-    // #endif
-}
-
-__global__ void variant_kernel_a()
-{
-    // #ifdef function_profiler
-    //     unsigned long long start_time = clock64();
-    // #endif
-    int blockId = blockIdx.x;
-    int threadId = threadIdx.x;
-    int globalIdx = blockId * blockDim.x + threadId;
-    unsigned long long variant_id = d_start_variant_id + globalIdx;
-    
-    // #ifdef function_profiler
-    //     // Set the device global variable
-    //     d_threadFunctionProfiles = d_threadFunctionProfiles_param;
-    // #endif
-    
-    while (variant_id <= d_end_variant_id && !d_address_found) {
-        char local_passphrase_value[MAX_PASSPHRASE_LENGTH] = {0};
-        find_letter_variant(variant_id, local_passphrase_value);
-
-        // // Print the local_passphrase_value
-        // printf("\nlocal_passphrase_value: ");
-        // for (int i = 0; i < MAX_PASSPHRASE_LENGTH; i++) {
-        //     printf("%c", local_passphrase_value[i]);
-        //     if (local_passphrase_value[i] == '\0') {
-        //         break;
-        //     }
-        // }
-        // printf("\n");
-        
-        // Calculate p-chain address
-        P_CHAIN_ADDRESS_STRUCT p_chain_address = restore_p_chain_address((uint8_t*)d_mnemonic, local_passphrase_value);
-        
-        if (my_strncmp(p_chain_address.data, d_expected_p_chain_address, P_CHAIN_ADDRESS_LENGTH+1) == 0) {
-            d_address_found = true;
-            for (int i = 0; i < P_CHAIN_ADDRESS_LENGTH; i++) {
-                d_address_value[i] = p_chain_address.data[i];
-            }
-            // Set the passphrase value
-            for (int i = 0; i < MAX_PASSPHRASE_LENGTH; i++) {
-                d_passphrase_value[i] = local_passphrase_value[i];
-            }
-            d_address_value[P_CHAIN_ADDRESS_LENGTH] = '\0';
-        }
-        // Early exit if address is found
-        if (d_address_found) break;
-        
-        variant_id += gridDim.x * blockDim.x;
-    }
-    // #ifdef function_profiler
-    //     record_function(FN_MAIN, start_time);
-    // #endif
 }
 
 int main() {
-    // 131072 # gkwf # P-avax1hkq2jc35k4m8llchp5lpklmg2l3yw2emy4afng
-    // int threadsPerBlock = 1024;
-    // int blocksPerGrid = 4;
-    // int blocksPerGrid = 80;
-    // int blocksPerGrid = 45;
-
-    // int threadsPerBlock = 256;
-    // int blocksPerGrid = 128;
-    // int blocksPerGrid = 4096;
- 
-    // int threadsPerBlock = 1;
-    // int blocksPerGrid = 1;
-
     // Get the current stack size limit
     size_t currentLimit;
     cudaError_t error = cudaDeviceGetLimit(&currentLimit, cudaLimitStackSize);
@@ -399,10 +223,6 @@ int main() {
     
     printf("Starting variant generation from ID %llu to %llu\n", start_variant_id, end_variant_id);
 
-    // // Calculate search area
-    // unsigned long long start_variant_id = find_variant_id(start_passphrase.c_str());
-    // unsigned long long end_variant_id = find_variant_id(end_passphrase.c_str());
-
     if (start_variant_id == OVERFLOW_FLAG || end_variant_id == OVERFLOW_FLAG) {
         std::cerr << "Passphrase overflow detected. The maximum passphrase is gkgwbylwrxtlpn" << std::endl;
         return -1;
@@ -422,31 +242,8 @@ int main() {
 
     std::cout << "Launching kernel with " << blocksPerGrid << " blocks and " << threadsPerBlock << " threads per block" << std::endl;
     
-    // Start NVTX range
-    // nvtxRangePush("KernelExecution");
-
-    // // Start profiling
-    // cudaProfilerStart();
-
-    // // #ifdef function_profiler
-    //     // Function profiling
-    //     int totalThreads = blocksPerGrid * threadsPerBlock;
-    //     // Allocate per-thread function profiling data
-    //     ThreadFunctionProfile *h_threadFunctionProfiles = new ThreadFunctionProfile[totalThreads];
-    //     ThreadFunctionProfile *d_threadFunctionProfiles;
-    //     cudaMalloc(&d_threadFunctionProfiles, totalThreads * sizeof(ThreadFunctionProfile));
-    //     cudaMemset(d_threadFunctionProfiles, 0, totalThreads * sizeof(ThreadFunctionProfile));
-    // // #endif
-
-    // printf("Total threads: %d\n", totalThreads);
-    // printf("Launching kernel with %d blocks and %d threads per block\n", blocksPerGrid, threadsPerBlock);
-
     // Launch kernel
-    // variant_kernel<<<blocksPerGrid, threadsPerBlock>>>(d_threadFunctionProfiles);
     variant_kernel<<<blocksPerGrid, threadsPerBlock>>>();
-
-    // End NVTX range
-    // nvtxRangePop();
 
     cudaError_t err = cudaGetLastError();
     if (err != cudaSuccess) {
@@ -456,9 +253,6 @@ int main() {
     }
 
     cudaDeviceSynchronize();
-
-    // // Stop profiling
-    // cudaProfilerStop();
 
     err = cudaGetLastError();
     if (err != cudaSuccess) {
@@ -489,24 +283,11 @@ int main() {
         printf("\nAddress not found\n");
     }
 
-    // #ifdef function_profiler
-    //     // After kernel execution, copy profiling data back to host
-    //     cudaMemcpy(h_threadFunctionProfiles, d_threadFunctionProfiles, totalThreads * sizeof(ThreadFunctionProfile), cudaMemcpyDeviceToHost);
-    //     // After kernel execution and copying profiling data back to host
-    //     write_function_profile_to_csv("performance/functions_data/profile.csv", h_threadFunctionProfiles, totalThreads, threadsPerBlock);
-    // #endif
-    // // Clean up
-    // delete[] h_threadFunctionProfiles;
-    // cudaFree(d_threadFunctionProfiles);
-
     // Clean up
     cudaFree(d_mnemonic);
     cudaFree(d_start_passphrase);
     cudaFree(d_end_passphrase);
     cudaFree(d_expected_p_chain_address);
-    // cudaFree(d_start_variant_id);
-    // cudaFree(d_end_variant_id);
-
     cudaDeviceReset();
 
     return 0;

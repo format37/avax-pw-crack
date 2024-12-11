@@ -248,11 +248,15 @@ folders = [
     # # "~/projects/avax-pw-crack/openssl/run.log",
     # # "~/projects/avax-pw-crack/cuda/logs/run.log",
 
-    # OSSL issue 14
-    "~/projects/avax-pw-crack/config.json",
-    "~/projects/avax-pw-crack/cuda/main.cu",
-    "~/projects/avax-pw-crack/openssl/main.c",
-    "~/projects/avax-pw-crack/openssl/child_key.h",
-    "~/projects/avax-pw-crack/cuda/logs/run.log",
-    "~/projects/avax-pw-crack/openssl/run.log",
+    # # OSSL issue 14
+    # "~/projects/avax-pw-crack/config.json",
+    # "~/projects/avax-pw-crack/cuda/main.cu",
+    # "~/projects/avax-pw-crack/openssl/main.c",
+    # "~/projects/avax-pw-crack/openssl/child_key.h",
+    # "~/projects/avax-pw-crack/cuda/logs/run.log",
+    # "~/projects/avax-pw-crack/openssl/run.log",
+    
+    # Refactoring
+    "../include/",
+    "../main.cu"
     ]
