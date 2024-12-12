@@ -1,0 +1,13 @@
+{
+  "mnemonic": "sell stereo useless course suffer tribe jazz monster fresh excess wire again father film sudden pelican always room attack rubber pelican trash alone cancel",
+  "p_chain_address": "P-avax1002erqnaygzrjldww7fwv9u3reuvznc424end7",
+  "alphabet": "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 !@#$%^&*()-_=+[]{};:'\",.<>?/\\|~",
+  "start_passphrase": "A",
+  "end_passphrase": "I",  
+  "cuda": {
+    "architecture": "sm_86",
+    "instances": 3,
+    "threadsPerBlock": 256,
+    "blocksPerGrid": 256
+  }  
+}
