@@ -26,15 +26,15 @@ def create_service_config(device_id: int, config_file: str) -> dict:
         arch = config.get('cuda', {}).get('architecture', 'sm_86')  # default to sm_86 if not specified
     
     return {
+        'container_name': f'avax_searcher_{device_id}',  # Added container name
         'image': f'avax:{arch}',  # Using the architecture-specific image
         'runtime': 'nvidia',
         'environment': [
             f'NVIDIA_VISIBLE_DEVICES={device_id}'
         ],
         'volumes': [
-            f'./configs/config_{device_id}.json:/app/config.json:ro',  # Mount config as read-only
-            f'./results/result_{device_id}.txt:/app/result.txt',       # Mount result file
-            f'./results/time_{device_id}.txt:/app/time.txt'           # Mount timing file
+            f'./configs/config_{device_id}.json:/config.json:ro',  # Mount config as read-only
+            f'./results:/app/results',       # Mount results folder
         ]
     }
 

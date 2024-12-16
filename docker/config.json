@@ -5,9 +5,9 @@
   "start_passphrase": "A",
   "end_passphrase": "I",  
   "cuda": {
-    "architecture": "sm_86",
-    "instances": 3,
+    "architecture": "sm_89",
+    "instances": 2,
     "threadsPerBlock": 256,
     "blocksPerGrid": 256
-  }  
+  }
 }

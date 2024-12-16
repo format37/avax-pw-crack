@@ -10,6 +10,8 @@
 #include <cstring>
 #include <string.h>
 #include <limits.h>
+#include <random>
+#include <sstream>
 
 #define MAX_PASSPHRASE_LENGTH 100 // Ledger declaration
 #define MAX_ALPHABET_LENGTH 256  // Maximum possible alphabet length
@@ -31,6 +33,40 @@ __device__ __constant__ unsigned long long d_start_variant_id;
 __device__ __constant__ unsigned long long d_end_variant_id;
 
 #define OVERFLOW_FLAG ULLONG_MAX
+
+// Function to generate UUID
+std::string generate_uuid() {
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<> dis(0, 15);
+    std::uniform_int_distribution<> dis2(8, 11);
+
+    std::stringstream ss;
+    ss << std::hex;
+
+    for (int i = 0; i < 8; i++) {
+        ss << dis(gen);
+    }
+    ss << "-";
+    for (int i = 0; i < 4; i++) {
+        ss << dis(gen);
+    }
+    ss << "-4";  // Version 4 UUID
+    for (int i = 0; i < 3; i++) {
+        ss << dis(gen);
+    }
+    ss << "-";
+    ss << dis2(gen);  // Variant byte
+    for (int i = 0; i < 3; i++) {
+        ss << dis(gen);
+    }
+    ss << "-";
+    for (int i = 0; i < 12; i++) {
+        ss << dis(gen);
+    }
+
+    return ss.str();
+}
 
 unsigned long long get_variant_id(const char* s, const char* alphabet, int alphabet_length) {
     int base = alphabet_length;
@@ -269,15 +305,28 @@ int main() {
         cudaMemcpyFromSymbol(h_passphrase_value, d_passphrase_value, MAX_PASSPHRASE_LENGTH);
         printf("Passphrase: %s\n", h_passphrase_value);
 
-        // Save results to file
-        std::ofstream result_file("result.txt");
+        // // Save results to file
+        // std::ofstream result_file("./results/result.txt");
+        // if (result_file.is_open()) {
+        //     result_file << "Address: " << h_address_value << std::endl;
+        //     result_file << "Passphrase: " << h_passphrase_value << std::endl;
+        //     result_file.close();
+        //     std::cout << "Results saved to result.txt" << std::endl;
+        // } else {
+        //     std::cerr << "Unable to open result.txt for writing" << std::endl;
+        // }
+
+        // Save results to file with UUID
+        std::string uuid = generate_uuid();
+        std::string result_filename = "./results/result_" + uuid + ".txt";
+        std::ofstream result_file(result_filename);
         if (result_file.is_open()) {
             result_file << "Address: " << h_address_value << std::endl;
             result_file << "Passphrase: " << h_passphrase_value << std::endl;
             result_file.close();
-            std::cout << "Results saved to result.txt" << std::endl;
+            std::cout << "Results saved to " << result_filename << std::endl;
         } else {
-            std::cerr << "Unable to open result.txt for writing" << std::endl;
+            std::cerr << "Unable to open " << result_filename << " for writing" << std::endl;
         }
     } else {
         printf("\nAddress not found\n");

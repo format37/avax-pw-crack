@@ -11,6 +11,7 @@ export CUDA_NVCC_EXECUTABLE="ccache nvcc"
 # -g \ # Generate host code debug information
 # -G \ # Generate device code debug information
 # -maxrregcount 64 \ # Set the maximum number of registers that GPU kernel function can use
+# -arch=sm_89 \ # 4090
 # -arch=sm_86 \ # 4090
 # -arch=sm_80 \ # A100
 
@@ -44,7 +45,7 @@ ccache nvcc \
     main.cu \
     --ptxas-options=-v \
     -lineinfo \
-    -arch=sm_86 \
+    -arch=sm_89 \
     -std=c++17 \
     -O3 \
     -use_fast_math \
