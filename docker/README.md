@@ -6,7 +6,7 @@
 * alphabet: You can drop some symbols if you are confident that it has not been used in 25th word. Pay attention to capital letters and symbols like I, l, |
 * start_passphrase: If we imagine the telephone book, it has names: A, B, ... Z, AA, AB .. So then if the alphabet has only capital letters, the search area from A to AA would be 32 words. There you can define the search area, where start_passphrase is a left boundary.
 * start_passphrase: Right boundary of the search area.
-* instances: Count of GPUs that you plan to utilize.
+* instances: Count of GPUs that you plan to utilize. Single GPU is acceptable too.
 * cuda architecture: The architecture of GPU that you plan to use. There is suggested to define architecture for most of your GPUs. You can redefine the architecture in config for each GPU later. The architecture table for some of GPUS is represented below.
   
 | GPU Model            | Architecture | Compute Capability | `sm_xx` Definition |
@@ -20,6 +20,8 @@
 | NVIDIA RTX 4090      | Ada Lovelace | 8.9                | `sm_89`            |
 | NVIDIA GTX 1080      | Pascal       | 6.1                | `sm_61`            |
 | NVIDIA GTX 1060      | Pascal       | 6.1                | `sm_61`            |
+  
+If your GPU is not listed above, you can google your architecture.
     
 ## Build images
 Update the build.sh script rights:
@@ -38,6 +40,7 @@ sudo docker images
 
 ## Generate configs
 ```
+python -m pip install requirements.txt
 python generate_configs.py
 ```
 If you have GPUs with a different architecture, you need to update the corresponding configs in the `./config` folder.
