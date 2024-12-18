@@ -8,21 +8,6 @@ from datetime import datetime
 from p_chain_tools import id_to_word, restore_p_chain_address
 from cuda_config import calculate_cuda_config
 
-# def get_next_variant(current, alphabet):
-#     chars = list(current)
-#     pos = len(chars) - 1
-    
-#     while pos >= 0:
-#         current_char_index = alphabet.index(chars[pos])
-#         if current_char_index < len(alphabet) - 1:
-#             chars[pos] = alphabet[current_char_index + 1]
-#             return ''.join(chars)
-#         else:
-#             chars[pos] = alphabet[0]
-#             pos -= 1
-    
-#     return alphabet[0] * (len(current) + 1)
-
 class TestRunner:
     def __init__(self, config_path, test_type):
         with open(config_path) as f:
@@ -66,7 +51,8 @@ class TestRunner:
         ]
         
         if self.test_type == "gpu":
-            cmd.extend(["--gpus", "all"])
+            device_id = self.config.get("device_id", 0)  # Get device_id from config, default to 0
+            cmd.extend(["--gpus", f'"device={device_id}"'])
         
         print(f">> config: {self.output_dir.absolute()}/config.json")
         print(f">> result: {self.output_dir.absolute()}/result.txt")
@@ -143,17 +129,6 @@ class TestRunner:
             self.search_config["step"]
             ):
             end_passphrase = self.id_to_word(self.search_config["alphabet"], end_id)
-            # start_word = self.id_to_word(self.alphabet, self.search_config["start"])
-            # print(f"Starting test from {start_word}")
-            # current_word = self.alphabet[0]  # Start with first character
-            # test_count = self.search_config["start"]  # Start from configured start value
-            
-            # while test_count < self.search_config["end"]:
-            #     # First test should use current_word as both start and end
-            #     if test_count == self.search_config["start"]:
-            #         next_word = current_word
-            #     else:
-            #         next_word = get_next_variant(current_word, self.alphabet)
             
             # Generate config for this test
             expected_p_chain_address = self.generate_config(
@@ -161,8 +136,6 @@ class TestRunner:
                 start_passphrase,
                 end_passphrase,
             )
-            
-            # print(f"Running test {test_count + 1}. Current word: {current_word}, Next word: {next_word}")
             
             # Run test
             result = self.run_docker_test(expected_p_chain_address)
@@ -181,13 +154,18 @@ class TestRunner:
             df = pd.DataFrame([results[-1]])
             df.to_csv(self.output_dir / f"tmp/report_{test_count}.csv", index=False)
             
-            # Move to next word
-            # current_word = next_word
             test_count += 1
-            
-            # Use step to determine how many tests to skip
-            # if (test_count - self.search_config["start"]) % self.search_config["step"] != 0:
-            #     test_count += self.search_config["step"] - ((test_count - self.search_config["start"]) % self.search_config["step"])
+
+            # read ./{self.test_type}_results/time.txt
+            with open(f"{self.output_dir.absolute()}/time.txt") as f:
+                duration = float(f.read())
+            print(f"duration: {duration}")
+        # Calculate and print search area size
+        search_area_size = self.search_config["end"] - self.search_config["start"]
+        print(f"Search area size: {search_area_size} words")
+        # Calculate and print penalty size (time per word searched)
+        penalty = duration / search_area_size
+        print(f"Performance penalty score: {penalty:.20f}")
         
         # Generate combined report
         df = pd.DataFrame(results)

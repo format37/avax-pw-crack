@@ -2,16 +2,17 @@
     "search_area": {
             "alphabet": "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 !@#$%^&*()-_=+[]{};:'\",.<>?/\\|~",
             "mnemonic": "sell stereo useless course suffer tribe jazz monster fresh excess wire again father film sudden pelican always room attack rubber pelican trash alone cancel",
-            "start": 10000000000,
-            "end": 10000000100,
-            "step": 1
+            "start": 0,
+            "end": 10000001,
+            "step": 10000000
     },
     "cpu_tests": {
         "docker_image": "cpu_search",
         "output_dir": "./cpu_results"
     },
     "gpu_tests": {
-        "docker_image": "gpu_search",
-        "output_dir": "./gpu_results"
+        "docker_image": "avax:sm_61",
+        "output_dir": "./gpu_results",
+        "device_id": 1
     }
 }
