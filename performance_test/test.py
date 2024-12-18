@@ -55,11 +55,9 @@ class TestRunner:
             cmd.extend(["--gpus", f'"device={device_id}"'])
         
         print(f">> config: {self.output_dir.absolute()}/config.json")
-        print(f">> result: {self.output_dir.absolute()}/result.txt")
         cmd.extend([
             "-v", f"{self.output_dir.absolute()}/config.json:/config.json:ro",
-            "-v", f"{self.output_dir.absolute()}/result.txt:/app/result.txt",
-            "-v", f"{self.output_dir.absolute()}/time.txt:/app/time.txt",
+            "-v", f"{self.output_dir.absolute()}:/app/results",
             self.config["docker_image"]
         ])
 
@@ -78,15 +76,36 @@ class TestRunner:
         print(f"result.stderr: {result.stderr}")
         print(f"result.stdout: {result.stdout}")
 
-        with open(f"{self.output_dir.absolute()}/time.txt") as f:
-            duration = float(f.read())
+        # Extract results filename from stdout
+        result_file = None
+        for line in result.stdout.split('\n'):
+            if 'Results saved to' in line:
+                result_file = line.split('/')[-1].strip()
+                break
 
-        with open(f"{self.output_dir.absolute()}/result.txt") as f:
-            result_p_chain_address = f.read().strip()
-        result_word = result_p_chain_address.split('\n')[1]
-        result_p_chain_address = result_p_chain_address.split('\n')[0]
-        result_p_chain_address = result_p_chain_address.replace("Address: ", "")
-        
+        # Use the extracted filename to read results
+        results_dir = f"{self.output_dir.absolute()}"
+        if result_file:
+            with open(f"{results_dir}/{result_file}") as f:
+                result_content = f.read().strip()
+            result_word = result_content.split('\n')[1]
+            result_p_chain_address = result_content.split('\n')[0]
+            result_p_chain_address = result_p_chain_address.replace("Address: ", "")
+        else:
+            print("Warning: Could not find results file in stdout")
+            result_word = ""
+            result_p_chain_address = ""
+
+        # Extract execution time from the last line containing it
+        duration = 0.0
+        for line in reversed(result.stdout.split('\n')):
+            if 'Execution time:' in line:
+                try:
+                    duration = float(line.split(':')[1].replace('seconds', '').strip())
+                    break
+                except (ValueError, IndexError):
+                    print("Warning: Could not parse execution time from output")
+
         success = result_p_chain_address == expected_p_chain_address
         if not success:
             print("Test failed!")
@@ -156,15 +175,11 @@ class TestRunner:
             
             test_count += 1
 
-            # read ./{self.test_type}_results/time.txt
-            with open(f"{self.output_dir.absolute()}/time.txt") as f:
-                duration = float(f.read())
-            print(f"duration: {duration}")
         # Calculate and print search area size
         search_area_size = self.search_config["end"] - self.search_config["start"]
         print(f"Search area size: {search_area_size} words")
         # Calculate and print penalty size (time per word searched)
-        penalty = duration / search_area_size
+        penalty = result["duration"] / search_area_size
         print(f"Performance penalty score: {penalty:.20f}")
         
         # Generate combined report

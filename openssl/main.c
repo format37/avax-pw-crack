@@ -20,19 +20,11 @@
 #include <fstream>
 #include <signal.h>
 #include <iostream>
+#include <random>
+#include <sstream>
 
-
-// #define debug_print
 
 #include "child_key.h"
-
-// BIGNUM *r = BN_new();
-// BIGNUM *a = BN_new();
-// BIGNUM *b = BN_new();
-// BN_CTX *ctx = BN_CTX_new();
-// BN_MONT_CTX *mont = BN_MONT_CTX_new();
-// // Initialize a, b, mont as needed
-// BN_mod_mul_montgomery(r, a, b, mont, ctx);
 
 #define MAX_PASSPHRASE_LENGTH 100 // TODO: Change this to the maximum passphrase length
 #define P_CHAIN_ADDRESS_LENGTH 45
@@ -109,16 +101,53 @@ void find_letter_variant(unsigned long long variant_id, char* passphrase_value, 
     }
 }
 
+std::string generate_uuid() {
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<> dis(0, 15);
+    std::uniform_int_distribution<> dis2(8, 11);
+
+    std::stringstream ss;
+    ss << std::hex;
+
+    for (int i = 0; i < 8; i++) {
+        ss << dis(gen);
+    }
+    ss << "-";
+    for (int i = 0; i < 4; i++) {
+        ss << dis(gen);
+    }
+    ss << "-4";  // Version 4 UUID
+    for (int i = 0; i < 3; i++) {
+        ss << dis(gen);
+    }
+    ss << "-";
+    ss << dis2(gen);  // Variant byte
+    for (int i = 0; i < 3; i++) {
+        ss << dis(gen);
+    }
+    ss << "-";
+    for (int i = 0; i < 12; i++) {
+        ss << dis(gen);
+    }
+
+    return ss.str();
+}
+
 void save_result(const char* address, const char* passphrase) {
-    std::ofstream outfile("result.txt");
+    std::string uuid = generate_uuid();
+    std::string result_filename = "./results/result_" + uuid + ".txt";
+    std::ofstream outfile(result_filename);
     if (outfile.is_open()) {
         outfile << "Address: " << address << std::endl;
         outfile << "Passphrase: " << passphrase << std::endl;
         outfile.close();
+        std::cout << "Results saved to " << result_filename << std::endl;
+    } else {
+        std::cerr << "Unable to open " << result_filename << " for writing" << std::endl;
     }
 }
 
-// Update generate_passphrases_iterative to use the alphabet from config
 void generate_passphrases_iterative(const std::string& start_passphrase, const std::string& end_passphrase, 
                                   const std::string& mnemonic, const std::string& expected_p_chain_address,
                                   const std::string& alphabet) {

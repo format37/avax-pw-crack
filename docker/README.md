@@ -30,7 +30,7 @@ chmod +x build.sh
 ```
 For each architecture that you plan to utilize. For example:
 ```
-./build.sh sm_86
+./build.sh sm_89
 ./build.sh sm_61
 ```
 You can check existing images with command:

@@ -1,7 +1,38 @@
-FROM nvidia/cuda:12.3.1-devel-ubuntu22.04
+# CPU Image Build
+FROM ubuntu:22.04 as cpu
 
-# Add build argument for CUDA architecture
-ARG CUDA_ARCH=sm_86
+# Install build essentials and dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    g++ \
+    libssl-dev \
+    nlohmann-json3-dev \
+    bc \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy source files
+COPY openssl/main.c .
+COPY openssl/child_key.h .
+
+# Build CPU version
+RUN g++ \
+    main.c \
+    -std=c++11 \
+    -I ../json \
+    -l:libcrypto.so.3 \
+    -o program
+
+# Using shell form for timestamp calculation
+CMD ["/bin/bash", "-c", "start_time=$(date +%s.%N) && ./program && end_time=$(date +%s.%N) && echo \"Execution time: $(echo \"$end_time - $start_time\" | bc) seconds\""]
+
+# GPU Image Build
+FROM nvidia/cuda:12.3.1-devel-ubuntu22.04 as gpu
+
+# Add build argument for CUDA architecture (will be set during build time)
+ARG CUDA_ARCH
+ENV CUDA_ARCH=${CUDA_ARCH}
 
 # Install build essentials and dependencies
 RUN apt-get update && apt-get install -y \
@@ -31,7 +62,7 @@ RUN mkdir -p logs
 COPY cuda/main.cu .
 COPY cuda/include include/
 
-# Build with nvcc using ccache (with error handling)
+# Build with nvcc using ccache (with architecture from build arg)
 RUN ccache nvcc \
     --threads $(nproc) \
     main.cu \
@@ -43,5 +74,5 @@ RUN ccache nvcc \
     -I ./include \
     -o program 2> logs/build.log || (cat logs/build.log && exit 1)
 
-# Using exec form with shell for better signal handling
-CMD ["/bin/bash", "-c", "start_time=$(date +%s.%N) && ./program && end_time=$(date +%s.%N) && echo $start_time && echo $end_time && echo \"$end_time - $start_time\" | bc > time.txt"]
+# Using shell form for timestamp calculation
+CMD ["/bin/bash", "-c", "start_time=$(date +%s.%N) && ./program && end_time=$(date +%s.%N) && echo \"Execution time: $(echo \"$end_time - $start_time\" | bc) seconds\""]
