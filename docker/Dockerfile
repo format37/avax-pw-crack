@@ -75,4 +75,4 @@ RUN ccache nvcc \
     -o program 2> logs/build.log || (cat logs/build.log && exit 1)
 
 # Using shell form for timestamp calculation
-CMD ["/bin/bash", "-c", "start_time=$(date +%s.%N) && ./program && end_time=$(date +%s.%N) && echo \"Execution time: $(echo \"$end_time - $start_time\" | bc) seconds\""]
+CMD ["/bin/bash", "-c", "echo \"GPU Device: $(nvidia-smi --query-gpu=name --format=csv,noheader)\" && start_time=$(date +%s.%N) && ./program && end_time=$(date +%s.%N) && echo \"Execution time: $(echo \"$end_time - $start_time\" | bc) seconds\""]

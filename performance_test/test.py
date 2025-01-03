@@ -149,6 +149,9 @@ class TestRunner:
             ):
             end_passphrase = self.id_to_word(self.search_config["alphabet"], end_id)
             
+            # Calculate search area for this test
+            search_area_size = end_id - self.search_config["start"]
+            
             # Generate config for this test
             expected_p_chain_address = self.generate_config(
                 self.search_config["mnemonic"],
@@ -166,7 +169,8 @@ class TestRunner:
                 "end_word": end_passphrase,
                 "duration": result["duration"],
                 "success": result["success"],
-                "found_word": result["word"]
+                "found_word": result["word"],
+                "search_area": search_area_size  # Add search area to results
             })
             
             # Save individual test report
@@ -175,7 +179,7 @@ class TestRunner:
             
             test_count += 1
 
-        # Calculate and print search area size
+        # Calculate and print search area size for the entire test suite
         search_area_size = self.search_config["end"] - self.search_config["start"]
         print(f"Search area size: {search_area_size} words")
         # Calculate and print penalty size (time per word searched)

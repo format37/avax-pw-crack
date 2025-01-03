@@ -6,7 +6,7 @@
   "end_passphrase": "LC%|",  
   "cuda": {
     "architecture": "sm_89",
-    "instances": 3,
+    "instances": 1,
     "threadsPerBlock": 256,
     "blocksPerGrid": 256
   }

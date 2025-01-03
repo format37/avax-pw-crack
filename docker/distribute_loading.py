@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 import numpy as np
+import pandas as pd
 
 def id_to_word(alphabet, n):
     """Convert numeric ID to word using given alphabet"""
@@ -33,13 +34,18 @@ def calculate_device_ranges(config_path, penalties_file):
     end_word = config['end_passphrase']
     num_devices = config['cuda']['instances']
     
-    # Read penalties
-    with open(penalties_file, 'r') as f:
-        penalties = [float(line.strip()) for line in f]
+    # Read penalties from CSV and filter for the required number of devices
+    penalties_df = pd.read_csv(penalties_file)
+    penalties_df = penalties_df[penalties_df['device_id'] < num_devices]
     
-    # Verify number of penalties matches number of devices
-    if len(penalties) != num_devices:
-        raise ValueError(f"Number of penalties ({len(penalties)}) does not match number of devices ({num_devices})")
+    # Verify we have enough device entries in the penalties file
+    if len(penalties_df) != num_devices:
+        raise ValueError(f"Not enough device entries in penalties file for {num_devices} devices")
+    
+    # Sort by device_id to ensure correct order
+    penalties_df = penalties_df.sort_values('device_id')
+    penalties = penalties_df['penalty'].tolist()
+    biases = penalties_df['bias'].tolist()
     
     # Calculate weights (inverse of penalties)
     weights = 1 / np.array(penalties)
@@ -107,7 +113,7 @@ def calculate_device_ranges(config_path, penalties_file):
 def main():
     # Configuration
     config_path = 'config.json'
-    penalties_file = 'penalties.txt'
+    penalties_file = 'penalties.csv'  # Updated file name
     
     # Calculate ranges
     ranges = calculate_device_ranges(config_path, penalties_file)
@@ -115,16 +121,29 @@ def main():
     # Create configs directory if it doesn't exist
     configs_dir = Path('configs')
     configs_dir.mkdir(exist_ok=True)
+
+    # Remove all existing files in configs directory
+    for file in configs_dir.glob('*'):
+        file.unlink()
     
     # Print results and save individual configs
     print("\nDevice Ranges:")
     print("-" * 60)
+    penalties_df = pd.read_csv(penalties_file)
     for r in ranges:
-        print(f"Device {r['device_id']}:")
+        device_id = r['device_id']
+        # Filter penalties_df by device_id to get the correct row
+        device_data = penalties_df[penalties_df['device_id'] == device_id].iloc[0]
+        penalty = device_data['penalty']
+        bias = device_data['bias']
+        forecast_time = penalty * r['range_size'] + bias
+        
+        print(f"Device {device_id}:")
         print(f"  Weight: {r['weight']:.2%}")
-        print(f"  Range Size: {r['range_size']:,}")
+        print(f"  Range Size: {r['range_size']}")
         print(f"  Start: {r['start_word']}")
         print(f"  End: {r['end_word']}")
+        print(f"  Forecast Time: {forecast_time:.2f} seconds ({forecast_time/3600:.2f} hours)")
         print()
         
         # Save individual device config
