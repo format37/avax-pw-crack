@@ -23,8 +23,10 @@ To use Docker for search follow the [Docker](https://github.com/format37/avax-pw
 Building from source is described in the [Cuda](https://github.com/format37/avax-pw-crack/tree/main/cuda) folder.  
 
 ## Performance evaluation
-The performance equation for this task is $time = \frac{penalty \times search\_area + bias}{GPU\_device\_count}$  
-For the single 4090 GPU the penalty is 0.0000142600841297 which means that it can solve approximately 70,126 combinations per second.  
+The performance equation for this task is $time = \frac{Penalty \times Search area + Bias}{GPU device count}$  
+  
+For the single 4090 GPU the Penalty is 0.0000142600841297 which means that it can solve approximately 70,126 combinations per second.  
+  
 The alphabet has 94 symbols max.  
 The ledger's 25th sord is 100 symbols max.  
   
