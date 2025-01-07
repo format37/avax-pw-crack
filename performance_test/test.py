@@ -5,7 +5,8 @@ import sys
 from pathlib import Path
 import pandas as pd
 from datetime import datetime
-from p_chain_tools import id_to_word, restore_p_chain_address
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from p_chain_tools import id_to_word, restore_p_chain_address, word_to_id
 from cuda_config import calculate_cuda_config
 
 class TestRunner:
@@ -15,6 +16,7 @@ class TestRunner:
             self.config = config_data[f"{test_type}_tests"]
             self.search_config = config_data["search_area"]
             self.alphabet = self.search_config.get("alphabet")
+            self.p_chain_export = config_data.get("p_chain_export", 0)
         
         self.test_type = test_type
         self.output_dir = Path(self.config["output_dir"])
@@ -25,6 +27,11 @@ class TestRunner:
         cuda = calculate_cuda_config(self.search_config["end"])  # Using max search area for CUDA config
         p_chain_address = restore_p_chain_address(mnemonic, end_word)
         print(f"[{end_word}] p-chain: {p_chain_address}")
+        # Calculate and print search area
+        start_id = word_to_id(self.alphabet, start_word)
+        end_id = word_to_id(self.alphabet, end_word)
+        search_area = end_id - start_id + 1
+        print(f"Search area: {search_area}")
         
         config = {
             "mnemonic": mnemonic,
@@ -32,7 +39,8 @@ class TestRunner:
             "end_passphrase": end_word,
             "p_chain_address": p_chain_address,
             "cuda": cuda,
-            "alphabet": self.alphabet
+            "alphabet": self.alphabet,
+            "p_chain_export": self.p_chain_export
         }
         
         config_path = self.output_dir / "config.json"
@@ -119,17 +127,6 @@ class TestRunner:
             "duration": duration,
             "word": result_word
         }
-
-    def id_to_word(self, alphabet, n):
-        base = len(alphabet)
-        result = []
-        n += 1  # Adjust for 1-based indexing
-        while n > 0:
-            n -= 1  # Adjust for 0-based indexing
-            result.append(alphabet[n % base])
-            n //= base
-        
-        return ''.join(reversed(result))
     
     def run_all_tests(self):
         """Run all tests based on configuration"""
@@ -137,7 +134,7 @@ class TestRunner:
         tmp_dir = self.output_dir / "tmp"
         tmp_dir.mkdir(parents=True, exist_ok=True)
         
-        start_passphrase = self.id_to_word(
+        start_passphrase = id_to_word(
             self.search_config["alphabet"], 
             self.search_config["start"]
             )
@@ -147,7 +144,7 @@ class TestRunner:
             self.search_config["end"], 
             self.search_config["step"]
             ):
-            end_passphrase = self.id_to_word(self.search_config["alphabet"], end_id)
+            end_passphrase = id_to_word(self.search_config["alphabet"], end_id)
             
             # Calculate search area for this test
             search_area_size = end_id - self.search_config["start"]

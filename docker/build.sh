@@ -56,19 +56,24 @@ build_cpu_image() {
     echo "Successfully built image: ${image_name}"
 }
 
+#!/bin/bash  # Make sure this line is present and the file has execute permissions
+
+# ... existing function definitions ...
+
 # Main script
 if [ $# -ne 1 ]; then
     echo "Usage: $0 <architecture>"
     echo "Examples:"
     echo "  $0 cpu         # Build CPU image"
-    echo "  $0 sm_86      # Build GPU image for CUDA architecture sm_86"
+    echo "  $0 sm_89      # Build GPU image for CUDA architecture Ada Lovelace (see README.md for other architectures)"
     exit 1
 fi
 
 arch=$1
 
+# Fix: Ensure proper function name is used
 if [ "$arch" = "cpu" ]; then
-    build_cpu_image
+    build_cpu_image    # Fix: Ensure this exact function name is used
 else
-    build_gpu_image "$arch"
+    build_gpu_image "$arch"    # Fix: Ensure this exact function name is used
 fi

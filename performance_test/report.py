@@ -1,181 +1,163 @@
-import os
-import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-from pathlib import Path
 import numpy as np
+from sklearn.linear_model import LinearRegression
+import matplotlib.pyplot as plt
+import csv
+import sys
+from pathlib import Path
+import json
+import pycuda.driver as cuda
+import subprocess
+from typing import Tuple, List, Optional
+from combine_results import combine_temp_results
 
-class PerformanceAnalyzer:
-    def __init__(self, base_folders=None):
-        """
-        Initialize the analyzer with a list of base folders to search for report files.
-        
-        Args:
-            base_folders (list): List of folder paths where report files are located
-                               e.g., ['./gpu_results', './cpu_results', './python_results']
-        """
-        self.engines = ['cpu', 'gpu', 'python']
-        self.base_folders = base_folders or ['.']
-        self.data = {}
-        
-        # Set style for better-looking plots
-        plt.style.use('seaborn')
-        sns.set_palette("husl")
-        
-    def find_report_files(self):
-        """Find all report files in the specified base folders."""
-        report_files = {}
-        
-        for engine in self.engines:
-            for base_folder in self.base_folders:
-                file_path = Path(base_folder) / f'report_{engine}.csv'
-                if file_path.exists():
-                    report_files[engine] = str(file_path)
-                    break  # Use the first found file for each engine
-                    
-        return report_files
-    
-    def load_data(self):
-        """Load data from all available report files."""
-        report_files = self.find_report_files()
-        
-        for engine, file_path in report_files.items():
-            try:
-                df = pd.read_csv(file_path)
-                self.data[engine] = df
-                print(f"Loaded data for {engine} engine from {file_path}")
-                
-                # Print basic statistics
-                stats = {
-                    'mean': df['duration'].mean(),
-                    'min': df['duration'].min(),
-                    'max': df['duration'].max(),
-                    'std': df['duration'].std()
-                }
-                print(f"Statistics for {engine}:")
-                for stat_name, value in stats.items():
-                    print(f"  {stat_name}: {value:.4f}")
-                print()
-                
-            except Exception as e:
-                print(f"Error loading data for {engine}: {str(e)}")
-    
-    def plot_performance(self, save_path=None, figsize=(12, 8)):
-        """
-        Create a performance comparison plot.
-        
-        Args:
-            save_path (str, optional): Path to save the plot image
-            figsize (tuple): Figure size in inches (width, height)
-        """
-        if not self.data:
-            print("No data loaded. Please run load_data() first.")
-            return
-            
-        plt.figure(figsize=figsize)
-        
-        # Plot each engine's data
-        for engine, df in self.data.items():
-            plt.plot(df['search_area'], df['duration'], 
-                    label=f'{engine.upper()}',
-                    alpha=0.8, linewidth=2)
-            
-        plt.xlabel('Search Area Size', fontsize=12)
-        plt.ylabel('Execution Time (seconds)', fontsize=12)
-        plt.title('Performance Comparison Across Different Engines', fontsize=14, pad=20)
-        
-        # Add grid
-        plt.grid(True, linestyle='--', alpha=0.7)
-        
-        # Add legend
-        plt.legend(fontsize=10, bbox_to_anchor=(1.05, 1), loc='upper left')
-        
-        # Adjust layout to prevent label cutoff
-        plt.tight_layout()
-        
-        if save_path:
-            plt.savefig(save_path, dpi=300, bbox_inches='tight')
-            print(f"Plot saved to {save_path}")
-        
-        plt.show()
-    
-    def plot_performance_with_statistics(self, save_path=None, figsize=(15, 10)):
-        """
-        Create a more detailed performance plot with statistical information.
-        
-        Args:
-            save_path (str, optional): Path to save the plot image
-            figsize (tuple): Figure size in inches (width, height)
-        """
-        if not self.data:
-            print("No data loaded. Please run load_data() first.")
-            return
-            
-        # Create figure with subplots
-        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=figsize, height_ratios=[3, 1])
-        
-        # Plot performance lines
-        for engine, df in self.data.items():
-            ax1.plot(df['search_area'], df['duration'], 
-                    label=f'{engine.upper()} Engine',
-                    alpha=0.8, linewidth=2)
-        
-        ax1.set_xlabel('Search Area Size')
-        ax1.set_ylabel('Execution Time (seconds)')
-        ax1.set_title('Performance Comparison Across Different Engines', pad=20)
-        ax1.grid(True, linestyle='--', alpha=0.7)
-        ax1.legend(fontsize=10)
-        
-        # Create statistics table
-        stats_data = []
-        columns = ['Engine', 'Mean (s)', 'Min (s)', 'Max (s)', 'Std Dev']
-        
-        for engine, df in self.data.items():
-            stats = [
-                engine.upper(),
-                f"{df['duration'].mean():.4f}",
-                f"{df['duration'].min():.4f}",
-                f"{df['duration'].max():.4f}",
-                f"{df['duration'].std():.4f}"
-            ]
-            stats_data.append(stats)
-        
-        # Turn off axis for statistics table
-        ax2.axis('tight')
-        ax2.axis('off')
-        
-        # Create table
-        table = ax2.table(cellText=stats_data,
-                         colLabels=columns,
-                         loc='center',
-                         cellLoc='center',
-                         colColours=['#f2f2f2']*len(columns))
-        
-        # Style the table
-        table.auto_set_font_size(False)
-        table.set_fontsize(9)
-        table.scale(1.2, 1.5)
-        
-        # Adjust layout
-        plt.tight_layout()
-        
-        if save_path:
-            plt.savefig(save_path, dpi=300, bbox_inches='tight')
-            print(f"Plot saved to {save_path}")
-        
-        plt.show()
+def get_device_id_by_pci_bus_id(target_pci_id: str) -> Optional[int]:
+    """Get CUDA device ID from PCI bus ID."""
+    cuda.init()
+    for i in range(cuda.Device.count()):
+        device = cuda.Device(i)
+        # Strip leading zeros and domain for comparison
+        device_pci = device.pci_bus_id().replace('0000:', '')
+        target_pci = target_pci_id.replace('00000000:', '')
+        if device_pci == target_pci:
+            return i
+    return None
 
-# Example usage
+def get_docker_gpu_pci_id(device_index: int) -> Optional[str]:
+    """Get GPU PCI ID from Docker device index."""
+    try:
+        # Get GPU info in JSON format
+        result = subprocess.run(['nvidia-smi', '-L'], capture_output=True, text=True)
+        if result.returncode != 0:
+            raise Exception("Failed to run nvidia-smi")
+            
+        lines = result.stdout.strip().split('\n')
+        if device_index >= len(lines):
+            raise Exception(f"GPU index {device_index} is out of range. Only {len(lines)} GPUs found.")
+            
+        # Just extract the device name from the line
+        device_name = lines[device_index].split(':')[1].split('(')[0].strip()
+        return device_name
+        
+    except Exception as e:
+        print(f"Error getting GPU info: {str(e)}")
+        return None
+
+def load_config() -> dict:
+    """Load and return configuration from config.json."""
+    with open('config.json', 'r') as f:
+        return json.load(f)
+
+def print_device_info(device_type: str, config: dict) -> None:
+    """Print information about the selected device."""
+    if device_type == 'gpu':
+        docker_device_id = config['gpu_tests']['device_id']
+        device_name = get_docker_gpu_pci_id(docker_device_id)
+        if device_name is None:
+            print(f"Error: Could not determine GPU name for Docker device {docker_device_id}")
+            sys.exit(1)
+        
+        docker_image = config['gpu_tests']['docker_image']
+        architecture = docker_image.split('sm_')[-1] if 'sm_' in docker_image else 'unknown'
+        
+        print(f"\nSelected GPU Information:")
+        print(f"Device ID: {docker_device_id}")
+        print(f"Device Name: {device_name}")
+        print(f"Architecture: sm_{architecture}")
+    else:
+        print(f"\nCPU Information:")
+        print(f"Docker Image: {config['cpu_tests']['docker_image']}")
+
+def load_performance_data(results_path: Path) -> Tuple[List[float], List[float], int]:
+    """Load and process performance data from CSV file."""
+    search_areas = []
+    durations = []
+    failed_tests = 0
+
+    with open(results_path, 'r') as file:
+        reader = csv.reader(file)
+        next(reader)  # Skip header
+        for row in reader:
+            search_area = float(row[6])
+            if search_area == 0:
+                continue
+            if row[4].lower() == 'false':
+                failed_tests += 1
+            durations.append(float(row[3]))    
+            search_areas.append(search_area)
+
+    return search_areas, durations, failed_tests
+
+def fit_linear_model(search_areas: List[float], durations: List[float]) -> Tuple[LinearRegression, float]:
+    """Fit linear regression model to the data."""
+    x = np.array(search_areas).reshape(-1, 1)
+    y = np.array(durations)
+    
+    model = LinearRegression()
+    model.fit(x, y)
+    r2_score = model.score(x, y)
+    
+    return model, r2_score
+
+def plot_results(search_areas: List[float], durations: List[float], 
+                model: LinearRegression, r2_score: float) -> None:
+    """Generate and display the results plot."""
+    x = np.array(search_areas).reshape(-1, 1)
+    y_pred = model.predict(x)
+    
+    plt.figure(figsize=(10, 6))
+    plt.scatter(x, durations, color='blue', label='Original points')
+    plt.plot(x, y_pred, color='red', 
+            label=f'Linear fit (y = {model.coef_[0]:.10f}x + {model.intercept_:.10f})')
+    plt.xlabel('Search Area')
+    plt.ylabel('Duration (seconds)')
+    plt.title(f'Linear Regression: Duration vs Search Area (R² = {r2_score:.4f})')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+def main() -> None:
+    """Main execution function."""
+    if len(sys.argv) != 2 or sys.argv[1] not in ['gpu', 'cpu']:
+        print("Usage: python fit_linear.py <device_type>")
+        print("device_type must be 'gpu' or 'cpu'")
+        sys.exit(1)
+
+    device_type = sys.argv[1]
+    results_dir = Path(f'{device_type}_results')
+    
+    # Combine results first
+    combined_df = combine_temp_results(device_type)
+    if combined_df is None:
+        print("Error: Failed to combine results")
+        sys.exit(1)
+    
+    config = load_config()
+    print_device_info(device_type, config)
+    
+    # Load and process data
+    search_areas, durations, failed_tests = load_performance_data(results_dir / "tmp_result.csv")
+    
+    if failed_tests > 0:
+        print(f"Warning: Dataset contains {failed_tests} failed test(s)")
+    else:
+        print("All tests were successful")
+    
+    # Fit model and calculate metrics
+    model, r2_score = fit_linear_model(search_areas, durations)
+    
+    # Print results
+    print("\nPerformance equation: time = penalty * search_area + bias")
+    print(f"where: penalty = {model.coef_[0]:.16f}")
+    print(f"       search_area: from {min(search_areas)} to {max(search_areas)}")
+    print(f"       bias = {model.intercept_:.16f}")
+    print(f"\nThe time for search_area = {max(search_areas)} is "
+          f"{model.coef_[0] * max(search_areas) + model.intercept_} seconds")
+    
+    # Plot results
+    plot_results(search_areas, durations, model, r2_score)
+    
+    print(f"Linear equation: time = {model.coef_[0]:.10f} * search_area + {model.intercept_:.10f}")
+    print(f"R-squared precision score: {r2_score:.10f}")
+
 if __name__ == "__main__":
-    # Initialize analyzer with folders
-    folders = ['./gpu_results', './cpu_results']
-    analyzer = PerformanceAnalyzer(folders)
-    
-    # Load and analyze data
-    analyzer.load_data()
-    
-    # Create basic performance plot
-    analyzer.plot_performance(save_path='performance_comparison.png')
-    
-    # Create detailed performance plot with statistics
-    analyzer.plot_performance_with_statistics(save_path='performance_comparison_detailed.png')
+    main()

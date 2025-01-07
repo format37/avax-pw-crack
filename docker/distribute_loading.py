@@ -2,25 +2,10 @@ import json
 from pathlib import Path
 import numpy as np
 import pandas as pd
-
-def id_to_word(alphabet, n):
-    """Convert numeric ID to word using given alphabet"""
-    base = len(alphabet)
-    result = []
-    n += 1  # Adjust for 1-based indexing
-    while n > 0:
-        n -= 1  # Adjust for 0-based indexing
-        result.append(alphabet[n % base])
-        n //= base
-    return ''.join(reversed(result))
-
-def word_to_id(alphabet, word):
-    """Convert word to numeric ID using given alphabet"""
-    base = len(alphabet)
-    id = 0
-    for char in word:
-        id = id * base + alphabet.index(char)
-    return id
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from p_chain_tools import id_to_word, word_to_id
 
 def calculate_device_ranges(config_path, penalties_file):
     """Calculate device ranges based on performance penalties and configuration"""

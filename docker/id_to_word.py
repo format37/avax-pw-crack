@@ -1,17 +1,10 @@
 #!/usr/bin/env python3
 import json
 import argparse
-
-def id_to_word(alphabet, n):
-    """Convert numeric ID to word using given alphabet"""
-    base = len(alphabet)
-    result = []
-    n += 1  # Adjust for 1-based indexing
-    while n > 0:
-        n -= 1  # Adjust for 0-based indexing
-        result.append(alphabet[n % base])
-        n //= base
-    return ''.join(reversed(result))
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from p_chain_tools import id_to_word
 
 def main():
     # Set up argument parser

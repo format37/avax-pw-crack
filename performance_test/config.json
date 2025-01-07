@@ -3,9 +3,10 @@
             "alphabet": "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 !@#$%^&*()-_=+[]{};:'\",.<>?/\\|~",
             "mnemonic": "sell stereo useless course suffer tribe jazz monster fresh excess wire again father film sudden pelican always room attack rubber pelican trash alone cancel",
             "start": 0,
-            "end": 60000001,
-            "step": 5000000
+            "end": 100000001,
+            "step": 10000000
     },
+    "p_chain_export": 0,
     "cpu_tests": {
         "docker_image": "avax:cpu",
         "output_dir": "./cpu_results"
