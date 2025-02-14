@@ -29,6 +29,8 @@ For the single 4090 GPU the Penalty is 0.0000142600841297 which means that it ca
   
 The alphabet has 94 symbols max.  
 The ledger's 25th word is 100 symbols max.  
+
+The Penalty of the single CPU is 0.0522797826 so 4090 GPU can do this job ~3666 times faster.
   
 The performance evaluation for your device can be performed in the (performance_test)[https://github.com/format37/avax-pw-crack/tree/main/performance_test] folder.
   
